@@ -207,3 +207,101 @@ main:focus,main h1[tabindex="-1"]:focus,main h2[tabindex="-1"]:focus{outline:non
 }
 @media(max-width:350px){.sidebar .nav-primary .nav-item,.lab-mode .sidebar .nav-primary .nav-item{font-size:12px;gap:3px}.sidebar,.lab-mode .sidebar{padding-left:6px;padding-right:6px;grid-template-columns:minmax(0,1fr) 54px}.nav-more{font-size:12px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* One current task leads the learning homepage; course navigation stays secondary. */
+:root{--focus-surface:var(--nav);--focus-muted:#d4dff0;--focus-line:#ffffff30}
+.sidebar{background:var(--surface);color:#52647b;border-right:1px solid var(--line)}
+.brand{color:var(--ink)}
+.brand-mark{color:var(--surface)}
+.brand small,.nav-label,.course-mini small,.semester{color:var(--muted)}
+.course-mini{border-color:var(--line)}
+.course-mini p{color:var(--ink)}
+.nav-item:hover{background:var(--canvas);color:var(--ink)}
+.nav-item.active{background:var(--blue-soft);color:var(--blue)}
+.sidebar .nav-item:focus-visible,.sidebar .brand:focus-visible{outline-color:#1745ad}
+.teacher-grid>section{min-width:0}
+.home-mode .main{max-width:1440px;padding-top:28px}
+.focus-home .map-intro{margin-bottom:22px}
+.focus-home .map-intro h1{font-size:23px;font-weight:600}
+.learning-overview{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:30px;align-items:start;margin-bottom:34px}
+.learning-focus{min-width:0;padding:26px 30px 28px;background:var(--focus-surface);color:var(--surface);border-radius:var(--radius)}
+.focus-context{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:13px}
+.focus-context>span:first-child{display:flex;align-items:center;gap:8px;color:var(--focus-muted)}
+.focus-context .icon{width:18px;height:18px}
+.focus-status{border:1px solid var(--focus-line);padding:2px 9px;border-radius:4px;font-size:12px;white-space:nowrap}
+.focus-course{display:inline-flex;align-items:center;gap:5px;font-size:14px;line-height:1.6;color:var(--focus-muted);margin-top:24px;min-height:28px}
+.focus-course .icon{width:13px;height:13px}
+.focus-course:hover,.focus-requirements:hover{color:white;text-decoration:underline}
+.learning-focus h2{font-size:32px;font-weight:650;line-height:1.4;margin:6px 0 8px;overflow-wrap:anywhere}
+.focus-description{font-size:15px;line-height:1.6;color:var(--focus-muted);margin:0}
+.focus-deadline{display:flex;align-items:center;gap:7px;font-size:13px;line-height:1.6;color:var(--focus-muted);margin:14px 0 0}
+.focus-deadline .icon{width:15px;height:15px}
+.focus-deadline.is-overdue{color:#ffd39d}
+.focus-action{margin-top:24px;padding-top:22px;border-top:1px solid var(--focus-line);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.focus-action>div{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.focus-action .button{background:var(--surface);color:var(--blue);min-height:46px;padding:10px 22px;font-size:15px;font-weight:650}
+.focus-action .button:hover{background:var(--blue-soft)}
+.focus-requirements{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-size:13px;color:var(--focus-muted)}
+.focus-requirements .icon{width:13px;height:13px}
+.focus-resume{font-size:12px;line-height:1.7;color:var(--focus-muted)}
+.focus-resume>span{display:block}
+.focus-resume code{font:12px Consolas,monospace}
+.learning-focus a:focus-visible{outline-color:#b7ccff;outline-offset:4px}
+.learning-aside{min-width:0;padding-top:3px}
+.next-tasks header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.next-tasks h2{font-size:17px;font-weight:600;margin:0}
+.next-tasks h2>span{font-size:12px;font-weight:400;color:var(--muted);margin-left:5px}
+.next-tasks header>a{display:inline-flex;align-items:center;gap:4px;min-height:32px;font-size:12px;color:#52647b}
+.next-tasks header>a .icon{width:13px;height:13px}
+.next-task{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);min-height:94px}
+.next-task-icon{display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);border-radius:7px;min-width:34px;height:38px;color:#52647b}
+.next-task-icon .icon{width:17px;height:17px}
+.next-task>div{flex:1;min-width:0}
+.next-task h3{font-size:15px;font-weight:600;margin:0 0 1px;line-height:1.6}
+.next-task p{font-size:12px;color:#52647b;line-height:1.6;margin:0 0 4px}
+.next-task small{font-size:12px;line-height:1.6}
+.next-task>.icon,.learning-feedback>.icon{width:14px;height:14px;color:var(--muted);align-self:center}
+.next-task:hover h3,.learning-feedback:hover h3{color:var(--blue)}
+.aside-empty{font-size:14px;line-height:1.7;color:#52647b;margin:14px 0}
+.learning-feedback{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:13px 14px;margin-top:18px}
+.feedback-icon{display:grid;place-items:center;color:var(--green)}
+.feedback-icon .icon{width:21px;height:21px}
+.learning-feedback>div{flex:1;min-width:0}
+.learning-feedback div>span{font-size:11px;color:var(--green)}
+.learning-feedback h3{font-size:14px;font-weight:600;line-height:1.6;margin:1px 0}
+.learning-feedback p{font-size:12px;line-height:1.6;color:#52647b;margin:0}
+.home-courses .map-section-heading{margin-bottom:14px}
+.home-courses .map-section-heading h2{font-size:18px}
+.home-courses .map-section-heading>a{display:inline-flex;align-items:center;gap:4px;min-height:32px;font-size:13px;color:#52647b}
+.home-courses .map-section-heading>a .icon{width:13px;height:13px}
+.home-courses .map-section-heading>a:hover,.next-tasks header>a:hover{color:var(--blue)}
+.home-course-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.home-course{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:18px 20px 16px;--course-color:var(--course-web);display:flex;flex-direction:column}
+.home-course.map-db{--course-color:var(--course-db)}
+.home-course.map-design{--course-color:var(--course-design)}
+.home-course-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#52647b}
+.home-course .course-mark{font:700 11px Consolas,monospace;color:var(--course-color);letter-spacing:.04em}
+.home-course h3{font-size:18px;font-weight:600;line-height:1.5;margin:12px 0 6px}
+.home-course h3 a{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:30px}
+.home-course h3 .icon{width:14px;height:14px;color:var(--muted)}
+.home-course h3 a:hover{color:var(--blue)}
+.home-course-chapter{font-size:13px;line-height:1.7;color:#52647b;margin:0 0 18px}
+.home-course .map-progress{padding:0;margin-top:auto;gap:7px;flex-wrap:wrap;font-size:11px}
+.home-course .map-progress>span:first-child{display:none}
+.home-course .map-progress .progress-track{max-width:none;min-width:40px;flex:1}
+.home-course .map-progress strong{margin-left:3px}
+.home-notice{display:flex;align-items:center;gap:14px;margin-top:24px;padding:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:13px;color:#52647b}
+.home-notice>span{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px}
+.home-notice>span .icon{width:16px;height:16px}
+.home-notice>a{display:inline-flex;align-items:center;gap:6px;min-height:28px;color:var(--ink)}
+.home-notice>a:hover{color:var(--blue)}
+.home-notice>a .icon{width:13px;height:13px;color:var(--muted)}
+.home-notice>small{font-size:12px;margin-left:auto;white-space:nowrap}
+.focus-home .map-bottom{border:0;margin-top:0;padding-top:12px}
+.focus-home .map-join{color:#52647b;font-size:13px}
+.focus-home .map-join:hover{color:var(--blue)}
+@media(max-width:1200px){.learning-overview{grid-template-columns:minmax(0,1fr) 280px;gap:24px}.learning-focus{padding:24px}.home-course{padding:17px 16px}.home-course-grid{gap:14px}.home-course h3{font-size:17px}}
+@media(max-width:1000px){.learning-overview{grid-template-columns:minmax(0,1fr)}.learning-aside{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}.learning-feedback{margin-top:0;align-self:start}.home-course-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.focus-resume>span{display:inline;margin-left:10px}.home-notice{flex-wrap:wrap;gap:6px 14px}.home-notice>small{margin-left:0}}
+@media(max-width:650px){.home-mode .main{padding-top:76px}.focus-home .map-intro{margin-bottom:16px}.focus-home .map-intro h1{font-size:21px}.focus-home .map-intro>span{font-size:11px}.learning-overview{gap:24px;margin-bottom:28px}.learning-focus{padding:20px}.focus-context{font-size:12px;gap:8px}.focus-context .icon{width:16px;height:16px}.focus-status{font-size:11px}.focus-course{font-size:12px;margin-top:18px;min-height:28px}.learning-focus h2{font-size:27px;margin-top:3px}.focus-description{font-size:14px}.focus-deadline{font-size:12px;margin-top:10px}.focus-action{margin-top:18px;padding-top:18px;gap:10px;align-items:flex-start;flex-direction:column}.focus-action>div{gap:16px;width:100%}.focus-action .button{min-height:46px;padding:10px 20px;font-size:14px}.focus-requirements{font-size:12px}.focus-resume{font-size:11px}.focus-resume code{font-size:11px}.learning-aside{display:block;padding:0}.next-tasks h2{font-size:16px}.next-tasks header>a{min-height:44px}.next-task{min-height:88px;padding:12px 0}.learning-feedback{margin-top:16px;min-height:88px}.home-course-grid{grid-template-columns:1fr;gap:12px}.home-course{padding:16px 18px}.home-course h3{font-size:17px;margin-top:8px}.home-course-chapter{margin-bottom:14px}.home-course .map-progress .progress-track{max-width:190px}.home-courses .map-section-heading>a{min-height:44px;font-size:12px}.home-courses .map-section-heading h2{font-size:17px}.home-notice{display:grid;grid-template-columns:1fr;margin-top:20px;padding:16px 0;gap:5px}.home-notice>a{font-size:13px;min-height:36px}.home-notice>small{font-size:11px}.focus-home .map-bottom{gap:4px;padding-top:6px}.sidebar .nav-item:focus-visible{outline-offset:-3px}}
+@media(max-width:350px){.learning-focus{padding:18px}.focus-context>span:first-child{gap:5px}.focus-context{font-size:11px}.learning-focus h2{font-size:25px}.focus-action>div{gap:10px}.focus-action .button{padding:10px 16px}.focus-course{font-size:11px}}
+@media(max-width:650px){.home-course h3 a{min-height:44px}}
