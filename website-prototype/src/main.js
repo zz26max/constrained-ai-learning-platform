@@ -2,7 +2,7 @@ const paths={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><p
 const icon=(name)=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]||paths.file}</svg>`;
 let toastTimer;
 function notice(message='此处为视觉原型，暂未接入实际功能。'){const el=document.getElementById('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500)}
-const button=(label,route,secondary=false,ic='arrow')=>`<a class="button ${secondary?'secondary':''}" href="#${route}">${label}${icon(ic)}</a>`;
+const button=(label,route,secondary=false,ic='arrow',ariaLabel='')=>`<a class="button ${secondary?'secondary':''}" href="#${route}"${ariaLabel?` aria-label="${ariaLabel}"`:''}>${label}${icon(ic)}</a>`;
 const mockButton=(label,ic='arrow',secondary=false)=>`<button class="button ${secondary?'secondary':''}" data-demo>${label}${icon(ic)}</button>`;
 const link=(label,route)=>`<a class="text-link" href="#${route}">${label}${icon('chevron')}</a>`;
 const navs=[['home','home','学习首页'],['course','book','我的课程'],['assignments','file','作业任务'],['progress','chart','学习记录'],['messages','bell','消息中心']];

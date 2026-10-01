@@ -25,11 +25,28 @@ const learningUI = (() => {
   const overdue = t => !t.done && t.due < sampleDate;
   const deadline = t => t.done ? '已完成' : overdue(t) ? `已逾期 · ${dateLabel(t.due)}截止` : `${dateLabel(t.due)}截止`;
   const stateView = (title, text, actions, error = false) => `<section class="empty-state ${error ? 'state-error' : ''}" ${error ? 'role="alert"' : ''}>${icon(error ? 'refresh' : 'book')}<h2>${title}</h2><p>${text}</p><div class="state-actions">${actions}</div></section>`;
-  const joinButton = () => `<button class="map-join" data-join>${icon('plus')}${joined.size ? '加入其他课程' : '加入课程'} <span>输入课程邀请码</span>${icon('chevron')}</button>`;
+  const joinButton = (compact = false) => compact ? `<button class="button secondary catalog-join" data-join>${icon('plus')}加入课程</button>` : `<button class="map-join" data-join>${icon('plus')}${joined.size ? '加入其他课程' : '加入课程'} <span>输入课程邀请码</span>${icon('chevron')}</button>`;
   const progress = c => `<div class="map-progress"><span>${c.unit}进度</span><div class="progress-track" role="progressbar" aria-label="${c.title}${c.unit}进度" aria-valuenow="${c.percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${c.percent}%"></span></div><span>${c.completed} / ${c.total} 个${c.unit} <strong>${c.percent}%</strong></span></div>`;
-  function card(c) {
-    const task = pending().find(t => t.course === c.id);
-    return `<section class="map-course map-${c.id}" aria-labelledby="course-${c.id}"><header class="map-course-info"><div class="map-course-meta"><span class="course-mark">${c.mark}${c.recent ? '<span>最近学习</span>' : ''}</span><span class="tag ${c.completed ? 'blue' : 'gray'}">${c.completed ? '学习中' : '待开始'}</span></div><h2 id="course-${c.id}"><a href="#course/${c.id}">${c.title}${icon('chevron')}</a></h2><p>${c.group} · ${c.teacher}</p></header><div class="map-chapter"><span>当前章节</span><a href="#course/${c.id}">第 ${c.chapter} 章 · ${c.chapterTitle}${icon('chevron')}</a></div>${task ? `<div class="map-practice"><div><span class="map-step">${c.recent ? '继续上次实验' : '待完成作业'} · ${task.state}</span><h3>${task.title}</h3>${c.recent ? '<p>上次编辑 style.css · 约 20 分钟</p>' : ''}<small class="${overdue(task) ? 'deadline-overdue' : ''}">${deadline(task)}</small></div>${button(c.recent ? '继续实验' : '查看作业', task.route, !c.recent)}</div>` : `<div class="map-course-entry">${button('查看课程', `course/${c.id}`, true)}</div>`}${progress(c)}${c.id === 'web' && feedbackCount() ? `<a class="map-feedback" href="#progress"><span>${icon('file')}个人介绍页 · 新反馈</span><span>查看反馈${icon('chevron')}</span></a>` : ''}</section>`;
+  function catalogCourse(c) {
+    const related = pending().filter(t => t.course === c.id), task = related[0];
+    const taskAction = task?.route === 'lab' ? '继续实验' : '查看作业';
+    const feedback = c.id === 'web' ? feedbackCount() : 0;
+    return `<li><section class="catalog-course" data-course="${c.id}" aria-labelledby="catalog-course-${c.id}">
+      <div class="catalog-course-main">
+        <div class="catalog-identity">
+          <div class="catalog-course-meta"><span class="course-mark">${c.mark}</span>${c.recent ? '<span class="catalog-recent">最近学习</span>' : !c.completed ? '<span>待开始</span>' : ''}</div>
+          <h2 id="catalog-course-${c.id}"><a href="#course/${c.id}">${c.title}</a></h2>
+          <p>${c.group} · ${c.teacher}</p>
+        </div>
+        <div class="catalog-learning"><span class="catalog-label">当前章节</span><p>第 ${c.chapter} 章 · ${c.chapterTitle}</p>${progress(c)}</div>
+        <div class="catalog-entry">${button('进入课程', `course/${c.id}`, true, 'arrow', `进入课程：${c.title}`)}</div>
+      </div>
+      <div class="catalog-activity">
+        <span class="catalog-task-count">${icon('file')}${related.length ? `${related.length} 项待办` : '暂无待办'}</span>
+        ${task ? `<a class="catalog-task" href="#${task.route}" aria-label="${taskAction}：${task.title}">${taskAction}<span class="catalog-task-name"> · ${task.title}</span>${icon('chevron')}</a><span class="catalog-deadline ${overdue(task) ? 'deadline-overdue' : ''}">${deadline(task)}</span>` : ''}
+        ${feedback ? `<a class="catalog-feedback" href="#progress" aria-label="查看${c.title}的${feedback}条新反馈">${icon('file')}${feedback} 条新反馈${icon('chevron')}</a>` : ''}
+      </div>
+    </section></li>`;
   }
   function currentLearning(c, task) {
     const isLab = task?.route === 'lab';
@@ -53,7 +70,12 @@ const learningUI = (() => {
     const current = next ? list.find(c => c.id === next.course) : list.find(c => c.recent) || list[0];
     return `<div class="course-map-home focus-home">${intro}${current ? `<div class="learning-overview">${currentLearning(current, next)}${learningAside(next)}</div><section class="home-courses" aria-labelledby="home-courses-title"><div class="map-section-heading"><h2 id="home-courses-title">我的课程 <span>${list.length} 门</span></h2><a href="#course">查看全部课程${icon('chevron')}</a></div><div class="home-course-grid">${list.map(homeCourse).join('')}</div></section>${homeNotice()}` : stateView('尚未加入课程', '使用教师提供的邀请码加入课程，随后查看章节、任务和反馈。', joinButton())}<footer class="map-bottom">${list.length ? joinButton() : '<span>加入课程后，学习任务会显示在这里。</span>'}<span>视觉原型 · 示例日期 ${sampleDate}</span></footer></div>`;
   }
-  function catalog() { return `${heading('我的课程', '选择课程，查看章节、作业和学习资料', joinButton())}${loadFailed ? stateView('课程暂时无法加载', '请重新加载课程列表，或查看使用帮助。', '<button class="button" data-retry>重新加载</button>', true) : available().length ? `<div class="catalog-grid course-map-home">${available().map(card).join('')}</div>` : stateView('尚未加入课程', '输入课程邀请码，开始本学期的学习。', joinButton())}`; }
+  function catalog() {
+    const list = available();
+    const header = `<header class="catalog-heading"><h1>我的课程</h1>${joinButton(true)}<p>2026 秋季学期 · ${loadFailed ? '课程信息暂不可用' : `已加入 ${list.length} 门课程`}</p></header>`;
+    const content = loadFailed ? stateView('课程暂时无法加载', '请重新加载课程列表，或查看使用帮助。', '<button class="button" data-retry>重新加载</button>', true) : list.length ? `<ul class="catalog-list" aria-label="已加入的课程">${list.map(catalogCourse).join('')}</ul>` : stateView('尚未加入课程', '输入课程邀请码，开始本学期的学习。', joinButton());
+    return `<div class="catalog-page">${header}${content}<p class="catalog-note">视觉原型 · 示例日期 ${sampleDate}</p></div>`;
+  }
   function course(id, webPage) {
     const c = Object.hasOwn(courses, id) ? courses[id] : null;
     if (!c) return stateView('找不到这门课程', '请从课程列表重新选择。', button('返回我的课程', 'course'));
