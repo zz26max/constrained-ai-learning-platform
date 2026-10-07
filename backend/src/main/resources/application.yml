@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: learning-platform-backend
+  profiles:
+    # 本轮只实现 API 进程；后续独立 worker 的配置随后台任务功能加入。
+    default: api
+  jackson:
+    deserialization:
+      # 请求 DTO 未声明的字段必须拒绝，避免拼写错误或越界字段被悄悄忽略。
+      fail-on-unknown-properties: true
+  datasource:
+    # 真实账号由终端、IDE 或本地启动脚本注入；仓库中不写数据库密码。
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      pool-name: learning-platform-pool
+      maximum-pool-size: 5
+      minimum-idle: 1
+      # 获取连接和验证均有限等待，避免数据库失效时健康检查长时间挂住。
+      connection-timeout: 2000
+      validation-timeout: 1000
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      # DATETIME 不自动换时区；每条新连接均明确采用 UTC。
+      connection-init-sql: SET time_zone = '+00:00'
+      data-source-properties:
+        connectionTimeZone: UTC
+        forceConnectionTimeZoneToSession: true
+        connectTimeout: 2000
+        socketTimeout: 3000
+  flyway:
+    locations: classpath:db/migration
+    # 保留启动校验；迁移错误或数据库初始不可用时，不带着错误表结构启动。
+    validate-on-migrate: true
+    clean-disabled: true
+  sql:
+    init:
+      # 表结构只交给 Flyway，避免再混入 schema.sql 等另一套初始化流程。
+      mode: never

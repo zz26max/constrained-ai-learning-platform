@@ -1,0 +1,8 @@
+server:
+  # 本地仅监听回环地址；部署时由环境变量设置监听地址与端口。
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  error:
+    # 未预期异常不向 HTTP 调用者暴露内部异常消息或堆栈。
+    include-message: never
+    include-stacktrace: never

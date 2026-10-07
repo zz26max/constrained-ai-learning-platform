@@ -1,0 +1,30 @@
+# 只供本地开发。项目账号由官方镜像创建，仅获得 learning_platform 库的权限。
+name: learning-platform-dev
+services:
+  db:
+    # 与集成测试使用相同的固定补丁版本，避免测试与开发数据库版本漂移。
+    image: mysql:8.4.11
+    ports:
+      - "127.0.0.1:3307:3306"
+    environment:
+      MYSQL_DATABASE: learning_platform
+      MYSQL_USER: ${DB_USERNAME:?请配置 DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?请配置 DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请配置 MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --transaction-isolation=READ-COMMITTED
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # 使用项目账号执行查询，检查库与账号就绪；密码取容器环境变量且不打印。
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$MYSQL_USER\" -D\"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+volumes:
+  # 普通停止保留数据；不要在日常启动过程中删除此卷。
+  mysql-data:

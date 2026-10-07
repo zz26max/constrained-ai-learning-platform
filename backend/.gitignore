@@ -1,0 +1,14 @@
+# Maven 编译结果、测试报告与本地运行日志不进入版本库。
+target/
+*.log
+
+# IDEA 配置留在每位开发者本地；构建依据由 pom.xml 与 Maven Wrapper 维护。
+.idea/
+*.iml
+
+# 后续数据库账号与密钥放在本地配置中，只提交不含真实值的示例。
+.env
+.env.*
+!.env.example
+
+# Maven Wrapper 的脚本和版本配置必须提交，不能忽略 .mvn/。
