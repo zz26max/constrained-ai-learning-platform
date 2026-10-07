@@ -1,0 +1,114 @@
+/* Learning records: feedback leads to a relevant action before the evidence list. */
+.records-page .records-overview{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 0 22px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.records-page .records-counts{display:flex;gap:36px;margin:0;flex-shrink:0}
+.records-page .records-counts>div{display:flex;flex-direction:column;gap:2px}
+.records-page .records-counts dt{font-size:13px;line-height:1.6;color:var(--muted)}
+.records-page .records-counts dd{order:-1;font-size:25px;font-weight:600;line-height:1.3;margin:0;font-variant-numeric:tabular-nums}
+.records-page .records-overview>p{max-width:310px;font-size:12px;line-height:1.7;color:var(--muted);margin:0}
+.records-page .records-feedback-group{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-bottom:28px}
+.records-page .records-feedback,.records-page .records-next{padding:22px 26px;min-width:0}
+.records-page .records-next{border-left:1px solid var(--line)}
+.records-page .records-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.records-page h2{font-size:17px;font-weight:600;line-height:1.5;margin:0}
+.records-page .records-section-heading>span:not(.tag){font-size:12px;color:var(--muted)}
+.records-page .records-feedback h3{font-size:20px;font-weight:600;line-height:1.5;margin:0 0 7px;overflow-wrap:anywhere}
+.records-page .records-feedback>p{font-size:14px;line-height:1.8;margin:0;color:var(--ink);max-width:620px;overflow-wrap:anywhere}
+.records-page .records-feedback-source{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin-top:16px}
+.records-page .records-feedback-source .icon{width:15px;height:15px;color:var(--blue-text)}
+.records-page .records-next h3{font-size:16px;font-weight:600;line-height:1.6;margin:16px 0 5px;overflow-wrap:anywhere}
+.records-page .records-next>p{font-size:14px;line-height:1.8;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.records-page .records-next code{font:13px Consolas,monospace;color:var(--ink);white-space:nowrap}
+.records-page .records-next-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:15px}
+.records-page .records-next-action .button{min-height:44px}
+.records-page .records-next-action>span{font-size:12px;color:var(--muted);line-height:1.7}
+.records-page .records-evidence-columns,.records-page .records-evidence-list>li{display:grid;grid-template-columns:160px 100px minmax(0,1fr);gap:20px;padding:16px 26px}
+.records-page .records-evidence-columns{font-size:12px;line-height:1.6;color:var(--muted);padding-top:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.records-page .records-evidence-list{list-style:none;padding:0;margin:0}
+.records-page .records-evidence-list>li+li{border-top:1px solid var(--line)}
+.records-page .records-evidence-list h3{font-size:15px;font-weight:600;line-height:1.65;margin:0;overflow-wrap:anywhere}
+.records-page .records-evidence-state{padding-top:1px}
+.records-page .records-evidence-detail{min-width:0}
+.records-page .records-evidence-detail p{font-size:14px;line-height:1.65;margin:0 0 4px;overflow-wrap:anywhere}
+.records-page .records-evidence-detail small{font-size:12px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere}
+.records-page .records-empty h2{font-size:20px}
+
+/* Messages: stable content, source, date and status columns within one surface. */
+.messages-page .messages-summary{display:flex;align-items:center;gap:16px;font-size:13px;line-height:1.65;color:var(--muted);margin:-5px 0 16px}
+.messages-page .messages-unread-count{color:var(--blue-text);padding-left:16px;border-left:1px solid var(--line)}
+.messages-page .messages-columns{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px 72px;gap:24px;padding:12px 26px;font-size:12px;line-height:1.6;color:var(--muted);border-bottom:1px solid var(--line)}
+.messages-page .messages-columns>span:first-child{padding-left:40px}
+.messages-page .messages-columns>span:last-child{text-align:right}
+.messages-page .messages-list{list-style:none;margin:0;padding:0}
+.messages-page .messages-list>li+li{border-top:1px solid var(--line)}
+.messages-page .messages-row{display:grid;grid-template-columns:16px minmax(0,1fr) 96px 96px 72px;align-items:start;gap:24px;padding:22px 26px;min-width:0}
+.messages-page .messages-icon{padding-top:3px;color:var(--muted);display:flex}
+.messages-page .messages-icon .icon{width:17px;height:17px}
+.messages-page .messages-feedback .messages-icon{color:var(--blue-text)}
+.messages-page .messages-content{min-width:0}
+.messages-page .messages-content h2{font-size:16px;font-weight:600;line-height:1.6;margin:0 0 3px;overflow-wrap:anywhere}
+.messages-page .messages-content p{font-size:13px;color:var(--muted);line-height:1.7;margin:0;overflow-wrap:anywhere}
+.messages-page .messages-meta{display:contents}
+.messages-page .messages-source,.messages-page .messages-meta>time{font-size:12px;line-height:1.7;color:var(--muted);padding-top:4px;white-space:nowrap}
+.messages-page .messages-status{padding-top:2px;text-align:right}
+.messages-page .messages-action{display:inline-flex;align-items:center;gap:3px;font-size:12px;line-height:1.7;color:var(--blue-text);margin-top:6px;min-height:24px}
+.messages-page .messages-action .icon{width:13px;height:13px}
+.messages-page .messages-feedback{min-height:44px;border-radius:0 0 var(--radius) var(--radius)}
+.messages-page .messages-feedback:hover{background:var(--canvas)}
+.messages-page .messages-feedback:hover .messages-action{text-decoration:underline;color:var(--blue-hover)}
+.messages-page .messages-feedback:focus-visible{outline-color:var(--focus-ring);outline-offset:-4px}
+
+@media(max-width:1100px){
+ .records-page .records-counts{gap:26px}
+ .records-page .records-overview>p{max-width:240px}
+ .records-page .records-feedback,.records-page .records-next{padding:20px}
+ .records-page .records-evidence-columns,.records-page .records-evidence-list>li{grid-template-columns:135px 90px minmax(0,1fr);gap:16px;padding-left:20px;padding-right:20px}
+ .messages-page .messages-columns{grid-template-columns:minmax(0,1fr) 84px 84px 58px;gap:16px;padding-left:20px;padding-right:20px}
+ .messages-page .messages-columns>span:first-child{padding-left:32px}
+ .messages-page .messages-row{grid-template-columns:16px minmax(0,1fr) 84px 84px 58px;gap:16px;padding:20px}
+}
+@media(max-width:850px){
+ .records-page .records-overview{display:block;padding-bottom:18px}
+ .records-page .records-overview>p{max-width:none;margin-top:12px}
+ .records-page .records-feedback-group{grid-template-columns:minmax(0,1fr)}
+ .records-page .records-next{border-left:0;border-top:1px solid var(--line)}
+ .records-page .records-next h3{margin-top:10px}
+ .records-page .records-evidence-columns,.records-page .records-evidence-list>li{grid-template-columns:120px 86px minmax(0,1fr);gap:12px}
+ .messages-page .messages-columns{display:none}
+ .messages-page .messages-row{grid-template-columns:16px minmax(0,1fr);gap:6px 14px}
+ .messages-page .messages-icon{grid-column:1;grid-row:1/3}
+ .messages-page .messages-content{grid-column:2;grid-row:1}
+ .messages-page .messages-meta{display:flex;grid-column:2;grid-row:2;align-items:center;gap:8px 16px;flex-wrap:wrap}
+ .messages-page .messages-source,.messages-page .messages-meta>time,.messages-page .messages-status{padding-top:0}
+ .messages-page .messages-status{margin-left:auto}
+}
+@media(max-width:650px){
+ .records-page .records-overview{margin-bottom:18px;padding-bottom:16px}
+ .records-page .records-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+ .records-page .records-counts dd{font-size:23px}
+ .records-page .records-counts dt{font-size:12px}
+ .records-page .records-overview>p{font-size:12px;line-height:1.7;margin-top:10px}
+ .records-page .records-feedback-group{margin-bottom:24px}
+ .records-page .records-feedback,.records-page .records-next{padding:18px}
+ .records-page .records-section-heading{gap:6px;margin-bottom:12px}
+ .records-page h2{font-size:16px}
+ .records-page .records-feedback h3{font-size:18px}
+ .records-page .records-feedback>p,.records-page .records-next>p{font-size:14px;line-height:1.75}
+ .records-page .records-feedback-source{margin-top:12px}
+ .records-page .records-next h3{font-size:15px;margin-top:8px}
+ .records-page .records-next-action{gap:8px 12px;margin-top:12px}
+ .records-page .records-next-action .button{font-size:13px}
+ .records-page .records-evidence-columns{display:none}
+ .records-page .records-evidence-list>li{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:16px 18px}
+ .records-page .records-evidence-list h3{font-size:15px}
+ .records-page .records-evidence-state{padding-top:0}
+ .records-page .records-evidence-detail{grid-column:1/-1}
+ .records-page .records-evidence-detail p{font-size:13px}
+ .messages-page .messages-summary{font-size:12px;margin-top:0;margin-bottom:12px}
+ .messages-page .messages-row{grid-template-columns:16px minmax(0,1fr);gap:5px 10px;padding:18px}
+ .messages-page .messages-icon{grid-row:1/3}
+ .messages-page .messages-content{grid-column:2;grid-row:1}
+ .messages-page .messages-content h2{font-size:15px;margin-bottom:4px}
+ .messages-page .messages-content p{font-size:13px}
+ .messages-page .messages-meta{gap:6px 10px}
+ .messages-page .messages-action{min-height:28px;margin-top:3px}
+}

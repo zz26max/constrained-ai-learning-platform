@@ -26,7 +26,7 @@ const learningUI = (() => {
   const deadline = t => t.done ? '已完成' : overdue(t) ? `已逾期 · ${dateLabel(t.due)}截止` : `${dateLabel(t.due)}截止`;
   const stateView = (title, text, actions, error = false) => `<section class="empty-state ${error ? 'state-error' : ''}" ${error ? 'role="alert"' : ''}>${icon(error ? 'refresh' : 'book')}<h2>${title}</h2><p>${text}</p><div class="state-actions">${actions}</div></section>`;
   const joinButton = (compact = false) => compact ? `<button class="button secondary catalog-join" data-join>${icon('plus')}加入课程</button>` : `<button class="map-join" data-join>${icon('plus')}${joined.size ? '加入其他课程' : '加入课程'} <span>输入课程邀请码</span>${icon('chevron')}</button>`;
-  const progress = c => `<div class="map-progress"><span>${c.unit}进度</span><div class="progress-track" role="progressbar" aria-label="${c.title}${c.unit}进度" aria-valuenow="${c.percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${c.percent}%"></span></div><span>${c.completed} / ${c.total} 个${c.unit} <strong>${c.percent}%</strong></span></div>`;
+  const progress = (c, className = 'map-progress') => `<div class="${className}"><span>${c.unit}进度</span><div class="progress-track" role="progressbar" aria-label="${c.title}${c.unit}进度" aria-valuenow="${c.percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${c.percent}%"></span></div><span>${c.completed} / ${c.total} 个${c.unit} <strong>${c.percent}%</strong></span></div>`;
   function catalogCourse(c) {
     const related = pending().filter(t => t.course === c.id), task = related[0];
     const taskAction = task?.route === 'lab' ? '继续实验' : '查看作业';
@@ -77,22 +77,45 @@ const learningUI = (() => {
     return `<div class="catalog-page">${header}${content}<p class="catalog-note">视觉原型 · 示例日期 ${sampleDate}</p></div>`;
   }
   function course(id, webPage) {
+    if (loadFailed) return `<div class="workspace-page">${workspaceHeading('课程学习', '课程信息暂不可用', button('返回我的课程', 'course', true, 'back'))}${stateView('课程暂时无法加载', '请重新加载，随后查看章节与任务。', '<button class="button" data-retry>重新加载</button>', true)}</div>`;
     const c = Object.hasOwn(courses, id) ? courses[id] : null;
     if (!c) return stateView('找不到这门课程', '请从课程列表重新选择。', button('返回我的课程', 'course'));
     if (id === 'web') return webPage();
     const related = pending().filter(t => t.course === id);
-    return `${heading(c.title, `${c.group} · ${c.teacher} · 2026 秋季学期`, button('返回我的课程', 'course', true))}<section class="panel chapter-overview"><span class="tag blue">当前章节 · 第 ${c.chapter} 章</span><h2>${c.chapterTitle}</h2><p>查看本章学习资料，按任务要求完成实践。</p>${progress(c)}</section><section class="panel lesson-section"><h2 class="section-title">本章知识</h2><div class="course-resource-list">${c.resources.map(([title, text]) => `<details><summary>${title}</summary><p>${text}</p></details>`).join('')}</div></section><section class="section-space"><h2 class="section-title">课程作业</h2>${related.length ? related.map(t => `<article class="assignment panel"><div class="assignment-body"><span class="tag orange">${deadline(t)}</span><h2>${t.title}</h2><p>${t.description}</p></div>${button('查看要求', `task/${t.id}`)}</article>`).join('') : stateView('暂无待办作业', '可以先阅读本章资料，后续任务以教师安排为准。', '')}</section>`;
+    return courseUI.other(c, id, related);
   }
   function taskPage(id) {
+    if (loadFailed) return `<div class="workspace-page">${workspaceHeading('作业任务', '任务信息暂不可用', button('返回作业任务', 'assignments', true, 'back'))}${stateView('作业暂时无法加载', '请重试，随后查看任务要求与期限。', '<button class="button" data-retry>重新加载</button>', true)}</div>`;
     const t = allTasks().find(t => t.id === id);
     if (!t) return stateView('找不到这项任务', '请返回作业列表重新选择。', button('返回作业任务', 'assignments'));
     const c = courses[t.course];
     const requirements = { nav: ['完成桌面与窄屏导航布局。', '检查菜单间距、换行和溢出情况。', '解释一项关键布局选择。'], sql: ['根据给定表结构编写筛选查询。', '使用表连接获取相关数据。', '解释查询条件与连接关系。'], cards: ['使用盒模型和 Flex 完成商品卡片布局。', '检查卡片间距与容器宽度。', '说明窄屏排列策略。'] };
-    return `${heading(t.title, `${c.title} · ${t.type}`, button('返回作业任务', 'assignments', true))}<section class="panel"><span class="tag ${overdue(t) ? 'orange' : 'blue'}">${deadline(t)}</span><p>${overdue(t) ? '任务已超过截止时间，请先确认教师的补交要求。' : '请按教师安排完成任务。'}</p><h2 class="section-title">任务要求</h2><ol>${(requirements[id] || ['查看教师评价，按反馈巩固相关知识。']).map(r => `<li>${r}</li>`).join('')}</ol><p class="notice-text">提交及补交规则以教师说明为准。当前页面为任务示例。</p><div class="state-actions">${t.route === 'lab' ? button('继续实验', 'lab') : button('查看相关章节', `course/${t.course}`)}${button('查看课程通知', 'messages', true)}</div></section>`;
+    return `<div class="workspace-page task-detail-page">${workspaceHeading(t.title, `${c.title} · ${t.type}`, button('返回作业任务', 'assignments', true, 'back'))}
+      <section class="workspace-surface task-requirements" aria-labelledby="task-requirements-title">
+        <div class="task-context"><span class="tag ${t.done ? 'green' : t.state === '进行中' ? 'blue' : 'gray'}">${t.state}</span><span>截止日期 · <time datetime="${t.due}">${dateLabel(t.due)}</time></span></div>
+        <p class="task-deadline-note ${overdue(t) ? 'deadline-overdue' : ''}">${overdue(t) ? '已逾期，请先确认教师的补交要求。' : '请按教师安排完成任务。'}</p>
+        <h2 id="task-requirements-title">任务要求</h2><p class="task-training">训练内容：${t.description}</p>
+        <ol>${(requirements[id] || ['查看教师评价，按反馈巩固相关知识。']).map(r => `<li>${r}</li>`).join('')}</ol>
+        <p class="task-rules">提交及补交规则以教师说明为准。当前页面为任务示例。</p>
+        <div class="task-detail-actions">${t.route === 'lab' ? button('继续实验', 'lab') : button('查看相关章节', `course/${t.course}`)}${button('查看课程通知', 'messages', true)}</div>
+      </section><p class="workspace-note">视觉原型 · 示例日期 ${sampleDate}</p>
+    </div>`;
+  }
+  function assignmentRow(t) {
+    const c = courses[t.course], label = t.done ? '查看反馈' : '查看要求';
+    return `<li class="assignment-item" data-task="${t.id}" data-status="${t.done ? 'done' : 'todo'}">
+      <div class="assignment-identity"><h2><a href="#${t.done ? 'progress' : `task/${t.id}`}">${t.title}</a></h2><p>${t.type} · ${t.description}</p></div>
+      <div class="assignment-course"><span class="assignment-mobile-label">课程</span><a href="#course/${t.course}">${c.title}</a></div>
+      <div class="assignment-state"><span class="tag ${t.done ? 'green' : t.state === '进行中' ? 'blue' : 'gray'}">${t.state}</span></div>
+      <div class="assignment-deadline ${overdue(t) ? 'deadline-overdue' : ''}"><time datetime="${t.due}">${dateLabel(t.due)}</time><small>${overdue(t) ? '已逾期' : '截止日期'}</small></div>
+      <div class="assignment-action">${button(label, t.done ? 'progress' : `task/${t.id}`, true, 'arrow', `${label}：${t.title}`)}</div>
+    </li>`;
   }
   function assignments() {
     const list = loadFailed ? [] : allTasks(), todo = list.filter(t => !t.done).length;
-    return `${heading('作业任务', '查看各课程的任务要求、期限和反馈')}<div class="filter-bar" role="group" aria-label="作业状态"><button class="filter active" data-filter="all">全部作业 <span>${list.length}</span></button><button class="filter" data-filter="todo">待完成 <span>${todo}</span></button><button class="filter" data-filter="done">已完成 <span>${list.length - todo}</span></button></div>${loadFailed ? stateView('作业暂时无法加载', '请重试，当前无法判断待办数量。', '<button class="button" data-retry>重新加载</button>', true) : list.length ? `<div class="assignment-list">${list.map(t => `<article class="assignment panel" data-status="${t.done ? 'done' : 'todo'}"><div class="assignment-body"><span class="tag ${t.done ? 'green' : overdue(t) ? 'orange' : 'blue'}">${t.state}${overdue(t) ? ' · 已逾期' : ''}</span><h2>${t.title}</h2><p>${courses[t.course].title} · ${t.description}</p><div class="assignment-details"><span>${icon('calendar')}${dateLabel(t.due)}${t.done ? '已提交' : '截止'}</span></div></div>${button(t.done ? '查看反馈' : '查看要求', t.done ? 'progress' : `task/${t.id}`, true)}</article>`).join('')}</div><div class="empty-state" data-filter-empty hidden><h2>暂无此类作业</h2><p>可以切换其他状态查看。</p></div>` : stateView('暂无作业任务', '加入课程后，教师发布的任务会显示在这里。', joinButton())}`;
+    const filters = `<div class="assignment-toolbar"><div class="filter-bar" role="group" aria-label="作业状态"><button class="filter active" aria-pressed="true" data-filter="all">全部作业 <span>${list.length}</span></button><button class="filter" aria-pressed="false" data-filter="todo">待完成 <span>${todo}</span></button><button class="filter" aria-pressed="false" data-filter="done">已完成 <span>${list.length - todo}</span></button></div><span class="assignment-visible-count" role="status" aria-live="polite">显示 ${list.length} 项作业</span></div>`;
+    const content = loadFailed ? stateView('作业暂时无法加载', '请重试，当前无法判断待办数量。', '<button class="button" data-retry>重新加载</button>', true) : list.length ? `${filters}<div class="workspace-surface assignment-results"><div class="assignment-columns" aria-hidden="true"><span>作业与训练内容</span><span>所属课程</span><span>状态</span><span>截止日期</span><span>操作</span></div><ul class="assignment-index" aria-label="课程作业">${list.map(assignmentRow).join('')}</ul></div><section class="empty-state" data-filter-empty hidden><h2>暂无此类作业</h2><p>可以切换其他状态查看。</p></section>` : stateView('暂无作业任务', '加入课程后，教师发布的任务会显示在这里。', joinButton());
+    return `<div class="workspace-page assignments-page">${workspaceHeading('作业任务', '查看各课程的任务要求、期限和反馈')}${content}<p class="workspace-note">视觉原型 · 示例日期 ${sampleDate}</p></div>`;
   }
   function previewLinks() { return `<section class="panel prototype-states"><h2>原型状态预览</h2><p>这些入口用于检查示例状态；不连接真实课程服务。日期判断统一采用 ${sampleDate}，加入的课程仅保留在本次页面预览中。</p><div class="state-actions"><a class="button secondary" href="?scenario=empty#home">无课程</a><a class="button secondary" href="?scenario=clear#home">无待办</a><a class="button secondary" href="?scenario=error#home">加载失败</a><a class="button" href="?#home">默认状态</a></div></section>`; }
   function openJoin(trigger) {
@@ -123,10 +146,10 @@ const learningUI = (() => {
     document.querySelectorAll('[data-retry]').forEach(b => b.addEventListener('click', () => { loadFailed = false; render(true); notice('示例数据已重新加载。'); }));
   }
   function records(page, content) {
-    if (loadFailed) return `${heading(page, '学习信息暂时不可用')}${stateView('学习信息暂时无法加载', '请重新加载，当前无法判断学习记录。', '<button class="button" data-retry>重新加载</button>', true)}`;
-    if (!joined.size) return `${heading(page, '课程与学习信息')} ${stateView('暂无学习信息', '加入课程后，可以在这里查看学习记录与课程通知。', joinButton())}`;
+    if (loadFailed) return `<div class="workspace-page">${workspaceHeading(page, '学习信息暂时不可用')}${stateView('学习信息暂时无法加载', page === '消息中心' ? '请重新加载，随后查看课程通知与教师反馈。' : '请重新加载，当前无法判断学习记录。', '<button class="button" data-retry>重新加载</button>', true)}</div>`;
+    if (!joined.size) return `<div class="workspace-page">${workspaceHeading(page, '课程与学习信息')}${stateView('暂无学习信息', '加入课程后，可以在这里查看学习记录与课程通知。', joinButton())}</div>`;
     return content();
   }
   const courseCountLabel = () => loadFailed ? '课程信息暂不可用' : `${joined.size} 门已加入课程`;
-  return { home, catalog, course, taskPage, assignments, previewLinks, bind, available, pending, feedbackCount, dateLabel, deadline, sampleDate, records, courseCountLabel };
+  return { home, catalog, course, taskPage, assignments, previewLinks, bind, available, pending, feedbackCount, dateLabel, deadline, sampleDate, records, courseCountLabel, progress };
 })();
