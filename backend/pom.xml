@@ -63,10 +63,14 @@
             <version>4.0.0</version>
         </dependency>
 
-        <!-- 先只引入口令处理模块；HTTP 认证过滤链随登录功能加入。 -->
+        <!-- 口令哈希与 HTTP 认证过滤链：crypto 提供算法，starter 提供过滤链与配置。 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>

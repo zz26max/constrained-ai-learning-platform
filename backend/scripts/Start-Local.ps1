@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$DatabaseOnly,
     [switch]$InitializeAccounts,
     [ValidateRange(1, 65535)]
@@ -46,8 +46,9 @@ if (-not (Test-Path -LiteralPath $localConfigPath)) {
 
 # 显式解析 KEY=value，不执行文本；保留密码两端的空格，不支持引号或插值语法。
 $accountKeys = @('LOCAL_STUDENT_PASSWORD', 'LOCAL_TEACHER_PASSWORD', 'LOCAL_ADMIN_PASSWORD')
+$optionalKeys = @('AUTH_PRE_LOGIN_SIGNING_KEY', 'AUTH_ALLOWED_ORIGINS', 'AUTH_COOKIE_SECURE')
 $requiredKeys = @('SPRING_PROFILES_ACTIVE', 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'MYSQL_ROOT_PASSWORD')
-$allowedKeys = $requiredKeys + $accountKeys
+$allowedKeys = $requiredKeys + $accountKeys + $optionalKeys
 $configValues = @{}
 # 独占文件后再补充随机密码，避免并发初始化写出不同的口令；已有值始终保留。
 $configStream = [System.IO.File]::Open($localConfigPath,

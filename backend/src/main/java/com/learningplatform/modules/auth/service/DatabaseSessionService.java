@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import com.learningplatform.common.audit.AuditService;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.modules.auth.config.AuthSessionProperties;
 import com.learningplatform.modules.auth.dto.UserDTO;
@@ -32,25 +33,28 @@ public class DatabaseSessionService {
     private final AuthSessionMapper sessionMapper;
     private final SessionTokenCodec tokens;
     private final AuthSessionProperties properties;
+    private final AuditService auditService;
     private final Clock clock;
 
     public DatabaseSessionService(LoginCredentialService credentials, UserMapper userMapper,
                                   AuthSessionMapper sessionMapper, SessionTokenCodec tokens,
-                                  AuthSessionProperties properties, Clock clock) {
+                                  AuthSessionProperties properties, AuditService auditService, Clock clock) {
         this.credentials = credentials;
         this.userMapper = userMapper;
         this.sessionMapper = sessionMapper;
         this.tokens = tokens;
         this.properties = properties;
+        this.auditService = auditService;
         this.clock = clock;
     }
 
     /**
      * 验证密码后建立新会话；只有成功登录才撤销当前浏览器持有的旧会话。
-     * previousToken 来自后续 HTTP 层读取的 Cookie，不能由前端指定任意数据库会话 ID。
+     * previousToken 来自 HTTP 层读取的 Cookie，不能由前端指定任意数据库会话 ID。
+     * requestId 用于把成功登录与业务请求关联进审计，由 HTTP 层传入，不为空。
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
-    public SessionGrant login(String username, String password, String previousToken) {
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public SessionGrant login(String username, String password, String previousToken, String requestId) {
         User verified = credentials.verifyUserForSession(username, password);
         AuthSession previousHint = findSession(previousToken);
         Map<String, User> lockedUsers = lockAccounts(verified.id(), previousHint);
@@ -76,6 +80,9 @@ public class DatabaseSessionService {
         if (sessionMapper.insert(session) != 1) {
             throw new IllegalStateException("会话创建失败");
         }
+        // 审计与会话创建同事务；审计写入失败时整个登录回滚，不留下无审计的成功登录。
+        auditService.record(user.id(), AuditService.ACTION_LOGIN_SUCCESS, "user", user.id(),
+                Map.of("username", user.username()), requestId);
         // 旧会话撤销与新会话插入处于同一事务，插入失败时旧会话也保持有效。
         return new SessionGrant(session.id(), token, session.csrfSecret(), identity(user), expiresAt);
     }
@@ -106,7 +113,7 @@ public class DatabaseSessionService {
     }
 
     /** 服务端撤销是幂等的，重复撤销及未知令牌不产生新会话。 */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void revoke(String token) {
         AuthSession hint = findSession(token);
         if (hint == null) { return; }

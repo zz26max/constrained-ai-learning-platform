@@ -47,3 +47,16 @@ auth:
     # 活跃会话续期只修改空闲期限，不能突破自创建起的绝对期限。
     idle-timeout: ${AUTH_SESSION_IDLE_TIMEOUT:PT12H}
     absolute-timeout: ${AUTH_SESSION_ABSOLUTE_TIMEOUT:P7D}
+  http:
+    # 预登录签名 Cookie 的有效期，与契约 x-cookie-policy 保持一致。
+    pre-login-max-age: PT10M
+    # 预登录 CSRF 签名密钥；生产必须显式提供，缺失时进程随机生成（仅单机开发可接受）。
+    pre-login-signing-key: ${AUTH_PRE_LOGIN_SIGNING_KEY:}
+    # 允许的浏览器 Origin（逗号分隔）；代理不得伪造 Origin 掩盖非法请求。
+    allowed-origins: ${AUTH_ALLOWED_ORIGINS:http://127.0.0.1:4173,http://localhost:4173}
+    # 生产 HTTPS 环境设为 true，Cookie 加 Secure；本地 HTTP 保持 false。
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+  login-rate-limit:
+    # 同一“用户名+IP”组合的失败登录窗口与上限；成功登录清除计数。
+    window: PT5M
+    max-failures: 5

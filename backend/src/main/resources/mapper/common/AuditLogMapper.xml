@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.common.audit.AuditLogMapper">
+    <insert id="insert">
+        INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, metadata, request_id, created_at)
+        VALUES (#{entry.id}, #{entry.actorId}, #{entry.action}, #{entry.targetType}, #{entry.targetId},
+                #{entry.metadataJson},
+                #{entry.requestId},
+                #{entry.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+    </insert>
+</mapper>

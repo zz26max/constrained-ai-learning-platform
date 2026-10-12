@@ -44,7 +44,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (!RequestIdFilter.isBusinessRequest(request)) {
             throw exception;
         }
-        return errorResponse(exception.getStatus(), new HttpHeaders(), exception.getCode(),
+        HttpHeaders headers = new HttpHeaders();
+        if (exception.getRetryAfterSeconds() != null) {
+            // 契约要求 429 与 REQUEST_IN_PROGRESS 必须返回重试等待秒数。
+            headers.set("Retry-After", String.valueOf(exception.getRetryAfterSeconds()));
+        }
+        return errorResponse(exception.getStatus(), headers, exception.getCode(),
                 exception.getMessage(), exception.getDetails(), request);
     }
 
