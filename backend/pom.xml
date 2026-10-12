@@ -22,6 +22,8 @@
         <!-- 编译目标固定为 Java 21；终端与 IDEA 也应选择同一版本的 JDK。 -->
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Argon2 实现需要 Bouncy Castle；此依赖不由 Boot BOM 管理，显式固定版本。 -->
+        <bouncycastle.version>1.86</bouncycastle.version>
     </properties>
 
     <dependencies>
@@ -52,6 +54,24 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- MyBatis 4.0 Starter 支持 Boot 4；复用已有 DataSource，不创建第二个连接池。 -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
+        <!-- 先只引入口令处理模块；HTTP 认证过滤链随登录功能加入。 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
         </dependency>
 
         <!-- 测试依赖只在测试阶段使用，包括 JUnit Jupiter、MockMvc 和 JSON 断言。 -->

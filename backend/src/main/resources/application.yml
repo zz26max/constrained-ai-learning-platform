@@ -37,3 +37,13 @@ spring:
     init:
       # 表结构只交给 Flyway，避免再混入 schema.sql 等另一套初始化流程。
       mode: never
+
+mybatis:
+  # 接口定义 Java 方法，XML 保存对应 SQL；两者通过完整接口名和方法名关联。
+  mapper-locations: classpath*:mapper/**/*.xml
+
+auth:
+  session:
+    # 活跃会话续期只修改空闲期限，不能突破自创建起的绝对期限。
+    idle-timeout: ${AUTH_SESSION_IDLE_TIMEOUT:PT12H}
+    absolute-timeout: ${AUTH_SESSION_ABSOLUTE_TIMEOUT:P7D}

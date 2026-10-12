@@ -1,0 +1,10 @@
+# 仅用于一次性初始化命令；不占用 API 的 8080 端口。
+spring:
+  main:
+    web-application-type: none
+
+local:
+  accounts:
+    student-password: ${LOCAL_STUDENT_PASSWORD:}
+    teacher-password: ${LOCAL_TEACHER_PASSWORD:}
+    admin-password: ${LOCAL_ADMIN_PASSWORD:}

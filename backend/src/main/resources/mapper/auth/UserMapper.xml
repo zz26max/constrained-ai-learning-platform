@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace 对应 Java 接口；select 的 id 对应接口方法，不能随意改名。 -->
+<mapper namespace="com.learningplatform.modules.auth.mapper.UserMapper">
+
+    <!-- record 没有 setter；显式把数据库列交给它的构造器，包含 snake_case 到 camelCase 映射。 -->
+    <resultMap id="user" type="com.learningplatform.modules.auth.model.User">
+        <constructor>
+            <idArg name="id" column="id" javaType="java.lang.String"/>
+            <arg name="username" column="username" javaType="java.lang.String"/>
+            <arg name="displayName" column="display_name" javaType="java.lang.String"/>
+            <arg name="passwordHash" column="password_hash" javaType="java.lang.String"/>
+            <arg name="roles" column="roles" javaType="java.util.List"
+                 typeHandler="com.learningplatform.modules.auth.mapper.typehandler.UserRolesTypeHandler"/>
+            <arg name="status" column="status" javaType="java.lang.String"/>
+            <arg name="createdAt" column="created_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+            <arg name="updatedAt" column="updated_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <!-- #{username} 交给 PreparedStatement 绑定，用户名只作为值，不作为 SQL 片段执行。 -->
+    <select id="findByUsername" resultMap="user">
+        SELECT id, username, display_name, password_hash, roles, status, created_at, updated_at
+        FROM users
+        WHERE username = #{username}
+          <!-- 上一条件使用唯一索引；追加字节比较，防止 ascii_bin 忽略输入末尾空格。 -->
+          AND CAST(username AS BINARY) = CAST(#{username} AS BINARY)
+    </select>
+    <!-- 必须在事务中调用；共享锁允许并发读取，但账户修改需等待本事务结束。 -->
+    <select id="findByIdForShare" resultMap="user">
+        SELECT id, username, display_name, password_hash, roles, status, created_at, updated_at
+        FROM users WHERE id = #{id}
+        FOR SHARE
+    </select>
+
+    <!-- 只接收哈希，不接收明文密码；角色和时间复用查询时的类型转换规则。 -->
+    <insert id="insert">
+        INSERT INTO users (id, username, display_name, password_hash, roles, status, created_at, updated_at)
+        VALUES (#{user.id}, #{user.username}, #{user.displayName}, #{user.passwordHash},
+                #{user.roles,typeHandler=com.learningplatform.modules.auth.mapper.typehandler.UserRolesTypeHandler},
+                #{user.status},
+                #{user.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},
+                #{user.updatedAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+    </insert>
+</mapper>

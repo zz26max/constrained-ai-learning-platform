@@ -1,5 +1,6 @@
 ﻿param(
     [switch]$DatabaseOnly,
+    [switch]$InitializeAccounts,
     [ValidateRange(1, 65535)]
     [int]$Port = 8080,
     [string]$JdkPath = $env:JAVA_HOME
@@ -9,8 +10,12 @@ $ErrorActionPreference = 'Stop'
 $backendDirectory = Split-Path -Path $PSScriptRoot -Parent
 $localConfigPath = Join-Path $backendDirectory '.env'
 
+if ($DatabaseOnly -and $InitializeAccounts) {
+    throw '-DatabaseOnly 与 -InitializeAccounts 不能同时使用。'
+}
+
 function New-LocalPassword {
-    # 仅用于这台开发机的独立数据库；真实密码不会出现在终端或提交文件中。
+    # 仅用于这台开发机的数据库和演示账户；真实密码不出现在终端或提交文件中。
     $randomBytes = New-Object byte[] 32
     $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try { $generator.GetBytes($randomBytes) } finally { $generator.Dispose() }
@@ -39,18 +44,59 @@ if (-not (Test-Path -LiteralPath $localConfigPath)) {
     }
 }
 
-# 显式把配置注入当前进程及其子进程，不执行 .env 中的文本，也不打印值。
-$allowedKeys = @('SPRING_PROFILES_ACTIVE', 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'MYSQL_ROOT_PASSWORD')
-foreach ($line in [System.IO.File]::ReadAllLines($localConfigPath)) {
-    $trimmedLine = $line.Trim()
-    if (-not $trimmedLine -or $trimmedLine.StartsWith('#')) { continue }
-    $entry = $trimmedLine -split '=', 2
-    if ($entry.Count -ne 2 -or $entry[0] -notin $allowedKeys) {
-        throw '本地 .env 存在无效配置项，请对照 .env.example 检查。'
+# 显式解析 KEY=value，不执行文本；保留密码两端的空格，不支持引号或插值语法。
+$accountKeys = @('LOCAL_STUDENT_PASSWORD', 'LOCAL_TEACHER_PASSWORD', 'LOCAL_ADMIN_PASSWORD')
+$requiredKeys = @('SPRING_PROFILES_ACTIVE', 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'MYSQL_ROOT_PASSWORD')
+$allowedKeys = $requiredKeys + $accountKeys
+$configValues = @{}
+# 独占文件后再补充随机密码，避免并发初始化写出不同的口令；已有值始终保留。
+$configStream = [System.IO.File]::Open($localConfigPath,
+    [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+try {
+    $reader = New-Object System.IO.StreamReader($configStream, [System.Text.Encoding]::UTF8, $true, 1024, $true)
+    try { $configText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    foreach ($line in ($configText -split '\r?\n')) {
+        if (-not $line.Trim() -or $line.TrimStart().StartsWith('#')) { continue }
+        $entry = $line -split '=', 2
+        if ($entry.Count -ne 2 -or $entry[0] -notin $allowedKeys -or $configValues.ContainsKey($entry[0])) {
+            throw '本地 .env 存在无效或重复配置项，请对照 .env.example 检查。'
+        }
+        $configValues[$entry[0]] = $entry[1]
     }
-    if ([string]::IsNullOrWhiteSpace($entry[1])) { throw ('请填写配置项：' + $entry[0]) }
-    [System.Environment]::SetEnvironmentVariable($entry[0], $entry[1], 'Process')
+    foreach ($key in $requiredKeys) {
+        if ([string]::IsNullOrWhiteSpace($configValues[$key])) { throw ('请填写配置项：' + $key) }
+    }
+    if ($InitializeAccounts) {
+        # 初始化命令只操作约定的本地开发库，避免误连远程环境。
+        if ($configValues['DB_URL'] -notmatch '^jdbc:mysql://(127\.0\.0\.1|localhost):3307/learning_platform(?:\?.*)?$') {
+            throw '账户初始化仅允许本地 3307 端口的 learning_platform 开发库。'
+        }
+        $changed = $false
+        foreach ($key in $accountKeys) {
+            if ([string]::IsNullOrWhiteSpace($configValues[$key])) {
+                $password = New-LocalPassword
+                if ($configValues.ContainsKey($key)) {
+                    $configText = $configText -replace ('(?m)^' + $key + '=[^\r\n]*'), ($key + '=' + $password)
+                } else {
+                    $configText = $configText.TrimEnd("`r", "`n") + "`r`n" + $key + '=' + $password + "`r`n"
+                }
+                $configValues[$key] = $password
+                $changed = $true
+            }
+        }
+        if ($changed) {
+            $configStream.Position = 0
+            $writer = New-Object System.IO.StreamWriter($configStream, (New-Object System.Text.UTF8Encoding($false)), 1024, $true)
+            try { $writer.Write($configText); $writer.Flush(); $configStream.SetLength($configStream.Position) }
+            finally { $writer.Dispose() }
+            Write-Host '演示账户的随机密码已保存到本地 .env；终端不会显示密码。'
+        }
+    }
+} finally { $configStream.Dispose() }
+foreach ($key in $allowedKeys) {
+    [System.Environment]::SetEnvironmentVariable($key, $configValues[$key], 'Process')
 }
+$configuredProfile = $env:SPRING_PROFILES_ACTIVE
 
 Push-Location $backendDirectory
 try {
@@ -68,8 +114,11 @@ try {
     $env:JAVA_HOME = $JdkPath
     $env:Path = (Join-Path $JdkPath 'bin') + ';' + $env:Path
     $env:SERVER_PORT = [string]$Port
+    if ($InitializeAccounts) { $env:SPRING_PROFILES_ACTIVE = 'local-accounts' }
     .\mvnw.cmd spring-boot:run
     if ($LASTEXITCODE -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
 } finally {
+    # 避免一次性命令影响同一终端后续启动的 API。
+    $env:SPRING_PROFILES_ACTIVE = $configuredProfile
     Pop-Location
 }
