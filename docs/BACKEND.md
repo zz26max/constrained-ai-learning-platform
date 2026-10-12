@@ -1,6 +1,6 @@
 # 后端开发手册
 
-基线：1.0.1 · 日期：2026-10-11 · 状态：健康检查与账户内部能力已实现；业务 HTTP、教学表、worker 待实现。
+基线：1.0.1 · 日期：2026-10-12 · 状态：P0-A 认证 HTTP 链（预登录 CSRF、登录、退出、/me、/config、会话 Cookie、Origin 校验、限流、审计）与账户内部能力已实现；P1～P3 教学业务端点、教学表与 worker 待实现。
 
 先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。原 DATA_MODEL 内容迁入本文，已有迁移与生产源码本轮不修改。
 
@@ -44,7 +44,7 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 ### A.3 配置与运行
 
-本地环境与现有启动命令以 [README](../README.md#后端启动) 为准。正式 frontend 尚未创建，旧 prototype 启动成功不代表业务联调就绪。API 默认 8080，开发数据库 3307；worker 使用独立非 Web profile，到 P2 才加入。
+本地环境与现有启动命令以 [README](../README.md#后端启动) 为准。正式 frontend 已建立（见 [FRONTEND](FRONTEND.md)），但旧 prototype 或前端本地启动成功都不代表业务联调就绪。API 默认 8080，开发数据库 3307；worker 使用独立非 Web profile，到 P2 才加入。
 
 数据库账号、预登录签名密钥、邀请摘要密钥和模型密钥由服务端环境注入，不进入前端、日志或仓库；新环境变量同步 .env.example 与实际启动脚本允许列表。健康检查不套业务信封，AI 故障不使数据库 ready 失败。原配置中没有的功能不能在文档里写成已可用。
 

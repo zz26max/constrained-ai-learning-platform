@@ -1,6 +1,6 @@
 # 前端开发手册
 
-基线：1.0.1 · 日期：2026-10-11 · 状态：设计已整理，Vue 工程与真实 API 接入待实现。
+基线：1.0.1 · 日期：2026-10-12 · 状态：P0-A 工程入口、同源代理、mock 开关与认证流程（登录/会话恢复）已实现；P1 起的页面与交互待实现。
 
 先读 [公共架构与业务规则](DEVELOPMENT.md)，只从 [OpenAPI](openapi.yaml) 获取接口类型、枚举和错误码；不维护手写 DTO 副本。当前原型保留在 website-prototype，正式工程目标目录为 frontend；本轮不迁移代码或更改已确认视觉。
 
@@ -8,7 +8,7 @@
 
 采用 Vue 3、TypeScript strict、Vite、Vue Router、Pinia，组件统一 Composition API / `<script setup lang="ts">`。首次开工核对版本兼容并固定依赖与 lockfile，使用 npm ci 安装；vue-tsc 类型检查与构建是两项检查，Vite 能构建不代表类型检查通过。
 
-正式工程采用 Node.js **24.21.0**，属于 Node 24 LTS；npm 固定为该版本随附的 **11.19.0**，建工程时将 `packageManager: npm@11.19.0` 写入 package.json。创建 frontend 时同时提交 `.nvmrc`（24.21.0）、`engines.node`（`>=24.21.0 <25`）和 package-lock.json，CI 使用相同精确 Node/npm 版本。首次生成 lockfile 用 npm install，之后用 npm ci；升级环境需同步这些配置并重跑类型检查及构建。目前仅确定工具链基线，尚未创建或验证正式 Vue 工程。[Node 官方发布](https://nodejs.org/en/download/archive/v24.21.0)、[Vite 环境要求](https://vite.dev/guide/)。
+正式工程采用 Node.js **24.21.0**，属于 Node 24 LTS；npm 固定为该版本随附的 **11.19.0**，建工程时将 `packageManager: npm@11.19.0` 写入 package.json。创建 frontend 时同时提交 `.nvmrc`（24.21.0）、`engines.node`（`>=24.21.0 <25`）和 package-lock.json，CI 使用相同精确 Node/npm 版本。首次生成 lockfile 用 npm install，之后用 npm ci；升级环境需同步这些配置并重跑类型检查及构建。P0-A 已建立 `frontend/` 并提交 `.nvmrc`、`engines` 与 lockfile；开发机若低于此处基线，必须明确记录实际使用的 Node/npm 版本，不能把低于基线的运行结果当作 CI 等价证据。[Node 官方发布](https://nodejs.org/en/download/archive/v24.21.0)、[Vite 环境要求](https://vite.dev/guide/)。
 
 ```text
 frontend/

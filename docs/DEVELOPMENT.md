@@ -19,7 +19,7 @@
 
 ### 1.1 当前真实状态
 
-本轮静态核对生产源码：只有两个健康检查端点已实现；81 个业务端点均待实现。账户初始化、密码校验和数据库会话是已有内部能力，不能视为浏览器已能登录。Flyway 只有 V1～V3。`website-prototype/` 是原生静态原型，没有真实 API 接入；正式 Vue 工程 `frontend/` 尚未创建。
+截至 P0-A：83 个操作中 7 个为 `implemented`——`getCsrfToken`、`login`、`logout`、`getMe`、`getConfig` 与两项健康检查；其余 76 个仍为 `planned`，尚无 `verified`。账户初始化、密码校验、数据库会话与 P0-A 认证 HTTP 链（预登录 CSRF、会话 Cookie、Origin 校验、登录限流、审计）已实现；教学业务端点、教学表和 worker 待实现。Flyway 已有 V1～V4（V4 为 `audit_logs`）。`website-prototype/` 保留为原生静态原型，不含真实 API 接入；正式 Vue 工程 `frontend/` 已建立，同源代理、mock 开关与认证流程按 FRONTEND 约定实现。跨端验收尚未执行，证据边界见 §12.3。
 
 OpenAPI 中 `x-implementation-status` 使用 planned / implemented / verified：分别表示未实现、已有生产实现且相关 HTTP 测试通过、通过真实跨端验收。`x-contract-status: reviewed` 仅表示静态设计审计。P0～P3 是计划阶段，不代表可用性。新增或删除生产路由必须在同一变更中更新契约状态；改变状态须在交付记录附代码与对应测试，verified 另附真实联调证据，不能按按钮是否出现判断完成。
 
@@ -43,7 +43,7 @@ P2 的 AI、行为和分析依赖 P1 已有任务、作品和评价；先有可�
 
 ### 3.1 技术方向
 
-正式前端采用 Vue 3 + TypeScript + Vite + Vue Router + Pinia，Composition API 与 `<script setup>` 统一写法；保留现有视觉和业务交互作为迁移基准。框架不代替保存串行化、权限和幂等设计。前端版本在首次建工程时核对兼容性、固定依赖并提交 lockfile，本轮没有安装正式前端依赖。
+正式前端采用 Vue 3 + TypeScript + Vite + Vue Router + Pinia，Composition API 与 `<script setup>` 统一写法；保留现有视觉和业务交互作为迁移基准。框架不代替保存串行化、权限和幂等设计。前端版本在首次建工程时核对兼容性、固定依赖并提交 lockfile；P0-A 已建立 `frontend/` 并提交 `.nvmrc`、`engines` 与 lockfile。
 
 后端沿用仓库已固定的 Java 21、Spring Boot 4.1.1、MyBatis、Flyway 与 MySQL 8.4.11。精确依赖以 `backend/pom.xml`、Wrapper、Compose 为准；本轮不升级现有工程。使用模块化单体和同一数据库，按业务包分模块。
 
@@ -430,7 +430,7 @@ AI queued/running 没有结果，completed 只交付审核后的正文，fallbac
 
 ### 11.1 协作与冻结流程
 
-用户已经确认 Vue 方向与三份文档组织。本轮基线 1.0.0 可作为两端开工依据；P0/P1 结构变更须先更新契约和受影响规则，P2/P3 开工前复核阶段设计。不得以“后端尚未实现”为由随意改字段。
+用户已经确认 Vue 方向与三份文档组织。本轮基线 1.0.1 可作为两端开工依据；P0/P1 结构变更须先更新契约和受影响规则，P2/P3 开工前复核阶段设计。不得以“后端尚未实现”为由随意改字段。
 
 GLM 负责前端实现，DeepSeek 负责后端实现，GPT 负责共享设计和跨端审计。任何一方均可提出变更；架构维护者记录影响、协调并更新共享基线。普通内部重构与界面调整可在职责范围内自主处理，不要求每次用户确认。
 
@@ -505,7 +505,7 @@ GitHub Actions 在 docs、backend、frontend、契约脚本及工作流变化时
 - CSRF 过期、多请求同时失败、恢复期间换用户、Origin 不受允许：业务无写入、不自动重放、仅一次共享刷新，失败后可人工恢复。
 - P2 供应商适配器测试确认不发送真实身份、凭据或未获准材料，重生成同样经过发送前检查。
 
-### 12.3 本轮审计记录（2026-10-11）
+### 12.3 审计记录（2026-10-11 设计基线 / 2026-10-12 P0-A）
 
 | 项目 | 本轮处理与证据边界 |
 | --- | --- |
@@ -518,16 +518,19 @@ GitHub Actions 在 docs、backend、frontend、契约脚本及工作流变化时
 | 设计与运行 | 未改动生产源码；新增生产路由核对并运行后端测试，未实现业务仍不标为验收通过 |
 | 1.0.1 修订 | CSRF 恢复、AI 外发边界、正式路由、mock/工具链、反馈视图和事件内部接收时间已明确 |
 
-以下为 **2026-10-11、设计基线 1.0.1** 的本地执行快照；不是自动更新的进度表。契约、校验器或相关测试变更后，交付者须重新执行并更新本段；不能只沿用此前的通过结论。
+以下为 **2026-10-12、设计基线 1.0.1** 的本地执行快照；不是自动更新的进度表。契约、校验器或相关测试变更后，交付者须重新执行并更新本段；不能只沿用此前的通过结论。
 
 | 执行位置与命令 | 本轮实际结果 | 能证明与不能证明的内容 |
 | --- | --- | --- |
-| 项目根目录：`python scripts/validate_contract.py`，使用已安装 requirements-contract.txt 的隔离解释器 | PASS：81 个业务 + 2 个健康操作，327 个 schema；29 个示例、40 个结构回归用例、62 处文档链接；6 个响应切片保留示例；5 项计数/筛选检查 | 验证结构、引用与静态样例，不验证实际权限、SQL 查询或并发 |
-| backend 目录：`./mvnw.cmd --batch-mode test` | BUILD SUCCESS；Tests run: 76, Failures: 0, Errors: 0, Skipped: 0（北京时间 22:57 完成） | 包含 ImplementationStatusContractTest 的 5 项测试及当前已有 HTTP/单元测试；不是业务端点全量联调 |
+| 项目根目录：`python scripts/validate_contract.py` | PASS：81 个业务 + 2 个健康操作，327 个 schema；29 个示例、40 个结构回归用例、64 处文档链接；6 个响应切片保留示例；5 项计数/筛选检查。实现状态为 verified 5（P0-A 认证操作）+ implemented 2（健康检查） | 验证结构、引用与静态样例，不验证实际权限、SQL 查询或并发 |
+| backend 目录：`./mvnw.cmd --batch-mode test` | BUILD SUCCESS；Tests run: 93, Failures: 0, Errors: 0, Skipped: 0 | 单元与 MockMvc HTTP 契约；不是真实数据库或跨端联调 |
+| backend 目录：`./mvnw.cmd --batch-mode verify` | BUILD SUCCESS；Tests run: 98, Failures: 0, Errors: 0, Skipped: 0（Testcontainers `mysql:8.4.11`：AuditLog 3 / Database 7 / UserMapper 33 / DatabaseSession 32 / LocalAccountInit 9 / LoginCredential 14） | 真实 MySQL 的方言、约束与事务行为；仍不能替代跨端联调 |
+| frontend 目录：`npm run verify`（typecheck + build + check:no-mock + vitest） | 全部通过：`vue-tsc` 无错误；`vite build` 38 模块；`check-no-mock` PASS；vitest 4 个文件 39 条用例通过 | 前端类型、构建与模拟传输下的行为；不证明真实后端联调或浏览器 UI |
+| P0-A 跨端联调（本机 `127.0.0.1:4173` 同源代理 → `8080` → MySQL `3307`） | 通过。正常流程：`GET /api/v1/auth/csrf-token` 200 且下发 `lp_pre_auth`（Max-Age=600）；`POST /auth/login` 200 且下发 `lp_session`（7 天）、清除 `lp_pre_auth`、响应不含密码字段；`GET /me` 200；`GET /me/config` 200（无学期时 `currentTermId:null`、`terms:[]`，三个 feature 均 false）；`POST /auth/logout` 200 且清除 `lp_session`；退出后 `GET /me` 401 `UNAUTHENTICATED`。负例：错误密码 401 `INVALID_CREDENTIALS`；缺 `X-CSRF-Token`、缺 `Origin`、非白名单 `Origin` 均 403 `CSRF_INVALID`。全部响应的 `X-Request-ID` 与正文 `requestId` 一致且带 `Cache-Control: no-store` | 证明这五个操作经前端同源代理与真实数据库可用；**不证明**浏览器 UI 交互、并发与限流边界，也不覆盖 P1 起的业务端点 |
 
-Maven XML/文本报告位于 `backend/target/surefire-reports/`（本地生成、不提交）；CI 运行日志是远程证据，本轮未声称远程 CI 已运行成功。完整上下文已在 Maven 环境启动，DataSource 替身与现有 MyBatis 配置未导致失败；IDE 输出布局需单独核查，不能把推测记为已复现缺陷。
+Maven XML/文本报告位于 `backend/target/surefire-reports/`（本地生成、不提交）；CI 运行日志是远程证据，本轮未声称远程 CI 已运行成功。
 
-本轮未运行 Maven verify/真实 MySQL 集成测试、尚未实现的业务联调或正式 Vue 构建。Node/npm、mock 和路由属于确定的开工约定，需前端建工程后验证；不把文档、模拟数据或 schema 通过当成这些功能已交付。
+本轮仍未执行：真实浏览器中的 UI 点击验收、P1 起的业务端点联调，以及在文档声明的 Node 24.21.0 / npm 11.19.0 基线下复现 `npm ci`（开发机为 Node 24.17.0 / npm 11.13.0）。不把文档、模拟数据或 schema 通过当成这些功能已交付。
 
 后端已有功能的历史运行证据见 [历史开发记录](archive/2026-10-08_DEVELOPMENT.md#112-实施进度与代码阅读)。架构与契约是一套可实施基线，运行正确性仍按工作包实测。
 
