@@ -1,14 +1,63 @@
-# 后端数据模型
+# 后端开发手册
 
-版本：0.4 · 日期：2026-10-06 · 状态：已通过 Flyway V1 建立 terms 并完成真实 MySQL 8.4 验证，其余业务表待迁移。
+基线：1.0.1 · 日期：2026-10-11 · 状态：健康检查与账户内部能力已实现；业务 HTTP、教学表、worker 待实现。
 
-配套：[开发方案](DEVELOPMENT.md) · [接口契约](API.md)。实现先按阶段建立所需表，不一次性引入 P2/P3 的全部实体。
+先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。原 DATA_MODEL 内容迁入本文，已有迁移与生产源码本轮不修改。
+
+快速定位：[工程规范](#a-工程与实现规范) · [会话配置](#session-timeouts) · [教学闭环](#4-p1教学内容与学习闭环) · [AI 与分析](#5-p2受限-ai求助与分析) · [核心事务](#db-transactions) · [查询索引](#8-查询与索引) · [数据保留](#10-迁移归档与删除) · [交付要求](#c-本端交付要求)
+
+## A. 工程与实现规范
+
+实际依赖以 backend/pom.xml、Wrapper 与 Compose 为准，复用现有 Java 21 / Boot / MyBatis / Flyway。Jakarta Validation 已在 pom 中，HTTP Spring Security 过滤链尚未建立；不要把已引入 crypto 模块当成已完成认证。
+
+Boot 4 实现时沿用当前工程的包与依赖：MVC 测试注解位于 `org.springframework.boot.webmvc.test.autoconfigure`，示例见 [HealthControllerTest](../backend/src/test/java/com/learningplatform/common/health/HealthControllerTest.java)。默认 JSON 数据绑定使用 Jackson 3 的 `tools.jackson.*`；注解仍可来自 `com.fasterxml.jackson.annotation`，不要全局替换所有 Jackson 包名，也不要为照搬 Boot 3 示例额外引入 Jackson 2 databind。实际配置以 pom 与现有序列化代码为准。
+
+包目录按业务模块后按职责分 controller/service/dto/mapper/model；只为已有职责建立包，不创建空层。现有 common/health 规模小，保留同包。HTTP security 负责请求适配，modules/auth/security 中现有令牌工具保留在账户模块，不为了目录一致搬动已有实现。
+
+Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与事务；Mapper 只负责参数绑定 SQL。实体不直接序列化为响应，尤其不能暴露口令哈希、会话摘要、CSRF 秘密与未公开评价。学生与教师响应采用契约里的独立视图，不能仅靠前端隐藏字段。
+
+### A.1 事务、异常与跨模块调用
+
+事务入口使用其他 Bean 调用的 public Service，明确 READ_COMMITTED、rollbackFor=Exception；代理同类自调用不算事务入口。MyBatis 与事务管理器使用同一 DataSource，连接池显式 READ COMMITTED。具体锁定、重试与数据库时钟以本文数据模型第 7 节为准。
+
+跨模块约束按 [DEVELOPMENT 3.3](DEVELOPMENT.md#33-调用与事务所有者)；同事务通知、事件、证据协作者不得提前独立提交。认证会话 resolve 的特殊提交行为保留在账户事务中，必须先结束它，再启动教学事务。外部 AI 调用不在事务中，不由数据库重试重新调用。
+
+拒绝未知 JSON 属性；PATCH DTO 必须能区分缺失与显式 null，可采用带 presence 标志的字段包装或受控 JsonNode 解析，不能用一个普通 nullable 字段混淆两者。先合并后校验完整对象，外部结构仍与 OpenAPI 一致。
+
+错误代码、HTTP 状态与公开详情必须来自契约 Error_* schema；不得为了实现方便临时新增错误码。现有统一 MVC 处理器继续复用；Security 的 EntryPoint/AccessDeniedHandler 使用相同信封，避免默认 HTML 重定向。原始异常和 SQL 不回显给客户端，日志也不记录凭据或完整正文。
+
+### A.2 接口与验证
+
+遵守契约先于实现。可以手写 Java DTO 与 Controller，但必须用真实 MockMvc 请求/响应验证 schema；springdoc 如加入，仅导出实现作比较，不覆盖 docs/openapi.yaml。前端不等待 Controller 生成后才知道字段。
+
+新增路由及其契约状态在同一变更提交。`ImplementationStatusContractTest` 自动核对生产路由与 planned/implemented/verified，纳入 Maven test；不能靠只改状态使功能通过验收，仍须新增对应 HTTP 行为测试。该检查使用数据库替身，不替代真实 MySQL 集成测试。
+
+实现 listMyAssignments 时，按 [AssignmentPage 契约](openapi.yaml#/components/schemas/AssignmentPage)验证四项计数守恒。测试必须覆盖同一用户与 offeringId/termId 范围内的 todo、done、归档未完成项；切换 filter 或分页不改变 summary，total 则跟随 filter。另测空集合、越界页和不同用户/教学班隔离。在 READ_COMMITTED 下，用同一条聚合 SQL 计算 summary，并据 filter 派生 total，避免分别计数时并发提交使统计来自不同快照。静态示例检查不能代替这些真实查询测试。
+
+状态核对以 Maven 运行结果作为验收证据。IDE 运行若有路由差异，先检查生产与测试类输出位置：该测试按代码来源位置排除测试 Controller，需要分离输出目录；不能未经复现就排除 MyBatis 或减少生产路由扫描。
+
+反馈只使用 [StudentFeedbackDTO](openapi.yaml#/components/schemas/StudentFeedbackDTO) 与 [TeacherFeedbackDTO](openapi.yaml#/components/schemas/TeacherFeedbackDTO)：学生结构只承载已发布公开快照，并关联本人通知；教师结构可承载草稿，messageId 恒为 null，不借用学生通知 ID。学生读路径从 published_payload 构造，不能把草稿实体序列化后只隐藏按钮。
+
+测试按责任分层：规则与纯函数用单元测试；HTTP 信封、校验、权限用 MockMvc；迁移、JSON、唯一约束、锁与并发用真实 MySQL Testcontainers。并发用独立连接和真实提交，不用 H2 或外层回滚替代。已有 Maven test/verify 的职责和运行方式见 README。
+
+新增迁移只向前编号；不得修改已经执行的 V1/V2/V3。跨模块共享的迁移序号由后端统一分配。部署执行明确迁移，演示账户与课程数据使用独立显式命令，正常启动不注入演示数据。
+
+### A.3 配置与运行
+
+本地环境与现有启动命令以 [README](../README.md#后端启动) 为准。正式 frontend 尚未创建，旧 prototype 启动成功不代表业务联调就绪。API 默认 8080，开发数据库 3307；worker 使用独立非 Web profile，到 P2 才加入。
+
+数据库账号、预登录签名密钥、邀请摘要密钥和模型密钥由服务端环境注入，不进入前端、日志或仓库；新环境变量同步 .env.example 与实际启动脚本允许列表。健康检查不套业务信封，AI 故障不使数据库 ready 失败。原配置中没有的功能不能在文档里写成已可用。
+
+## B. 数据模型与事务
+
+以下保留已有 MySQL 设计。规范主键、复合约束、锁顺序、独立数据库时间采样、调用代次与 tombstone 规则不因文档迁移而改变。API 字段映射只是引用，对外结构仍以契约为准。
+
 
 ## 1. 命名与公共字段
 
 - 数据库基线为 **MySQL 8.4 LTS / InnoDB**；服务端使用 Spring Boot。所有表显式声明 `ENGINE=InnoDB`，正文使用 `utf8mb4`；不混用其他数据库的 SQL 语法。
 - 主键 `id` 使用应用生成的规范小写 UUID；API 用字符串，字段 camelCase；数据库字段 snake_case。首版统一 `CHAR(36) CHARACTER SET ascii COLLATE ascii_bin`，所有 UUID 外键同型、同字符集、同排序规则；不在首版夹杂整数 ID 或二进制 UUID 映射。
-- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 使用带 `Z` 或明确偏移的 ISO 8601。预算日 `reserved_day` 为 `DATE`，从锁后采样 UTC 时刻按 `Asia/Shanghai` 转换后取得，不能直接用 UTC 日期代替本地预算日。
+- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 按契约统一使用带 `Z` 的 UTC ISO 8601。预算日 `reserved_day` 为 `DATE`，从锁后采样 UTC 时刻按 `Asia/Shanghai` 转换后取得，不能直接用 UTC 日期代替本地预算日。
 - 非纯关联表默认包含 `created_at/updated_at`。不可变快照只有创建时间和版本/来源信息。
 - 数据库状态用 `VARCHAR` 加命名 `CHECK` 约束，布尔值用 `TINYINT NOT NULL` 并约束为 0/1，不能写前端中文标签；分数使用 `DECIMAL(6,2)`，满分限定 `0 < max_score <= 9999.99`，得分限定 `0 <= score <= 对应满分`。Java 使用 `BigDecimal`，输入至多两位小数，不依赖数据库静默舍入；启用严格 SQL 模式，不通过 `INSERT IGNORE` 吞掉错误。
 - MySQL `JSON` 用于小型文件集、冻结量表、策略配置和结构化输出；实体归属/核心关系用真实外键，不能全部埋在 JSON 中。JSON 不直接作为普通索引键，需要查询的标量先提取为显式列或生成列；正文/任意 JSON 路径不默认加索引。
@@ -47,18 +96,50 @@ erDiagram
 
 `course_offering` 是权限与学情隔离的基本单元。章节/知识点在教学班实例内维护，避免改一个班影响同课程其他班。
 
+<a id="db-auth"></a>
+
 ## 3. P0：账户与工程基础
+
+<a id="session-timeouts"></a>
+
+### 3.1 会话期限与配置
+
+默认空闲期限为 12 小时，创建后的绝对期限为 7 天；有效访问仅延长空闲期限，不能突破绝对期限。配置项分别为 `auth.session.idle-timeout`、`auth.session.absolute-timeout`，环境变量为 `AUTH_SESSION_IDLE_TIMEOUT=PT12H`、`AUTH_SESSION_ABSOLUTE_TIMEOUT=P7D`。配置必须为正数，空闲期限不超过绝对期限，精度最多微秒；到期时刻本身即失效。默认值应与 [application.yml](../backend/src/main/resources/application.yml) 及 AuthSessionConfigurationTest 同步维护。运行时环境注入方式见 [README](../README.md)。
+
+### 3.2 账户数据与事务
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
-| `users` | `id, username, display_name, password_hash, roles, status` | username 唯一；roles 是受控 student/teacher/admin 集合；status active/disabled |
-| `auth_sessions` | `id, user_id, token_hash, csrf_secret, expires_at, idle_expires_at, revoked_at, last_seen_at` | 不透明随机令牌只存摘要；user_id FK；token_hash 唯一；登录轮换令牌 |
+| `users` | `id, username, display_name, password_hash, roles, status, created_at, updated_at` | username 为规范小写 ASCII、唯一；roles 是非空且无重复的 student/teacher/admin 集合；status active/disabled，默认 active |
+| `auth_sessions` | `id, user_id, token_hash, credential_hash, csrf_secret, expires_at, idle_expires_at, revoked_at, last_seen_at, created_at, updated_at` | 不透明随机令牌只存摘要；user_id FK；token_hash 唯一；credential_hash 绑定密码与平台角色状态；登录轮换令牌 |
 | `audit_logs` | `id, actor_id, action, target_type, target_id, metadata, request_id, created_at` | 不记录口令/凭证/完整正文；用户删除可匿名化 actor；只允许追加 |
 | `terms` | `id, label, starts_at, ends_at, is_current, current_slot` | 学期由管理员维护；ends_at > starts_at；current_slot 为可空 STORED 生成列，唯一索引保证最多一个当前学期；label 为展示文本 |
 
-2026-10-06 已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)，当前只迁移 `terms`；`users/auth_sessions/audit_logs` 随账户相关功能继续增加版本迁移。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由后续管理功能显式写入，不设置依赖服务器时区的默认时间。此轮没有初始化学期数据，因此不存在当前学期；尚未实现的 `/me/config` 不能视为已可查询。
+已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql)；`audit_logs` 随对应功能继续增加版本迁移。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。尚无当前学期，未实现的 `/me/config` 不能视为已可查询。
 
-Flyway 自行维护 `flyway_schema_history`，记录迁移版本和校验值；应用启动时验证并执行未应用版本。已经应用的迁移不修改，后续结构调整新增 V2、V3 等文件。当前开发实例和 Testcontainers 均固定 `mysql:8.4.11`，已验证迁移重复执行、当前学期唯一性、0/1 检查、时间区间、微秒精度及 UTC / READ COMMITTED 配置。
+`users` 的具体存储约定如下：
+
+- `username` 为 `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin`，3～64 个字符，以小写字母或数字开头，其余字符只允许小写字母、数字、点、下划线、连字符。`uq_users_username` 保障唯一并支持查询，不另建重复普通索引；`ck_users_username` 同时检查长度、首字符及非法字符，连末尾空格或换行也必须拒绝。
+- 已实现的登录凭据校验对用户名 `strip()`、`toLowerCase(Locale.ROOT)` 后校验规范；受控账户导入后续沿用，本地初始化使用固定规范用户名。Mapper 按规范值精确查询，不自行转换。SQL 保留唯一索引等值条件，并追加字节比较，避免 `ascii_bin` 的 PAD SPACE 语义忽略输入尾随空格。用户名身份比较与中文展示名称分开，`display_name` 为 `VARCHAR(100)`，采用表默认 `utf8mb4`。
+- `password_hash` 为 `VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin`，保存 `{argon2}$argon2id$...` 格式。使用 Spring Security `PasswordEncoder`，Argon2id 参数为内存 19456 KiB、迭代 2 次、并行度 1、随机盐 16 字节、输出 32 字节；算法前缀、参数与盐包含在哈希内，不新增盐字段、不修改已执行的 V2。校验使用 `matches(原始密码, 已存哈希)`，不能重新 encode 后比较两个字符串；相同口令的随机盐不同，因此哈希不同。数据库对象不作为 API DTO，密码哈希不进入 JSON 或 `toString()`。[Spring 密码存储](https://docs.spring.io/spring-security/reference/features/authentication/password-storage.html)、[OWASP 密码存储](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- `roles` 为必填 JSON 数组，`ck_users_roles` 使用内联 JSON Schema 检查 1～3 个受控字符串且无重复；这是集合，数组顺序不具有权限优先级。Java 映射为不可修改的 `List<String>`。`ck_users_status` 按二进制精确检查 `active/disabled`，防止排序规则忽略末尾空格；登录凭据校验已拒绝 disabled 账户，查询本身不隐藏它。一次查询与口令校验不提供并发状态变更的事务保证，会话创建及后续鉴权须在相应阶段重新检查。
+- Java `Instant` 通过 [UtcInstantTypeHandler](../backend/src/main/java/com/learningplatform/common/mybatis/UtcInstantTypeHandler.java) 与 JDBC `LocalDateTime` 按 UTC 显式转换，保留微秒，不使用 JVM 默认时区。
+
+凭据校验只读 `users`，不更新账户时间/哈希/权限，不创建 `auth_sessions`，也不新增迁移。成功返回单独的 `UserDTO`，角色集合复制为不可修改列表；未知用户使用进程内占位哈希进行校验计算，占位值不写入任何账户或数据库。数据库保存的未知算法或损坏哈希拒绝认证；算法升级仍需完整迁移方案，不把原始 MD5 或明文当作可验证格式。登录输入边界与错误规则见 [契约 LoginWrite](openapi.yaml)。
+
+本地开发执行 `Start-Local.ps1 -InitializeAccounts` 时，创建 `student.demo/teacher.demo/admin.demo`，各持有同名的单一角色，姓名为演示学生、演示教师、演示管理员，初始状态 `active`。UUID 与 UTC 微秒时间由 Service 写入。新密码须为 15～128 个 Unicode 码点且不能全为空白，不裁剪、不改变大小写；本地脚本默认生成独立随机口令。已有账户全部跳过，不覆盖哈希、角色、状态、姓名或时间；三项在一个 READ COMMITTED 事务内完成，任一新增失败回滚本次新增，已有数据保留。并发初始化由唯一键阻止重复，失败方回滚后重试。该命令只用于约定的本地开发库，不是公共注册、密码重置或生产账户管理接口；正常 API 启动与 Flyway 迁移均不创建账户。更完整的教学演示数据仍随 P1 实现。
+
+Flyway 自行维护 `flyway_schema_history`，记录迁移版本和校验值；应用启动时验证并执行未应用版本。已经应用的迁移不修改，后续结构调整新增 V4、V5 等文件。当前开发实例和 Testcontainers 均固定 `mysql:8.4.11`，已验证学期迁移重复执行、当前学期唯一性、0/1 检查、时间区间、微秒精度及 UTC / READ COMMITTED 配置；用户与会话验证见历史开发记录的第四至七步。
+
+`auth_sessions` 的存储与事务规则如下：
+
+- `token_hash/credential_hash/csrf_secret` 使用 `CHAR(64) ascii_bin`，CHECK 精确限制 64 个小写十六进制字符。令牌为 32 个密码学随机字节的十六进制表示，数据库仅存 SHA-256 摘要并唯一索引；`csrf_secret` 是另行生成的随机秘密，供后续 HTTP CSRF 实现使用，本轮尚不校验 CSRF。
+- `credential_hash` 为已存密码哈希、换行分隔符及排序后逗号连接的平台角色集合的 SHA-256 摘要，用于识别会话创建后安全状态是否改变；角色数组仅调整顺序不改变摘要。它不哈希原始口令，不替代 `users.password_hash` 中的 Argon2id。
+- `user_id` 外键关联 `users.id`，删除账户级联删除其会话；索引 `user_id` 支持账户会话查询，`expires_at` 支持后续清理。会话清理任务尚未实现，保留周期随运维规则落实。全部时间为 UTC 微秒；CHECK 保证 `created_at <= last_seen_at <= updated_at`、空闲期限大于最近访问且不超过绝对期限、撤销时间不早于创建时间。
+- `DatabaseSessionService.login()` 在 READ COMMITTED 事务中完成凭据校验，随后对账户 `FOR SHARE` 锁读并再次检查状态及所验证的密码哈希，再锁旧会话 `FOR UPDATE`；切换账户时先按用户 ID 排序取账户锁，所有路径均遵循账户→会话顺序。锁等待结束后通过注入的 UTC `Clock` 取创建时刻，旧会话撤销与新会话插入同事务，后者失败前者回滚。只轮换传入的旧令牌，支持其他设备独立登录。[MySQL 锁读](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html)
+- `resolve()` 在同样的锁顺序下检查撤销、账户 active、密码/角色摘要及两种期限；到期时刻本身即失效。有效访问更新最近访问与空闲期限，取 `min(访问时刻 + 空闲时长, 绝对期限)`，绝对期限始终不变。时钟回拨时不让最近访问时间倒退。检测到失效会话时持久撤销；此方法使用 `noRollbackFor=BusinessException.class`，使该清理可在业务拒绝时提交，意外数据库故障仍回滚。后续 HTTP 鉴权层须在业务写事务前调用并结束会话事务，不能与后续业务异常混成一个事务。
+- `revoke()` 重复执行、未知或格式错误令牌均可安全结束；已撤销会话不能恢复。禁用被观察后，即使重新启用也不能恢复该会话。当前没有账户管理入口；后续禁用、口令或权限修改必须在修改事务内主动撤销全部会话，不能仅依赖访问时观察变更。身份每次读取当前姓名与角色，模块资格仍不等于教学班对象权限。
+- 内部 `AuthSession/SessionGrant/SessionIdentity` 的敏感字段使用 `@JsonIgnore` 并覆写安全 `toString()`，不直接作为登录 HTTP 响应；原始会话令牌后续仅写 Cookie，不进入 URL、日志或前端存储。[OWASP 会话管理](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 
 平台角色赋予模块资格，授课范围由 `offering_members` 决定。管理员维护操作通过独立管理流程审计，不能直接把所有学生隐私暴露给普通管理列表。
 
@@ -77,6 +158,8 @@ ALTER TABLE terms
 ```
 
 并发切换由同一管理员事务按 ID 升序锁定目标学期与当前学期，先清除再设置；唯一约束是最终防线。冲突整体回滚并返回可识别错误，不能先提交清除操作。[MySQL 生成列](https://dev.mysql.com/doc/refman/8.4/en/create-table-generated-columns.html)、[UNIQUE 的 NULL 规则](https://dev.mysql.com/doc/refman/8.4/en/create-table.html)
+
+<a id="db-teaching"></a>
 
 ## 4. P1：教学内容与学习闭环
 
@@ -108,7 +191,7 @@ P1 所有 active 基础课程允许 teacher 角色开班；若以后需要逐课
 | `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, files_snapshot, reflection, content_version, assignment_title_snapshot, requirements_snapshot, rubric_snapshot, max_score_snapshot, knowledge_points_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | UNIQUE(assignment_id,student_id,attempt_no)；每学生每任务仅一个 is_current=1；current_slot 为生成列；快照字段创建后不可修改 |
 | `feedback` | `id, submission_id, teacher_id, draft_payload, published_payload, version, published_version, published_at` | submission_id 唯一；draft/published payload分开；发布后P1不可再编辑；分数/量表/知识结论在payload内 |
 
-`assignmentState` 不单独存成可随意修改的学生状态列，按以下顺序派生：当前提交有 published_payload → REVIEWED；当前提交存在 → SUBMITTED；工作区存在 → IN_PROGRESS；否则 NOT_STARTED。
+`assignmentState` 的合法值以 [AssignmentState](openapi.yaml#/components/schemas/AssignmentState) 为准，不单独存成可随意修改的学生状态列。按以下优先级推导对应契约状态：当前提交有 published_payload → 已评价；当前提交存在 → 已提交；工作区存在 → 进行中；否则 → 未开始。中文仅解释含义，响应必须使用契约枚举原值。
 
 学生对作业的所有读取、列表、推荐与统计都要求 `published_at IS NOT NULL` 且满足成员权限。公开生命周期仅为 draft→published→archived；归档接口只允许 published→archived，重复归档返回原结果，draft 归档请求拒绝。归档教学班不自动公开任何 draft 子对象，教师仍可读自己的草稿。
 
@@ -128,15 +211,7 @@ ALTER TABLE submissions
 
 首次读取未保存工作区时 API 返回模板与 `revision=0`，不插入表。第一次保存由 baseRevision=0 创建 revision=1。P2 提示进度放在独立 `tutoring_progress`，发起 AI 辅导不创建模板工作区、不增加文件 revision，也不使未保存作业伪装为 IN_PROGRESS。
 
-`files` 结构：
-
-```json
-[
-  {"path":"index.html","content":"<nav class=\"navbar\"></nav>"},
-  {"path":"style.css","content":".navbar { display: flex; }"},
-  {"path":"script.js","content":""}
-]
-```
+`files` 的 JSON 结构引用契约 FileDTO；数据库 JSON 不改变字段含义。
 
 文件必须完全符合任务模板类型的允许清单；Web 可为空文本但不能遗漏文件字段。默认单文件 100 KiB，总量 256 KiB，按 UTF-8 字节数验证。SQL/文字类型采用对应一个文件，按相同上限。
 
@@ -155,9 +230,11 @@ P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=nul
 | `idempotency_records` | `id, user_id, method, path, idempotency_key, request_hash, state, response_status, response_body, resource_type, resource_id, expires_at` | UNIQUE(user_id,method,path,idempotency_key)；对应 Idempotency-Key 请求头，保留至少 24 小时；state processing/completed；AI 仅保存请求指针和入队响应，不复制正文；过期后相同键视为新请求 |
 | `learning_events` | `id, user_id, offering_id, assignment_id, chapter_id, client_event_id, source_event_key, session_id, type, source, occurred_at, received_at, payload` | P1 先建最小表并仅写 source=server；P2 开放 client，P3 开放 checker；非空 source_event_key 唯一；非空 client_event_id 有 UNIQUE(user_id,client_event_id) |
 
-课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入 `notifications` 和全部 `notification_recipients`，任一写入失败整体回滚。P1 不引入通知 worker 或“通知处理中”状态。成功返回后本人消息即可查询；`FeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notification_recipients.id`，用于 `/me/messages/{messageId}/read`。共享通知实体 `notifications.id` 只用于公告端点及内部关联，不混作个人消息 ID。
+课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入 `notifications` 和全部 `notification_recipients`，任一写入失败整体回滚。P1 不引入通知 worker 或“通知处理中”状态。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notification_recipients.id`，用于 `/me/messages/{messageId}/read`。共享通知实体 `notifications.id` 只用于公告端点及内部关联，不混作个人消息 ID。
 
-公告和作业发布在同一事务内查询当时 active 学生成员并批量插入收件人，`recipientCount` 来自实际冻结集合；后加入学生不补发旧个人提醒，但可读本班历史公告。自然键例如 `feedback:{id}:published:{version}`、`assignment:{id}:published:{contentVersion}`、`notice:{id}`、`help_reply:{id}`；重复业务请求命中原通知，不生成新的通知 ID，收件人唯一约束作为第二层防重。`target_type` 允许 offering/chapter/resource/assignment/feedback/help_request；求助回复指向原 help_request，不暴露其他会话。
+公告和作业发布在同一事务内查询当时 active 学生成员并批量插入收件人，`recipientCount` 来自实际冻结集合；后加入学生不补发旧个人提醒，但可读本班历史公告。自然键例如 `feedback:{id}:published:{version}`、`assignment:{id}:published:{contentVersion}`、`notice:{id}`、`help_reply:{id}`；重复业务请求命中原通知，不生成新的通知 ID，收件人唯一约束作为第二层防重。`target_type` 的合法值引用 [TargetDTO.type](openapi.yaml#/components/schemas/TargetDTO/properties/type)，数据库约束与该集合保持一致；求助回复指向原 help_request，不暴露其他会话。
+
+`learning_events.received_at` 是服务端接收或创建事件的 UTC 微秒时间，不从客户端 occurredAt 复制；当前 HTTP 事件上报不接收也不回传 receivedAt。它是内部存储字段，并未从数据模型删除。
 
 P1 保存、提交、评价、发布与章节访问等可信事件同业务事务落库，事件 `source_event_key` 使用业务对象 ID 与版本，例如 `workspace:{id}:saved:{revision}`，事务重试不重复记数。P1 不开放客户端事件写接口，也不产生掌握分析；这避免 P1 事务依赖尚未迁移的 P2 表。事件 payload 只存白名单元数据，不复制作品、密码或聊天正文。每个事件只能使用对应来源的去重键，客户端不得指定 source 或 source_event_key。
 
@@ -190,9 +267,13 @@ ALTER TABLE assignments
 
 `chapter_id` 可空代表独立作业，非空时上述关系强制同班。InnoDB 外键即时校验，不提供延迟到 COMMIT 的约束；循环引用分阶段建立：先建章节/成员与作业/政策表、以 NULL 初始化可选指针，再添加复合 FK 并绑定。不要通过关闭 `foreign_key_checks` 导入未校验数据；重新打开该开关不会回查期间写入的数据。所有 FK 在迁移中使用数据库范围内唯一的显式名称。
 
+<a id="db-ai"></a>
+
 ## 5. P2：受限 AI、求助与分析
 
 ### 5.1 AI 与求助
+
+提供商适配器只接收按 [外部 AI 数据发送边界](DEVELOPMENT.md#ai-data-boundary) 组装的最小上下文；不得直接序列化用户实体、提交实体或整段请求日志到供应商。每次首次调用与受控重生成均执行发送前检查。
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
@@ -244,25 +325,7 @@ CREATE TABLE ai_budget_locks (
 
 学生消息在请求入队事务内创建；会话行锁保护 `next_message_sequence` 分配。完成或提供 fallback 时至多增加一条助手消息；failed 请求不制造助手正文，前端从请求状态展示错误。请求归属必须与消息 session_id 一致，数据库以相应复合键约束。分页以持久 sequence 排序，正文过期后返回“内容已到期”的占位，不能让历史消息序号变化或让同一请求出现两个答案。
 
-`ai_policies.config` 示例（项目默认建议，不是实现中的常量）：
-
-```json
-{
-  "enabled":true,
-  "allowedActions":["ask","concept","next_hint"],
-  "allowedModes":["concept","debug_hint","guided_question"],
-  "restrictCompleteSolution":true,
-  "maxHintLevel":3,
-  "allowCodeBlocks":false,
-  "requireAttemptFromLevel":2,
-  "dailyUserLimit":30,
-  "dailyAssignmentLimit":12,
-  "perMinuteLimit":3,
-  "maxOutputTokens":800
-}
-```
-
-教师规则只能收紧平台上限，不能扩大允许输出为完整答案或修改其他班政策。dailyUserLimit 和 perMinuteLimit 是平台只读配置，教师 PUT 时只可省略或原值回传；班级政策最多再收紧该作业限额。
+`ai_policies.config` 保存契约 AiPolicyWriteDTO 中的政策字段，不含 baseVersion；版本及操作者使用独立列。平台只读值在写入前检查，默认与可配置边界由契约和 DEVELOPMENT 辅导政策规则定义。
 
 ### 5.2 后台任务与恢复
 
@@ -305,7 +368,7 @@ ALTER TABLE knowledge_evidence
 
 P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有效证据查询计算，返回 `ruleVersion/asOf/evidenceIds`；只有确认查询瓶颈后才加入可重建的缓存/物化表，避免让缓存成为唯一事实。
 
-教师已发布知识评价是当前 `knowledge-v2` 的唯一掌握证据；分析不引用草稿评价。学生有关联任务真正进行中可以决定 learning，但不是通过证据；历史只有一次 meets_expectation 且没有进行中任务时仍为 insufficient_evidence，不能无限期称为正在学习。对外 assessmentState=basically_mastered/needs_practice/learning/insufficient_evidence，不与教师单条 result 混用；具体优先级及 freshness 从有效证据、当前任务和接口规则计算，不添加可任意写入的状态列。P1 不建 knowledge_evidence，P2 启用后从既有已发布评价幂等回填。
+教师已发布知识评价是当前 `knowledge-v2` 的唯一掌握证据；分析不引用草稿评价。学生有关联任务真正进行中可以决定 learning，但不是通过证据；历史只有一次 meets_expectation 且没有进行中任务时仍为 insufficient_evidence，不能无限期称为正在学习。对外状态引用 [KnowledgeAssessment.assessmentState](openapi.yaml#/components/schemas/KnowledgeAssessment/properties/assessmentState)，不与教师单条 result 混用；具体优先级及 freshness 按 DEVELOPMENT 8.2 计算，不添加可任意写入的状态列。P1 不建 knowledge_evidence，P2 启用后从既有已发布评价幂等回填。
 
 ## 6. P3：自动检查
 
@@ -316,6 +379,8 @@ P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有�
 检查任务只能从本人服务器保存版本或授课教师可访问提交取快照。worker 将快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
 
 P3 将检查转为知识证据时需更新分析规则版本，并标注 source=checker、检查规则与可信度。不要在尚无检查服务时填充“通过检查”的种子事实。
+
+<a id="db-transactions"></a>
 
 ## 7. 核心事务
 
@@ -349,7 +414,7 @@ READ COMMITTED 减少普通范围查询的间隙锁，但外键校验与唯一�
 
 ### 7.3 提交作业
 
-验证当前身份及既有幂等响应；未命中时在同一事务领取幂等键 → 教学班/作业共享锁 → 该学生成员、工作区、当前提交及评价锁 → 新语句获取一次提交时刻 → 校验期限/重交/次数/版本/尚未发布评价 → 旧版 is_current=0 → 新快照 is_current=1 → 写 P1 服务端事件 → 保存幂等响应 → 同事务提交。任一失败整体回滚；旧提交先失效再插入新当前提交，以满足生成列唯一约束。
+验证当前身份及既有幂等响应；未命中时在同一事务领取幂等键 → 教学班/作业共享锁 → 该学生成员、工作区、当前提交及评价锁 → 新语句获取一次提交时刻 → 按 DEVELOPMENT 10.3 的优先级检查提交资格，再校验当前工作区版本 → 旧版 is_current=0 → 新快照 is_current=1 → 写 P1 服务端事件 → 保存幂等响应 → 同事务提交。任一失败整体回滚；旧提交先失效再插入新当前提交，以满足生成列唯一约束。
 
 ### 7.4 发布评价
 
@@ -397,20 +462,13 @@ READ COMMITTED 减少普通范围查询的间隙锁，但外键校验与唯一�
 
 本表的普通索引均为 MySQL B-tree 复合索引，不附 `WHERE` 过滤条件。查询与约束使用不同索引时显式保留两者，不能假设生成列唯一索引自动满足所有 `is_current/status` 过滤查询。当前规模只按有效证据计算最近三份不同作业；有查询计划依据后再调整列顺序。幂等、自然键等索引不使用前缀唯一索引，防止把截断前缀误当全值唯一。
 
-## 9. 统计公式与种子数据
+## 9. 统计与种子数据
 
-- 学生有效完成作业：每任务当前有效提交存在，不累计 attempt_no。
-- 待完成只包含active班级的published未提交作业；归档未完成计archivedIncompleteCount，不进入首页。allCount=todoCount+doneCount+archivedIncompleteCount，done包含已提交/评价历史。
-- 已完成实验：以上范围中 type=web_lab；不能把所有文字任务都叫实验。
-- 已发布教师评价：当前提交的 published_payload 非空；重复发布不重复计数。
-- 教师待批阅：本班当前提交没有 published_payload；草稿评价仍算待批阅。
-- 章节进度：已发布必修章节中本人已确认 completed 数 / 已发布必修章节总数。
-- 实验/作业进度：已发布必做任务中有有效提交数 / 已发布必做任务总数。
-- 百分比正数 .5 向上，零分母返回 percent=0、notConfigured=true。
-- 未读反馈：本人当前评价对应消息未读，按不同 feedbackId 去重；旧版提醒不再计数。
-- 班级共性问题：相同 offering/assignment/issueTag 下学生ID去重，不按报错次数累计。
+统计业务口径只维护在 [DEVELOPMENT 第 9 节](DEVELOPMENT.md#9-首页进度与消息口径)，查询不得复制出另一套公式。
 
 种子数据用虚构教师/学生；至少两个学期、两个教学班、两个学生、一名教师、三个状态不同的作业。截止时间基于可控测试时钟生成，不能把前端固定 `2026-10-01` 作为服务器时钟。除跨班、截止和同版本竞争外，必须在真实 MySQL 8.4 / InnoDB 环境验证：归档与提交/邀请/政策完成并发；等待锁跨过截止；通知写入失败整体回滚及重试防重；AI 双会话并发和跨作业每日预算竞争；预算首行初始化并发；生成列 NULL 历史多行与非空当前唯一约束；1213/1205 后无部分提交；第一次或第二次外部调用失联；旧 worker 迟到不覆盖终态；续租等待跨过旧租约；只辅导不产生工作区；未发布草稿在归档班仍不可见；90 天后共享入口不能恢复已清理正文。测试可采用 Testcontainers MySQL，不用 H2 代替这些方言与锁行为。
+
+<a id="db-retention"></a>
 
 ## 10. 迁移、归档与删除
 
@@ -423,3 +481,10 @@ READ COMMITTED 减少普通范围查询的间隙锁，但外键校验与唯一�
 求助的 shared_tutoring_request_ids 仅指向原请求，详情读取受原 AI 请求的同一 content_expires_at 约束；到期显示已清理占位，不能通过求助副本延长聊天或 AI 上下文保留。学生主动共享的代码独立副本在创建求助时写 shared_snapshot_expires_at=created_at+90 天，到期清除 shared_snapshot 并写 shared_snapshot_purged_at。此清理不删除按课程归档策略保留的正式作品和评价；它们属于独立教学考核记录。
 
 background_jobs.payload 只存对象 ID；幂等响应对于 AI 仅存入队状态与请求 ID，不复制模型正文。日志、摘要、失败堆栈及备份均纳入相同保留边界，清理流程不得留下可以绕过期限的重复正文。自动清理只删除明确到期的内容、缓存或过期幂等记录；没有批准的课程归档策略时，不自动删除考核作品。知识状态直接从有效提交和已发布反馈重建，不依赖已过期客户端事件或 AI 正文。
+
+
+## C. 本端交付要求
+
+每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [DEVELOPMENT 11.1](DEVELOPMENT.md#111-协作与冻结流程) 的提交约定提交，交接时给出提交哈希与正文中记录的实际检查结果。
+
+阶段建立表的数量不作为进度目标，以可验收流程为准。P1 事件与通知同事务落库，P2 才回填知识证据并启动 AI worker；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。

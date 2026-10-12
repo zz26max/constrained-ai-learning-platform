@@ -7,3 +7,7 @@
 .env.*
 !.env.example
 *.log
+
+# 文档契约校验使用独立工具环境，不进入产品依赖。
+.contract-venv/
+scripts/__pycache__/

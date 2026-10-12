@@ -1,0 +1,46 @@
+name: Contract and documentation
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docs/**'
+      - 'scripts/*.py'
+      - 'scripts/requirements-contract.txt'
+      - 'README.md'
+      - '.github/workflows/contract.yml'
+  push:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docs/**'
+      - 'scripts/*.py'
+      - 'scripts/requirements-contract.txt'
+      - 'README.md'
+      - '.github/workflows/contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/requirements-contract.txt
+      - run: python -m pip install -r scripts/requirements-contract.txt
+      - run: python scripts/validate_contract.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Check production routes and backend unit/HTTP tests
+        working-directory: backend
+        run: bash ./mvnw --batch-mode test
