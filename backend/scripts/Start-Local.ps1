@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$DatabaseOnly,
     [switch]$InitializeAccounts,
     [ValidateRange(1, 65535)]
@@ -9,6 +9,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $backendDirectory = Split-Path -Path $PSScriptRoot -Parent
 $localConfigPath = Join-Path $backendDirectory '.env'
+
+function Invoke-NativeCommand {
+    # Windows PowerShell 5.1 在 ErrorActionPreference=Stop 下会把原生命令写到 stderr 的进度信息
+    # 当成终止错误（docker compose 与 maven 都会这样输出），导致脚本在命令实际成功时中断。
+    # 这里临时放行，只依据退出码判断成败。
+    param([scriptblock]$Command)
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Command; return $LASTEXITCODE } finally { $ErrorActionPreference = $previousPreference }
+}
 
 if ($DatabaseOnly -and $InitializeAccounts) {
     throw '-DatabaseOnly 与 -InitializeAccounts 不能同时使用。'
@@ -102,8 +112,8 @@ $configuredProfile = $env:SPRING_PROFILES_ACTIVE
 Push-Location $backendDirectory
 try {
     # Docker Desktop 需已启动。--wait 等待账号与数据库真正可查询后再启动 API。
-    docker compose --env-file .env up -d --wait --wait-timeout 120 db
-    if ($LASTEXITCODE -ne 0) { throw '本地数据库启动失败，请检查 Docker Desktop 和 3307 端口。' }
+    $composeExitCode = Invoke-NativeCommand { docker compose --env-file .env up -d --wait --wait-timeout 120 db }
+    if ($composeExitCode -ne 0) { throw '本地数据库启动失败，请检查 Docker Desktop 和 3307 端口。' }
     if ($DatabaseOnly) {
         Write-Host 'MySQL 已就绪，监听 127.0.0.1:3307；可按 README 配置 IDEA 启动。'
         return
@@ -116,8 +126,8 @@ try {
     $env:Path = (Join-Path $JdkPath 'bin') + ';' + $env:Path
     $env:SERVER_PORT = [string]$Port
     if ($InitializeAccounts) { $env:SPRING_PROFILES_ACTIVE = 'local-accounts' }
-    .\mvnw.cmd spring-boot:run
-    if ($LASTEXITCODE -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
+    $serverExitCode = Invoke-NativeCommand { .\mvnw.cmd spring-boot:run }
+    if ($serverExitCode -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
 } finally {
     # 避免一次性命令影响同一终端后续启动的 API。
     $env:SPRING_PROFILES_ACTIVE = $configuredProfile
