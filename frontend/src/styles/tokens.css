@@ -1,0 +1,22 @@
+/* 设计变量迁移自 website-prototype/src/styles.css（FRONTEND.md 9：沿用现有视觉约定）。 */
+:root {
+  --canvas: #f7f7f5;
+  --surface: #fff;
+  --ink: #262c36;
+  --muted: #606873;
+  --line: #e0e3e7;
+  --blue: #315cc8;
+  --blue-hover: #254aa9;
+  --blue-text: #2e539e;
+  --blue-soft: #e9effc;
+  --green: #247052;
+  --green-soft: #eaf4ee;
+  --orange: #97520c;
+  --orange-soft: #fff3e2;
+  --red: #a93434;
+  --red-soft: #fff2f0;
+  --focus-ring: #234ba7;
+  --radius-panel: 12px;
+  --radius-button: 7px;
+  --min-touch: 44px;
+}
