@@ -97,6 +97,22 @@ def check_links():
     return count
 
 
+def check_windows_scripts():
+    """Windows PowerShell 5.1 在非 UTF-8 代码页（如 936）下按 ANSI 读取无 BOM 的脚本，中文会破坏解析。
+
+    backend/scripts/Start-Local.ps1 曾因丢失 BOM 而整个脚本无法解析，启动路径静默失效；
+    编辑器与工具会顺手去掉 BOM，因此把这条约束纳入静态检查。
+    """
+    checked = 0
+    for path in sorted((ROOT / 'backend' / 'scripts').glob('*.ps1')):
+        data = path.read_bytes()
+        check(data.startswith(b'\xef\xbb\xbf'),
+              f'{path.name}: Windows PowerShell 脚本必须带 UTF-8 BOM，否则中文在 936 等代码页下无法解析')
+        checked += 1
+    check(checked > 0, '未发现任何 Windows PowerShell 脚本，该检查可能已失效')
+    return checked
+
+
 def main():
     validate_spec(SPEC)
     operations = [(p, m, op) for p, item in SPEC['paths'].items() for m, op in item.items() if m in METHODS]
@@ -242,9 +258,11 @@ def main():
     check(len(sliced['paths']) == 3, 'Contract slice selected unexpected paths')
     check('AssignmentDetailDTO' not in sliced['components']['schemas'], 'Contract slice includes unrelated schemas')
     links = check_links()
+    scripts = check_windows_scripts()
     print(f'PASS: OpenAPI 3.1; {len(business)} business + {len(operations)-len(business)} health operations; {len(examples)} schemas')
     print(f'PASS: baseline coverage, local refs, permissions metadata, error/status mapping; {count_examples} examples; {len(cases)} regression cases; {links} current-document links')
     print('PASS: six detail-response slices retain examples; five count/filter fixture checks (not live queries)')
+    print(f'PASS: {scripts} Windows PowerShell script(s) keep their UTF-8 BOM')
     print('Implementation states:', dict(Counter(op['x-implementation-status'] for _, _, op in operations)))
     print('Static validation only. No claim of HTTP integration, authorization, database or concurrency correctness.')
 
