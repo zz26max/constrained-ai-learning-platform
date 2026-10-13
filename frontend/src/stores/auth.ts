@@ -21,13 +21,7 @@ export type LoginFailure =
   | { kind: 'rate'; message: string }
   | { kind: 'unavailable'; message: string }
 
-/**
- * 认证状态（FRONTEND.md 2/4）：
- * - 会话令牌只在内存，不进 localStorage；服务端角色是权限来源。
- * - userGeneration 是用户代次：登录/退出递增；响应落地前核对代次，
- *   旧代次结果不得覆盖新用户数据。
- * - CSRF_INVALID 恢复按 DEVELOPMENT.md 10.2：不自动重放写请求。
- */
+/** 身份只在内存保存；CSRF 恢复遵循契约 1.1.0，不自动重放写请求。 */
 export const useAuthStore = defineStore('auth', () => {
   const api: AuthApi = authApi()
 
@@ -36,44 +30,69 @@ export const useAuthStore = defineStore('auth', () => {
   const identity = ref<UserDTO | null>(null)
   const config = ref<ConfigDTO | null>(null)
   const csrfToken = ref<string | null>(null)
-  const userGeneration = ref(0)
   const loginStatus = ref<RequestPhase>('idle')
   const loginFailure = ref<LoginFailure | null>(null)
+  // 本地操作提示，不是接口字段或业务错误码。
+  const logoutFailure = ref<string | null>(null)
   const lastRequestId = ref<string | null>(null)
   const identityRequestId = ref<string | null>(null)
 
-  let consecutiveCsrfFailures = 0
+  let loginRecoveryUsed = false
+  let logoutRecoveryUsed = false
+  const csrfRefresh = createCsrfRefreshCoordinator(refreshCsrfAndIdentity)
 
-  const csrfRefresh = createCsrfRefreshCoordinator(
-    () => refreshCsrfToken(),
-    () => userGeneration.value,
-  )
+  function clearAuthenticatedState(): void {
+    identity.value = null
+    config.value = null
+    csrfToken.value = null
+    identityRequestId.value = null
+    phase.value = 'anonymous'
+    bootStatus.value = 'success'
+    // lastRequestId 留给失败提示；不能把身份清理显示为退出成功。
+  }
 
   async function refreshCsrfToken(): Promise<void> {
-    const generation = userGeneration.value
+    const userId = identity.value?.id
+    csrfToken.value = null
     const result = await api.getCsrfToken()
-    if (userGeneration.value !== generation) return
-    csrfToken.value = result.data.csrfToken
+    if (identity.value?.id === userId) csrfToken.value = result.data.csrfToken
+  }
+
+  /** 已登录时共享整次恢复：取 token 与 /me，同时核对是否仍为同一用户。 */
+  async function refreshCsrfAndIdentity(): Promise<void> {
+    const userId = identity.value?.id
+    csrfToken.value = null
+    if (userId === undefined) {
+      await refreshCsrfToken()
+      return
+    }
+    const [token, me] = await Promise.all([api.getCsrfToken(), api.getMe()])
+    if (me.data.id !== userId || identity.value?.id !== userId) {
+      clearAuthenticatedState()
+      throw new Error('登录身份已变化，请重新登录。')
+    }
+    identity.value = me.data
+    identityRequestId.value = me.requestId
+    csrfToken.value = token.data.csrfToken
   }
 
   async function ensureCsrfToken(): Promise<string> {
     if (csrfToken.value !== null) return csrfToken.value
     await refreshCsrfToken()
     const token = csrfToken.value
-    if (token === null) {
-      throw new TransportError('未能获得登录令牌，请稍后重试。')
-    }
+    if (token === null) throw new TransportError('未能获得登录令牌，请稍后重试。')
     return token
   }
 
   async function loadConfig(): Promise<void> {
-    const generation = userGeneration.value
+    const userId = identity.value?.id
     try {
       const result = await api.getConfig()
-      if (userGeneration.value !== generation) return
-      config.value = result.data
+      if (identity.value?.id === userId && phase.value === 'authenticated') {
+        config.value = result.data
+      }
     } catch {
-      // 配置读取失败不清除登录态；配置相关功能按不可用显示。
+      // 配置读取失败不清除已核对的身份；配置相关功能按不可用显示。
     }
   }
 
@@ -90,10 +109,9 @@ export const useAuthStore = defineStore('auth', () => {
       await loadConfig()
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        phase.value = 'anonymous'
-        identity.value = null
+        clearAuthenticatedState()
       } else {
-        // 网络/服务不可用：保留可重试的错误态，不伪装成匿名。
+        // 网络/服务不可用不伪装成匿名。
         bootStatus.value = 'error'
         return
       }
@@ -119,61 +137,60 @@ export const useAuthStore = defineStore('auth', () => {
     )
   }
 
-  /** 登录：CSRF → login → 代次核对 → /me 验证 → config；403 CSRF_INVALID 只刷新令牌，等用户重新提交。 */
+  /** 登录响应与 /me 均成功才确认身份；失败恢复不重放登录。 */
   async function login(username: string, password: string): Promise<boolean> {
     if (loginStatus.value === 'loading') return false
-    const generation = userGeneration.value
     loginStatus.value = 'loading'
     loginFailure.value = null
+    lastRequestId.value = null
+    let loginAccepted = false
     try {
       const token = await ensureCsrfToken()
       const result = await api.login({ username, password }, token)
-      if (userGeneration.value !== generation) {
-        loginStatus.value = 'idle'
-        return false
-      }
+      loginAccepted = true
       csrfToken.value = result.data.csrfToken
-      identity.value = result.data.user
-      identityRequestId.value = result.requestId
-      userGeneration.value += 1
+      const me = await api.getMe()
+      identity.value = me.data
+      identityRequestId.value = me.requestId
+      config.value = null
       phase.value = 'authenticated'
+      await loadConfig()
       loginStatus.value = 'success'
-      consecutiveCsrfFailures = 0
-      // 登录后按验收链读取 /me 与 config；失败不回滚登录态，后续读取走 401 恢复。
-      try {
-        const me = await api.getMe()
-        if (userGeneration.value === generation + 1) {
-          identity.value = me.data
-          identityRequestId.value = me.requestId
-        }
-        await loadConfig()
-      } catch {
-        // 保留登录响应中的身份
-      }
+      loginRecoveryUsed = false
+      logoutRecoveryUsed = false
+      logoutFailure.value = null
       return true
     } catch (error) {
-      if (userGeneration.value !== generation) {
-        loginStatus.value = 'idle'
-        return false
-      }
+      if (loginAccepted) clearAuthenticatedState()
       loginStatus.value = 'error'
       if (error instanceof ApiError) {
         lastRequestId.value = error.requestId
         if (error.status === 403 && error.code === 'CSRF_INVALID') {
-          consecutiveCsrfFailures += 1
-          if (consecutiveCsrfFailures >= 2) {
-            // 重试后仍失败：停止自动恢复，提供刷新重入入口（DEVELOPMENT.md 10.2 第 4 条）
+          if (loginRecoveryUsed) {
+            clearAuthenticatedState()
             loginFailure.value = {
               kind: 'csrf-stalled',
-              message: '多次登录令牌校验失败，请刷新页面后重新登录。',
+              message: '登录令牌再次校验失败，请刷新页面后重新登录。',
             }
           } else {
-            await csrfRefresh.recover().catch(() => {})
-            loginFailure.value = {
-              kind: 'csrf',
-              message: '登录令牌已刷新，请重新点击“登录”。',
+            loginRecoveryUsed = true
+            try {
+              await csrfRefresh.recover()
+              loginFailure.value = {
+                kind: 'csrf',
+                message: '登录令牌已刷新，请重新点击“登录”。',
+              }
+            } catch {
+              clearAuthenticatedState()
+              loginFailure.value = {
+                kind: 'csrf-stalled',
+                message: '登录令牌刷新或身份核对失败，请重新登录。',
+              }
             }
           }
+        } else if (error.status === 401 && error.code === 'UNAUTHENTICATED') {
+          clearAuthenticatedState()
+          loginFailure.value = { kind: 'unavailable', message: '登录身份已失效，请重新登录。' }
         } else if (error.status === 401 && error.code === 'INVALID_CREDENTIALS') {
           loginFailure.value = { kind: 'credentials', message: '用户名或密码错误。' }
         } else if (error.status === 422 && error.code === 'VALIDATION_ERROR') {
@@ -185,9 +202,9 @@ export const useAuthStore = defineStore('auth', () => {
         } else if (error.status === 429 && error.code === 'RATE_LIMITED') {
           const wait =
             error.retryAfterSeconds !== null && error.retryAfterSeconds > 0
-              ? `（约 ${error.retryAfterSeconds} 秒后可重试）`
+              ? '（约 ' + error.retryAfterSeconds + ' 秒后可重试）'
               : ''
-          loginFailure.value = { kind: 'rate', message: `尝试过于频繁，请稍后再试${wait}。` }
+          loginFailure.value = { kind: 'rate', message: '尝试过于频繁，请稍后再试' + wait + '。' }
         } else {
           loginFailure.value = { kind: 'unavailable', message: '服务暂不可用，请稍后重试。' }
         }
@@ -198,33 +215,47 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 退出：401 视为会话已失效，按退出完成清理；其他失败保留登录态供重试。 */
+  /** 退出：401 清理身份；CSRF 首次恢复后由用户重试，再次失败停止恢复。 */
   async function logout(): Promise<boolean> {
     if (phase.value !== 'authenticated') return false
-    const generation = userGeneration.value
+    const userId = identity.value?.id
+    logoutFailure.value = null
     try {
       const token = await ensureCsrfToken()
       await api.logout(token)
     } catch (error) {
+      if (error instanceof ApiError) lastRequestId.value = error.requestId
       if (error instanceof ApiError && error.status === 401) {
-        // 会话已不存在：继续清理本地状态
+        // 会话已不存在：继续清理本地状态。
       } else if (error instanceof ApiError && error.status === 403 && error.code === 'CSRF_INVALID') {
-        await csrfRefresh.recover().catch(() => {})
-        return false // 提示用户重试，不自动重放写请求
+        if (logoutRecoveryUsed) {
+          clearAuthenticatedState()
+          logoutFailure.value = '退出安全校验再次失败，请重新登录。'
+        } else {
+          try {
+            await csrfRefresh.recover()
+            logoutFailure.value = '令牌已刷新，退出尚未完成，请重新点击“退出登录”。'
+          } catch {
+            clearAuthenticatedState()
+            logoutFailure.value = '令牌刷新或身份核对失败，请重新登录。'
+          } finally {
+            // 进行中的失败共用一次恢复；恢复结束后的用户重试不得再刷新。
+            logoutRecoveryUsed = true
+          }
+        }
+        return false
       } else {
-        return false // 网络/服务失败：保留登录态
+        logoutFailure.value = '退出失败，请稍后重试。'
+        return false
       }
     }
-    if (userGeneration.value !== generation) return false
-    identity.value = null
-    config.value = null
-    csrfToken.value = null
-    identityRequestId.value = null
-    consecutiveCsrfFailures = 0
-    userGeneration.value += 1
-    phase.value = 'anonymous'
+    if (identity.value?.id !== userId) return false
+    clearAuthenticatedState()
+    loginRecoveryUsed = false
+    logoutRecoveryUsed = false
     loginStatus.value = 'idle'
     loginFailure.value = null
+    logoutFailure.value = null
     return true
   }
 
@@ -234,9 +265,9 @@ export const useAuthStore = defineStore('auth', () => {
     identity,
     config,
     csrfToken,
-    userGeneration,
     loginStatus,
     loginFailure,
+    logoutFailure,
     lastRequestId,
     identityRequestId,
     ensureBoot,

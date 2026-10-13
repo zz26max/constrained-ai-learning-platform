@@ -81,14 +81,13 @@ describe('会话恢复（ensureBoot）', () => {
 })
 
 describe('登录（login）', () => {
-  it('成功：令牌轮换、代次递增、按验收链读取 /me 与 config', async () => {
+  it('成功：令牌轮换、按验收链读取 /me 与 config', async () => {
     scripted.setHandler(happyAuthScript())
     const ok = await store.login('student.demo', 'any-pass')
     expect(ok).toBe(true)
     expect(store.phase).toBe('authenticated')
     expect(store.identity?.username).toBe('student.demo')
     expect(store.csrfToken).toBe('csrf-t2')
-    expect(store.userGeneration).toBe(1)
     expect(operationIds(scripted.requests)).toEqual(['getCsrfToken', 'login', 'getMe', 'getConfig'])
   })
 
@@ -176,24 +175,10 @@ describe('登录（login）', () => {
     expect(store.loginFailure?.kind).toBe('rate')
   })
 
-  it('旧代次结果不落地：登录响应落地前代次已变化则丢弃', async () => {
-    scripted.setHandler((request) => {
-      if (request.operationId === 'login') {
-        // 模拟登录期间另一动作改变了用户代次
-        store.$patch({ userGeneration: 99 })
-        return okEnvelope({ user: { ...DEMO_USER, roles: [...DEMO_USER.roles] }, csrfToken: 'x' })
-      }
-      return happyAuthScript()(request)
-    })
-    const ok = await store.login('student.demo', 'any-pass')
-    expect(ok).toBe(false)
-    expect(store.phase).toBe('booting')
-    expect(store.identity).toBeNull()
-  })
 })
 
 describe('退出（logout）', () => {
-  it('成功：清空身份与配置，代次递增', async () => {
+  it('成功：清空身份与配置', async () => {
     scripted.setHandler(happyAuthScript())
     await store.ensureBoot()
     const ok = await store.logout()
@@ -201,7 +186,6 @@ describe('退出（logout）', () => {
     expect(store.phase).toBe('anonymous')
     expect(store.identity).toBeNull()
     expect(store.config).toBeNull()
-    expect(store.userGeneration).toBe(1)
   })
 
   it('401（会话已失效）：同样清理本地状态', async () => {
