@@ -31,6 +31,12 @@ public class ApiSecurityErrorWriter implements AuthenticationEntryPoint, AccessD
         write(request, response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "权限不足");
     }
 
+    /** 认证所依赖的会话查询异常属于服务端故障，不能降级成匿名或回显异常消息。 */
+    public void writeServerFailure(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        write(request, response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR", "服务暂时出现问题，请稍后重试。");
+    }
+
     private void write(HttpServletRequest request, HttpServletResponse response,
                        int status, String code, String message) throws IOException {
         if (response.isCommitted()) {

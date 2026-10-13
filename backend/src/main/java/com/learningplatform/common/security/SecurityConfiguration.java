@@ -25,9 +25,9 @@ public class SecurityConfiguration {
                                               DatabaseSessionService sessions,
                                               CsrfTokenService csrfTokens,
                                               AuthHttpProperties properties) throws Exception {
-        SessionCookieAuthFilter sessionAuth = new SessionCookieAuthFilter(sessions);
-        CsrfOriginFilter csrfOrigin = new CsrfOriginFilter(properties, csrfTokens);
         ApiSecurityErrorWriter errors = new ApiSecurityErrorWriter();
+        SessionCookieAuthFilter sessionAuth = new SessionCookieAuthFilter(sessions, errors);
+        CsrfOriginFilter csrfOrigin = new CsrfOriginFilter(properties, csrfTokens);
 
         http.securityMatcher("/api/v1/**")
                 .csrf(AbstractHttpConfigurer::disable)

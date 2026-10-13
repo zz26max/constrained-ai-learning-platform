@@ -46,7 +46,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         }
         HttpHeaders headers = new HttpHeaders();
         if (exception.getRetryAfterSeconds() != null) {
-            // 契约要求 429 与 REQUEST_IN_PROGRESS 必须返回重试等待秒数。
+            // 契约要求 429 限流响应返回重试等待秒数。
             headers.set("Retry-After", String.valueOf(exception.getRetryAfterSeconds()));
         }
         return errorResponse(exception.getStatus(), headers, exception.getCode(),
