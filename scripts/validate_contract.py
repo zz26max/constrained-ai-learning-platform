@@ -151,6 +151,9 @@ def main():
         for key in ['x-phase', 'x-implementation-status', 'x-contract-status', 'x-permission', 'x-csrf-required', 'x-idempotency']:
             check(key in op, f'{op["operationId"]}: missing {key}')
         check(op['x-implementation-status'] in {'planned', 'implemented', 'verified'}, 'Invalid implementation status')
+        check(op['x-contract-status'] in {'reviewed', 'draft'}, f'{op["operationId"]}: invalid contract status')
+        check(op['x-contract-status'] == 'reviewed' or op['x-phase'] in {'P2', 'P3'}, f'{op["operationId"]}: only P2/P3 may stay draft')
+        check(op['x-idempotency'] in {'none', 'natural', 'required', 'optional'}, f'{op["operationId"]}: invalid idempotency mode')
         params = op.get('parameters', [])
         declared = {p['name'] for p in params if p['in'] == 'path' and p['required']}
         check(declared == set(re.findall(r'{(.*?)}', path)), f'{path}: path parameters mismatch')
@@ -218,7 +221,9 @@ def main():
     case('AI expired content cannot leak', 'TutoringRequestDTO', expired, False)
     case('ask needs content', 'TutoringWrite', {'action': 'ask', 'content': ''}, False)
     case('concept permits empty content', 'TutoringWrite', {'action': 'concept', 'content': ''})
-    case('event cannot forge score', 'LearningEventsWrite', {'events': [{'eventId': uid, 'sessionId': uid, 'occurredAt': now, 'offeringId': uid, 'type': 'active_heartbeat', 'payload': {'visible': True, 'score': 100}}]}, False)
+    editor_event = {'eventId': uid, 'sessionId': uid, 'occurredAt': now, 'offeringId': uid, 'assignmentId': uid, 'type': 'editor_opened', 'payload': {'activeFile': 'index.html'}}
+    case('editor event accepted', 'LearningEventsWrite', {'events': [editor_event]})
+    case('event cannot forge score', 'LearningEventsWrite', {'events': [{**editor_event, 'payload': {'activeFile': 'index.html', 'score': 100}}]}, False)
     detail = {**deepcopy(examples['AssignmentWriteDTO']['examples'][0]),
               **deepcopy(examples['DashboardDTO']['examples'][0]['otherPendingAssignments'][0]),
               'attemptsUsed': 0, 'canSubmit': True, 'submissionBlockedReason': None}

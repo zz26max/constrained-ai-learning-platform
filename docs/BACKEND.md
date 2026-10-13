@@ -1,8 +1,8 @@
 # 后端开发手册
 
-基线：1.0.1 · 状态更新：2026-10-13 · 状态：P0-A 认证 HTTP 链（预登录 CSRF、登录、退出、/me、/config、会话 Cookie、Origin 校验、限流、审计）与账户内部能力已实现；P1～P3 教学业务端点、教学表与 worker 待实现。
+基线：1.1.0。当前实现进度见 [STATUS](STATUS.md)。
 
-先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。当前交付与待修复问题统一见 [交接说明](STATUS.md#handoff)。
+先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、事务和保留约定。当前交付与待修复问题统一见 [交接说明](STATUS.md#handoff)。
 
 快速定位：[工程规范](#a-工程与实现规范) · [会话配置](#session-timeouts) · [教学闭环](#4-p1教学内容与学习闭环) · [AI 与分析](#5-p2受限-ai求助与分析) · [核心事务](#db-transactions) · [查询索引](#8-查询与索引) · [数据保留](#10-迁移归档与删除) · [交付要求](#c-本端交付要求)
 
@@ -18,7 +18,7 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 ### A.1 事务、异常与跨模块调用
 
-事务入口使用其他 Bean 调用的 public Service，明确 READ_COMMITTED、rollbackFor=Exception；代理同类自调用不算事务入口。MyBatis 与事务管理器使用同一 DataSource，连接池显式 READ COMMITTED。具体锁定、重试与数据库时钟以本文数据模型第 7 节为准。
+事务入口使用其他 Bean 调用的 public Service，明确 READ_COMMITTED、rollbackFor=Exception；代理同类自调用不算事务入口。MyBatis 与事务管理器使用同一 DataSource，连接池显式 READ COMMITTED。并发手段与时钟以本文数据模型第 7 节为准。
 
 跨模块约束按 [DEVELOPMENT 3.3](DEVELOPMENT.md#33-调用与事务所有者)；同事务通知、事件、证据协作者不得提前独立提交。认证会话 resolve 的特殊提交行为保留在账户事务中，必须先结束它，再启动教学事务。外部 AI 调用不在事务中，不由数据库重试重新调用。
 
@@ -38,19 +38,19 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 反馈只使用 [StudentFeedbackDTO](openapi.yaml#/components/schemas/StudentFeedbackDTO) 与 [TeacherFeedbackDTO](openapi.yaml#/components/schemas/TeacherFeedbackDTO)：学生结构只承载已发布公开快照，并关联本人通知；教师结构可承载草稿，messageId 恒为 null，不借用学生通知 ID。学生读路径从 published_payload 构造，不能把草稿实体序列化后只隐藏按钮。
 
-测试按责任分层：规则与纯函数用单元测试；HTTP 信封、校验、权限用 MockMvc；迁移、JSON、唯一约束、锁与并发用真实 MySQL Testcontainers。并发用独立连接和真实提交，不用 H2 或外层回滚替代。已有 Maven test/verify 的职责和运行方式见 README。
+测试按责任分层：规则与纯函数用单元测试；HTTP 信封、校验、权限用 MockMvc；迁移、JSON、唯一约束与条件更新用真实 MySQL Testcontainers，不用 H2 替代。已有 Maven test/verify 的职责和运行方式见 README。
 
 新增迁移只向前编号；不得修改已经执行的 V1/V2/V3。跨模块共享的迁移序号由后端统一分配。部署执行明确迁移，演示账户与课程数据使用独立显式命令，正常启动不注入演示数据。
 
 ### A.3 配置与运行
 
-本地环境与现有启动命令以 [README](../README.md#后端启动) 为准。正式 frontend 已建立（见 [FRONTEND](FRONTEND.md)），但旧 prototype 或前端本地启动成功都不代表业务联调就绪。API 默认 8080，开发数据库 3307；worker 使用独立非 Web profile，到 P2 才加入。
+本地环境与现有启动命令以 [README](../README.md#后端启动) 为准。正式 frontend 已建立（见 [FRONTEND](FRONTEND.md)），但旧 prototype 或前端本地启动成功都不代表业务联调就绪。API 默认 8080，开发数据库 3307；P2 的 AI 后台执行在同一应用内，不另起进程。
 
 数据库账号、预登录签名密钥、邀请摘要密钥和模型密钥由服务端环境注入，不进入前端、日志或仓库；新环境变量同步 .env.example 与实际启动脚本允许列表。健康检查不套业务信封，AI 故障不使数据库 ready 失败。原配置中没有的功能不能在文档里写成已可用。
 
 ## B. 数据模型与事务
 
-以下保留已有 MySQL 设计。规范主键、复合约束、锁顺序、独立数据库时间采样、调用代次与 tombstone 规则不因文档迁移而改变。API 字段映射只是引用，对外结构仍以契约为准。
+规范主键、复合约束与 tombstone 规则如下；并发只用唯一约束、乐观锁与条件更新（第 7 节）。API 字段映射只是引用，对外结构仍以契约为准。
 
 
 ## 1. 命名与公共字段
@@ -170,7 +170,7 @@ ALTER TABLE terms
 | `courses` | `id, code, mark, title, description, status, created_by` | code 唯一；课程基础，由管理流程导入；status active/archived；mark为展示缩写，不包含个人进度 |
 | `course_offerings` | `id, course_id, term_id, title, group_name, progress_unit, status, issue_tags_config, created_by` | course_id/term_id FK；progress_unit chapter/assignment；status active/archived；issue_tags_config 是 P2 启用的版本化词表 JSON |
 | `offering_members` | `id, offering_id, user_id, role, status, joined_at, last_studied_at, last_chapter_id` | UNIQUE(offering_id,user_id)；role student/teacher；status active/inactive；同班单一角色；last_chapter_id 可空且必须同班 |
-| `course_invites` | `id, offering_id, code_digest, expires_at, max_uses, used_count, revoked_at, created_by` | code_digest 唯一；计数非负且不超过非空 max_uses；加入事务锁定 |
+| `course_invites` | `id, offering_id, code_digest, expires_at, max_uses, used_count, revoked_at, created_by` | code_digest 唯一；计数非负且不超过非空 max_uses；名额用条件更新消耗 |
 | `chapters` | `id, offering_id, position, title, summary, status, is_required, content_version` | UNIQUE(offering_id,position)；status draft/published/archived；position 正整数 |
 | `knowledge_points` | `id, offering_id, title, description, chapter_id, position` | chapter_id 可空；非空时必须属于同 offering；API order映射position |
 | `resources` | `id, offering_id, chapter_id, knowledge_point_id, title, content_markdown, position, status` | chapter/knowledge_point 的复合 FK 校验同班；知识点可空；status active/archived；可见性继承章节；P1 仅 Markdown |
@@ -180,7 +180,7 @@ Markdown 输出需经过允许列表清理；不渲染任意原始脚本或不�
 
 P1 所有 active 基础课程允许 teacher 角色开班；若以后需要逐课程授权，再增加开班授权关联表。章节 API 的 number 对应数据库 position，不另存冗余排序。学生 DTO 的 publicationState 来自 chapters.status，studentProgress 从 chapter_progress 派生，教师响应该字段为 null。教师发布章节后学生才可访问其内容；已发布资源修改是有审计的内容澄清，不能改提交中的冻结评价规则。
 
-实际展示章节或作业后，前端调用 `POST /me/learning-position`，提交 `offeringId` 及 chapterId/assignmentId 中恰好一个；GET 读取本身不修改学习位置。服务持父级共享锁校验 active 班级下本人可访问且仍为 published 的对象，更新 `offering_members.last_studied_at`；章节或绑定章节的作业同时更新 `last_chapter_id` 与 `chapter_progress.last_opened_at`，进度行不存在时创建 in_progress，不伪造 completed。未绑定章节的独立作业只更新班级最近学习时间。`currentChapter` 优先选本人最后访问且仍可见的章节，否则选首个未完成的已发布章节，再退到首个已发布章节，均无则为 null。归档教学班只读历史、不接受位置写入。章节完成确认单独处理 completed_at，访问已完成章节不降级。
+实际展示章节或作业后，前端调用 `POST /me/learning-position`，提交 `offeringId` 及 chapterId/assignmentId 中恰好一个；GET 读取本身不修改学习位置。服务校验 active 班级下本人可访问且仍为 published 的对象，更新 `offering_members.last_studied_at`；章节或绑定章节的作业同时更新 `last_chapter_id` 与 `chapter_progress.last_opened_at`，进度行不存在时创建 in_progress，不伪造 completed。未绑定章节的独立作业只更新班级最近学习时间。`currentChapter` 优先选本人最后访问且仍可见的章节，否则选首个未完成的已发布章节，再退到首个已发布章节，均无则为 null。归档教学班只读历史、不接受位置写入。章节完成确认单独处理 completed_at，访问已完成章节不降级。
 
 ### 4.2 作业、工作区、提交
 
@@ -188,7 +188,7 @@ P1 所有 active 基础课程允许 teacher 角色开班；若以后需要逐课
 | --- | --- | --- |
 | `assignments` | `id, offering_id, chapter_id, title, description, estimated_minutes, type, status, is_required, due_at, late_until, allow_resubmit, max_attempts, max_score, content_version, requirements, rubric, template_files, knowledge_point_ids, current_ai_policy_id, published_at` | type web_lab/sql_text/text；status draft/published/archived；max_attempts>=1；late_until 空或>due_at；满分范围见第 1 节；rubric 总分与 max_score 相符；API initialFiles 映射 template_files |
 | `workspaces` | `id, offering_id, assignment_id, student_id, files, active_file, revision, updated_at` | UNIQUE(assignment_id,student_id)；revision>=1；文件为 JSON；只表达真正保存过的学生草稿 |
-| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, files_snapshot, reflection, content_version, assignment_title_snapshot, requirements_snapshot, rubric_snapshot, max_score_snapshot, knowledge_points_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | UNIQUE(assignment_id,student_id,attempt_no)；每学生每任务仅一个 is_current=1；current_slot 为生成列；快照字段创建后不可修改 |
+| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, files_snapshot, reflection, content_version, assignment_title_snapshot, requirements_snapshot, rubric_snapshot, max_score_snapshot, knowledge_points_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | UNIQUE(assignment_id,student_id,attempt_no)；UNIQUE(assignment_id,student_id,workspace_revision) 保证同一版本只提交一次（自然幂等）；每学生每任务仅一个 is_current=1；current_slot 为生成列；快照字段创建后不可修改 |
 | `feedback` | `id, submission_id, teacher_id, draft_payload, published_payload, version, published_version, published_at` | submission_id 唯一；draft/published payload分开；发布后P1不可再编辑；分数/量表/知识结论在payload内 |
 
 `assignmentState` 的合法值以 [AssignmentState](openapi.yaml#/components/schemas/AssignmentState) 为准，不单独存成可随意修改的学生状态列。按以下优先级推导对应契约状态：当前提交有 published_payload → 已评价；当前提交存在 → 已提交；工作区存在 → 进行中；否则 → 未开始。中文仅解释含义，响应必须使用契约枚举原值。
@@ -221,16 +221,15 @@ feedback_payload的issueTags为P2可选数组，P1为空；每个tag必须属于
 
 P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=null；P2才建立ai_policies并为作业绑定生效版本。P1 feedback_payload可以保留教师明确给出的知识评价，但P2之前不自动产生掌握判断。
 
-### 4.3 消息、幂等与服务端事件
+### 4.3 消息与服务端事件
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
 | `notifications` | `id, offering_id, type, title, content, target_type, target_id, source_event_key, source_version, created_by` | source_event_key 唯一；type course_notice/assignment_published/feedback/system/help_reply；help_reply 于 P2 启用；target 为受控对象 |
 | `notification_recipients` | `id, notification_id, user_id, read_at, superseded_at` | UNIQUE(notification_id,user_id)；按接收者记录阅读状态；旧反馈提醒可置为已替代 |
-| `idempotency_records` | `id, user_id, method, path, idempotency_key, request_hash, state, response_status, response_body, resource_type, resource_id, expires_at` | UNIQUE(user_id,method,path,idempotency_key)；对应 Idempotency-Key 请求头，保留至少 24 小时；state processing/completed；AI 仅保存请求指针和入队响应，不复制正文；过期后相同键视为新请求 |
 | `learning_events` | `id, user_id, offering_id, assignment_id, chapter_id, client_event_id, source_event_key, session_id, type, source, occurred_at, received_at, payload` | P1 先建最小表并仅写 source=server；P2 开放 client，P3 开放 checker；非空 source_event_key 唯一；非空 client_event_id 有 UNIQUE(user_id,client_event_id) |
 
-课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入 `notifications` 和全部 `notification_recipients`，任一写入失败整体回滚。P1 不引入通知 worker 或“通知处理中”状态。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notification_recipients.id`，用于 `/me/messages/{messageId}/read`。共享通知实体 `notifications.id` 只用于公告端点及内部关联，不混作个人消息 ID。
+课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入 `notifications` 和全部 `notification_recipients`，任一写入失败整体回滚。P1 不引入异步通知或“通知处理中”状态。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notification_recipients.id`，用于 `/me/messages/{messageId}/read`。共享通知实体 `notifications.id` 只用于公告端点及内部关联，不混作个人消息 ID。
 
 公告和作业发布在同一事务内查询当时 active 学生成员并批量插入收件人，`recipientCount` 来自实际冻结集合；后加入学生不补发旧个人提醒，但可读本班历史公告。自然键例如 `feedback:{id}:published:{version}`、`assignment:{id}:published:{contentVersion}`、`notice:{id}`、`help_reply:{id}`；重复业务请求命中原通知，不生成新的通知 ID，收件人唯一约束作为第二层防重。`target_type` 的合法值引用 [TargetDTO.type](openapi.yaml#/components/schemas/TargetDTO/properties/type)，数据库约束与该集合保持一致；求助回复指向原 help_request，不暴露其他会话。
 
@@ -238,16 +237,16 @@ P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=nul
 
 P1 保存、提交、评价、发布与章节访问等可信事件同业务事务落库，事件 `source_event_key` 使用业务对象 ID 与版本，例如 `workspace:{id}:saved:{revision}`，事务重试不重复记数。P1 不开放客户端事件写接口，也不产生掌握分析；这避免 P1 事务依赖尚未迁移的 P2 表。事件 payload 只存白名单元数据，不复制作品、密码或聊天正文。每个事件只能使用对应来源的去重键，客户端不得指定 source 或 source_event_key。
 
-幂等键、事件自然键和去重键均为 ASCII、区分大小写，禁止使用默认的忽略大小写正文排序规则。`idempotency_key` 用 `VARCHAR(128)`，`method` 用 `VARCHAR(8)`，`path` 用 `VARCHAR(512)`（规范化路由路径，不包含 query，业务参数纳入 request_hash），这些列统一 `ascii_bin`；键长度和允许字符在边界校验。`source_event_key/dedupe_key` 用 `VARCHAR(192) ascii_bin`，`request_hash` 用 `CHAR(64) ascii_bin` 的 SHA-256 hex。MySQL 中直接 `UNIQUE(source_event_key)` 与 `UNIQUE(user_id,client_event_id)` 允许多条 NULL，无需条件索引；非空去重字段才参与防重。指针类型与正文响应的保留期限按接口约定管理。
+事件自然键和去重键均为 ASCII、区分大小写，禁止使用默认的忽略大小写正文排序规则。`source_event_key/dedupe_key` 用 `VARCHAR(192) ascii_bin`。MySQL 中直接 `UNIQUE(source_event_key)` 与 `UNIQUE(user_id,client_event_id)` 允许多条 NULL，无需条件索引；非空去重字段才参与防重。
 
 ### 4.4 必须落实的关联约束
 
 - `chapters/knowledge_points/assignments` 各增加 `UNIQUE(id,offering_id)`；`offering_members` 增加 `UNIQUE(id,offering_id)`。`assignments(chapter_id,offering_id)`、`knowledge_points(chapter_id,offering_id)` 复合引用章节；`resources` 对章节与非空知识点也按同班复合引用。
-- `chapter_progress(member_id,offering_id)` 引用成员，`(chapter_id,offering_id)` 引用章节；`offering_members(last_chapter_id,offering_id)` 引用同班章节。成员是否 active 学生、章节是否 published 由持有生命周期锁的服务校验。
+- `chapter_progress(member_id,offering_id)` 引用成员，`(chapter_id,offering_id)` 引用章节；`offering_members(last_chapter_id,offering_id)` 引用同班章节。成员是否 active 学生、章节是否 published 由服务校验。
 - `workspaces(assignment_id,offering_id)` 引用作业，`(offering_id,student_id)` 引用成员的唯一键；增加 `UNIQUE(id,assignment_id,student_id)`。`submissions(workspace_id,assignment_id,student_id)` 必须整体引用该工作区，同时 `(assignment_id,offering_id)` 引用同班作业，不能拼接其他学生/作业的 workspace_id。
 - P2 的 `knowledge_evidence` 同时复合引用所属作业、知识点、学生成员、提交与评价：提交增加 `UNIQUE(id,assignment_id,student_id,offering_id)`，评价增加 `UNIQUE(id,submission_id)`；证据以 `(submission_id,assignment_id,student_id,offering_id)` 和 `(feedback_id,submission_id)` 引用，杜绝把其他学生评价混为当前学生证据。引用列与父唯一索引按相同顺序，父/子 UUID 的字符集与排序规则完全一致。
 - P2 `ai_policies` 增加 `UNIQUE(id,assignment_id)`，`assignments(current_ai_policy_id,id)` 与 `submissions(ai_policy_id,assignment_id)` 按复合键引用，政策不允许跨作业绑定；P1 两字段为空，相关 FK 随 P2 迁移建立。`tutoring_sessions` 增加 `UNIQUE(id,assignment_id,student_id)`，请求用三列复合 FK 固定会话归属。
-- `tutoring_requests` 增加 `UNIQUE(id,session_id)`；消息以 `(tutoring_request_id,session_id)` 复合引用 `(id,session_id)`，请求与会话归属不能仅靠两条各自存在的单列 FK。请求的 `generation_policy_id/review_policy_id` 分别与 assignment_id 复合引用政策唯一键，尚未生成/审核时政策字段允许 NULL；调用行的政策归属由请求关联和服务校验保证。
+- `tutoring_requests` 增加 `UNIQUE(id,session_id)`；消息以 `(tutoring_request_id,session_id)` 复合引用 `(id,session_id)`，请求与会话归属不能仅靠两条各自存在的单列 FK。请求的 `generation_policy_id/review_policy_id` 分别与 assignment_id 复合引用政策唯一键，尚未生成/审核时政策字段允许 NULL。
 - P2 求助、证据对已有 offering_id、assignment_id、knowledge_point_id 等采用同班复合引用；JSON 中的任务知识点、量表 criterionId、共享请求 ID 仍需服务层检查重复项、实体存在、同班/同作业与章节范围。外键不能替代身份授权。
 - 核心教学记录默认限制物理删除，归档不级联删除作品、评价与历史引用。分数范围、文件大小、量表总分分别由数据库标量约束和服务端结构校验保护。
 
@@ -278,18 +277,16 @@ ALTER TABLE assignments
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
 | `ai_policies` | `id, assignment_id, version, config, created_by, created_at` | UNIQUE(assignment_id,version)；每版本不可变；config 用服务端固定模型校验；作业指向当前版本 |
-| `ai_budget_locks` | `student_id, created_at` | student_id 为 PK 且 FK→users.id；每个学生一行，仅用于跨作业/班级串行化 AI 预算检查与预占；不存预算金额/正文；其他领域表不引用此表 |
 | `tutoring_progress` | `id, assignment_id, student_id, highest_delivered_hint_level, disclosure_summary, disclosure_version, content_purged_at` | UNIQUE(student_id,assignment_id)；最高已交付层次默认 0；跨会话共享；summary 可空且受正文保留期限约束 |
 | `tutoring_sessions` | `id, assignment_id, student_id, status, next_message_sequence, created_at` | status active/closed；next_message_sequence 默认 1；不因新建会话重置作业提示进度或预算 |
-| `tutoring_requests` | `id, session_id, student_id, assignment_id, action, content, student_attempt, workspace_revision, workspace_snapshot, generation_policy_id, review_policy_id, review_version, reviewed_at, hint_level, status, pending_slot, result, fallback_reason, input_tokens, output_tokens, reserved_day, budget_reserved, started_at, completed_at, content_expires_at, content_purged_at` | status queued/running/completed/fallback/failed；每学生每作业最多一个 queued/running，pending_slot 为生成列；result 只存已审核输出；代码 revision/snapshot 可空 |
-| `tutoring_provider_calls` | `id, tutoring_request_id, attempt_no, generation_policy_id, state, provider_request_id, started_at, completed_at, input_tokens, output_tokens, raw_response, content_purged_at` | UNIQUE(tutoring_request_id,attempt_no)；attempt_no 为 1 或 2；state started/completed/unknown；raw_response 默认不保存，确需诊断时受同一保留期限约束 |
+| `tutoring_requests` | `id, session_id, student_id, assignment_id, action, content, student_attempt, workspace_revision, workspace_snapshot, generation_policy_id, review_policy_id, review_version, reviewed_at, hint_level, status, pending_slot, result, fallback_reason, provider_call_count, input_tokens, output_tokens, started_at, completed_at, content_expires_at, content_purged_at` | status queued/running/completed/fallback/failed；每学生每作业最多一个 queued/running，pending_slot 为生成列；provider_call_count 0～2；result 只存已审核输出；代码 revision/snapshot 可空；不保存供应商原始响应 |
 | `tutoring_messages` | `id, session_id, tutoring_request_id, sequence, role, content, mode, hint_level, policy_id, created_at, content_purged_at` | UNIQUE(session_id,sequence)；UNIQUE(tutoring_request_id,role)；role student/assistant；正文清理后保留 tombstone，ID/序号不重排 |
 | `help_requests` | `id, offering_id, assignment_id, student_id, title, content, student_attempt, workspace_revision, shared_snapshot, shared_snapshot_expires_at, shared_snapshot_purged_at, shared_tutoring_request_ids, issue_tags, status` | status open/answered/closed；只共享本人主动选择的内容；代码共享副本独立 90 天；AI 共享仅引用原请求，不复制正文延长保留 |
 | `help_replies` | `id, help_request_id, author_id, content, created_at` | 仅该班授课教师可回复；回复、原求助状态变更和站内通知/收件人同事务 |
 
-预算不必先创建独立计数系统：按第 7 节取得教学班、作业共享锁后，对既有 `ai_budget_locks.student_id` 行取 `FOR UPDATE`，再依次锁该学生成员、提示进度、可选工作区及会话，在全部必要锁后采样时间并串行检查预占记录。每日请求、每学生每作业请求和滚动一分钟配额都查 `budget_reserved=1` 的预占记录；`reserved_day` 按锁后数据库时间转换为北京时间自然日。不同作业、班级和会话共用学生全局额度；释放确定未调用的预占也取同一预算锁。该锁不替代授课/本人权限校验，不锁 users 行。
+预算不建独立计数或锁表：入队时按本人 `tutoring_requests` 计数判断每用户每日、每作业每日与最近一分钟配额，自然日按北京时间计算；计入 queued/running/completed/fallback，以及调用过供应商的 failed（provider_call_count>0）。不同作业、班级和会话共用学生全局额度。并发入队可能偶发超出 1 次，列为已知限制。
 
-同一学生在同一作业的所有会话合计只允许一个未完成请求，数据库兜底如下。新 key 并发入队返回 `AI_REQUEST_IN_PROGRESS`，原 key 重试返回原请求；另开会话不能同时拆解答案或跳过累计审核。
+同一学生在同一作业的所有会话合计只允许一个未完成请求，数据库兜底如下；冲突（1062 命中该索引）返回 `AI_REQUEST_IN_PROGRESS` 与 pendingRequestId，另开会话不能同时拆解答案或跳过累计审核。
 
 ```sql
 ALTER TABLE tutoring_requests
@@ -302,44 +299,23 @@ ALTER TABLE tutoring_requests
 
 `student_id/assignment_id` 必须 NOT NULL，终态产生 NULL slot，因此多条历史终态共存但在途最多一条。不要使用 `UNIQUE(student_id,assignment_id,status)` 替代，它既允许 queued 与 running 各一条，也会错误禁止多条 completed。
 
-预算锁表在 P2 迁移时为既有学生预填，新建学生或赋予 student 角色时在账户事务中预创建。若检测到缺行，允许在进入教学业务事务**之前**用独立短事务补齐；未补齐不得进入 AI 入队事务。在已经持有 offering/assignment 锁后缺行，整体回滚并报告配置错误，不临时插入预算行，不用 `users FOR UPDATE` 替代。补齐只进行预算行插入，1062 表示其他入口已创建后可读既有行；不使用 `INSERT IGNORE` 吞掉 FK/类型错误。该初始化流程不获取教学班/作业锁，因此不会把隐式 users FK 锁带入教学锁链。
-
-```sql
-CREATE TABLE ai_budget_locks (
-  student_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  created_at DATETIME(6) NOT NULL,
-  PRIMARY KEY (student_id),
-  CONSTRAINT fk_ai_budget_locks_student
-    FOREIGN KEY (student_id) REFERENCES users (id)
-    ON UPDATE RESTRICT ON DELETE RESTRICT
-) ENGINE=InnoDB;
-```
-
 `highest_delivered_hint_level` 只在经审核的 `completed` 结果已作为可读助手消息提交时推进，表示平台已交付内容，不等待客户端已读；`fallback/failed` 不升级。下次请求从这个进度决定允许层次；达到政策 requireAttemptFromLevel 时仍检查实际尝试。输出审核必须覆盖本人同作业跨会话的已交付历史，不能只看当前会话。可选 `disclosure_summary/disclosure_version` 用于摘要和校验版本，不得在摘要中永久保留已到期的答案正文；正文过期后的信息不足应保守回退，不视为可重新泄漏的空历史。
 
-每次真正的外部生成先插入一条 `tutoring_provider_calls(state=started)` 并提交，再发网络请求；第二次受控重生成是 `attempt_no=2` 的新调用行，也必须先持久化 started。仅在首次收到明确结果且输出审核失败时允许第二次；请求最多两次调用，不把 worker 重试次数当作外部调用次数。失联的 started 调用回收为 unknown：支持查询时按 provider_request_id 恢复结果，否则固定回退/失败，不重新生成、不释放预算。提供商已经受理或结果未知仍占一次请求预算；只有该请求没有任何外部调用、且确定在调用前系统失败时才释放预占。各调用 token 汇总到请求；unknown 的用量为空并明确未知，不能填 0。
+外部生成前先把 provider_call_count 加一并提交，再发网络请求；仅在首次收到明确结果且输出审核失败时允许第二次。结果未知（超时、进程中断）不盲目重试，结束为固定回退或 failed，避免重复费用。各次调用 token 累加到请求；用量未知时保持 NULL，不填 0。
 
-入队时若附本人当前已保存 revision，则冻结有限代码片段；未附 revision 可以只按问题和公开材料辅导，不创建工作区。排队后继续保存不会改变已受理上下文。`generation_policy_id` 记录最后一次实际模型调用所用政策，尚未调用时为空；每次外部调用另以不可变调用行保存本次 generation_policy_id，重生成不能覆盖之前调用的依据；`review_policy_id/review_version/reviewed_at` 单独记录最终交付审核所用政策、审核器版本和时间，不能覆盖生成政策掩盖政策变化。
+入队时若附本人当前已保存 revision，则冻结有限代码片段；未附 revision 可以只按问题和公开材料辅导，不创建工作区。排队后继续保存不会改变已受理上下文。`generation_policy_id` 记录最后一次实际模型调用所用政策，尚未调用时为空；`review_policy_id/review_version/reviewed_at` 单独记录最终交付审核所用政策、审核器版本和时间，不能覆盖生成政策掩盖政策变化。
 
-政策版本不可变。若模型生成或审核期间政策更新，完成事务持作业共享锁核对当前政策 ID 与审核版本；不相符时放弃本次提交，在锁外按新政策重新审核/受控回退，再持锁核对。最终写入助手消息、请求终态、提示进度及任务成功必须在一次短事务内完成。归档或成员失活后只记录失败元数据，不交付新生成正文。`tutoring_messages.policy_id` 对学生消息可空，对助手消息为实际审核政策。
+政策版本不可变。若模型生成或审核期间政策更新，交付事务核对当前政策 ID 与审核版本；不相符时放弃本次交付，按新政策重新审核或受控回退后再核对。最终写入助手消息、请求终态、提示进度及任务成功必须在一次短事务内完成。归档或成员失活后只记录失败元数据，不交付新生成正文。`tutoring_messages.policy_id` 对学生消息可空，对助手消息为实际审核政策。
 
-学生消息在请求入队事务内创建；会话行锁保护 `next_message_sequence` 分配。完成或提供 fallback 时至多增加一条助手消息；failed 请求不制造助手正文，前端从请求状态展示错误。请求归属必须与消息 session_id 一致，数据库以相应复合键约束。分页以持久 sequence 排序，正文过期后返回“内容已到期”的占位，不能让历史消息序号变化或让同一请求出现两个答案。
+学生消息在请求入队事务内创建；`next_message_sequence` 用条件更新分配，`UNIQUE(session_id,sequence)` 兜底。完成或提供 fallback 时至多增加一条助手消息；failed 请求不制造助手正文，前端从请求状态展示错误。请求归属必须与消息 session_id 一致，数据库以相应复合键约束。分页以持久 sequence 排序，正文过期后返回“内容已到期”的占位，不能让历史消息序号变化或让同一请求出现两个答案。
 
 `ai_policies.config` 保存契约 AiPolicyWriteDTO 中的政策字段，不含 baseVersion；版本及操作者使用独立列。平台只读值在写入前检查，默认与可配置边界由契约和 DEVELOPMENT 辅导政策规则定义。
 
-### 5.2 后台任务与恢复
+### 5.2 后台执行与恢复
 
-| 表 | 主要字段 | 约束/说明 |
-| --- | --- | --- |
-| `background_jobs` | `id, type, dedupe_key, payload, status, attempts, max_attempts, available_at, lease_until, claimed_by, claim_token, lease_version, last_error` | P2 建立；dedupe_key 唯一；status queued/running/succeeded/failed；payload 只放领域对象 ID；每次领取生成新 claim_token，lease_version 加一 |
+P2 不建通用任务表与独立 worker 进程。AI 请求在同一 Spring 应用内由有界线程池执行，并由 `@Scheduled` 定时扫描 queued 请求兜底；领取用条件更新 `SET status='running', started_at=? WHERE id=? AND status='queued'`，影响 1 行才执行，因此同一请求不会被重复执行。外部调用与审核不在数据库事务内。
 
-领取使用 InnoDB 短事务 `FOR UPDATE SKIP LOCKED` 并设置租约，锁定任务行后另发 `SELECT UTC_TIMESTAMP(6)` 取得租约时刻。`SKIP LOCKED` 只用于可跳过行的任务队列，不用于提交/评价/权限校验；领取排序使用 `available_at,id` 并配置相应索引。如启用复制，使用行复制，不能采用不安全的语句复制。普通领取事务只锁任务行，提交后才执行领域事务；不得长期持有任务锁再逆序获取教学班/作业锁。[MySQL 锁定读与 SKIP LOCKED](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html)
-
-续租在短事务内先按任务 PK 取 `FOR UPDATE`，锁后用独立 `SELECT UTC_TIMESTAMP(6)` 采样，再核对 `id+claim_token+lease_version+status=running` 与旧租约尚未过期，最后按相同条件更新；过期 worker 不能自行复活旧租约。完成交付也先获取全部领域锁与任务锁，再用新语句采样并核对有效租约；不能在可能等待的锁定 SELECT 或 UPDATE 中使用语句开始时的 `UTC_TIMESTAMP()` 代替锁后时间。
-
-外部调用前的 started 记录须在短事务内验证当前领取代次和有效租约，与调用行创建一起提交。完成事务按第 7 节锁领域行后再锁任务行，检查同一领取代次、有效租约和允许的请求前态；将领域终态、消息、提示进度及任务成功作为同一原子提交。条件不匹配时丢弃迟到结果，禁止旧 worker 覆盖新 worker 的 fallback/failed/completed。任务回收后先检查逐次外部调用记录，再决定恢复查询或固定回退，不能仅凭任务重新变 queued 就再次调用 AI。
-
-达到重试上限的任务必须同时把关联请求推进到可解释终态，释放未完成请求唯一索引占位；不得仅把 background_jobs 标 failed、让 tutoring_requests 永久 running。清理、续租和补偿任务同样遵守领取代次。任务错误只暴露有限错误码，日志和 payload 不保存学生完整作品、聊天正文或凭证。
+应用启动时把遗留 running 请求结束为 failed（使用契约 TaskError 已登记的码），释放在途唯一占位；这同时是进程崩溃后的恢复路径。终态请求不再被更新，迟到结果直接丢弃。任务错误只暴露有限错误码，日志不保存学生完整作品、聊天正文或凭证。规模扩大需要独立进程时再拆分，领域 Service 边界不变。
 
 ### 5.3 行为与证据
 
@@ -362,9 +338,9 @@ ALTER TABLE knowledge_evidence
     (student_id, offering_id, knowledge_point_id, is_current, occurred_at, id);
 ```
 
-沿用 P1 的 `learning_events`，P2 才开放客户端允许事件最小集：`chapter_opened/resource_opened/editor_opened/preview_opened/active_heartbeat`。payload 每种有固定字段，不提供任意 JSON 收集个人信息。保存/提交/评价/AI/求助事件由服务端在业务成功事务内产生，客户端不能指定学生、source、score 或可信判定；P1 章节访问的服务端事实与 P2 客户端报告按 source/type 区分，不相加冒充两次访问。
+沿用 P1 的 `learning_events`，P2 才开放客户端允许事件最小集：`chapter_opened/resource_opened/editor_opened/preview_opened`。payload 每种有固定字段，不提供任意 JSON 收集个人信息。保存/提交/评价/AI/求助事件由服务端在业务成功事务内产生，客户端不能指定学生、source、score 或可信判定；P1 章节访问的服务端事实与 P2 客户端报告按 source/type 区分，不相加冒充两次访问。
 
-建议一次批量请求原子校验与写入：未知事件、跨班 ID、非法 payload 返回422/403且整批不写；重复事件返回 acceptedCount=0、duplicateCount 增加；客户端不能重传相同 eventId 改正文，返回409 `EVENT_CONFLICT`。允许 occurredAt 为接收时间之前24小时至之后5分钟范围，超范围拒绝；时长按服务端接收/合法时间综合估计。
+建议一次批量请求原子校验与写入：未知事件、跨班 ID、非法 payload 返回422/403且整批不写；重复事件返回 acceptedCount=0、duplicateCount 增加；客户端不能重传相同 eventId 改正文，返回409 `EVENT_CONFLICT`。允许 occurredAt 为接收时间之前24小时至之后5分钟范围，超范围拒绝。不计算活跃时长。
 
 P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有效证据查询计算，返回 `ruleVersion/asOf/evidenceIds`；只有确认查询瓶颈后才加入可重建的缓存/物化表，避免让缓存成为唯一事实。
 
@@ -376,7 +352,7 @@ P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有�
 | --- | --- | --- |
 | `check_runs` | `id, assignment_id, student_id, workspace_revision, files_snapshot, submission_id, checker_version, status, result, error_code, started_at, finished_at` | status queued/running/completed/error；result记录规则ID与pass/fail；无密钥；student_id由登录态取得 |
 
-检查任务只能从本人服务器保存版本或授课教师可访问提交取快照。worker 将快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
+检查任务只能从本人服务器保存版本或授课教师可访问提交取快照。后台执行把快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
 
 P3 将检查转为知识证据时需更新分析规则版本，并标注 source=checker、检查规则与可信度。不要在尚无检查服务时填充“通过检查”的种子事实。
 
@@ -384,59 +360,48 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ## 7. 核心事务
 
-### 7.0 生命周期锁、锁顺序与时钟
+### 7.0 并发策略与时钟
 
-采用 **MySQL InnoDB + 明确 READ COMMITTED 隔离级别**下的短事务和行锁；Spring 服务事务显式指定该隔离级别，不能依赖 MySQL 默认的 REPEATABLE READ。所有教学写操作（含进度/访问记录、加入、内容维护、提交、评价、AI 入队与结果交付）先对所属 `course_offerings` 行按主键取 `FOR SHARE` 并检查 active；涉及作业时再对 assignment 按主键取 `FOR SHARE` 并核对可操作状态。普通保存与提交在父级只取共享锁，因此不同学生可并发，不把整班或整份作业排他串行。
+教学写入使用 A.1 的短事务，不设父级生命周期锁、全局锁顺序或死锁重试协议。正确性只依赖以下手段：
 
-教师修改/发布/归档作业、修改当前 AI 政策时，在取得教学班共享锁后直接取 assignment `FOR UPDATE`；教学班归档直接取 offering `FOR UPDATE`。需要排他锁的操作一开始就获取所需模式，不先取共享锁再升级。父级共享锁一直持有到事务提交，归档检查与新业务写入才能互斥；仅普通 SELECT 校验状态不足以阻止并发修改。生命周期锁仅使用本设计明确的 MySQL FOR SHARE / FOR UPDATE 模式。
+- **唯一约束**：成员 `(offering_id,user_id)`、工作区 `(assignment_id,student_id)`、提交 `(assignment_id,student_id,workspace_revision)` 与当前提交 current_slot、通知 source_event_key、在途 AI pending_slot、当前证据 current_slot。1062 只在明确命中对应约束时转为业务结果（如返回已有对象），其他唯一冲突按各自业务错误处理。
+- **乐观锁**：工作区 revision、评价 version，用 `UPDATE ... WHERE id=? AND revision=?`，影响 0 行返回对应 409。
+- **条件更新**：邀请名额、发布与归档等状态迁移，用 `WHERE status=?` 或计数条件，影响 0 行按当前状态返回业务错误。
+- **唯一保留的行锁**：提交替换与评价发布都对该学生当前 submission 行 `SELECT ... FOR UPDATE`，保证评价不会发到刚被替换的提交。
 
-触及多类对象时统一顺序：教学班 → 作业 → `ai_budget_locks` 预算行（仅需要时，`FOR UPDATE`）→ 学生成员行（`FOR UPDATE`）→ 提示进度 → 工作区 → 提交 → 评价 → 辅导会话 → 辅导请求 → 调用记录 → 后台任务；需要修改的子表按键取 `FOR UPDATE`。只取当前操作需要的锁；同类多行按 ID 升序。邀请在教学班锁之后、成员创建之前锁定，不在持有成员行后反向等待邀请。单纯任务领取/续租不再获取领域锁，避免和结果提交形成反向顺序。管理员执行成员失活或班级角色变更时先取得 offering FOR UPDATE，再修改成员；这与全部教学写入的父级共享锁互斥，保证教师和学生权限撤销与在途写入有明确先后。
-
-首次工作区/提示进度尚不存在时先锁该学生成员行，随后按唯一键创建并重新检查版本；不同学生仍互不阻塞。工作区保存、提交和评价都遵循成员→工作区→提交→评价顺序，避免发布评价到已替换提交。预算只锁独立 `ai_budget_locks` 行，禁止为预算锁 `users FOR UPDATE`：InnoDB 外键检查会对 users 父行获取共享锁，排他预算锁会扩大无关业务冲突范围。预算行在教学事务前确保已存在，具体创建规则见 5.1；不要依赖对不存在行的 SELECT FOR UPDATE 保护首行创建。
-
-READ COMMITTED 减少普通范围查询的间隙锁，但外键校验与唯一键检查仍可能加间隙锁，仍需按一致顺序取锁并处理死锁。字段更新关联的 FK 检查可能产生隐式锁；显式生命周期锁不能替代真实 MySQL 并发测试。参见 [MySQL 隔离级别](https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html) 与 [锁定读](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html)。
-
-新提交获取全部必要锁后，**另发一条 `SELECT UTC_TIMESTAMP(6)`** 并只采样一次，此值共同用于期限校验、`submitted_at` 和 `is_late`；AI 的日期/分钟预算、邀请到期与租约有效性也使用各自完成必要锁后的单次数据库时间。MySQL NOW / UTC_TIMESTAMP 在每条语句开始时取值；不能把时间与可能等待的 `SELECT ... FOR UPDATE` 或条件 UPDATE 合并，否则等待锁跨过截止后仍可能用旧时刻。锁等待完成后的独立时间采样是必需步骤。幂等命中的旧提交直接返回原结果，不重新判迟交。[MySQL 当前时间函数](https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html)
-
-数据库死锁 `1213 / SQLSTATE 40001` 在服务内部最多重试 2 次（首次加重试共 3 次），每次整体重做短事务并保留原幂等键。非幂等键等待导致的锁等待超时 `1205 / SQLSTATE HY000`，应用显式回滚整个事务后才允许按相同上限整体重试；不能把所有 HY000 或所有数据库异常都视为可重试。MySQL 默认的锁超时通常只回滚当前语句，服务不得继续提交先前写入；事务代理外层执行重试，每次使用新的事务与连接状态。业务 409、FK 错误、CHECK 错误和普通唯一键冲突不自动覆盖重试。数据库事务及其重试范围内绝不执行 AI 网络调用。[MySQL 错误处理](https://dev.mysql.com/doc/refman/8.4/en/innodb-error-handling.html)、[错误码](https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html)
-
-幂等记录与业务成功同事务提交，不能先提交 processing 行再无限等待；规范请求哈希与原键不因事务重试改变。并发同键插入由 `UNIQUE(user_id,method,path,idempotency_key)` 竞争：1062 只在明确命中该约束时才按幂等逻辑处理，先整体回滚本次业务事务，再在新短事务读取已提交记录，校验 request_hash 并重放响应；其他唯一冲突按各自业务错误处理。不能通过 `INSERT IGNORE` 或 `ON DUPLICATE KEY UPDATE` 覆盖原幂等记录。设置有限锁等待时间，同键等待超时整体回滚并返回 `REQUEST_IN_PROGRESS` 与 `Retry-After`，不在服务内部追加重试、也不留下已提交的 processing 占位。认证和授权在读取/重放前重新校验。
+时钟使用应用层 `Instant.now()`（UTC），每个操作在事务内取一次，同时用于期限判断与写入时间；测试注入可控 `Clock`。死锁或锁等待超时不在服务内重试，整体回滚后按契约服务端错误返回，由用户重试；业务 409、FK 与 CHECK 错误不自动重试。数据库事务内绝不执行 AI 网络调用。未防护的竞态列入 [STATUS 已知限制](STATUS.md#4-已知限制)。
 
 ### 7.1 加入教学班
 
-校验会话、解析邀请码目标 → 教学班共享锁 → 查已存在成员 → 锁邀请码 → 用锁后时间校验期限/余量 → 插入唯一成员 → 使用次数加一 → 提交。并发冲突返回现有成员，不再次计数；已加入学生重复提交无需耗用新名额，返回既存关系也不新增教学写入。无效邀请码统一错误，不通过错误暴露任意教学班；归档教学班不能新增成员。
+校验会话与邀请码 → 读取教学班 active、邀请未过期未撤销 → 已是本班学生返回 200 → 插入成员（成员唯一约束 1062 视为已加入，返回 200）→ 条件更新 `used_count=used_count+1 WHERE id=? AND (max_uses IS NULL OR used_count<max_uses)`，0 行则回滚并返回邀请码不可用 → 提交。无效邀请码统一错误，不通过错误暴露任意教学班；归档教学班不能新增成员。
 
 ### 7.2 保存工作区
 
-教学班共享锁 → 作业共享锁确认 published → 锁该学生成员并校验 active → 校验文件 → 锁/创建工作区 → 比较 baseRevision → 覆盖完整文件并 revision+1 → 更新最近学习时间、写 P1 服务端保存事件 → 提交。首次保存 baseRevision=0 若已存在工作区返回409，不悄悄覆盖刚保存的内容。
+校验教学班 active、作业 published、本人 active 学生成员 → 校验文件 → baseRevision=0 时插入工作区（唯一约束 1062 返回 409 `WORKSPACE_CONFLICT`）；否则 `UPDATE workspaces SET files=?, revision=revision+1 WHERE assignment_id=? AND student_id=? AND revision=?`，0 行返回 409 → 更新最近学习时间、写 P1 服务端保存事件 → 提交。
 
 草稿在截止、补交到期或已评价后仍可保存用于练习，不改变原提交与状态；是否正式可提交由 canSubmit 及对应错误码决定。作业/教学班归档后只读。提示进度位于独立表，不增加文件 revision，AI 请求不能制造文件保存冲突。
 
 ### 7.3 提交作业
 
-验证当前身份及既有幂等响应；未命中时在同一事务领取幂等键 → 教学班/作业共享锁 → 该学生成员、工作区、当前提交及评价锁 → 新语句获取一次提交时刻 → 按 DEVELOPMENT 10.3 的优先级检查提交资格，再校验当前工作区版本 → 旧版 is_current=0 → 新快照 is_current=1 → 写 P1 服务端事件 → 保存幂等响应 → 同事务提交。任一失败整体回滚；旧提交先失效再插入新当前提交，以满足生成列唯一约束。
+校验身份与归属 → 同 `(assignment,student,workspaceRevision)` 已有提交则返回 200 原提交 → 读取教学班/作业状态 → 锁该学生当前提交行（如有）→ 取一次当前时刻 → 按 DEVELOPMENT 10.3 的优先级检查资格，并校验 workspaceRevision 等于工作区当前 revision → 旧版 is_current=0 → 插入新快照 is_current=1 → 写 P1 服务端事件 → 提交。并发插入命中 workspace_revision 唯一约束时回滚并返回原提交 200；命中 current_slot 唯一约束说明并发提交了不同版本，返回 409 `WORKSPACE_CONFLICT`。
 
 ### 7.4 发布评价
 
-教学班/作业共享锁 → 锁目标学生成员、工作区及当前提交 → 锁评价 → 校验授课关系、当前提交、baseVersion 和分数 → 发布快照并增加版本 → P2 创建当前知识证据 → 同步写唯一反馈通知及学生收件人 → 写服务端事件与审计 → 提交。若新提交已替换正在批阅作品，返回409 `SUBMISSION_SUPERSEDED`。同一次已发布评价的重复 publish 仅在 baseVersion 等于发布前版本或当前 published_version 时按原公开结果幂等返回；更旧版本返回 FEEDBACK_VERSION_CONFLICT，不再增加版本、消息和证据。
+校验授课关系与作业状态 → 锁目标 submission 行并确认 is_current=1，否则 409 `SUBMISSION_SUPERSEDED` → 以 baseVersion 乐观更新评价，冲突返回 `FEEDBACK_VERSION_CONFLICT` → 校验分数与量表 → 发布快照并增加版本 → P2 创建当前知识证据 → 同步写唯一反馈通知及学生收件人 → 写服务端事件与审计 → 提交。同一次已发布评价的重复 publish 仅在 baseVersion 等于发布前版本或当前 published_version 时按原公开结果返回，不再增加版本、消息和证据。
 
-评价草稿保存也使用相同顺序并验证当前提交。P1 已发布评价不可再编辑；不引入成绩更正工作流。归档作业不允许新评价发布。P2 当前规模下知识状态直接从证据查询计算，无需为每次发布制造无用途的重算任务；未来引入缓存时才在业务事务内插入可幂等重建任务。
+评价草稿保存同样锁 submission 行并验证当前提交。P1 已发布评价不可再编辑；不引入成绩更正工作流。归档作业不允许新评价发布。知识状态直接从证据查询计算，不为发布制造重算任务。
 
 ### 7.5 AI 入队与完成
 
-进入业务事务前确认该学生预算行已存在；入队：领取/命中幂等键 → 教学班/作业共享锁 → 独立 ai_budget_locks 行 FOR UPDATE → 学生成员及独立提示进度锁 → 按需锁已保存工作区、会话 → 锁后新语句采样预算时刻 → 检查当前政策、尝试要求、该学生该作业未完成请求与预算 → 预占预算并冻结有限上下文 → 创建请求、学生消息与唯一后台任务 → 保存幂等入队响应 → 提交。同学生同作业另一 key 的请求返回409 `AI_REQUEST_IN_PROGRESS`，不限于同一会话。没有工作区时仍可辅导，不创建假草稿。
+入队：校验身份、成员、作业可辅导、会话归属、当前政策与尝试要求 → 按 5.1 计数判断预算 → 冻结有限上下文 → 插入请求（queued；pending_slot 冲突返回 409 `AI_REQUEST_IN_PROGRESS`）与学生消息 → 提交。没有工作区时仍可辅导，不创建假草稿。
 
-执行：worker 单独领取任务并提交领取事务 → 以有效领取代次提交外部调用 started 行 → 锁外调用 AI → 保存每次调用状态/用量 → 锁外审核 → 按统一顺序在完成短事务中再次验证成员、当前政策、教学状态和任务领取代次 → 原子提交已审核助手消息、请求终态、进度与任务终态。不得先提交任务成功再写领域结果。
-
-若归档或成员失活发生在排队后，完成阶段取消正文发布；可持父级共享锁写入失败元数据、清理预占状态并结束任务，这属于已受理任务收尾，不开放新的教学写入。提示进度与消息只在仍允许交付时更新。后台任务失败、超出重试上限、外部结果未知都必须得到终态请求，不能永久停在 running。
+执行与交付：按 5.2 条件领取 → 事务外调用 AI 与审核 → 交付短事务确认请求仍 running、成员与教学班有效、审核政策仍为当前 → 原子写入已审核助手消息、结果、终态与提示进度。条件不符时写 fallback/failed，不交付新正文；归档或成员失活发生在排队后同样处理。任何失败都必须得到终态请求，不能永久停在 running。
 
 ### 7.6 归档、发布和通知
 
-教学班归档先取得 offering `FOR UPDATE`，再检查本班是否存在当前且无已发布评价的提交；存在则返回 `ARCHIVE_PENDING_REVIEWS`，否则改为 archived 后提交。父级排他锁会等待所有已开始的子业务事务结束，并阻止新的子业务通过 active 检查，因此检查后不会再插入漏掉的提交。
+教学班归档：检查本班无当前且未发布评价的提交，否则返回 `ARCHIVE_PENDING_REVIEWS` → 条件更新 `status='archived' WHERE status='active'`，已归档按原结果返回。作业归档同理，仅 published→archived。检查与更新之间恰好到达的提交属于已知限制。归档班级/作业只阻止新的教学写入，历史读取和本人消息已读仍可用。
 
-作业归档先取得 offering `FOR SHARE`、assignment `FOR UPDATE`；仅 published→archived，锁后检查该作业待批阅提交，重复归档返回原结果。归档班级/作业只阻止新的教学写入，历史读取和本人消息已读仍可用，消息已读不要求教学班 active。
-
-作业首次发布持 assignment 排他锁验证章节与规则，冻结 content_version 并写 published_at；公开状态、通知实体和发布时收件人一起提交。重复发布复用自然键，不重复提醒。课程公告与教师回复同理在原业务事务同步写消息；故障注入必须证明“业务已发布但通知缺失”和“事务重试后通知翻倍”都不会发生。
+作业首次发布用条件更新 draft→published，验证章节与规则，冻结 content_version 并写 published_at；公开状态、通知实体和发布时收件人一起提交。重复发布复用自然键，不重复提醒。课程公告与教师回复同理在原业务事务同步写消息；测试须证明“业务已发布但通知缺失”和“重试后通知翻倍”都不会发生。
 
 ## 8. 查询与索引
 
@@ -447,44 +412,43 @@ READ COMMITTED 减少普通范围查询的间隙锁，但外键校验与唯一�
 | 课程章节/资源 | chapters(offering_id,status,position)，resources(chapter_id,status,position) |
 | 最近学习 | chapter_progress(member_id,last_opened_at)，offering_members(user_id,last_studied_at) |
 | 待办排序 | assignments(offering_id,status,due_at,id) |
-| 当前提交与教师批阅 | submissions(assignment_id,student_id,current_slot) UNIQUE；submissions(assignment_id,is_current,submitted_at,id) |
+| 当前提交与教师批阅 | submissions(assignment_id,student_id,current_slot) UNIQUE；submissions(assignment_id,student_id,workspace_revision) UNIQUE；submissions(assignment_id,is_current,submitted_at,id) |
 | 学生反馈 | submissions(student_id,submitted_at)，feedback(submission_id) UNIQUE |
 | 未读消息 | notification_recipients(user_id,read_at)，notification_recipients(notification_id,user_id) UNIQUE，notifications(source_event_key) UNIQUE |
 | 行为查询/去重 | learning_events(user_id,offering_id,occurred_at)，非空 user_id/client_event_id 唯一，非空 source_event_key 唯一 |
 | 知识证据 | knowledge_evidence(student_id,offering_id,knowledge_point_id,is_current,occurred_at,id)；(student_id,assignment_id,knowledge_point_id,current_slot) UNIQUE 生成列索引；(feedback_id,feedback_published_version,knowledge_point_id) UNIQUE |
-| AI 预算/历史 | ai_budget_locks(student_id) PK；tutoring_requests(student_id,budget_reserved,reserved_day)，tutoring_requests(student_id,budget_reserved,created_at)，tutoring_requests(session_id,created_at,id) |
-| AI 并发/消息 | tutoring_progress(student_id,assignment_id) UNIQUE；tutoring_requests(student_id,assignment_id,pending_slot) UNIQUE 生成列索引；messages(session_id,sequence) 与 (tutoring_request_id,role) UNIQUE；calls(tutoring_request_id,attempt_no) UNIQUE |
-| 任务领取/回收 | background_jobs(status,available_at,id)，background_jobs(status,lease_until,id)，dedupe_key UNIQUE |
+| AI 预算/历史 | tutoring_requests(student_id,created_at)，tutoring_requests(student_id,assignment_id,created_at)，tutoring_requests(session_id,created_at,id) |
+| AI 并发/消息 | tutoring_progress(student_id,assignment_id) UNIQUE；tutoring_requests(student_id,assignment_id,pending_slot) UNIQUE 生成列索引；messages(session_id,sequence) 与 (tutoring_request_id,role) UNIQUE |
+| AI 执行扫描 | tutoring_requests(status,created_at,id) |
 | AI 正文清理 | tutoring_requests(content_purged_at,content_expires_at,id)；help_requests(shared_snapshot_purged_at,shared_snapshot_expires_at,id) |
-| 幂等过期 | idempotency_records(expires_at) |
 
 先保证正确性，再在有查询计划与数据量依据时优化；不默认加所有可能索引。列表稳定使用时间/位置加ID排序，避免同时间分页乱序。
 
-本表的普通索引均为 MySQL B-tree 复合索引，不附 `WHERE` 过滤条件。查询与约束使用不同索引时显式保留两者，不能假设生成列唯一索引自动满足所有 `is_current/status` 过滤查询。当前规模只按有效证据计算最近三份不同作业；有查询计划依据后再调整列顺序。幂等、自然键等索引不使用前缀唯一索引，防止把截断前缀误当全值唯一。
+本表的普通索引均为 MySQL B-tree 复合索引，不附 `WHERE` 过滤条件。查询与约束使用不同索引时显式保留两者，不能假设生成列唯一索引自动满足所有 `is_current/status` 过滤查询。当前规模只按有效证据计算最近三份不同作业；有查询计划依据后再调整列顺序。自然键等索引不使用前缀唯一索引，防止把截断前缀误当全值唯一。
 
 ## 9. 统计与种子数据
 
 统计业务口径只维护在 [DEVELOPMENT 第 9 节](DEVELOPMENT.md#9-首页进度与消息口径)，查询不得复制出另一套公式。
 
-种子数据用虚构教师/学生；至少两个学期、两个教学班、两个学生、一名教师、三个状态不同的作业。截止时间基于可控测试时钟生成，不能把前端固定 `2026-10-01` 作为服务器时钟。除跨班、截止和同版本竞争外，必须在真实 MySQL 8.4 / InnoDB 环境验证：归档与提交/邀请/政策完成并发；等待锁跨过截止；通知写入失败整体回滚及重试防重；AI 双会话并发和跨作业每日预算竞争；预算首行初始化并发；生成列 NULL 历史多行与非空当前唯一约束；1213/1205 后无部分提交；第一次或第二次外部调用失联；旧 worker 迟到不覆盖终态；续租等待跨过旧租约；只辅导不产生工作区；未发布草稿在归档班仍不可见；90 天后共享入口不能恢复已清理正文。测试可采用 Testcontainers MySQL，不用 H2 代替这些方言与锁行为。
+种子数据用虚构教师/学生；至少两个学期、两个教学班、两个学生、一名教师、三个状态不同的作业。截止时间基于可控测试时钟生成，不能把前端固定 `2026-10-01` 作为服务器时钟。必须在真实 MySQL 8.4 / InnoDB 环境验证：跨班访问拒绝；邀请最后名额并发；同 revision 重复提交返回原提交；不同版本并发提交只成功一个；评价发布与重交并发不发到旧提交；通知写入失败整体回滚、重试不翻倍；AI 双会话并发只有一个在途请求；重启后遗留 running 请求结束；终态不被迟到结果覆盖；生成列 NULL 历史多行与非空当前唯一约束；只辅导不产生工作区；未发布草稿在归档班仍不可见；90 天后共享入口不能恢复已清理正文。测试采用 Testcontainers MySQL，不用 H2 代替。
 
 <a id="db-retention"></a>
 
 ## 10. 迁移、归档与删除
 
-迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 包括完整站内通知、幂等记录、最小 learning_events 及可信服务端写入，不依赖 worker；P2 才引入 AI、预算锁表与预填、求助、后台任务、客户端事件入口和知识证据，P3 增加隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
+迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 包括完整站内通知、最小 learning_events 及可信服务端写入；P2 才引入 AI、求助、客户端事件入口和知识证据，P3 增加隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
 
 成员退出/失活后保留作品和评价归属，阻止新写入；作业、教学班用归档保留链路，不级联删除考核作品。管理员按已确认策略清除用户数据时，先撤销会话，再删除/匿名化事件、聊天、求助、证据及关联作品；日志中的身份做匿名化，通知接收者按关联删除。备份过期也应符合保留周期。
 
-默认原始客户端事件保留 90 天后按策略删除。AI 请求在创建时确定 `content_expires_at=created_at+90 天`；到期清除 content、student_attempt、workspace_snapshot、result 中正文以及 tutoring_messages.content，保留 ID、序号、终态、政策版本、用量、时间、回退原因等必要元数据，并写 content_purged_at。请求和消息 tombstone 使历史分页及审计仍可读，API 不把清理后的空正文当作新生成内容。外部调用 raw_response 如曾保存，同原请求到期清理，不以调用/重试时间延长；没有留存的原始响应无需另复制。提示 disclosure_summary 到期同步清空或仅依据尚未到期的源内容重建，highest_delivered_hint_level 不归零。
+默认原始客户端事件保留 90 天后按策略删除。AI 请求在创建时确定 `content_expires_at=created_at+90 天`；到期清除 content、student_attempt、workspace_snapshot、result 中正文以及 tutoring_messages.content，保留 ID、序号、终态、政策版本、用量、时间、回退原因等必要元数据，并写 content_purged_at。请求和消息 tombstone 使历史分页及审计仍可读，API 不把清理后的空正文当作新生成内容。供应商原始响应不保存。提示 disclosure_summary 到期同步清空或仅依据尚未到期的源内容重建，highest_delivered_hint_level 不归零。
 
 求助的 shared_tutoring_request_ids 仅指向原请求，详情读取受原 AI 请求的同一 content_expires_at 约束；到期显示已清理占位，不能通过求助副本延长聊天或 AI 上下文保留。学生主动共享的代码独立副本在创建求助时写 shared_snapshot_expires_at=created_at+90 天，到期清除 shared_snapshot 并写 shared_snapshot_purged_at。此清理不删除按课程归档策略保留的正式作品和评价；它们属于独立教学考核记录。
 
-background_jobs.payload 只存对象 ID；幂等响应对于 AI 仅存入队状态与请求 ID，不复制模型正文。日志、摘要、失败堆栈及备份均纳入相同保留边界，清理流程不得留下可以绕过期限的重复正文。自动清理只删除明确到期的内容、缓存或过期幂等记录；没有批准的课程归档策略时，不自动删除考核作品。知识状态直接从有效提交和已发布反馈重建，不依赖已过期客户端事件或 AI 正文。
+日志、摘要、失败堆栈及备份均纳入相同保留边界，清理流程不得留下可以绕过期限的重复正文。自动清理只删除明确到期的内容或缓存；没有批准的课程归档策略时，不自动删除考核作品。知识状态直接从有效提交和已发布反馈重建，不依赖已过期客户端事件或 AI 正文。
 
 
 ## C. 本端交付要求
 
 每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [AGENTS.md](../AGENTS.md) 的提交约定提交，并更新 [STATUS](STATUS.md)。
 
-阶段建立表的数量不作为进度目标，以可验收流程为准。P1 事件与通知同事务落库，P2 才回填知识证据并启动 AI worker；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。
+阶段建立表的数量不作为进度目标，以可验收流程为准。P1 事件与通知同事务落库，P2 才回填知识证据并启用 AI 后台执行；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。

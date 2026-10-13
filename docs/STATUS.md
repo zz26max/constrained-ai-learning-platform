@@ -4,7 +4,7 @@
 
 ## 1. 当前真实状态
 
-截至 2026-10-13，P0-A 已交付：契约 83 个操作中，5 个认证操作（getCsrfToken、login、logout、getMe、getConfig）标为 verified，2 个健康检查为 implemented，其余 76 个为 planned。已有账户初始化、数据库会话、认证 HTTP 链、登录限流、审计和 Flyway V1～V4；正式 Vue 工程 frontend/ 已建立，包含登录、会话联调页、身份恢复、退出、同源代理与 mock。website-prototype/ 仅保留静态原型。
+契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-13，P0-A 已交付：契约 83 个操作中，5 个认证操作（getCsrfToken、login、logout、getMe、getConfig）标为 verified，2 个健康检查为 implemented，其余 76 个为 planned。已有账户初始化、数据库会话、认证 HTTP 链、登录限流、审计和 Flyway V1～V4；正式 Vue 工程 frontend/ 已建立，包含登录、会话联调页、身份恢复、退出、同源代理与 mock。website-prototype/ 仅保留静态原型。
 
 已有通过前端代理连接真实数据库的接口联调记录，尚未完成真实浏览器 UI 验收。P1 教学业务与 P2/P3 功能尚未实现；定向检查发现的认证异常恢复和并发限流问题见下方交接。
 
@@ -23,11 +23,13 @@
 | --- | --- | --- |
 | 登录后身份失效 | 前端 [auth.ts](../frontend/src/stores/auth.ts) | login 200 后 /me 401，仍返回登录成功并保留 authenticated；应进入身份恢复 |
 | CSRF 刷新失败提示错误 | 前端 auth.ts | 刷新请求失败仍提示“令牌已刷新”，旧 token 保留；区分成功与失败 |
-| 退出恢复不完整 | 前端 auth.ts / csrf-refresh.ts | 三次退出 CSRF 失败触发三次刷新、零次身份核对；落实单次恢复、再次失败停止及用户代次检查 |
+| 退出恢复不完整 | 前端 auth.ts / csrf-refresh.ts | 三次退出 CSRF 失败触发三次刷新、零次身份核对；按契约 1.1.0 的简化规则（[DEVELOPMENT 10.2](DEVELOPMENT.md#102-会话csrf-与请求边界)）改为共用一次刷新并核对 /me、再次失败提示重新登录；现有令牌代次/用户代次追踪可删除 |
 | 会话查询异常无统一响应 | 后端 [SessionCookieAuthFilter](../backend/src/main/java/com/learningplatform/common/security/SessionCookieAuthFilter.java) | 模拟数据库异常直接逃出过滤器，未写入业务错误信封；按现有契约处理服务端故障 |
 | 并发登录限流空档 | 后端 [LoginRateLimiter](../backend/src/main/java/com/learningplatform/modules/auth/security/LoginRateLimiter.java) / AuthController | 模拟先检查后回报失败的并发时序，上限 5 仍放行 20 次校验；补原子的请求准入或在途限制并验证 |
 
 上表来自 2026-10-13 对现有代码的定向模拟验证，不是真实浏览器或并发压测；临时探针未提交。接手者先补可重复的回归测试，再修复并分别提交。
+
+后端 [GlobalExceptionHandler.java:49](../backend/src/main/java/com/learningplatform/common/exception/GlobalExceptionHandler.java) 的注释仍提到已删除的 REQUEST_IN_PROGRESS，429 的 Retry-After 不受影响，后端任务顺手更新即可。
 
 下一包优先收尾上述认证异常路径，再按 [DEVELOPMENT 第 11 节](DEVELOPMENT.md#11-开发顺序与工作包) 进入 P1-A；不重新创建已有工程或重复实现认证接口。
 
@@ -48,3 +50,15 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 尚未确认：真实浏览器 UI、P1 业务联调与远程 CI。工具链方面，前端提交 12205b6 声称实测 Node 24.21.0 / npm 11.19.0，后续审计文字却记录 Node 24.17.0 / npm 11.13.0；接手者记录实际 `node --version` / `npm --version`，再按 frontend/.nvmrc 与 packageManager 重现 npm ci 和 verify。
 
 后端已有功能的历史运行证据见 [历史开发记录](archive/2026-10-08_DEVELOPMENT.md#112-实施进度与代码阅读)。
+
+## 4. 已知限制
+
+以下竞态在课程演示规模下发生概率极低，按设计不加防护；如果出现，在此记录现象再决定是否补强。
+
+| 场景 | 可能结果 | 为何接受 |
+| --- | --- | --- |
+| 教学班/作业归档的检查与更新之间恰好有学生提交 | 归档后存在一份待批阅提交，P1 无法在归档后发布评价 | 归档是低频教师操作，窗口为毫秒级；需要时由管理员处理 |
+| 写入校验通过后教学班恰好被归档 | 该次草稿保存或位置更新落在归档之后 | 不公开任何草稿，后续请求一律拒绝 |
+| 同一学生并发发起多个 AI 请求（不同作业） | 每日/每分钟预算偶发超出 1 次 | 预算是用量保护，不是计费；在途唯一约束仍阻止同作业并发 |
+| AI 请求已完成但响应丢失，客户端重新发送 | 新建一次请求，多计一次预算 | 删除通用幂等键后的代价，用户可见且无数据错误 |
+| 死锁或锁等待超时 | 返回服务端错误，用户手动重试 | 无全局锁顺序，但保留的行锁只有 submission 一处，死锁面很小 |
