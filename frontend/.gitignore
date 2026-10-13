@@ -1,0 +1,12 @@
+node_modules/
+dist/
+# 本机会话工具：npm 运行时与下载缓存，不属于工程交付物
+.tools/
+.npm-cache/
+*.local
+.env.local
+.env.*.local
+# .env.mock 是 VITE_API_MODE=mock 的模式文件（FRONTEND.md 1.1，非秘密），
+# 根 .gitignore 的 .env.* 防密钥规则之外定点再纳入
+!.env.mock
+vitest-results/

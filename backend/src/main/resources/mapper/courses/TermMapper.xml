@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.modules.courses.mapper.TermMapper">
+    <resultMap id="term" type="com.learningplatform.modules.courses.model.Term">
+        <constructor>
+            <idArg name="id" column="id" javaType="java.lang.String"/>
+            <arg name="label" column="label" javaType="java.lang.String"/>
+            <arg name="startsAt" column="starts_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+            <arg name="endsAt" column="ends_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+            <arg name="current" column="is_current" javaType="boolean"/>
+            <arg name="createdAt" column="created_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+            <arg name="updatedAt" column="updated_at" javaType="java.time.Instant"
+                 typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findAllOrdered" resultMap="term">
+        SELECT id, label, starts_at, ends_at, is_current, created_at, updated_at
+        FROM terms
+        ORDER BY starts_at DESC, id
+    </select>
+</mapper>

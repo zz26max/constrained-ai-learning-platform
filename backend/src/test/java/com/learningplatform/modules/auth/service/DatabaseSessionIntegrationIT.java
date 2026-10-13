@@ -120,7 +120,7 @@ class DatabaseSessionIntegrationIT {
     @DisplayName("正确凭据创建会话，后续用令牌识别用户；数据库不保存原令牌")
     void loginCreatesSessionAndRecognizesNextRequest() {
         // 第一处业务入口：凭据校验 + 创建会话。
-        SessionGrant grant = service.login("student.demo", TEST_PASSWORD, null);
+        SessionGrant grant = service.login("student.demo", TEST_PASSWORD, null, "test-request-id");
 
         AuthSession stored = stored(grant.token());
         assertThat(countSessions()).isEqualTo(1);
@@ -154,7 +154,7 @@ class DatabaseSessionIntegrationIT {
     @Test
     void wrongPasswordDoesNotCreateSessionOrRevokeExistingOne() {
         SessionGrant existing = login();
-        assertThatThrownBy(() -> service.login("student.demo", "Wrong-test-password", existing.token()))
+        assertThatThrownBy(() -> service.login("student.demo", "Wrong-test-password", existing.token(), "test-request-id"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getCode()).isEqualTo("INVALID_CREDENTIALS"));
         assertThat(countSessions()).isEqualTo(1);
@@ -165,7 +165,7 @@ class DatabaseSessionIntegrationIT {
     @Test
     void successfulLoginRotatesPreviousSessionAndCsrfSecret() {
         SessionGrant old = login();
-        SessionGrant replacement = service.login("student.demo", TEST_PASSWORD, old.token());
+        SessionGrant replacement = service.login("student.demo", TEST_PASSWORD, old.token(), "test-request-id");
         assertThat(replacement.token()).isNotEqualTo(old.token());
         assertThat(replacement.csrfSecret()).isNotEqualTo(old.csrfSecret());
         assertThat(stored(old.token()).revokedAt()).isEqualTo(START);
@@ -177,7 +177,7 @@ class DatabaseSessionIntegrationIT {
     void switchingAccountsRevokesOnlyPresentedPreviousSession() {
         SessionGrant old = login();
         SessionGrant otherDevice = login();
-        SessionGrant teacher = service.login("teacher.demo", TEST_PASSWORD, old.token());
+        SessionGrant teacher = service.login("teacher.demo", TEST_PASSWORD, old.token(), "test-request-id");
         assertUnauthenticated(old.token());
         assertThat(service.resolve(teacher.token()).user().roles()).containsExactly("teacher");
         assertThat(service.resolve(otherDevice.token()).user().username()).isEqualTo("student.demo");
@@ -262,7 +262,7 @@ class DatabaseSessionIntegrationIT {
                 .passwordEncoder().encode("Changed-test-session-password");
         jdbcTemplate.update("UPDATE users SET password_hash = ? WHERE username = 'student.demo'", newHash);
         assertUnauthenticated(grant.token());
-        SessionGrant replacement = service.login("student.demo", "Changed-test-session-password", null);
+        SessionGrant replacement = service.login("student.demo", "Changed-test-session-password", null, "test-request-id");
         assertThat(service.resolve(replacement.token()).user().username()).isEqualTo("student.demo");
     }
 
@@ -305,7 +305,7 @@ class DatabaseSessionIntegrationIT {
         SessionGrant existing = login();
         // 强制碰撞真实唯一键，验证 SQL 插入失败不会留下“旧会话已撤销、新会话未创建”。
         doReturn(existing.token()).when(tokens).generate();
-        assertThatThrownBy(() -> service.login("student.demo", TEST_PASSWORD, existing.token()))
+        assertThatThrownBy(() -> service.login("student.demo", TEST_PASSWORD, existing.token(), "test-request-id"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(countSessions()).isEqualTo(1);
         assertThat(stored(existing.token()).revokedAt()).isNull();
@@ -329,7 +329,7 @@ class DatabaseSessionIntegrationIT {
             return realUserMapper.findByIdForShare(invocation.getArgument(0, String.class));
         }).when(userMapper).findByIdForShare(anyString());
 
-        assertThatThrownBy(() -> service.login("student.demo", TEST_PASSWORD, null))
+        assertThatThrownBy(() -> service.login("student.demo", TEST_PASSWORD, null, "test-request-id"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.getCode()).isEqualTo("INVALID_CREDENTIALS"));
         assertThat(countSessions()).isZero();
@@ -395,7 +395,7 @@ class DatabaseSessionIntegrationIT {
     }
 
     private SessionGrant login() {
-        return service.login("student.demo", TEST_PASSWORD, null);
+        return service.login("student.demo", TEST_PASSWORD, null, "test-request-id");
     }
 
     private AuthSession stored(String token) {

@@ -28,7 +28,7 @@ public class LocalAccountInitializationService {
      * 三个账户作为一个整体初始化；任何校验或数据库写入失败，均回滚本次新增。
      * 已有账户保持原样，此命令不承担重置密码、恢复禁用账户或修改权限的职责。
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Result initialize(String studentPassword, String teacherPassword, String adminPassword) {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         int created = 0;

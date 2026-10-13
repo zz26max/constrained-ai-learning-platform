@@ -17,13 +17,20 @@ public class BusinessException extends RuntimeException {
     private final HttpStatus status;
     private final String code;
     private final Map<String, Object> details;
+    private final Integer retryAfterSeconds;
 
     public BusinessException(HttpStatus status, String code, String message) {
-        this(status, code, message, Map.of());
+        this(status, code, message, Map.of(), null);
     }
 
     public BusinessException(HttpStatus status, String code, String message,
                              Map<String, Object> details) {
+        this(status, code, message, details, null);
+    }
+
+    /** 仅限流等明确带 Retry-After 的拒绝使用；未设置时不产生该响应头。 */
+    public BusinessException(HttpStatus status, String code, String message,
+                             Map<String, Object> details, Integer retryAfterSeconds) {
         super(Objects.requireNonNull(message));
         this.status = Objects.requireNonNull(status);
         if (!status.isError()) {
@@ -31,6 +38,10 @@ public class BusinessException extends RuntimeException {
         }
         this.code = Objects.requireNonNull(code);
         this.details = Map.copyOf(details);
+        if (retryAfterSeconds != null && retryAfterSeconds < 0) {
+            throw new IllegalArgumentException("Retry-After 不能为负数");
+        }
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 
     public HttpStatus getStatus() {
@@ -43,5 +54,9 @@ public class BusinessException extends RuntimeException {
 
     public Map<String, Object> getDetails() {
         return details;
+    }
+
+    public Integer getRetryAfterSeconds() {
+        return retryAfterSeconds;
     }
 }

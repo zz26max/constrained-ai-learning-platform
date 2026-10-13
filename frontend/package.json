@@ -1,0 +1,39 @@
+{
+  "name": "learning-platform-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "npm": ">=11.19.0 <12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --mode mock",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "contract:types": "openapi-typescript ../docs/openapi.yaml -o src/api/generated/schema.d.ts",
+    "check:no-mock": "node scripts/check-no-mock.mjs",
+    "verify": "npm run typecheck && npm run build && npm run check:no-mock && npm run test"
+  },
+  "dependencies": {
+    "pinia": "^4.0.3",
+    "vue": "^3.5.43",
+    "vue-router": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vue/test-utils": "^2.5.1",
+    "happy-dom": "^21.0.1",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "vue-tsc": "^3.3.13"
+  }
+}
