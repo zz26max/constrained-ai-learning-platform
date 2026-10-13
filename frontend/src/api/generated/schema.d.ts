@@ -363,7 +363,7 @@ export interface paths {
         put?: never;
         /**
          * submitAssignment
-         * @description 权限：本班学生本人，需 CSRF、`Idempotency-Key`。请求约定：`{workspaceRevision,reflection}`。结果约定：201 `SubmissionSummaryDTO`；创建代码与评价标准不可变快照。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision,reflection}`。结果约定：新建 201 `SubmissionSummaryDTO`，创建代码与评价标准不可变快照；同一学生同一作业的该 `workspaceRevision` 已提交过时 200 返回原提交，不新建、不占次数（自然幂等，请求中的 reflection 不覆盖原值）。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["submitAssignment"];
         delete?: never;
@@ -1271,7 +1271,7 @@ export interface paths {
         put?: never;
         /**
          * sendTutoringMessage
-         * @description 权限：会话本人，需 CSRF、`Idempotency-Key`。请求约定：`{action:'ask'\|'concept'\|'next_hint',content,studentAttempt?,workspaceRevision?}`。结果约定：202 `{tutoringRequestId,status:'queued'}`。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：会话本人，需 CSRF。同学生同作业已有 queued/running 请求时返回 409 `AI_REQUEST_IN_PROGRESS` 与 pendingRequestId，客户端改为轮询该请求。请求约定：`{action:'ask'\|'concept'\|'next_hint',content,studentAttempt?,workspaceRevision?}`。结果约定：202 `{tutoringRequestId,status:'queued'}`。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["sendTutoringMessage"];
         delete?: never;
@@ -1355,7 +1355,7 @@ export interface paths {
         put?: never;
         /**
          * createCheck
-         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`；建议附 `Idempotency-Key`。结果约定：202 `{checkId,status:'queued'}`。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status:'queued'}`；同一 workspaceRevision 已有检查时返回原检查（自然幂等）。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["createCheck"];
         delete?: never;
@@ -2875,22 +2875,8 @@ export interface components {
                 viewport: "desktop" | "mobile";
             };
         };
-        Event_active_heartbeat: {
-            eventId: components["schemas"]["UUID"];
-            sessionId: components["schemas"]["UUID"];
-            occurredAt: components["schemas"]["Timestamp"];
-            offeringId: components["schemas"]["UUID"];
-            assignmentId?: components["schemas"]["UUID"];
-            chapterId?: components["schemas"]["UUID"];
-            /** @constant */
-            type: "active_heartbeat";
-            payload: {
-                /** @constant */
-                visible: true;
-            };
-        };
         /** @description 客户端事件仅提供 occurredAt；receivedAt 为服务端内部接收时间，保存到 learning_events.received_at，不接受客户端设置，也不在当前上报响应中返回。 */
-        LearningEvent: components["schemas"]["Event_chapter_opened"] | components["schemas"]["Event_resource_opened"] | components["schemas"]["Event_editor_opened"] | components["schemas"]["Event_preview_opened"] | components["schemas"]["Event_active_heartbeat"];
+        LearningEvent: components["schemas"]["Event_chapter_opened"] | components["schemas"]["Event_resource_opened"] | components["schemas"]["Event_editor_opened"] | components["schemas"]["Event_preview_opened"];
         LearningEventsWrite: {
             events: components["schemas"]["LearningEvent"][];
         };
@@ -3167,7 +3153,7 @@ export interface components {
             error: components["schemas"]["Error_FORBIDDEN"];
             requestId: string;
         };
-        /** @description CSRF 或 Origin 校验失败；业务写入与业务幂等记录创建前拒绝。前端暂停写入，同一轮并发失败最多共用一次令牌刷新，核对身份后由用户重新操作；不自动重放写请求，也不把普通 FORBIDDEN 当作本错误。恢复失败或再次出现本错误时停止自动恢复，Origin 失败不能靠换令牌绕过。 */
+        /** @description CSRF 或 Origin 校验失败；业务写入前拒绝。前端并发失败共用一次令牌刷新，不自动重放写请求，由用户重新操作；也不把普通 FORBIDDEN 当作本错误。刷新失败或再次出现本错误时停止并提示重新登录，Origin 失败不能靠换令牌绕过。 */
         Error_CSRF_INVALID: {
             /** @constant */
             code: "CSRF_INVALID";
@@ -3237,17 +3223,6 @@ export interface components {
             error: components["schemas"]["Error_FEEDBACK_VERSION_CONFLICT"];
             requestId: string;
         };
-        /** @description 同一幂等键对应不同请求。 */
-        Error_IDEMPOTENCY_KEY_REUSED: {
-            /** @constant */
-            code: "IDEMPOTENCY_KEY_REUSED";
-            message: string;
-            details: components["schemas"]["Empty"];
-        };
-        Failure_IDEMPOTENCY_KEY_REUSED: {
-            error: components["schemas"]["Error_IDEMPOTENCY_KEY_REUSED"];
-            requestId: string;
-        };
         /** @description 同一事件 ID 对应不同正文。 */
         Error_EVENT_CONFLICT: {
             /** @constant */
@@ -3312,17 +3287,6 @@ export interface components {
         };
         Failure_SUBMISSION_SUPERSEDED: {
             error: components["schemas"]["Error_SUBMISSION_SUPERSEDED"];
-            requestId: string;
-        };
-        /** @description 同幂等键的事务仍在处理中，附 Retry-After。 */
-        Error_REQUEST_IN_PROGRESS: {
-            /** @constant */
-            code: "REQUEST_IN_PROGRESS";
-            message: string;
-            details: components["schemas"]["Empty"];
-        };
-        Failure_REQUEST_IN_PROGRESS: {
-            error: components["schemas"]["Error_REQUEST_IN_PROGRESS"];
             requestId: string;
         };
         /** @description 归档范围存在当前待批阅提交。 */
@@ -4728,28 +4692,37 @@ export interface components {
                 "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"];
             };
         };
-        /** @description 201 `SubmissionSummaryDTO`；创建代码与评价标准不可变快照 */
-        submitAssignment_201: {
+        /** @description 200 `SubmissionSummaryDTO`；该 workspaceRevision 已提交，返回原提交 */
+        submitAssignment_200: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["Response_submitAssignment"];
             };
         };
-        /** @description OFFERING_ARCHIVED / IDEMPOTENCY_KEY_REUSED / REQUEST_IN_PROGRESS / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED / SUBMISSION_CLOSED / RESUBMIT_NOT_ALLOWED / ATTEMPT_LIMIT_REACHED / RESUBMIT_AFTER_REVIEW */
+        /** @description 201 `SubmissionSummaryDTO`；创建代码与评价标准不可变快照 */
+        submitAssignment_201: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_submitAssignment"];
+            };
+        };
+        /** @description OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED / SUBMISSION_CLOSED / RESUBMIT_NOT_ALLOWED / ATTEMPT_LIMIT_REACHED / RESUBMIT_AFTER_REVIEW */
         submitAssignment_409: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_IDEMPOTENCY_KEY_REUSED"] | components["schemas"]["Failure_REQUEST_IN_PROGRESS"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"] | components["schemas"]["Failure_SUBMISSION_CLOSED"] | components["schemas"]["Failure_RESUBMIT_NOT_ALLOWED"] | components["schemas"]["Failure_ATTEMPT_LIMIT_REACHED"] | components["schemas"]["Failure_RESUBMIT_AFTER_REVIEW"];
+                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"] | components["schemas"]["Failure_SUBMISSION_CLOSED"] | components["schemas"]["Failure_RESUBMIT_NOT_ALLOWED"] | components["schemas"]["Failure_ATTEMPT_LIMIT_REACHED"] | components["schemas"]["Failure_RESUBMIT_AFTER_REVIEW"];
             };
         };
         /** @description 200 `List<SubmissionSummaryDTO>`，按 `attemptNumber` 降序 */
@@ -5483,23 +5456,21 @@ export interface components {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["Response_sendTutoringMessage"];
             };
         };
-        /** @description OFFERING_ARCHIVED / IDEMPOTENCY_KEY_REUSED / REQUEST_IN_PROGRESS / WORKSPACE_CONFLICT / AI_DISABLED / AI_REQUEST_IN_PROGRESS / HINT_LIMIT_REACHED / ASSIGNMENT_ARCHIVED / SESSION_CLOSED */
+        /** @description OFFERING_ARCHIVED / WORKSPACE_CONFLICT / AI_DISABLED / AI_REQUEST_IN_PROGRESS / HINT_LIMIT_REACHED / ASSIGNMENT_ARCHIVED / SESSION_CLOSED */
         sendTutoringMessage_409: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_IDEMPOTENCY_KEY_REUSED"] | components["schemas"]["Failure_REQUEST_IN_PROGRESS"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_AI_DISABLED"] | components["schemas"]["Failure_AI_REQUEST_IN_PROGRESS"] | components["schemas"]["Failure_HINT_LIMIT_REACHED"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"] | components["schemas"]["Failure_SESSION_CLOSED"];
+                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_AI_DISABLED"] | components["schemas"]["Failure_AI_REQUEST_IN_PROGRESS"] | components["schemas"]["Failure_HINT_LIMIT_REACHED"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"] | components["schemas"]["Failure_SESSION_CLOSED"];
             };
         };
         /** @description VALIDATION_ERROR / ATTEMPT_REQUIRED */
@@ -5562,23 +5533,21 @@ export interface components {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["Response_createCheck"];
             };
         };
-        /** @description OFFERING_ARCHIVED / IDEMPOTENCY_KEY_REUSED / REQUEST_IN_PROGRESS / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED */
+        /** @description OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED */
         createCheck_409: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
                 "Cache-Control": components["headers"]["CacheControl"];
-                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_IDEMPOTENCY_KEY_REUSED"] | components["schemas"]["Failure_REQUEST_IN_PROGRESS"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"];
+                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"];
             };
         };
         /** @description 200 `{id,assignmentId,workspaceRevision,checkerVersion,status,result,error,createdAt,completedAt}` */
@@ -5631,10 +5600,8 @@ export interface components {
         CacheControl: "no-store";
         /** @description 会话 lp_session / 预登录 lp_pre_auth；各 Cookie 独立 Set-Cookie 头，不合并。详见 DEVELOPMENT 会话规范。 */
         SetCookie: string;
-        /** @description 重试等待秒数；429 与 REQUEST_IN_PROGRESS 必须返回。 */
+        /** @description 重试等待秒数；429 必须返回。 */
         RetryAfter: string;
-        /** @description 已重放为 true，首次成功为 false；未带可选键时省略。 */
-        IdempotencyReplayed: "true" | "false";
     };
     pathItems: never;
 }
@@ -6144,7 +6111,6 @@ export interface operations {
                 "X-Request-ID"?: string;
                 "X-CSRF-Token": string;
                 Origin: string;
-                "Idempotency-Key": components["schemas"]["UUID"];
             };
             path: {
                 assignmentId: components["schemas"]["UUID"];
@@ -6157,6 +6123,7 @@ export interface operations {
             };
         };
         responses: {
+            200: components["responses"]["submitAssignment_200"];
             201: components["responses"]["submitAssignment_201"];
             400: components["responses"]["getCsrfToken_400"];
             401: components["responses"]["logout_401"];
@@ -7712,7 +7679,6 @@ export interface operations {
                 "X-Request-ID"?: string;
                 "X-CSRF-Token": string;
                 Origin: string;
-                "Idempotency-Key": components["schemas"]["UUID"];
             };
             path: {
                 sessionId: components["schemas"]["UUID"];
@@ -7851,7 +7817,6 @@ export interface operations {
                 "X-Request-ID"?: string;
                 "X-CSRF-Token": string;
                 Origin: string;
-                "Idempotency-Key"?: components["schemas"]["UUID"];
             };
             path: {
                 assignmentId: components["schemas"]["UUID"];
