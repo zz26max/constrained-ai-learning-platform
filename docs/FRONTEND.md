@@ -1,8 +1,8 @@
 # 前端开发手册
 
-基线：1.0.1 · 日期：2026-10-12 · 状态：P0-A 工程入口、同源代理、mock 开关与认证流程（登录/会话恢复）已实现；P1 起的页面与交互待实现。
+基线：1.0.1 · 状态更新：2026-10-13 · 状态：P0-A 工程入口、同源代理、mock 开关与认证流程（登录/会话恢复）已实现；P1 起的页面与交互待实现。
 
-先读 [公共架构与业务规则](DEVELOPMENT.md)，只从 [OpenAPI](openapi.yaml) 获取接口类型、枚举和错误码；不维护手写 DTO 副本。当前原型保留在 website-prototype，正式工程目标目录为 frontend；本轮不迁移代码或更改已确认视觉。
+先读 [公共架构与业务规则](DEVELOPMENT.md)，只从 [OpenAPI](openapi.yaml) 获取接口类型、枚举和错误码；不维护手写 DTO 副本。正式工程已位于 frontend，website-prototype 保留原型与视觉参考；当前交付与待修复问题统一见 [交接说明](DEVELOPMENT.md#handoff)。
 
 ## 1. 工程与迁移
 

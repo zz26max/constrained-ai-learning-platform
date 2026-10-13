@@ -1,14 +1,14 @@
 # 后端开发手册
 
-基线：1.0.1 · 日期：2026-10-12 · 状态：P0-A 认证 HTTP 链（预登录 CSRF、登录、退出、/me、/config、会话 Cookie、Origin 校验、限流、审计）与账户内部能力已实现；P1～P3 教学业务端点、教学表与 worker 待实现。
+基线：1.0.1 · 状态更新：2026-10-13 · 状态：P0-A 认证 HTTP 链（预登录 CSRF、登录、退出、/me、/config、会话 Cookie、Origin 校验、限流、审计）与账户内部能力已实现；P1～P3 教学业务端点、教学表与 worker 待实现。
 
-先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。原 DATA_MODEL 内容迁入本文，已有迁移与生产源码本轮不修改。
+先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。当前交付与待修复问题统一见 [交接说明](DEVELOPMENT.md#handoff)。
 
 快速定位：[工程规范](#a-工程与实现规范) · [会话配置](#session-timeouts) · [教学闭环](#4-p1教学内容与学习闭环) · [AI 与分析](#5-p2受限-ai求助与分析) · [核心事务](#db-transactions) · [查询索引](#8-查询与索引) · [数据保留](#10-迁移归档与删除) · [交付要求](#c-本端交付要求)
 
 ## A. 工程与实现规范
 
-实际依赖以 backend/pom.xml、Wrapper 与 Compose 为准，复用现有 Java 21 / Boot / MyBatis / Flyway。Jakarta Validation 已在 pom 中，HTTP Spring Security 过滤链尚未建立；不要把已引入 crypto 模块当成已完成认证。
+实际依赖以 backend/pom.xml、Wrapper 与 Compose 为准，复用现有 Java 21 / Boot / MyBatis / Flyway。Jakarta Validation 与 Spring Security 已接入；P0-A 的 Cookie 会话、CSRF/Origin 与 HTTP 授权过滤链已有实现，异常路径仍有交接节列明的问题。
 
 Boot 4 实现时沿用当前工程的包与依赖：MVC 测试注解位于 `org.springframework.boot.webmvc.test.autoconfigure`，示例见 [HealthControllerTest](../backend/src/test/java/com/learningplatform/common/health/HealthControllerTest.java)。默认 JSON 数据绑定使用 Jackson 3 的 `tools.jackson.*`；注解仍可来自 `com.fasterxml.jackson.annotation`，不要全局替换所有 Jackson 包名，也不要为照搬 Boot 3 示例额外引入 Jackson 2 databind。实际配置以 pom 与现有序列化代码为准。
 
@@ -115,7 +115,7 @@ erDiagram
 | `audit_logs` | `id, actor_id, action, target_type, target_id, metadata, request_id, created_at` | 不记录口令/凭证/完整正文；用户删除可匿名化 actor；只允许追加 |
 | `terms` | `id, label, starts_at, ends_at, is_current, current_slot` | 学期由管理员维护；ends_at > starts_at；current_slot 为可空 STORED 生成列，唯一索引保证最多一个当前学期；label 为展示文本 |
 
-已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql)；`audit_logs` 随对应功能继续增加版本迁移。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。尚无当前学期，未实现的 `/me/config` 不能视为已可查询。
+已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql) 及 [V4__create_audit_logs.sql](../backend/src/main/resources/db/migration/V4__create_audit_logs.sql)，包含 audit_logs。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。`/me/config` 已实现；未初始化学期时 currentTermId=null、terms=[]，不能把此空态当成接口未实现。
 
 `users` 的具体存储约定如下：
 
@@ -133,13 +133,13 @@ Flyway 自行维护 `flyway_schema_history`，记录迁移版本和校验值；�
 
 `auth_sessions` 的存储与事务规则如下：
 
-- `token_hash/credential_hash/csrf_secret` 使用 `CHAR(64) ascii_bin`，CHECK 精确限制 64 个小写十六进制字符。令牌为 32 个密码学随机字节的十六进制表示，数据库仅存 SHA-256 摘要并唯一索引；`csrf_secret` 是另行生成的随机秘密，供后续 HTTP CSRF 实现使用，本轮尚不校验 CSRF。
+- `token_hash/credential_hash/csrf_secret` 使用 `CHAR(64) ascii_bin`，CHECK 精确限制 64 个小写十六进制字符。令牌为 32 个密码学随机字节的十六进制表示，数据库仅存 SHA-256 摘要并唯一索引；`csrf_secret` 是另行生成的随机秘密，供已实现的 HTTP CSRF 服务派生会话绑定令牌，原始秘密不对外返回。
 - `credential_hash` 为已存密码哈希、换行分隔符及排序后逗号连接的平台角色集合的 SHA-256 摘要，用于识别会话创建后安全状态是否改变；角色数组仅调整顺序不改变摘要。它不哈希原始口令，不替代 `users.password_hash` 中的 Argon2id。
 - `user_id` 外键关联 `users.id`，删除账户级联删除其会话；索引 `user_id` 支持账户会话查询，`expires_at` 支持后续清理。会话清理任务尚未实现，保留周期随运维规则落实。全部时间为 UTC 微秒；CHECK 保证 `created_at <= last_seen_at <= updated_at`、空闲期限大于最近访问且不超过绝对期限、撤销时间不早于创建时间。
 - `DatabaseSessionService.login()` 在 READ COMMITTED 事务中完成凭据校验，随后对账户 `FOR SHARE` 锁读并再次检查状态及所验证的密码哈希，再锁旧会话 `FOR UPDATE`；切换账户时先按用户 ID 排序取账户锁，所有路径均遵循账户→会话顺序。锁等待结束后通过注入的 UTC `Clock` 取创建时刻，旧会话撤销与新会话插入同事务，后者失败前者回滚。只轮换传入的旧令牌，支持其他设备独立登录。[MySQL 锁读](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html)
-- `resolve()` 在同样的锁顺序下检查撤销、账户 active、密码/角色摘要及两种期限；到期时刻本身即失效。有效访问更新最近访问与空闲期限，取 `min(访问时刻 + 空闲时长, 绝对期限)`，绝对期限始终不变。时钟回拨时不让最近访问时间倒退。检测到失效会话时持久撤销；此方法使用 `noRollbackFor=BusinessException.class`，使该清理可在业务拒绝时提交，意外数据库故障仍回滚。后续 HTTP 鉴权层须在业务写事务前调用并结束会话事务，不能与后续业务异常混成一个事务。
+- `resolve()` 在同样的锁顺序下检查撤销、账户 active、密码/角色摘要及两种期限；到期时刻本身即失效。有效访问更新最近访问与空闲期限，取 `min(访问时刻 + 空闲时长, 绝对期限)`，绝对期限始终不变。时钟回拨时不让最近访问时间倒退。检测到失效会话时持久撤销；此方法使用 `noRollbackFor=BusinessException.class`，使该清理可在业务拒绝时提交，意外数据库故障仍回滚。HTTP 鉴权层在业务写事务前调用并结束会话事务，不能与后续业务异常混成一个事务。
 - `revoke()` 重复执行、未知或格式错误令牌均可安全结束；已撤销会话不能恢复。禁用被观察后，即使重新启用也不能恢复该会话。当前没有账户管理入口；后续禁用、口令或权限修改必须在修改事务内主动撤销全部会话，不能仅依赖访问时观察变更。身份每次读取当前姓名与角色，模块资格仍不等于教学班对象权限。
-- 内部 `AuthSession/SessionGrant/SessionIdentity` 的敏感字段使用 `@JsonIgnore` 并覆写安全 `toString()`，不直接作为登录 HTTP 响应；原始会话令牌后续仅写 Cookie，不进入 URL、日志或前端存储。[OWASP 会话管理](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+- 内部 `AuthSession/SessionGrant/SessionIdentity` 的敏感字段使用 `@JsonIgnore` 并覆写安全 `toString()`，不直接作为登录 HTTP 响应；原始会话令牌仅写 Cookie，不进入 URL、日志或前端存储。[OWASP 会话管理](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 
 平台角色赋予模块资格，授课范围由 `offering_members` 决定。管理员维护操作通过独立管理流程审计，不能直接把所有学生隐私暴露给普通管理列表。
 

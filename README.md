@@ -2,7 +2,7 @@
 
 本项目面向多课程的实践学习，提供作业学习、教师反馈、受限 AI 辅导和可解释的学习分析。
 
-整理日期：2026-10-11。当前已有原生 HTML / CSS / JavaScript 前端原型，正式前端确定迁移为 Vue 3 + TypeScript，尚未创建工程；后端采用 **Java / Spring Boot / MySQL**，已实现健康检查、学期/用户/会话表迁移、统一业务响应、请求标识和 MVC 异常处理，以及 MyBatis 用户读写、Argon2id 密码哈希、本地账户初始化、登录凭据校验与内部数据库会话管理。登录 HTTP 接口与其他业务接口仍待开发。页面中的课程、成绩、AI 对话和学习判断仍为示例。
+状态更新：2026-10-13。已交付 P0-A：frontend/ 为 Vue 3 + TypeScript 正式工程，包含登录与会话联调页；backend/ 已实现五个认证接口、Cookie/CSRF、限流、审计及 Flyway V1～V4。P1 教学业务、P2 AI/分析和 P3 检查仍待实现。原型中的课程、成绩与 AI 内容仍是演示数据。前后端分开实现，不绑定特定模型。
 
 ## 文档入口
 
@@ -15,11 +15,23 @@
 | [后端手册](docs/BACKEND.md) | 服务分层、权限、数据模型、事务、迁移与运行 |
 | [接口契约](docs/openapi.yaml) | 两端共用的接口结构、错误、权限和实现状态 |
 
-正式前端确定为 Vue 3 + TypeScript，目标目录 frontend/ 尚未创建；下方 website-prototype 命令仍只启动现有原生原型。当前业务接口均待开发。历史材料在 docs/archive/，不作为开工必读规范。
+下一个 agent 先读 [简短交接说明](docs/DEVELOPMENT.md#handoff)：包含代码基点、已有验证、前端三项/后端两项待修复问题及下一步。历史材料 docs/archive/ 不作为实现规范。
 
-## 本地查看
+## 正式前端启动
 
-需要 Node.js 20 或更新版本。当前前端没有第三方依赖，无需安装依赖。以下命令从项目根目录执行：
+工具链以 frontend/.nvmrc 与 package.json 的 packageManager 为准；首次安装与验证方式见 [前端工程说明](frontend/README.md)。在 frontend/ 执行：
+
+```powershell
+npm ci
+npm run dev
+# 不依赖真实后端的界面开发：npm run dev:mock
+```
+
+真实模式从 http://127.0.0.1:4173 进入，代理到本地 8080 后端；先启动下节后端并准备开发账户。mock 必须明确显示标识，不能作为真实联调证据。原型与正式前端默认端口相同，不同时占用。
+
+## 原型本地查看
+
+以下只启动 website-prototype，不启动正式前端；原型没有第三方依赖。以下命令从项目根目录执行：
 
 ```sh
 npm --prefix website-prototype run dev
@@ -42,7 +54,7 @@ npm --prefix website-prototype run preview
 
 ## 后端启动
 
-当前后端提供 `GET /health/live` 和 `GET /health/ready`，已建立统一业务响应、请求标识与 MVC 异常处理基础，登录等业务端点仍待开发。使用 JDK 21、Spring Boot 4.1.1、Maven Wrapper 3.3.4 / Maven 3.9.16、MySQL 8.4.11。工程位置为 `backend/`，运行前需要准备 Docker 中的项目数据库；首次依赖或镜像下载需要联网。
+当前后端提供两项健康检查及 getCsrfToken/login/logout/getMe/getConfig 五个认证操作，已建立认证链、审计与统一响应；教学业务端点仍待开发。使用 JDK 21、Spring Boot 4.1.1、Maven Wrapper 3.3.4 / Maven 3.9.16、MySQL 8.4.11。工程位置为 `backend/`，运行前需要准备 Docker 中的项目数据库；首次依赖或镜像下载需要联网。
 
 先准备本地数据库，Windows PowerShell 从项目根目录执行：
 
@@ -66,7 +78,7 @@ IDEA 开发步骤：
 
 默认只监听 `127.0.0.1:8080`：`http://127.0.0.1:8080/health/live` 返回 HTTP 200 和 `{"status":"ok"}`；`http://127.0.0.1:8080/health/ready` 返回 HTTP 200 和 `{"status":"ready"}`。端口被占用时可给脚本增加 `-Port 8081`，或在 IDEA 环境变量中设置 `SERVER_PORT`。在启动终端按 Ctrl+C 停止 API。
 
-应用首次启动时 Flyway 依次执行 V1、V2、V3，建立 `terms`、`users`、`auth_sessions` 和迁移记录；已有 V2 的数据库在重启时只新增 V3。迁移不初始化学期、账户或会话，再次启动先校验迁移，不重复建表。数据库初始连接或迁移失败时应用启动失败；已启动后数据库失联，ready 返回 503 `{"status":"unavailable"}`，live 仍可返回 200。
+应用首次启动时 Flyway 依次执行 V1～V4，建立 `terms`、`users`、`auth_sessions`、`audit_logs` 和迁移记录；已有数据库只执行尚未应用的迁移。迁移不初始化学期、账户或会话，再次启动先校验迁移，不重复建表。数据库初始连接或迁移失败时应用启动失败；已启动后数据库失联，ready 返回 503 `{"status":"unavailable"}`，live 仍可返回 200。
 
 首次调试时，在 `src/main/java/com/learningplatform/common/health/HealthController.java` 的 `live()` 返回语句设置行断点，以 Debug 模式运行启动类，访问上述地址。停住后确认请求到达自己的方法，再选择 Resume Program（Windows 默认 F9）让请求完成。Step Into（F7）会进入被调用的方法，可能打开 Spring 依赖类的反编译代码；Step Over（F8）执行当前行，本方法返回后也可能回到 Spring 的调用者。本轮先观察请求进入与返回结果，具体操作见 [IDEA 步进说明](https://www.jetbrains.com/help/idea/stepping-through-the-program.html)。
 
@@ -74,11 +86,11 @@ IDEA 开发步骤：
 
 如果刚命中断点就显示自己的 `HealthController.class`，先停止调试，以 Maven 项目打开 `backend/pom.xml` 并完成同步，确认 `src/main/java` 为后端模块源码目录，再从 `LearningPlatformApplication.java` 启动 Debug。断点应放在 `src/main/java` 下的 `.java` 文件中；`target/classes` 和打包 jar 是编译输出。
 
-学习统一异常处理时，重启 Debug 应用，在 `RequestIdFilter.doFilterInternal()` 和 `GlobalExceptionHandler.handleExceptionInternal()` 设置断点，再访问 `http://127.0.0.1:8080/api/v1/not-existing`。它是故意访问的不存在路径，应得到 HTTP 404、`error.code=NOT_FOUND` 和 `requestId`；浏览器开发者工具中 `X-Request-ID` 响应头与正文一致。成功及业务拒绝的演示 Controller 仅存在于 [ApiContractTest](backend/src/test/java/com/learningplatform/common/api/ApiContractTest.java)，在 IDEA 调试对应测试即可观察，不需要数据库。
+学习统一异常处理时，重启 Debug 应用，在 `RequestIdFilter.doFilterInternal()` 和 `GlobalExceptionHandler.handleExceptionInternal()` 设置断点，再访问 `http://127.0.0.1:8080/api/v1/not-existing`。它是故意访问的不存在路径；先在正式前端登录，同一浏览器持有效会话时返回 HTTP 404、`error.code=NOT_FOUND` 和 `requestId`，匿名请求会先被认证链以 401 拒绝；浏览器开发者工具中 `X-Request-ID` 响应头与正文一致。成功及业务拒绝的演示 Controller 仅存在于 [ApiContractTest](backend/src/test/java/com/learningplatform/common/api/ApiContractTest.java)，在 IDEA 调试对应测试即可观察，不需要数据库。
 
 在 `backend/` 且终端已选择 JDK 21 时，执行 `.\mvnw.cmd test` 跑 Web 契约、密码算法、登录凭据校验、会话令牌与配置的单元测试，不需要 Docker 或数据库环境变量；执行 `.\mvnw.cmd verify` 还会运行 Testcontainers 真实 MySQL 测试（学期约束、就绪检查、用户读写、账户初始化、登录校验与会话生命周期）并打包，要求 Docker 引擎可用。数据库测试使用临时库与临时端口，完成后释放容器，不连接开发库。数据库验证不会因为缺少 Docker 被静默跳过。
 
-本轮用户查询是内部数据访问方法，没有新增 HTTP 地址。在 IDEA 调试 [UserMapperIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/mapper/UserMapperIntegrationIT.java) 的 `findByUsernameMapsAccountAndKeepsRolesImmutable()`，在调用 Mapper 前设置断点，步过查询观察 `Optional<User>`。SQL 位于 [UserMapper.xml](backend/src/main/resources/mapper/auth/UserMapper.xml)，角色与时间的类型转换器也可设断点；Mapper 接口由 MyBatis 生成代理实现，不需要手写实现类。测试中的虚构账户只在临时库存在，不是开发库的登录账号。
+下面是内部数据访问方法的调试入口，不替代认证 HTTP 接口验收。在 IDEA 调试 [UserMapperIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/mapper/UserMapperIntegrationIT.java) 的 `findByUsernameMapsAccountAndKeepsRolesImmutable()`，在调用 Mapper 前设置断点，步过查询观察 `Optional<User>`。SQL 位于 [UserMapper.xml](backend/src/main/resources/mapper/auth/UserMapper.xml)，角色与时间的类型转换器也可设断点；Mapper 接口由 MyBatis 生成代理实现，不需要手写实现类。测试中的虚构账户只在临时库存在，不是开发库的登录账号。
 
 IDEA 的测试启动器也需要与 JUnit 版本兼容。2026-10-08 核查本机 IDEA 2024.2.4 的 `JUnit5TestRunnerUtil` 仍调用 `MethodSelector.getMethodParameterTypes()`，而项目由 Boot 管理的 JUnit 6.0.3 已移除该方法，因此直接点击测试 Debug 会出现 `NoSuchMethodError`，尚未进入查询代码。Maven 复测该查询方法及 40 条 Web 用例均通过。建议使用 IDEA 2025.3 或更新的支持 JUnit 6 的稳定版本，完成 Maven 同步后再调试；项目 SDK 保持 JDK 21，测试依赖继续由 Boot 管理。[JUnit 6 发布记录](https://docs.junit.org/6.0.0/release-notes.html)、[IDEA 2025.3 发布说明](https://www.jetbrains.com/idea/whatsnew/2025-3/)
 
@@ -98,11 +110,11 @@ IDEA 的测试启动器也需要与 JUnit 版本兼容。2026-10-08 核查本机
 
 脚本仅允许连接约定的本地 `3307/learning_platform` 开发库，为缺失的 `LOCAL_STUDENT_PASSWORD/LOCAL_TEACHER_PASSWORD/LOCAL_ADMIN_PASSWORD` 生成独立随机值并保存在被忽略的 `.env`。账户分别是 `student.demo`（学生）、`teacher.demo`（教师）、`admin.demo`（管理员），姓名均为虚构演示名称。需要查看自己的密码时在本机打开 `.env`，不要将它提交或截图分享。可在首次初始化前自行填写 15～128 个 Unicode 字符的非全空白密码；格式是原样 `KEY=value`，不加引号，不执行插值，密码首尾空格也会保留。
 
-命令启用 `local-accounts` profile，执行迁移及事务初始化后退出，不占用 API 端口；普通 `api` 启动不创建账户。日志只显示新增与跳过数量。重复执行跳过已有账户，不更改密码、姓名、权限、状态或时间；任何新增失败，本次新增全部回滚。修改或重新生成 `.env` 密码不会重置已有用户口令，已有账户即使被禁用也不会自动恢复。账户信息存入 `users`，密码仅以 Argon2id 哈希保存；初始化不会创建学期或登录会话，登录 HTTP 地址仍待实现。
+命令启用 `local-accounts` profile，执行迁移及事务初始化后退出，不占用 API 端口；普通 `api` 启动不创建账户。日志只显示新增与跳过数量。重复执行跳过已有账户，不更改密码、姓名、权限、状态或时间；任何新增失败，本次新增全部回滚。修改或重新生成 `.env` 密码不会重置已有用户口令，已有账户即使被禁用也不会自动恢复。账户信息存入 `users`，密码仅以 Argon2id 哈希保存；初始化不会创建学期或登录会话，初始化后可通过正式前端调用已实现的登录 HTTP 接口。
 
 学习这一功能，优先查看 [LocalAccountInitializationService](backend/src/main/java/com/learningplatform/modules/auth/service/LocalAccountInitializationService.java) 的 `initialize()` 与 `createIfMissing()`。在 IDEA Debug [LocalAccountInitializationIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/service/LocalAccountInitializationIntegrationIT.java) 的 `createsAccountsWithVerifiableHashes()`，在 Service 的查询、生成哈希和插入语句设置行断点；F8 观察新账户的业务流程。重复初始化场景见 `repeatedInitializationPreservesEveryExistingField()`。测试仅操作独立临时数据库，不会更改开发库密码。
 
-登录凭据校验已实现为内部方法 [LoginCredentialService.verifyCredentials()](backend/src/main/java/com/learningplatform/modules/auth/service/LoginCredentialService.java)。它规范化用户名、保留密码原样，查询账户并通过 `matches()` 验证哈希；仅 `active` 账户可通过。成功返回不含密码字段的 `UserDTO`，不存在、密码错误和禁用统一抛出 `INVALID_CREDENTIALS` 业务异常。字段缺失或超出输入范围为 `VALIDATION_ERROR`，数据库故障保留为服务端异常。未知用户名仍执行占位哈希校验，减少明显的计算耗时差异；这不保证整个请求耗时完全相同，也不替代后续登录限流。
+登录凭据校验已实现为内部方法 [LoginCredentialService.verifyCredentials()](backend/src/main/java/com/learningplatform/modules/auth/service/LoginCredentialService.java)。它规范化用户名、保留密码原样，查询账户并通过 `matches()` 验证哈希；仅 `active` 账户可通过。成功返回不含密码字段的 `UserDTO`，不存在、密码错误和禁用统一抛出 `INVALID_CREDENTIALS` 业务异常。字段缺失或超出输入范围为 `VALIDATION_ERROR`，数据库故障保留为服务端异常。未知用户名仍执行占位哈希校验，减少明显的计算耗时差异；这不保证整个请求耗时完全相同，也不替代已接入的登录限流（并发空档待修复）。
 
 在 IDEA Debug [LoginCredentialIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/service/LoginCredentialIntegrationIT.java) 的 `verifiesActiveAccountAndReturnsSafeIdentity()`，在 Service 的 `User user = ...` 和 `boolean passwordCorrect = ...` 设置行断点，F8 观察数据库用户和校验结果；先禁用 Mapper 接口方法断点，避免停在代理类中。失败场景可调试 `rejectsWrongShortPasswordWithCredentialFailure()` 与 `disabledAccountFailsWithSamePublicError()`。测试会先在自己的临时库创建账户，测试口令仅在测试代码中使用；开发库的私有密码不用于这些测试。
 
@@ -110,9 +122,9 @@ IDEA 的测试启动器也需要与 JUnit 版本兼容。2026-10-08 核查本机
 
 会话默认期限、环境变量名称和配置约束统一见 [BACKEND 会话期限](docs/BACKEND.md#session-timeouts)。覆盖值可在 IDEA 或启动进程环境变量中设置；无需修改本地 `.env`，该文件的脚本允许字段尚不包含这两项。过期、禁用或密码/平台角色变更被观察到时，旧会话拒绝并持久撤销；姓名变更读取最新值。后续账户管理还须在禁用、密码或权限修改事务内主动撤销全部会话，避免状态先改回再访问而未被观察到。
 
-在 IDEA Debug [DatabaseSessionIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/service/DatabaseSessionIntegrationIT.java) 的 `loginCreatesSessionAndRecognizesNextRequest()`，先在 Service 的 `login()` 内第一条语句设置行断点，再在 `resolve()` 的第一条语句设置断点。F8 观察登录产生 `SessionGrant`，再观察相同令牌识别出 `SessionIdentity`；这是两次内部调用，尚非浏览器 HTTP 请求。测试使用独立临时库。本轮没有修改 Maven 依赖，正常编译即可，无需因为修改 Java 文件反复同步 Maven。
+在 IDEA Debug [DatabaseSessionIntegrationIT](backend/src/test/java/com/learningplatform/modules/auth/service/DatabaseSessionIntegrationIT.java) 的 `loginCreatesSessionAndRecognizesNextRequest()`，先在 Service 的 `login()` 内第一条语句设置行断点，再在 `resolve()` 的第一条语句设置断点。F8 观察登录产生 `SessionGrant`，再观察相同令牌识别出 `SessionIdentity`；这是两次内部调用，不是浏览器 HTTP 验收。测试使用独立临时库。
 
-打包产物为 `target/learning-platform-backend-0.0.1-SNAPSHOT.jar`；终端注入上述数据库变量后可用 `java -jar target/learning-platform-backend-0.0.1-SNAPSHOT.jar` 启动。登录 HTTP、Cookie、CSRF 校验、限流和前端 API 代理继续分步实现；当前不能通过浏览器调用上述会话方法。内部结果的原始令牌与 CSRF 秘密不进入 JSON 或 `toString()`。
+打包产物为 `target/learning-platform-backend-0.0.1-SNAPSHOT.jar`；终端注入上述数据库变量后可用 `java -jar target/learning-platform-backend-0.0.1-SNAPSHOT.jar` 启动。登录 HTTP、Cookie、CSRF、限流和前端 API 代理已接入；通过 frontend/ 登录页访问，内部 Service 不直接暴露。内部结果的原始令牌与 CSRF 秘密不进入 JSON 或 `toString()`。
 
 停止开发数据库时，在 `backend/` 执行 `docker compose --env-file .env stop db`；下次运行启动脚本恢复。普通停止保留数据，日常开发不要删除数据卷。数据库首次初始化后，修改 `.env` 密码不会自动修改已有数据库账号，应通过数据库管理流程协调变更。
 
@@ -133,7 +145,7 @@ scripts/
   contract_slice.py             按 operationId 提取只读契约
   requirements-contract.txt     契约工具依赖
 .github/workflows/contract.yml  静态检查与后端测试
-frontend/                       正式 Vue 工程，计划目录、尚未创建
+frontend/                       正式 Vue 工程，P0-A 登录与会话基础已交付
 backend/
   pom.xml                       Maven 依赖与打包配置
   compose.yml                   本地 MySQL 8.4.11 与持久化数据卷
