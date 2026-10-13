@@ -1,50 +1,18 @@
 # 项目开发方案与协作基线
 
-设计基线：1.0.1 · 状态更新：2026-10-13。前后端按独立工作包实现，不绑定模型名称；共享设计、契约与跨端审查由用户指定的维护任务统一负责。
+设计基线：1.0.1。前后端按独立工作包实现；当前进度见 [STATUS](STATUS.md)。
 
 ## 1. 阅读与权威边界
 
-日常只维护三份开发文档和一份结构契约：
-
 | 文件 | 唯一负责的内容 | 阅读方式 |
 | --- | --- | --- |
-| 本文 | 架构、跨端业务规则、协作、阶段与验收 | 两端必读 1～3、11～14 节，业务章节按任务读取 |
+| 本文 | 架构、跨端业务规则、阶段与工作包 | 两端必读 1～3、11 节，业务章节按任务读取 |
 | [FRONTEND.md](FRONTEND.md) | Vue 工程、页面、状态、保存与浏览器行为 | 前端按功能读取 |
-| [BACKEND.md](BACKEND.md) | 服务分层、存储、锁、事务、迁移与运行 | 后端按功能读取 |
-| [openapi.yaml](openapi.yaml) | HTTP 地址、字段、类型、必填/可空、枚举、错误和接口状态 | 按 operationId 及其引用的 schema 读取，不将全文塞进每个任务 |
+| [BACKEND.md](BACKEND.md) | 服务分层、存储、事务、迁移与运行 | 后端按功能读取 |
+| [openapi.yaml](openapi.yaml) | HTTP 地址、字段、类型、必填/可空、枚举、错误和接口状态 | 按 operationId 切片读取 |
+| [STATUS.md](STATUS.md) | 当前进度、交接、验证记录、已知限制 | 接手时先读 |
 
-字段结构以 OpenAPI 为准，业务含义以本文为准，存储与事务以 BACKEND 为准，界面行为以 FRONTEND 为准。这是职责分工，不是允许冲突的覆盖顺序：发现冲突先修正文档与契约再开发。其他文件可引用字段、表名和规则，但不维护第二套字段表、错误码表或 DTO 定义。示例不取代 schema。
-
-`archive/` 是历史快照和审计输入，不是开工必读项。README 只保留项目入口与实际启动方法，不再承担新增规范。旧 API、DATA_MODEL 与开发进度详细记录已保存到 2026-10-08 快照。
-
-### 1.1 当前真实状态
-
-截至 2026-10-13，P0-A 已交付：契约 83 个操作中，5 个认证操作（getCsrfToken、login、logout、getMe、getConfig）标为 verified，2 个健康检查为 implemented，其余 76 个为 planned。已有账户初始化、数据库会话、认证 HTTP 链、登录限流、审计和 Flyway V1～V4；正式 Vue 工程 frontend/ 已建立，包含登录、会话联调页、身份恢复、退出、同源代理与 mock。website-prototype/ 仅保留静态原型。
-
-已有通过前端代理连接真实数据库的接口联调记录，尚未完成真实浏览器 UI 验收。P1 教学业务与 P2/P3 功能尚未实现；本轮定向检查发现认证异常恢复和并发限流问题，见下方交接。verified 保留原已验证场景的证据，不表示覆盖所有异常或并发条件。
-
-OpenAPI 中 `x-implementation-status` 使用 planned / implemented / verified：分别表示未实现、已有生产实现且相关 HTTP 测试通过、通过真实跨端验收。`x-contract-status: reviewed` 仅表示静态设计审计。P0～P3 是计划阶段，不代表可用性。新增或删除生产路由必须在同一变更中更新契约状态；改变状态须在交付记录附代码与对应测试，verified 另附真实联调证据，不能按按钮是否出现判断完成。
-
-CI 使用应用注册的生产路由，按 HTTP 方法和路径双向核对状态：实际存在的路由不得标为 planned，也不得游离于契约之外；implemented/verified 必须存在对应路由。此检查不自动认定业务完成或把状态升级为 verified，接口行为仍由 HTTP 测试和跨端验收证明。状态描述当前仓库版本，不表示某个服务器已部署；前端真实联调须同时确认环境地址、部署提交和测试账户。
-
-<a id="handoff"></a>
-
-### 1.2 交接说明（2026-10-13）
-
-- **接手方式**：先读本节，再按任务阅读本端手册及契约切片。前端只实现 frontend/，后端只实现 backend/；不绑定任何模型，共享文档/契约变更须先说明影响并取得用户授权。
-- **代码基点**：整理前 HEAD 为 `86574e2`；前端首包 `12205b6`，后端首包 `fa72b3f`，启动脚本修复 `0aa9856`，CI 扩充 `6935b6e`。当前处于 P0-A 收尾，P1 尚未开工。
-- **已有证据**：本地报告为后端 93 项单元/HTTP 测试、98 项数据库集成测试通过；前端交付记录为 verify 与 39 项用例通过；五个认证操作经代理联调通过。浏览器 UI、远程 CI 未确认，不能据此宣称全量验收。工具链基线与历史实测版本存在记录冲突，接手前记录 node/npm 实际版本，按锁定基线重新验证。
-- **建议下一步**：前后端分别处理下表问题，再做浏览器登录→刷新→退出与异常恢复验收；不要直接把这些问题记为已修复。本次仅整理文档，没有改业务代码或契约。
-
-| 待处理 | 归属 / 入口 | 已复现的现象及验收目标 |
-| --- | --- | --- |
-| 登录后身份失效 | 前端 [auth.ts](../frontend/src/stores/auth.ts) | login 200 后 /me 401，仍返回登录成功并保留 authenticated；应进入身份恢复 |
-| CSRF 刷新失败提示错误 | 前端 auth.ts | 刷新请求失败仍提示“令牌已刷新”，旧 token 保留；区分成功与失败 |
-| 退出恢复不完整 | 前端 auth.ts / csrf-refresh.ts | 三次退出 CSRF 失败触发三次刷新、零次身份核对；落实单次恢复、再次失败停止及用户代次检查 |
-| 会话查询异常无统一响应 | 后端 [SessionCookieAuthFilter](../backend/src/main/java/com/learningplatform/common/security/SessionCookieAuthFilter.java) | 模拟数据库异常直接逃出过滤器，未写入业务错误信封；按现有契约处理服务端故障 |
-| 并发登录限流空档 | 后端 [LoginRateLimiter](../backend/src/main/java/com/learningplatform/modules/auth/security/LoginRateLimiter.java) / AuthController | 模拟先检查后回报失败的并发时序，上限 5 仍放行 20 次校验；补原子的请求准入或在途限制并验证 |
-
-上表来自 2026-10-13 对现有代码的定向模拟验证，不是真实浏览器或并发压测；临时探针未提交。接手者先补可重复的回归测试，再修复并分别提交。每包交付说明改动、实际检查、未做事项、自主决定和提交哈希；不要把排查结论当成实现结果。
+协作、修改权限、证据与提交规则只在 [AGENTS.md](../AGENTS.md) 维护。`archive/` 是历史快照，不是规范；README 只保留项目入口与启动方法。P0～P3 是计划阶段，不代表可用性；接口是否可用看契约的 `x-implementation-status`。
 
 ## 2. 范围与阶段
 
@@ -449,33 +417,11 @@ AI queued/running 没有结果，completed 只交付审核后的正文，fallbac
 交付：改动文件、实际检查结果、尚未实现项
 ```
 
-### 11.1 协作与冻结流程
+### 11.1 契约冻结与变更
 
-用户已经确认 Vue 方向与三份文档组织。本轮基线 1.0.1 可作为两端开工依据；P0/P1 结构变更须先更新契约和受影响规则，P2/P3 开工前复核阶段设计。不得以“后端尚未实现”为由随意改字段。
+本轮基线可作为两端开工依据。P0/P1 结构变更须先更新契约和受影响规则；不得以“后端尚未实现”为由随意改字段。patch 表示文字澄清与不改结构的修正；新增兼容操作用 minor；删除、重命名、类型/必填/枚举语义变化按破坏性变更审查。修改流程与提交约定见 [AGENTS.md](../AGENTS.md)。
 
-前端与后端由独立工作包实现，执行 agent 不绑定模型品牌。用户指定的共享设计维护任务负责架构、契约与跨端审查；任何实现方均可提出变更。修改 docs/ 前须说明内容、原因与影响并取得用户授权，再由维护任务统一修改；已获明确授权的文档维护任务按授权范围执行。普通本端内部重构可在任务范围内处理，遇到影响目标或方案的不确定性先询问。
-
-建议同一仓库、各自独立分支/工作区开发：前端主要改 frontend，后端主要改 backend，共享文档/契约集中修改后同步。多个 agent 不要同时编辑同一工作区的共享文件。交接必须包含实际提交或文件差异，聊天里的“已同步”不算证据。
-
-**提交约定：** 每完成一个工作包或一个可独立验收的模块，在本端检查通过后立即提交，不把多个工作包压成一个提交，也不长期保留未提交改动。提交信息首行为 `<范围>: <结果>`，范围用 `frontend` / `backend` / `contract` / `docs` / `scripts`；正文写清三件事——改了什么（关键文件或模块）、实际执行了什么检查及真实结果、本次未做什么。契约状态变更（`x-implementation-status`）必须与新增或删除的生产路由在同一提交内；前后端代码分开提交；已授权的契约状态变更可与对应后端路由同提交，其他共享设计变更单独提交。禁止 `wip`、`更新`、`fix`、`修改` 这类无法据以判断内容的说明；不用 `-f` 绕过 `.gitignore` 提交 `target/`、`dist/`、`.env`、`.contract-venv` 等生成物或私密配置。交接时给出提交哈希，用于替代口头说明。
-
-以下为提交格式模板，不是实际测试结果：
-
-```text
-<frontend|backend|docs>: <本包可验证的结果>
-
-改动：<关键文件与行为>
-检查：<命令、实际结果；未运行须说明原因>
-未做：<未覆盖的场景与后续事项>
-```
-
-契约变更在同一可审查变更集中更新受影响 schema、示例、前端生成类型/模拟数据和后端契约测试。两端无法同步时停止使用受影响接口，保留旧基线，不能只让一端兼容猜测。patch 表示文字澄清与不改结构的修正；新增兼容操作用 minor；删除、重命名、类型/必填/枚举语义变化按破坏性变更审查，不因版本号小就绕过审查。
-
-### 11.2 当前交接范围
-
-P0-A 首批五个认证操作与 Vue 工程入口已交付，具体代码基点、验证边界和待修复问题统一见 [交接说明](#handoff)。下一包优先收尾认证异常路径，再按第 11 节工作包进入 P1-A；不重新创建已有工程或重复实现认证接口。
-
-模拟模式使用真实请求层对应的响应结构，明确显示模拟环境。真实模式收到失败不得回退模拟成功。mock 能支持并行开发，不能证明权限、事务或数据库行为已实现。
+模拟模式使用真实请求层对应的响应结构，明确显示模拟环境。
 
 ## 12. 验收与审计
 
@@ -487,24 +433,10 @@ P0-A 首批五个认证操作与 Vue 工程入口已交付，具体代码基点�
 python -m venv .contract-venv
 .\.contract-venv\Scripts\python.exe -m pip install -r scripts/requirements-contract.txt
 .\.contract-venv\Scripts\python.exe scripts/validate_contract.py
-```
-
-检查 OpenAPI 3.1、内部引用、81 个基线业务端点覆盖、schema 结构、示例与关键正反例、文档链接。工具只做静态检查，不会启动或修改开发数据库。依赖由工具目录单独管理，不加入正式后端或前端依赖。
-
-契约本身较长，属于机器可读产物，不要求开发者或模型全文阅读。使用下列只读命令先找接口，再提取当前工作包及其依赖的 schema：
-
-```powershell
 .\.contract-venv\Scripts\python.exe scripts/contract_slice.py --list
-.\.contract-venv\Scripts\python.exe scripts/contract_slice.py login getMe getConfig
 ```
 
-提取结果只用于阅读，不另存为需要维护的契约；它不替代工作包指定的公共规则和本端手册。枚举领域、阻断原因优先级、计数范围等容易误读的接口语义同时就近写入 schema，保证提取后仍可读。
-
-GitHub Actions 在 docs、backend、frontend、契约脚本及工作流变化时，执行静态检查与后端 `test`。本地从 backend 目录运行 `./mvnw.cmd test`（Linux 使用 `bash ./mvnw test`）。其中 ImplementationStatusContractTest 启动应用上下文、以 DataSource 替身隔离数据库，并将真实注册的生产路由与契约状态双向核对；不加载开发数据库、不执行迁移。新增 Controller 会自动纳入检查，无需维护路由白名单。远程运行结果以实际 CI 为准。当前检查不自动证明变更向后兼容；字段兼容性仍需架构审查及两端类型/契约测试。
-
-前端开工后从契约生成 TypeScript 类型，生成目录不可手改；必须执行 vue-tsc 与构建。后端使用 MockMvc 实际响应对 schema 校验，已实现端点按对应状态验证；springdoc 如引入，只导出实现用于差异核对，不反向覆盖设计契约。具体生成工具版本在前端工程初始化时锁定，目前没有声称已经生成客户端。
-
-自动检查负责可验证结构，跨字段总分、时间窗口、权限与并发由实际测试证明。CI 静态通过不等于跨端联调通过；实际调用还应检查响应状态、Cookie/CSRF、错误详情和角色可见字段。
+validate_contract 静态检查 OpenAPI 结构、引用、示例、正反例与文档链接，不连接数据库。contract_slice 按 operationId 提取只读切片，不另存为契约。后端 `./mvnw.cmd test` 中的 ImplementationStatusContractTest 把真实注册的生产路由与 `x-implementation-status` 双向核对；CI 在 docs、backend、frontend、脚本变化时运行上述检查。前端类型由 `npm run contract:types` 从契约生成，生成目录不可手改。跨字段总分、时间窗口、权限与并发由实际测试证明。
 
 ### 12.2 功能验收
 
@@ -525,36 +457,7 @@ GitHub Actions 在 docs、backend、frontend、契约脚本及工作流变化时
 - CSRF 过期、多请求同时失败、恢复期间换用户、Origin 不受允许：业务无写入、不自动重放、仅一次共享刷新，失败后可人工恢复。
 - P2 供应商适配器测试确认不发送真实身份、凭据或未获准材料，重生成同样经过发送前检查。
 
-### 12.3 验证记录（P0-A 历史证据 / 2026-10-13 文档整理）
-
-本次文档整理实际重跑：`python scripts/validate_contract.py` 通过（83 个操作、327 个 schema、29 个示例、40 个结构回归用例、74 处当前文档链接；切片示例、计数检查及启动脚本 BOM 检查通过），`git diff --check` 通过。本次未重跑前后端测试，下面的运行结果保留为历史证据。
-
-| 项目 | 历史设计整理与证据边界 |
-| --- | --- |
-| 架构职责 | 明确模块拥有的数据、跨模块窄接口、事务负责人及循环依赖处理 |
-| 前端方案 | 从原生正式接入调整为 Vue 3 + TypeScript；保留原型与视觉，不标记迁移已完成 |
-| 接口覆盖 | 81 个业务操作与两项健康检查，逐项标注阶段、权限、CSRF、幂等及实现状态 |
-| 类型缺口 | 补齐内联/未登记 DTO；学生与教师视图分离；列表解包路径明确 |
-| 横切缺口 | PATCH/null、Cookie 名称、评分类型、提交阻断顺序、重放头与错误注册补齐 |
-| 新发现歧义 | 公告 target 统一；教师个人状态为 null；关闭求助拒绝回复；章归档与闭合会话错误登记 |
-| 设计与运行 | 未改动生产源码；新增生产路由核对并运行后端测试，未实现业务仍不标为验收通过 |
-| 1.0.1 修订 | CSRF 恢复、AI 外发边界、正式路由、mock/工具链、反馈视图和事件内部接收时间已明确 |
-
-以下为 **P0-A 已有交付记录与本地报告（提交日期 2026-10-13）、设计基线 1.0.1** 的验证快照；不是自动更新的进度表。契约、校验器或相关测试变更后，交付者须重新执行并更新本段；不能只沿用此前的通过结论。
-
-| 执行位置与命令 | 已有记录的结果 | 能证明与不能证明的内容 |
-| --- | --- | --- |
-| 项目根目录：`python scripts/validate_contract.py` | PASS：81 个业务 + 2 个健康操作，327 个 schema；29 个示例、40 个结构回归用例、文档链接检查通过（当前数量以重新执行的输出为准）；6 个响应切片保留示例；5 项计数/筛选检查。实现状态为 verified 5（P0-A 认证操作）+ implemented 2（健康检查） | 验证结构、引用与静态样例，不验证实际权限、SQL 查询或并发 |
-| backend 目录：`./mvnw.cmd --batch-mode test` | BUILD SUCCESS；Tests run: 93, Failures: 0, Errors: 0, Skipped: 0 | 单元与 MockMvc HTTP 契约；不是真实数据库或跨端联调 |
-| backend 目录：`./mvnw.cmd --batch-mode verify` | BUILD SUCCESS；Tests run: 98, Failures: 0, Errors: 0, Skipped: 0（Testcontainers `mysql:8.4.11`：AuditLog 3 / Database 7 / UserMapper 33 / DatabaseSession 32 / LocalAccountInit 9 / LoginCredential 14） | 真实 MySQL 的方言、约束与事务行为；仍不能替代跨端联调 |
-| frontend 目录：`npm run verify`（typecheck + build + check:no-mock + vitest） | 全部通过：`vue-tsc` 无错误；`vite build` 38 模块；`check-no-mock` PASS；vitest 4 个文件 39 条用例通过 | 前端类型、构建与模拟传输下的行为；不证明真实后端联调或浏览器 UI |
-| P0-A 跨端联调（本机 `127.0.0.1:4173` 同源代理 → `8080` → MySQL `3307`） | 通过。正常流程：`GET /api/v1/auth/csrf-token` 200 且下发 `lp_pre_auth`（Max-Age=600）；`POST /auth/login` 200 且下发 `lp_session`（7 天）、清除 `lp_pre_auth`、响应不含密码字段；`GET /me` 200；`GET /me/config` 200（无学期时 `currentTermId:null`、`terms:[]`，三个 feature 均 false）；`POST /auth/logout` 200 且清除 `lp_session`；退出后 `GET /me` 401 `UNAUTHENTICATED`。负例：错误密码 401 `INVALID_CREDENTIALS`；缺 `X-CSRF-Token`、缺 `Origin`、非白名单 `Origin` 均 403 `CSRF_INVALID`。全部响应的 `X-Request-ID` 与正文 `requestId` 一致且带 `Cache-Control: no-store` | 证明这五个操作经前端同源代理与真实数据库可用；**不证明**浏览器 UI 交互、并发与限流边界，也不覆盖 P1 起的业务端点 |
-
-Maven XML/文本报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsafe-reports/`（本地生成、不提交）；CI 运行日志是远程证据，本轮未声称远程 CI 已运行成功。
-
-尚未确认：真实浏览器 UI、P1 业务联调与远程 CI。工具链方面，前端提交 12205b6 声称实测 Node 24.21.0 / npm 11.19.0，后续审计文字却记录 Node 24.17.0 / npm 11.13.0；现有证据不能消除这项历史差异，不把任一说法当作已核实。接手者记录实际 node --version / npm --version，再按 frontend/.nvmrc 与 packageManager 重现 npm ci 和 verify。
-
-后端已有功能的历史运行证据见 [历史开发记录](archive/2026-10-08_DEVELOPMENT.md#112-实施进度与代码阅读)。架构与契约是一套可实施基线，运行正确性仍按工作包实测。
+历次实际验证结果记录在 [STATUS 验证记录](STATUS.md#3-验证记录p0-a2026-10-13)。
 
 ## 13. 运维与数据边界
 

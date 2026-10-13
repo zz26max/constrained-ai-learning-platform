@@ -72,7 +72,7 @@ def slug(text):
 def check_links():
     count = 0
     # Historical snapshots retain historical coordinates; only current documents are normative.
-    for path in [ROOT / 'README.md', *[DOCS / n for n in ['DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md']]]:
+    for path in [ROOT / 'README.md', ROOT / 'AGENTS.md', *[DOCS / n for n in ['DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]:
         content = path.read_text(encoding='utf-8')
         for target in re.findall(r'\[[^\]\n]+\]\(([^)\n]+)\)', content):
             if re.match(r'^[a-z]+://', target, re.I):

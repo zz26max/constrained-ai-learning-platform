@@ -2,7 +2,7 @@
 
 基线：1.0.1 · 状态更新：2026-10-13 · 状态：P0-A 认证 HTTP 链（预登录 CSRF、登录、退出、/me、/config、会话 Cookie、Origin 校验、限流、审计）与账户内部能力已实现；P1～P3 教学业务端点、教学表与 worker 待实现。
 
-先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。当前交付与待修复问题统一见 [交接说明](DEVELOPMENT.md#handoff)。
+先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、锁、事务和保留约定。当前交付与待修复问题统一见 [交接说明](STATUS.md#handoff)。
 
 快速定位：[工程规范](#a-工程与实现规范) · [会话配置](#session-timeouts) · [教学闭环](#4-p1教学内容与学习闭环) · [AI 与分析](#5-p2受限-ai求助与分析) · [核心事务](#db-transactions) · [查询索引](#8-查询与索引) · [数据保留](#10-迁移归档与删除) · [交付要求](#c-本端交付要求)
 
@@ -485,6 +485,6 @@ background_jobs.payload 只存对象 ID；幂等响应对于 AI 仅存入队状�
 
 ## C. 本端交付要求
 
-每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [DEVELOPMENT 11.1](DEVELOPMENT.md#111-协作与冻结流程) 的提交约定提交，交接时给出提交哈希与正文中记录的实际检查结果。
+每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [AGENTS.md](../AGENTS.md) 的提交约定提交，并更新 [STATUS](STATUS.md)。
 
 阶段建立表的数量不作为进度目标，以可验收流程为准。P1 事件与通知同事务落库，P2 才回填知识证据并启动 AI worker；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。
