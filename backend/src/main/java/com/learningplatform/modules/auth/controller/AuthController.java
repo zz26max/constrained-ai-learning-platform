@@ -94,16 +94,16 @@ public class AuthController {
                                        HttpServletRequest request, HttpServletResponse response) {
         String requestId = RequestIdFilter.getRequestId(request);
         String rateKey = loginRateLimiter.key(body.username(), request.getRemoteAddr());
-        LoginRateLimiter.Outcome outcome = loginRateLimiter.check(rateKey);
-        if (outcome.limited()) {
-            int retryAfter = (int) Math.min(outcome.retryAfterSeconds(), Integer.MAX_VALUE);
+        LoginRateLimiter.Admission admission = loginRateLimiter.acquire(rateKey);
+        if (admission.limited()) {
+            int retryAfter = (int) Math.min(admission.retryAfterSeconds(), Integer.MAX_VALUE);
             throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
                     "尝试次数过多，请稍后再试", Map.of(), retryAfter);
         }
-        String previousToken = AuthCookies.read(request, AuthCookies.SESSION);
         try {
+            String previousToken = AuthCookies.read(request, AuthCookies.SESSION);
             SessionGrant grant = sessions.login(body.username(), body.password(), previousToken, requestId);
-            loginRateLimiter.onSuccess(rateKey);
+            admission.onSuccess();
             long maxAge = Math.max(Duration.between(clock.instant(), grant.expiresAt()).getSeconds(), 0);
             response.addHeader("Set-Cookie", AuthCookies.session(grant.token(), maxAge, properties.cookieSecure()));
             response.addHeader("Set-Cookie", AuthCookies.clear(AuthCookies.PRE_AUTH, properties.cookieSecure()));
@@ -111,10 +111,13 @@ public class AuthController {
                     csrfTokens.sessionToken(grant.id(), grant.csrfSecret())), requestId);
         } catch (BusinessException exception) {
             if ("INVALID_CREDENTIALS".equals(exception.getCode())) {
-                loginRateLimiter.onFailure(rateKey);
+                admission.onFailure();
                 auditLoginFailure(body.username(), requestId);
             }
             throw exception;
+        } finally {
+            // 成功和凭据错误已结算；数据库故障等其他路径只释放预占，不记为错误密码。
+            admission.close();
         }
     }
 
