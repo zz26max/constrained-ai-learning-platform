@@ -47,7 +47,7 @@
 
 Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsafe-reports/`（本地生成、不提交）。
 
-尚未确认：真实浏览器 UI、P1 业务联调与远程 CI。工具链方面，前端提交 12205b6 声称实测 Node 24.21.0 / npm 11.19.0，后续审计文字却记录 Node 24.17.0 / npm 11.13.0；接手者记录实际 `node --version` / `npm --version`，再按 frontend/.nvmrc 与 packageManager 重现 npm ci 和 verify。
+尚未确认：真实浏览器 UI、P1 业务联调与远程 CI。工具链方面，2026-10-13 在本开发机实测 `node --version` 为 v24.17.0、`npm --version` 为 11.13.0，低于 frontend/.nvmrc 与 packageManager 锁定的 24.21.0 / 11.19.0（前端提交 12205b6 的 24.21.0 说法不成立）；该环境下 `npm run verify` 通过（4 文件 39 用例），但不等同 CI 基线。升级本机 Node 后重跑 npm ci 与 verify。
 
 后端已有功能的历史运行证据见 [历史开发记录](archive/2026-10-08_DEVELOPMENT.md#112-实施进度与代码阅读)。
 
