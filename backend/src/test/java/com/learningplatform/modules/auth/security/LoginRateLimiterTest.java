@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.learningplatform.modules.auth.config.LoginRateLimitProperties;
@@ -28,33 +30,78 @@ class LoginRateLimiterTest {
     void blocksAtLimitWithRetryAfterEqualToWindow() {
         String key = limiter.key("student.demo", "127.0.0.1");
         for (int i = 0; i < 4; i++) {
-            limiter.onFailure(key);
-            assertThat(limiter.check(key).limited()).isFalse();
+            limiter.acquire(key).onFailure();
+            try (LoginRateLimiter.Admission probe = limiter.acquire(key)) {
+                assertThat(probe.limited()).isFalse();
+            }
         }
-        limiter.onFailure(key); // 第 5 次失败，达到上限
-        assertThat(limiter.check(key).limited()).isTrue();
-        assertThat(limiter.check(key).retryAfterSeconds()).isEqualTo(300);
+        limiter.acquire(key).onFailure(); // 第 5 次失败，达到上限
+        LoginRateLimiter.Admission limited = limiter.acquire(key);
+        assertThat(limited.limited()).isTrue();
+        assertThat(limited.retryAfterSeconds()).isEqualTo(300);
     }
 
     @Test
-    void successClearsFailureCount() {
+    void successClearsFailuresWithoutDiscardingOtherInFlightRequests() {
         String key = limiter.key("student.demo", "127.0.0.1");
-        for (int i = 0; i < 5; i++) {
-            limiter.onFailure(key);
+        for (int i = 0; i < 3; i++) {
+            limiter.acquire(key).onFailure();
         }
-        limiter.onSuccess(key);
-        assertThat(limiter.check(key).limited()).isFalse();
+        LoginRateLimiter.Admission successful = limiter.acquire(key);
+        LoginRateLimiter.Admission stillRunning = limiter.acquire(key);
+        assertThat(limiter.acquire(key).limited()).isTrue();
+
+        successful.onSuccess();
+        List<LoginRateLimiter.Admission> newlyAdmitted = new ArrayList<>();
+        try {
+            // 成功清空三次失败，但另一个在途请求依然占一格，只能再准入四个。
+            for (int i = 0; i < 4; i++) {
+                LoginRateLimiter.Admission admission = limiter.acquire(key);
+                assertThat(admission.limited()).isFalse();
+                newlyAdmitted.add(admission);
+            }
+            assertThat(limiter.acquire(key).limited()).isTrue();
+            stillRunning.onFailure();
+            assertThat(limiter.acquire(key).limited()).isTrue();
+        } finally {
+            newlyAdmitted.forEach(LoginRateLimiter.Admission::close);
+            stillRunning.close();
+            successful.close();
+        }
     }
 
     @Test
     void windowExpiryFreesTheKey() {
         String key = limiter.key("student.demo", "127.0.0.1");
         for (int i = 0; i < 5; i++) {
-            limiter.onFailure(key);
+            limiter.acquire(key).onFailure();
         }
-        assertThat(limiter.check(key).limited()).isTrue();
-        clock.advanceTo(START.plus(Duration.ofMinutes(5)).plusSeconds(1));
-        assertThat(limiter.check(key).limited()).isFalse();
+        assertThat(limiter.acquire(key).limited()).isTrue();
+        clock.advanceTo(START.plus(Duration.ofMinutes(5)));
+        try (LoginRateLimiter.Admission admission = limiter.acquire(key)) {
+            assertThat(admission.limited()).isFalse();
+        }
+    }
+
+    @Test
+    void inFlightReservationsAreReleasedOnlyOnce() {
+        String key = limiter.key("student.demo", "127.0.0.1");
+        List<LoginRateLimiter.Admission> running = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            running.add(limiter.acquire(key));
+        }
+        LoginRateLimiter.Admission limited = limiter.acquire(key);
+        assertThat(limited.limited()).isTrue();
+        assertThat(limited.retryAfterSeconds()).isEqualTo(1);
+
+        running.getFirst().close();
+        running.getFirst().close();
+        try (LoginRateLimiter.Admission replacement = limiter.acquire(key)) {
+            assertThat(replacement.limited()).isFalse();
+            assertThat(limiter.acquire(key).limited()).isTrue();
+        } finally {
+            running.forEach(LoginRateLimiter.Admission::close);
+        }
     }
 
     @Test
