@@ -116,7 +116,18 @@ async function logout(): Promise<void> {
           <button type="button" class="button secondary" :disabled="loggingOut" @click="logout">
             {{ loggingOut ? '退出中…' : '退出登录' }}
           </button>
-          <p v-if="logoutFailed" class="field-error" role="alert">退出失败，请重试。</p>
+          <p v-if="logoutFailed && auth.logoutFailure !== null" class="field-error" role="alert">
+            {{ auth.logoutFailure }}
+          </p>
+          <p v-if="logoutFailed && auth.lastRequestId !== null" class="request-id">
+            requestId: {{ auth.lastRequestId }}
+          </p>
+          <button
+            v-if="logoutFailed && auth.phase === 'anonymous'"
+            type="button"
+            class="button secondary"
+            @click="router.push({ name: 'login' })"
+          >重新登录</button>
         </div>
       </section>
 
