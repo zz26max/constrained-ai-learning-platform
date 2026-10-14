@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { registerAuthApi } from '../src/api'
+import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
+import { registerAuthApi, registerCoursesApi, CoursesApi, coursesApi } from '../src/api'
 import { AuthApi } from '../src/api/auth'
-import { ApiClient, TransportError } from '../src/api/client'
+import { ApiClient, ApiError, TransportError } from '../src/api/client'
 import { useAuthStore } from '../src/stores/auth'
 import { createCsrfRefreshCoordinator } from '../src/stores/csrf-refresh'
+import { pageError } from '../src/features/courses/page-error'
+import { useCourseActions } from '../src/features/courses/use-course-actions'
 import {
   createScriptedTransport,
   DEMO_CONFIG,
@@ -61,7 +66,9 @@ const requestsFor = (operationId: string) =>
 beforeEach(() => {
   setActivePinia(createPinia())
   scripted = createScriptedTransport()
-  registerAuthApi(new AuthApi(new ApiClient(scripted.transport)))
+  const client = new ApiClient(scripted.transport)
+  registerAuthApi(new AuthApi(client))
+  registerCoursesApi(new CoursesApi(client))
   store = useAuthStore()
 })
 
@@ -211,6 +218,115 @@ describe('P0-A 认证异常恢复', () => {
     expect(store.lastRequestId).toBe('req-shared-refresh-failed')
   })
 
+  it('写操作恢复后成功会结束失败链，下一次 CSRF_INVALID 仍可再次刷新', async () => {
+    await authenticatedSession()
+    let refreshCalls = 0
+    scripted.setHandler((request) => {
+      if (request.operationId === 'getCsrfToken') {
+        refreshCalls += 1
+        return okEnvelope({ csrfToken: `csrf-action-${refreshCalls}` })
+      }
+      return happyResponse(request.operationId)
+    })
+
+    await expect(store.recoverCsrfFailure('req-action-first')).resolves.toContain('令牌已刷新')
+    store.markActionSucceeded()
+    await expect(store.recoverCsrfFailure('req-action-second')).resolves.toContain('令牌已刷新')
+
+    expect(refreshCalls).toBe(2)
+    expect(requestsFor('getMe')).toHaveLength(2)
+    expect(store.phase).toBe('authenticated')
+    expect(store.identity?.id).toBe(DEMO_USER.id)
+  })
+
+  it('useCourseActions 写入成功后清除 action 恢复标志，下一次 CSRF_INVALID 仍能恢复', async () => {
+    await authenticatedSession()
+    let writeAttempts = 0
+    let refreshCalls = 0
+    scripted.setHandler((request) => {
+      if (request.operationId === 'createChapter') {
+        writeAttempts += 1
+        if (writeAttempts === 1 || writeAttempts === 3) return failEnvelope(403, 'CSRF_INVALID', {}, `req-action-${writeAttempts}`)
+        return okEnvelope({ id: '00000000-0000-4000-8000-000000000306' })
+      }
+      if (request.operationId === 'getCsrfToken') {
+        refreshCalls += 1
+        return okEnvelope({ csrfToken: `csrf-action-${refreshCalls}` })
+      }
+      return happyResponse(request.operationId)
+    })
+
+    let actions!: ReturnType<typeof useCourseActions>
+    const Harness = defineComponent({ setup: () => { actions = useCourseActions(); return () => h('div') } })
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: Harness }] })
+    await router.push('/')
+    await router.isReady()
+    const pinia = getActivePinia()
+    if (pinia === undefined) throw new Error('Pinia 未激活')
+    const wrapper = mount(Harness, { global: { plugins: [pinia, router] } })
+    const operation = (token: string) => coursesApi().createChapter('00000000-0000-4000-8000-000000000201', { number: 9, title: '章节', summary: '', isRequired: true }, { csrfToken: token })
+
+    await expect(actions.run(operation)).resolves.toBeNull()
+    await expect(actions.run(operation)).resolves.not.toBeNull()
+    await expect(actions.run(operation)).resolves.toBeNull()
+
+    expect(refreshCalls).toBe(2)
+    expect(store.phase).toBe('authenticated')
+    expect(store.identity).not.toBeNull()
+    wrapper.unmount()
+    router.options.history.destroy()
+  })
+  it('写操作连续两次 CSRF_INVALID 才清除登录态，第二次不再刷新令牌', async () => {
+    await authenticatedSession()
+    let refreshCalls = 0
+    scripted.setHandler((request) => {
+      if (request.operationId === 'getCsrfToken') {
+        refreshCalls += 1
+        return okEnvelope({ csrfToken: 'csrf-action-only-once' })
+      }
+      return happyResponse(request.operationId)
+    })
+
+    await store.recoverCsrfFailure('req-action-first')
+    await expect(store.recoverCsrfFailure('req-action-second')).resolves.toContain('再次失败')
+
+    expect(refreshCalls).toBe(1)
+    expect(requestsFor('getMe')).toHaveLength(1)
+    expect(store.phase).toBe('anonymous')
+    expect(store.identity).toBeNull()
+  })
+
+  it('身份恢复失败时 pageError 能区分已退出登录，并保留原请求 requestId', async () => {
+    await authenticatedSession()
+    scripted.setHandler((request) => {
+      if (request.operationId === 'getCsrfToken') throw new TransportError('身份恢复断网')
+      return happyResponse(request.operationId)
+    })
+
+    const failure = await pageError(new ApiError({
+      status: 401,
+      code: 'UNAUTHENTICATED',
+      message: '会话已失效。',
+      requestId: 'req-page-identity-failed',
+    }))
+
+    expect(failure.kind).toBe('session')
+    expect(failure.message).toBe('已退出登录，请重新登录。')
+    expect(failure.requestId).toBe('req-page-identity-failed')
+    expect(store.lastRequestId).toBeNull()
+    expect(store.phase).toBe('anonymous')
+  })
+  it('422 页面错误展示 details.fields，便于定位章节号等字段', async () => {
+    const failure = await pageError(new ApiError({
+      status: 422,
+      code: 'VALIDATION_ERROR',
+      message: '输入不符合要求。',
+      errorDetails: { fields: [{ field: 'number', message: '章节编号已存在。' }] },
+      requestId: 'req-field-error',
+    }))
+    expect(failure.message).toContain('number：章节编号已存在。')
+    expect(failure.requestId).toBe('req-field-error')
+  })
   it('协调器共享刷新拒绝：首个与共享调用都传播同一个错误，不吞掉共享失败', async () => {
     const refresh = deferred<void>()
     let refreshCalls = 0

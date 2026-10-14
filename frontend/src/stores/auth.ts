@@ -39,7 +39,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   let loginRecoveryUsed = false
   let logoutRecoveryUsed = false
+  let actionRecoveryUsed = false
   const csrfRefresh = createCsrfRefreshCoordinator(refreshCsrfAndIdentity)
+
+  function resetRecoveryFlags(): void {
+    loginRecoveryUsed = false
+    logoutRecoveryUsed = false
+    actionRecoveryUsed = false
+  }
 
   function clearAuthenticatedState(): void {
     identity.value = null
@@ -48,6 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
     identityRequestId.value = null
     phase.value = 'anonymous'
     bootStatus.value = 'success'
+    resetRecoveryFlags()
     // lastRequestId 留给失败提示；不能把身份清理显示为退出成功。
   }
 
@@ -64,6 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
     csrfToken.value = null
     if (userId === undefined) {
       await refreshCsrfToken()
+      resetRecoveryFlags()
       return
     }
     const [token, me] = await Promise.all([api.getCsrfToken(), api.getMe()])
@@ -74,6 +83,8 @@ export const useAuthStore = defineStore('auth', () => {
     identity.value = me.data
     identityRequestId.value = me.requestId
     csrfToken.value = token.data.csrfToken
+    // 恢复成功只结束本次连续失败链；下一批 CSRF_INVALID 可以再次恢复。
+    resetRecoveryFlags()
   }
 
   async function ensureCsrfToken(): Promise<string> {
@@ -156,8 +167,6 @@ export const useAuthStore = defineStore('auth', () => {
       phase.value = 'authenticated'
       await loadConfig()
       loginStatus.value = 'success'
-      loginRecoveryUsed = false
-      logoutRecoveryUsed = false
       logoutFailure.value = null
       return true
     } catch (error) {
@@ -186,6 +195,9 @@ export const useAuthStore = defineStore('auth', () => {
                 kind: 'csrf-stalled',
                 message: '登录令牌刷新或身份核对失败，请重新登录。',
               }
+            } finally {
+              // 恢复成功时 refreshCsrfAndIdentity 会先清零；本次登录重试仍只允许一次。
+              loginRecoveryUsed = true
             }
           }
         } else if (error.status === 401 && error.code === 'UNAUTHENTICATED') {
@@ -251,12 +263,44 @@ export const useAuthStore = defineStore('auth', () => {
     }
     if (identity.value?.id !== userId) return false
     clearAuthenticatedState()
-    loginRecoveryUsed = false
-    logoutRecoveryUsed = false
     loginStatus.value = 'idle'
     loginFailure.value = null
     logoutFailure.value = null
     return true
+  }
+
+  /** 教学页面复用认证恢复：连续两次 CSRF 失败才放弃，不按会话累计。 */
+  async function recoverCsrfFailure(requestId: string | null): Promise<string> {
+    lastRequestId.value = requestId
+    if (actionRecoveryUsed) {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'csrf-stalled', message: '安全校验再次失败，请重新登录。' }
+      return loginFailure.value.message
+    }
+    try {
+      await csrfRefresh.recover()
+      return '安全令牌已刷新，原操作尚未完成，请重新操作。'
+    } catch {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'csrf-stalled', message: '安全令牌刷新或身份核对失败，请重新登录。' }
+      return loginFailure.value.message
+    } finally { actionRecoveryUsed = true }
+  }
+
+  async function recoverIdentity(_requestId: string | null): Promise<boolean> {
+    try {
+      await csrfRefresh.recover()
+      return true
+    } catch {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'unavailable', message: '登录身份已失效，请重新登录。' }
+      return false
+    }
+  }
+
+  /** 写操作成功后结束 action 的连续失败链。 */
+  function markActionSucceeded(): void {
+    actionRecoveryUsed = false
   }
 
   return {
@@ -274,5 +318,9 @@ export const useAuthStore = defineStore('auth', () => {
     retryBoot,
     login,
     logout,
+    ensureCsrfToken,
+    recoverCsrfFailure,
+    recoverIdentity,
+    markActionSucceeded,
   }
 })

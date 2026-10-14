@@ -1,9 +1,33 @@
 import { AuthApi } from './auth'
+import { CoursesApi } from './courses'
 import { ApiClient } from './client'
 import { realTransport } from './real-transport'
 import type { ApiMode } from '../app/api-mode'
 
 let registered: AuthApi | null = null
+let registeredCourses: CoursesApi | null = null
+
+export function registerCoursesApi(api: CoursesApi): void {
+  registeredCourses = api
+}
+
+export function coursesApi(): CoursesApi {
+  if (registeredCourses === null) {
+    throw new Error('CoursesApi 尚未注册：请先在应用启动时调用 registerCoursesApi()。')
+  }
+  return registeredCourses
+}
+
+export async function createDefaultCoursesApi(): Promise<CoursesApi> {
+  if (import.meta.env.VITE_API_MODE === 'mock') {
+    const { mockTransport } = await import('../mocks/index')
+    return new CoursesApi(new ApiClient(mockTransport))
+  }
+  return new CoursesApi(new ApiClient(realTransport))
+}
+
+export { CoursesApi } from './courses'
+export type * from './courses'
 
 /** 应用启动时注册默认 AuthApi（main.ts）；测试中可注册脚本化实例。 */
 export function registerAuthApi(api: AuthApi): void {

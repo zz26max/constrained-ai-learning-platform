@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mockTransport, resetMockAuthState, resetMockCookies } from '../src/mocks/index'
 import { MockNotImplementedError } from '../src/mocks/types'
+import { MOCK_TERM } from '../src/mocks/auth'
+import { P1A_IDS } from '../src/mocks/courses'
 import type { TransportRequest } from '../src/api/transport'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -154,15 +156,15 @@ describe('mock 层信封与 Cookie（同一契约）', () => {
     expect(failBody(after).error.code).toBe('UNAUTHENTICATED')
   })
 
-  it('getConfig 返回契约要求的 ConfigDTO 形状（P0 全部功能关闭）', async () => {
+  it('getConfig 返回契约要求的学期配置，特色功能保持关闭', async () => {
     await loginAsMock('student.demo', 'mock-demo-pass')
     const result = await call({ operationId: 'getConfig' })
     expect(result.status).toBe(200)
     const data = okBody(result).data
     expect(data['apiVersion']).toBe('v1')
     expect(data['timezone']).toBe('Asia/Shanghai')
-    expect(data['currentTermId']).toBeNull()
-    expect(data['terms']).toEqual([])
+    expect(data['currentTermId']).toBe(MOCK_TERM.id)
+    expect(data['terms']).toEqual([MOCK_TERM])
     expect(data['serverTime']).toMatch(TIMESTAMP_PATTERN)
     const features = data['features'] as Record<string, unknown>
     expect(features['aiTutoring']).toBe(false)
@@ -198,5 +200,148 @@ describe('mock 层信封与 Cookie（同一契约）', () => {
     expect(failBody(logout).error.code).toBe('CSRF_INVALID')
     const me = await call({ operationId: 'getMe' })
     expect(me.status).toBe(200)
+  })
+})
+async function loginTeacherAndGetCsrf(): Promise<string> {
+  const result = await loginAsMock('teacher.demo', 'mock-demo-pass')
+  const token = okBody(result).data['csrfToken']
+  if (typeof token !== 'string') throw new Error('教师登录未返回 CSRF 令牌')
+  return token
+}
+
+describe('P1-A 教学 mock 契约分支', () => {
+  it('教师可以创建并发布章节，重复发布返回 200 原结果', async () => {
+    const csrfToken = await loginTeacherAndGetCsrf()
+    const created = await call({
+      operationId: 'createChapter',
+      method: 'POST',
+      path: `/api/v1/teacher/offerings/${P1A_IDS.offeringWeb}/chapters`,
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ number: 99, title: 'mock 新章节', summary: 'mock 摘要', isRequired: true }),
+    })
+    expect(created.status).toBe(201)
+    const chapterId = okBody(created).data['id']
+    expect(typeof chapterId).toBe('string')
+
+    const publish = await call({
+      operationId: 'publishChapter', method: 'POST',
+      path: `/api/v1/teacher/chapters/${chapterId}/publish`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    const duplicate = await call({
+      operationId: 'publishChapter', method: 'POST',
+      path: `/api/v1/teacher/chapters/${chapterId}/publish`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    expect(publish.status).toBe(200)
+    expect(duplicate.status).toBe(200)
+    expect(okBody(duplicate).data).toEqual(okBody(publish).data)
+  })
+
+  it('教师邀请码创建只在创建响应返回明文，之后可幂等撤销', async () => {
+    const csrfToken = await loginTeacherAndGetCsrf()
+    const created = await call({
+      operationId: 'createInvite', method: 'POST',
+      path: `/api/v1/teacher/offerings/${P1A_IDS.offeringWeb}/invites`,
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ expiresAt: '2099-01-01T00:00:00Z', maxUses: 2 }),
+    })
+    expect(created.status).toBe(201)
+    const createdData = okBody(created).data
+    expect(typeof createdData['inviteCode']).toBe('string')
+    const inviteId = createdData['id']
+    if (typeof inviteId !== 'string') throw new Error('创建邀请码未返回 id')
+
+    const listed = await call({ operationId: 'listInvites', path: `/api/v1/teacher/offerings/${P1A_IDS.offeringWeb}/invites?page=1&pageSize=20` })
+    expect(listed.status).toBe(200)
+    const listedItems = okBody(listed).data['items']
+    expect(Array.isArray(listedItems)).toBe(true)
+    expect(listedItems).not.toContainEqual(expect.objectContaining({ inviteCode: createdData['inviteCode'] }))
+
+    const revoked = await call({
+      operationId: 'revokeInvite', method: 'POST',
+      path: `/api/v1/teacher/invites/${inviteId}/revoke`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    const revokedAgain = await call({
+      operationId: 'revokeInvite', method: 'POST',
+      path: `/api/v1/teacher/invites/${inviteId}/revoke`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    expect(revoked.status).toBe(200)
+    expect(revokedAgain.status).toBe(200)
+    expect(okBody(revokedAgain).data).toEqual(okBody(revoked).data)
+  })
+
+  it('归档成功幂等，待批阅返回 ARCHIVE_PENDING_REVIEWS；归档章节返回 CHAPTER_ARCHIVED', async () => {
+    const csrfToken = await loginTeacherAndGetCsrf()
+    const first = await call({
+      operationId: 'archiveOffering', method: 'POST',
+      path: `/api/v1/teacher/offerings/${P1A_IDS.offeringEmpty}/archive`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    const second = await call({
+      operationId: 'archiveOffering', method: 'POST',
+      path: `/api/v1/teacher/offerings/${P1A_IDS.offeringEmpty}/archive`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(okBody(second).data).toEqual(okBody(first).data)
+
+    const pending = await call({
+      operationId: 'archiveOffering', method: 'POST',
+      path: `/api/v1/teacher/offerings/${P1A_IDS.offeringPendingArchive}/archive`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    expect(pending.status).toBe(409)
+    expect(failBody(pending).error.code).toBe('ARCHIVE_PENDING_REVIEWS')
+
+    const archivedChapter = await call({
+      operationId: 'publishChapter', method: 'POST',
+      path: `/api/v1/teacher/chapters/${P1A_IDS.chapterArchived}/publish`,
+      headers: { 'X-CSRF-Token': csrfToken }, body: '{}',
+    })
+    expect(archivedChapter.status).toBe(409)
+    expect(failBody(archivedChapter).error.code).toBe('CHAPTER_ARCHIVED')
+
+    resetMockAuthState()
+    resetMockCookies()
+    const studentLogin = await loginAsMock('student.demo', 'mock-demo-pass')
+    const studentToken = okBody(studentLogin).data['csrfToken']
+    if (typeof studentToken !== 'string') throw new Error('学生登录未返回 CSRF 令牌')
+    const archivedProgress = await call({
+      operationId: 'updateChapterProgress', method: 'PUT',
+      path: '/api/v1/chapters/' + P1A_IDS.chapterArchived + '/progress',
+      headers: { 'X-CSRF-Token': studentToken }, body: JSON.stringify({ status: 'completed' }),
+    })
+    expect(archivedProgress.status).toBe(409)
+    expect(failBody(archivedProgress).error.code).toBe('CHAPTER_ARCHIVED')
+  })
+
+  it('createOffering 的 FORBIDDEN 与 OFFERING_ARCHIVED 分支以及分页边界可到达', async () => {
+    const csrfToken = await loginTeacherAndGetCsrf()
+    const body = { title: '新教学班', groupName: '演示班', termId: MOCK_TERM.id, progressUnit: 'chapter' }
+    const forbidden = await call({
+      operationId: 'createOffering', method: 'POST', path: '/api/v1/teacher/offerings',
+      headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ ...body, courseId: P1A_IDS.baseForbidden }),
+    })
+    const conflict = await call({
+      operationId: 'createOffering', method: 'POST', path: '/api/v1/teacher/offerings',
+      headers: { 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ ...body, courseId: P1A_IDS.baseConflict }),
+    })
+    expect(forbidden.status).toBe(403)
+    expect(failBody(forbidden).error.code).toBe('FORBIDDEN')
+    expect(conflict.status).toBe(409)
+    expect(failBody(conflict).error.code).toBe('OFFERING_ARCHIVED')
+
+    const last = await call({ operationId: 'listInvites', path: `/api/v1/teacher/offerings/${P1A_IDS.offeringDatabase}/invites?page=99&pageSize=1` })
+    expect(last.status).toBe(200)
+    expect(okBody(last).data['items']).toEqual([])
+    expect(okBody(last).data['total']).toBe(4)
+    const empty = await call({ operationId: 'listInvites', path: `/api/v1/teacher/offerings/${P1A_IDS.offeringPendingArchive}/invites?page=1&pageSize=20` })
+    expect(empty.status).toBe(200)
+    expect(okBody(empty).data['items']).toEqual([])
+    expect(okBody(empty).data['total']).toBe(0)
   })
 })

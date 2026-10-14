@@ -1,21 +1,36 @@
 import { nextTick } from 'vue'
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHashHistory, type RouteRecordRaw, type RouterHistory } from 'vue-router'
 import LoginPage from '../features/auth/LoginPage.vue'
 import SessionPanel from '../features/auth/SessionPanel.vue'
 import NotFoundPage from '../features/NotFoundPage.vue'
 import { useAuthStore } from '../stores/auth'
+import type { components } from '../api/generated/schema'
+import AccessDeniedPage from './AccessDeniedPage.vue'
+import CourseListPage from '../features/courses/CourseListPage.vue'
+import OfferingPage from '../features/courses/OfferingPage.vue'
+import ChapterPage from '../features/courses/ChapterPage.vue'
+import ResourcePage from '../features/courses/ResourcePage.vue'
+import TeacherOfferingsPage from '../features/teacher/TeacherOfferingsPage.vue'
+import TeacherOfferingPage from '../features/teacher/TeacherOfferingPage.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean
     requiresAuth?: boolean
     title?: string
+    requiresRole?: 'student' | 'teacher'
   }
 }
 
 /** 站内返回路径只接受同应用内部路由，不把外部输入当跳转目标。 */
 export function isInternalPath(value: string): boolean {
   return /^\/(?!\/)[A-Za-z0-9\-._~/]*$/.test(value)
+}
+
+export function defaultEntry(user: components['schemas']['UserDTO'] | null): string {
+  if (user?.roles.includes('teacher')) return '/teacher'
+  if (user?.roles.includes('student')) return '/course'
+  return '/debug/session'
 }
 
 const routes: RouteRecordRaw[] = [
@@ -26,11 +41,22 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: '登录 · 学习空间' },
   },
   {
-    name: 'session',
     path: '/',
+    redirect: () => useAuthStore().phase === 'authenticated' ? defaultEntry(useAuthStore().identity) : '/login',
+  },
+  {
+    name: 'session',
+    path: '/debug/session',
     component: SessionPanel,
     meta: { requiresAuth: true, title: '学习空间 · 会话联调页' },
   },
+  { name: 'courses', path: '/course', component: CourseListPage, meta: { requiresAuth: true, requiresRole: 'student', title: '我的课程 · 学习空间' } },
+  { name: 'course', path: '/course/:offeringId', component: OfferingPage, meta: { requiresAuth: true, requiresRole: 'student', title: '课程详情 · 学习空间' } },
+  { name: 'chapter', path: '/course/:offeringId/chapter/:chapterId', component: ChapterPage, meta: { requiresAuth: true, requiresRole: 'student', title: '章节阅读 · 学习空间' } },
+  { name: 'resource', path: '/resource/:resourceId', component: ResourcePage, meta: { requiresAuth: true, requiresRole: 'student', title: '学习资料 · 学习空间' } },
+  { name: 'teacher', path: '/teacher', component: TeacherOfferingsPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学班 · 学习空间' } },
+  { name: 'teacher-offering', path: '/teacher/offerings/:id', component: TeacherOfferingPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学工作台 · 学习空间' } },
+  { name: 'access-denied', path: '/access-denied', component: AccessDeniedPage, meta: { requiresAuth: true, title: '权限不足 · 学习空间' } },
   {
     name: 'not-found',
     path: '/:pathMatch(.*)*',
@@ -39,9 +65,10 @@ const routes: RouteRecordRaw[] = [
   },
 ]
 
-export const router = createRouter({
+export function createAppRouter(history: RouterHistory = createWebHashHistory()) {
+const router = createRouter({
   // FRONTEND.md 1：hash 模式；路由配置 path 不带 #，命名路由 params 传参。
-  history: createWebHashHistory(),
+  history,
   routes,
 })
 
@@ -50,20 +77,20 @@ router.beforeEach(async (to) => {
   // 首次进入任一页面先恢复会话；刷新浏览器可直接恢复登录态（P0-A 验收链）。
   if (auth.bootStatus === 'idle') {
     await auth.ensureBoot()
+  } else if (auth.bootStatus === 'error') {
+    await auth.retryBoot()
   }
   if (to.meta.requiresAuth === true && auth.phase !== 'authenticated') {
-    const returnQuery = to.query.return
-    const query =
-      typeof returnQuery === 'string' && isInternalPath(returnQuery) ? { return: returnQuery } : {}
+    const query = isInternalPath(to.fullPath) ? { return: to.fullPath } : {}
     return { name: 'login', query }
   }
   if (to.name === 'login' && auth.phase === 'authenticated') {
     const ret = to.query.return
-    return typeof ret === 'string' && isInternalPath(ret) ? ret : '/'
+    return typeof ret === 'string' && isInternalPath(ret) ? ret : defaultEntry(auth.identity)
   }
+  if (to.meta.requiresRole && !auth.identity?.roles.includes(to.meta.requiresRole)) return { name: 'access-denied' }
   return true
 })
-
 router.afterEach((to) => {
   const title = to.meta.title
   if (typeof title === 'string') {
@@ -75,3 +102,7 @@ router.afterEach((to) => {
     heading?.focus({ preventScroll: false })
   })
 })
+return router
+}
+
+export const router = createAppRouter()
