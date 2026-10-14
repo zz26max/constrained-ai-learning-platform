@@ -11,3 +11,7 @@
 # 文档契约校验使用独立工具环境，不进入产品依赖。
 .contract-venv/
 scripts/__pycache__/
+
+# AI 工具的本机会话配置与文档预览缓存。
+.claude/
+.preview/
