@@ -220,6 +220,49 @@ class CourseHttpContractTest {
                 .andExpect(jsonPath("$.data.created").value(false));
     }
 
+
+    @Test
+    void p1aContentWriteRoutesRequireCsrf() throws Exception {
+        for (Operation op : contentOperations().filter(Operation::writes).toList()) {
+            mvc.perform(authenticated(op, op.teacher() ? TEACHER_TOKEN : STUDENT_TOKEN, false))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+        }
+    }
+
+    @Test
+    void p1aContentRoutesRejectAnonymousRequests() throws Exception {
+        for (Operation op : contentOperations().toList()) {
+            MockHttpServletRequestBuilder builder = base(op);
+            if (op.writes()) {
+                CsrfTokenService.PreAuthTicket ticket = csrf.issuePreAuth();
+                builder.cookie(new Cookie("lp_pre_auth", ticket.cookieValue()))
+                        .header("Origin", ORIGIN).header("X-CSRF-Token", ticket.token());
+            }
+            mvc.perform(builder).andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
+        }
+    }
+
+    private static Stream<Operation> contentOperations() {
+        return Stream.of(
+                new Operation("listChapters", "GET", "/api/v1/offerings/" + ID + "/chapters", false, null, 200, false),
+                new Operation("getChapter", "GET", "/api/v1/chapters/" + ID, false, null, 200, false),
+                new Operation("getResource", "GET", "/api/v1/resources/" + ID, false, null, 200, false),
+                new Operation("updateChapterProgress", "PUT", "/api/v1/chapters/" + ID + "/progress", false, "{\"status\":\"completed\"}", 200, false),
+                new Operation("recordLearningPosition", "POST", "/api/v1/me/learning-position", false, "{\"offeringId\":\"" + ID + "\",\"chapterId\":\"" + TERM + "\"}", 200, false),
+                new Operation("listTeacherChapters", "GET", "/api/v1/teacher/offerings/" + ID + "/chapters", true, null, 200, false),
+                new Operation("createChapter", "POST", "/api/v1/teacher/offerings/" + ID + "/chapters", true, "{\"number\":1,\"title\":\"一\",\"summary\":\"一\",\"isRequired\":true}", 201, false),
+                new Operation("getTeacherChapter", "GET", "/api/v1/teacher/chapters/" + ID, true, null, 200, false),
+                new Operation("patchChapter", "PATCH", "/api/v1/teacher/chapters/" + ID, true, "{\"title\":\"二\"}", 200, false),
+                new Operation("publishChapter", "POST", "/api/v1/teacher/chapters/" + ID + "/publish", true, "{}", 200, false),
+                new Operation("createKnowledgePoint", "POST", "/api/v1/teacher/offerings/" + ID + "/knowledge-points", true, "{\"title\":\"点\",\"description\":\"点\",\"order\":1}", 201, false),
+                new Operation("listKnowledgePoints", "GET", "/api/v1/teacher/offerings/" + ID + "/knowledge-points", true, null, 200, false),
+                new Operation("patchKnowledgePoint", "PATCH", "/api/v1/teacher/knowledge-points/" + ID, true, "{\"title\":\"点2\"}", 200, false),
+                new Operation("createResource", "POST", "/api/v1/teacher/chapters/" + ID + "/resources", true, "{\"title\":\"资料\",\"type\":\"markdown\",\"content\":\"正文\",\"url\":null,\"order\":1}", 201, false),
+                new Operation("patchResource", "PATCH", "/api/v1/teacher/resources/" + ID, true, "{\"title\":\"资料2\"}", 200, false),
+                new Operation("archiveResource", "DELETE", "/api/v1/teacher/resources/" + ID, true, "{}", 200, false));
+    }
+
     @Test
     void malformedOfferingIdIsRejected() throws Exception {
         Operation op = new Operation("getOffering", "GET", "/api/v1/offerings/not-a-uuid", false, null, 200, false);

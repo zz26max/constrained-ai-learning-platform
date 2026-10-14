@@ -36,5 +36,32 @@ public interface CourseMapper {
     int chapterTotal(String offeringId);
     int chapterCompleted(@Param("offeringId") String offeringId,@Param("memberId") String memberId);
     CurrentChapter currentChapter(@Param("offeringId") String offeringId,@Param("memberId") String memberId,@Param("lastChapterId") String lastChapterId);
-}
 
+    List<Chapter> chapters(@Param("offeringId") String offeringId,@Param("publicOnly") boolean publicOnly);
+    Chapter chapter(String id);
+    List<Resource> resources(@Param("chapterId") String chapterId,@Param("publicOnly") boolean publicOnly);
+    List<KnowledgePoint> knowledgePoints(@Param("offeringId") String offeringId,@Param("chapterId") String chapterId);
+    Resource resource(String id);
+    KnowledgePoint knowledgePoint(String id);
+    int resourceCountForKnowledgePoint(String knowledgePointId);
+    com.learningplatform.modules.courses.model.CourseRows.ChapterProgress chapterProgress(@Param("memberId") String memberId,@Param("chapterId") String chapterId);
+    int insertChapter(@Param("id") String id,@Param("offeringId") String offeringId,@Param("position") int position,@Param("title") String title,
+            @Param("summary") String summary,@Param("required") boolean required,@Param("now") Instant now);
+    int updateChapter(@Param("id") String id,@Param("position") int position,@Param("title") String title,@Param("summary") String summary,
+            @Param("required") boolean required,@Param("version") int version,@Param("now") Instant now);
+    int publishChapter(@Param("id") String id,@Param("now") Instant now);
+    int insertKnowledgePoint(@Param("id") String id,@Param("offeringId") String offeringId,@Param("chapterId") String chapterId,@Param("title") String title,
+            @Param("description") String description,@Param("position") int position,@Param("now") Instant now);
+    int updateKnowledgePoint(@Param("id") String id,@Param("chapterId") String chapterId,@Param("title") String title,@Param("description") String description,
+            @Param("position") int position,@Param("now") Instant now);
+    int insertResource(@Param("id") String id,@Param("offeringId") String offeringId,@Param("chapterId") String chapterId,@Param("knowledgePointId") String knowledgePointId,
+            @Param("title") String title,@Param("content") String content,@Param("position") int position,@Param("now") Instant now);
+    int updateResource(@Param("id") String id,@Param("knowledgePointId") String knowledgePointId,@Param("title") String title,@Param("content") String content,
+            @Param("position") int position,@Param("now") Instant now);
+    int archiveResource(@Param("id") String id,@Param("now") Instant now);
+    int insertProgress(@Param("id") String id,@Param("offeringId") String offeringId,@Param("memberId") String memberId,@Param("chapterId") String chapterId,
+            @Param("status") String status,@Param("completedAt") Instant completedAt,@Param("now") Instant now);
+    int updateProgress(@Param("memberId") String memberId,@Param("chapterId") String chapterId,@Param("status") String status,@Param("completedAt") Instant completedAt,@Param("now") Instant now);
+    int touchProgress(@Param("memberId") String memberId,@Param("chapterId") String chapterId,@Param("now") Instant now);
+    int updateLearningPosition(@Param("offeringId") String offeringId,@Param("userId") String userId,@Param("chapterId") String chapterId,@Param("now") Instant now);
+}

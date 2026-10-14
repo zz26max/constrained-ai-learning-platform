@@ -20,5 +20,24 @@ public final class CourseDTOs {
     public record CourseSummaryDTO(String offeringId,String courseId,String title,String mark,String groupName,
             String termId,String termLabel,String status,List<TeacherBrief> teachers,CurrentChapter currentChapter,
             ProgressDTO progress,Instant lastStudiedAt,int pendingAssignmentCount,int unreadFeedbackCount) {}
+    public record ChapterProgress(String status,Instant completedAt) {}
+    public record ChapterSummaryDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
+            String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount) {}
+    public record ResourceDTO(String id,String offeringId,String chapterId,String knowledgePointId,String title,
+            String type,String content,String url,int order,boolean archived) {}
+    public record KnowledgePointDTO(String id,String offeringId,String chapterId,String title,String description,int order) {}
+    public record ChapterDetailDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
+            String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount,
+            List<ResourceDTO> resources,List<KnowledgePointDTO> knowledgePoints,List<Object> assignments) {}
+    public record TeacherChapterSummaryDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
+            String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount) {}
+    public record TeacherChapterDetailDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
+            String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount,List<ResourceDTO> resources,
+            List<KnowledgePointDTO> knowledgePoints,List<Object> assignments) {}
+    public record ChapterListDTO(String offeringId,List<ChapterSummaryDTO> items) {}
+    public record TeacherChapterListDTO(String offeringId,List<TeacherChapterSummaryDTO> items) {}
+    public record KnowledgePointListDTO(String offeringId,List<KnowledgePointDTO> items) {}
+    public record ChapterProgressDTO(String chapterId,ChapterProgress studentProgress,ProgressDTO courseProgress) {}
+    public record LearningPositionDTO(String offeringId,String lastChapterId,Instant lastStudiedAt) {}
+    public record ResourceArchiveDTO(String id,boolean archived) {}
 }
-

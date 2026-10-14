@@ -12,5 +12,11 @@ public final class CourseRows {
             int usedCount,Instant revokedAt,Instant createdAt,String createdBy) {
         @Override public String toString() { return "Invite[id="+id+", offeringId="+offeringId+"]"; }
     }
+    public record Chapter(String id,String offeringId,int position,String title,String summary,String status,
+            boolean isRequired,int contentVersion,Instant publishedAt) {}
+    public record Resource(String id,String offeringId,String chapterId,String knowledgePointId,String title,
+            String contentMarkdown,int position,String status) {}
+    public record KnowledgePoint(String id,String offeringId,String chapterId,String title,String description,int position) {}
+    public record ChapterProgress(String id,String offeringId,String memberId,String chapterId,String status,
+            Instant completedAt,Instant lastOpenedAt) {}
 }
-

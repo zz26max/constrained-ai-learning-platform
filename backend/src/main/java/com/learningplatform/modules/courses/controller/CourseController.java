@@ -78,6 +78,39 @@ public class CourseController {
         CourseService.validateEnrollment(body);EnrollmentDTO result=service.enroll(user(auth),body,id(req));
         return ResponseEntity.status(result.created()?HttpStatus.CREATED:HttpStatus.OK).body(response(result,req));
     }
+
+    @GetMapping("/offerings/{offeringId}/chapters")
+    public ApiResponse<ChapterListDTO> listChapters(Authentication a,HttpServletRequest req,@PathVariable String offeringId){CourseInput.uuid(offeringId);return response(service.listChapters(user(a),offeringId),req);}
+    @GetMapping("/chapters/{chapterId}")
+    public ApiResponse<ChapterDetailDTO> getChapter(Authentication a,HttpServletRequest req,@PathVariable String chapterId){CourseInput.uuid(chapterId);return response(service.getChapter(user(a),chapterId),req);}
+    @GetMapping("/resources/{resourceId}")
+    public ApiResponse<ResourceDTO> getResource(Authentication a,HttpServletRequest req,@PathVariable String resourceId){CourseInput.uuid(resourceId);return response(service.getResource(user(a),resourceId),req);}
+    @PutMapping("/chapters/{chapterId}/progress")
+    public ApiResponse<ChapterProgressDTO> updateChapterProgress(Authentication a,HttpServletRequest req,@PathVariable String chapterId,@RequestBody Map<String,Object>b){CourseInput.uuid(chapterId);return response(service.updateChapterProgress(user(a),chapterId,b,id(req)),req);}
+    @PostMapping("/me/learning-position")
+    public ApiResponse<LearningPositionDTO> recordLearningPosition(Authentication a,HttpServletRequest req,@RequestBody Map<String,Object>b){return response(service.recordLearningPosition(user(a),b,id(req)),req);}
+    @GetMapping("/teacher/offerings/{offeringId}/chapters")
+    public ApiResponse<TeacherChapterListDTO> listTeacherChapters(Authentication a,HttpServletRequest req,@PathVariable String offeringId){CourseInput.uuid(offeringId);return response(service.listTeacherChapters(user(a),offeringId),req);}
+    @PostMapping("/teacher/offerings/{offeringId}/chapters")
+    public ResponseEntity<ApiResponse<TeacherChapterSummaryDTO>> createChapter(Authentication a,HttpServletRequest req,@PathVariable String offeringId,@RequestBody Map<String,Object>b){CourseInput.uuid(offeringId);var x=service.createChapter(user(a),offeringId,b,id(req));return ResponseEntity.status(HttpStatus.CREATED).body(response(x,req));}
+    @GetMapping("/teacher/chapters/{chapterId}")
+    public ApiResponse<TeacherChapterDetailDTO> getTeacherChapter(Authentication a,HttpServletRequest req,@PathVariable String chapterId){CourseInput.uuid(chapterId);return response(service.getTeacherChapter(user(a),chapterId),req);}
+    @PatchMapping("/teacher/chapters/{chapterId}")
+    public ApiResponse<TeacherChapterSummaryDTO> patchChapter(Authentication a,HttpServletRequest req,@PathVariable String chapterId,@RequestBody Map<String,Object>b){CourseInput.uuid(chapterId);return response(service.patchChapter(user(a),chapterId,b,id(req)),req);}
+    @PostMapping("/teacher/chapters/{chapterId}/publish")
+    public ApiResponse<TeacherChapterSummaryDTO> publishChapter(Authentication a,HttpServletRequest req,@PathVariable String chapterId,@RequestBody Map<String,Object>b){CourseInput.uuid(chapterId);CourseInput.empty(b);return response(service.publishChapter(user(a),chapterId,id(req)),req);}
+    @PostMapping("/teacher/offerings/{offeringId}/knowledge-points")
+    public ResponseEntity<ApiResponse<KnowledgePointDTO>> createKnowledgePoint(Authentication a,HttpServletRequest req,@PathVariable String offeringId,@RequestBody Map<String,Object>b){CourseInput.uuid(offeringId);var x=service.createKnowledgePoint(user(a),offeringId,b,id(req));return ResponseEntity.status(HttpStatus.CREATED).body(response(x,req));}
+    @GetMapping("/teacher/offerings/{offeringId}/knowledge-points")
+    public ApiResponse<KnowledgePointListDTO> listKnowledgePoints(Authentication a,HttpServletRequest req,@PathVariable String offeringId){CourseInput.uuid(offeringId);return response(service.listKnowledgePoints(user(a),offeringId),req);}
+    @PatchMapping("/teacher/knowledge-points/{knowledgePointId}")
+    public ApiResponse<KnowledgePointDTO> patchKnowledgePoint(Authentication a,HttpServletRequest req,@PathVariable String knowledgePointId,@RequestBody Map<String,Object>b){CourseInput.uuid(knowledgePointId);return response(service.patchKnowledgePoint(user(a),knowledgePointId,b,id(req)),req);}
+    @PostMapping("/teacher/chapters/{chapterId}/resources")
+    public ResponseEntity<ApiResponse<ResourceDTO>> createResource(Authentication a,HttpServletRequest req,@PathVariable String chapterId,@RequestBody Map<String,Object>b){CourseInput.uuid(chapterId);var x=service.createResource(user(a),chapterId,b,id(req));return ResponseEntity.status(HttpStatus.CREATED).body(response(x,req));}
+    @PatchMapping("/teacher/resources/{resourceId}")
+    public ApiResponse<ResourceDTO> patchResource(Authentication a,HttpServletRequest req,@PathVariable String resourceId,@RequestBody Map<String,Object>b){CourseInput.uuid(resourceId);return response(service.patchResource(user(a),resourceId,b,id(req)),req);}
+    @DeleteMapping("/teacher/resources/{resourceId}")
+    public ApiResponse<ResourceArchiveDTO> archiveResource(Authentication a,HttpServletRequest req,@PathVariable String resourceId){CourseInput.uuid(resourceId);return response(service.archiveResource(user(a),resourceId,id(req)),req);}
     private void query(String termId,int page,int size) { CourseInput.page(page,size);if(termId!=null) CourseInput.uuid(termId); }
     private UserDTO user(Authentication auth) { return ((SessionIdentity)auth.getPrincipal()).user(); }
     private String id(HttpServletRequest req) { return RequestIdFilter.getRequestId(req); }
