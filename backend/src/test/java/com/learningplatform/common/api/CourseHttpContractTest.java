@@ -70,7 +70,7 @@ class CourseHttpContractTest {
     }
 
     static Stream<Operation> operations() {
-        return Stream.of(
+        Stream<Operation> base = Stream.of(
                 new Operation("listBaseCourses", "GET", "/api/v1/teacher/courses", true, null, 200, true),
                 new Operation("listTeacherOfferings", "GET", "/api/v1/teacher/offerings", true, null, 200, true),
                 new Operation("createOffering", "POST", "/api/v1/teacher/offerings", true,
@@ -84,7 +84,9 @@ class CourseHttpContractTest {
                 new Operation("listInvites", "GET", "/api/v1/teacher/offerings/" + ID + "/invites", true, null, 200, true),
                 new Operation("revokeInvite", "POST", "/api/v1/teacher/invites/" + ID + "/revoke", true, "{}", 200, false),
                 new Operation("enroll", "POST", "/api/v1/me/enrollments", false, "{\"inviteCode\":\"test-one-time-code\"}", 201, false));
+        return Stream.concat(base, contentOperations());
     }
+
 
     static Stream<Operation> writes() { return operations().filter(Operation::writes); }
     static Stream<Operation> teacherOperations() { return operations().filter(Operation::teacher); }
@@ -99,7 +101,11 @@ class CourseHttpContractTest {
         return operations().filter(o -> List.of("archiveOffering", "revokeInvite").contains(o.id()));
     }
     static Stream<Operation> objectOperations() {
-        return operations().filter(o -> List.of("getOffering", "archiveOffering", "listMembers", "createInvite", "listInvites", "revokeInvite").contains(o.id()));
+        return operations().filter(o -> List.of("getOffering", "archiveOffering", "listMembers", "createInvite", "listInvites", "revokeInvite",
+                "listChapters", "getChapter", "getResource", "updateChapterProgress", "recordLearningPosition",
+                "listTeacherChapters", "createChapter", "getTeacherChapter", "patchChapter", "publishChapter",
+                "createKnowledgePoint", "listKnowledgePoints", "patchKnowledgePoint", "createResource", "patchResource",
+                "archiveResource").contains(o.id()));
     }
 
     @BeforeEach
@@ -129,6 +135,35 @@ class CourseHttpContractTest {
         when(courses.listInvites(any(), anyString(), anyInt(), anyInt())).thenReturn(new Page<>(List.of(invite), 1, 20, 1));
         when(courses.revokeInvite(any(), anyString(), anyString())).thenReturn(new InviteRevokedDTO(ID, Instant.parse("2026-10-14T00:00:00Z")));
         when(courses.enroll(any(), anyMap(), anyString())).thenReturn(new EnrollmentDTO(ID, Instant.parse("2026-10-14T00:00:00Z"), true));
+
+        ChapterProgress chapterProgress = new ChapterProgress("completed", Instant.parse("2026-10-14T00:00:00Z"));
+        ProgressDTO progress = new ProgressDTO("chapter", 1, 1, 100, false, Instant.parse("2026-10-14T00:00:00Z"));
+        ChapterSummaryDTO chapterSummary = new ChapterSummaryDTO(ID, ID, 1, "第一章", "摘要", true,
+                "published", chapterProgress, 1, 1, 0);
+        ResourceDTO resource = new ResourceDTO(ID, ID, ID, null, "资料", "markdown", "正文", null, 1, false);
+        KnowledgePointDTO knowledgePoint = new KnowledgePointDTO(ID, ID, ID, "知识点", "说明", 1);
+        when(courses.listChapters(any(), anyString())).thenReturn(new ChapterListDTO(ID, List.of(chapterSummary)));
+        when(courses.getChapter(any(), anyString())).thenReturn(new ChapterDetailDTO(ID, ID, 1, "第一章", "摘要", true,
+                "published", chapterProgress, 1, 1, 0, List.of(resource), List.of(knowledgePoint), List.of()));
+        when(courses.getResource(any(), anyString())).thenReturn(resource);
+        when(courses.updateChapterProgress(any(), anyString(), anyMap(), anyString()))
+                .thenReturn(new ChapterProgressDTO(ID, chapterProgress, progress));
+        when(courses.recordLearningPosition(any(), anyMap(), anyString()))
+                .thenReturn(new LearningPositionDTO(ID, ID, Instant.parse("2026-10-14T00:00:00Z")));
+        TeacherChapterSummaryDTO teacherSummary = new TeacherChapterSummaryDTO(ID, ID, 1, "第一章", "摘要", true,
+                "published", null, 1, 1, 0);
+        when(courses.listTeacherChapters(any(), anyString())).thenReturn(new TeacherChapterListDTO(ID, List.of(teacherSummary)));
+        when(courses.createChapter(any(), anyString(), anyMap(), anyString())).thenReturn(teacherSummary);
+        when(courses.getTeacherChapter(any(), anyString())).thenReturn(new TeacherChapterDetailDTO(ID, ID, 1, "第一章", "摘要", true,
+                "published", null, 1, 1, 0, List.of(resource), List.of(knowledgePoint), List.of()));
+        when(courses.patchChapter(any(), anyString(), anyMap(), anyString())).thenReturn(teacherSummary);
+        when(courses.publishChapter(any(), anyString(), anyString())).thenReturn(teacherSummary);
+        when(courses.createKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenReturn(knowledgePoint);
+        when(courses.listKnowledgePoints(any(), anyString())).thenReturn(new KnowledgePointListDTO(ID, List.of(knowledgePoint)));
+        when(courses.patchKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenReturn(knowledgePoint);
+        when(courses.createResource(any(), anyString(), anyMap(), anyString())).thenReturn(resource);
+        when(courses.patchResource(any(), anyString(), anyMap(), anyString())).thenReturn(resource);
+        when(courses.archiveResource(any(), anyString(), anyString())).thenReturn(new ResourceArchiveDTO(ID, true));
     }
 
     @ParameterizedTest(name = "{0}") @MethodSource("operations")
@@ -176,6 +211,22 @@ class CourseHttpContractTest {
             case "createInvite" -> when(courses.createInvite(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
             case "listInvites" -> when(courses.listInvites(any(), anyString(), anyInt(), anyInt())).thenThrow(hidden);
             case "revokeInvite" -> when(courses.revokeInvite(any(), anyString(), anyString())).thenThrow(hidden);
+            case "listChapters" -> when(courses.listChapters(any(), anyString())).thenThrow(hidden);
+            case "getChapter" -> when(courses.getChapter(any(), anyString())).thenThrow(hidden);
+            case "getResource" -> when(courses.getResource(any(), anyString())).thenThrow(hidden);
+            case "updateChapterProgress" -> when(courses.updateChapterProgress(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "recordLearningPosition" -> when(courses.recordLearningPosition(any(), anyMap(), anyString())).thenThrow(hidden);
+            case "listTeacherChapters" -> when(courses.listTeacherChapters(any(), anyString())).thenThrow(hidden);
+            case "createChapter" -> when(courses.createChapter(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "getTeacherChapter" -> when(courses.getTeacherChapter(any(), anyString())).thenThrow(hidden);
+            case "patchChapter" -> when(courses.patchChapter(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "publishChapter" -> when(courses.publishChapter(any(), anyString(), anyString())).thenThrow(hidden);
+            case "createKnowledgePoint" -> when(courses.createKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "listKnowledgePoints" -> when(courses.listKnowledgePoints(any(), anyString())).thenThrow(hidden);
+            case "patchKnowledgePoint" -> when(courses.patchKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "createResource" -> when(courses.createResource(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "patchResource" -> when(courses.patchResource(any(), anyString(), anyMap(), anyString())).thenThrow(hidden);
+            case "archiveResource" -> when(courses.archiveResource(any(), anyString(), anyString())).thenThrow(hidden);
             default -> throw new AssertionError(op.id());
         }
         mvc.perform(authenticated(op, op.teacher() ? TEACHER_TOKEN : STUDENT_TOKEN, true))
@@ -188,10 +239,14 @@ class CourseHttpContractTest {
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
     }
 
-    @ParameterizedTest(name = "{0}") @MethodSource("writes")
+    @ParameterizedTest(name = "{0}") @MethodSource("malformedWrites")
     void malformedWriteBodyIsRejected(Operation op) throws Exception {
         mvc.perform(authenticated(op, op.teacher() ? TEACHER_TOKEN : STUDENT_TOKEN, true).content("{"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    static Stream<Operation> malformedWrites() {
+        return writes().filter(o -> o.body() != null && !"DELETE".equals(o.method()));
     }
 
     @ParameterizedTest(name = "{0}") @MethodSource("bodyRequiredFields")
@@ -221,26 +276,28 @@ class CourseHttpContractTest {
     }
 
 
-    @Test
-    void p1aContentWriteRoutesRequireCsrf() throws Exception {
-        for (Operation op : contentOperations().filter(Operation::writes).toList()) {
-            mvc.perform(authenticated(op, op.teacher() ? TEACHER_TOKEN : STUDENT_TOKEN, false))
-                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidContentBodies")
+    void invalidContentBodyReturnsValidationError(Operation op) throws Exception {
+        BusinessException invalid = new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", "请求字段无效。");
+        switch (op.id()) {
+            case "updateChapterProgress" -> when(courses.updateChapterProgress(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "recordLearningPosition" -> when(courses.recordLearningPosition(any(), anyMap(), anyString())).thenThrow(invalid);
+            case "createChapter" -> when(courses.createChapter(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "patchChapter" -> when(courses.patchChapter(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "createKnowledgePoint" -> when(courses.createKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "patchKnowledgePoint" -> when(courses.patchKnowledgePoint(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "createResource" -> when(courses.createResource(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            case "patchResource" -> when(courses.patchResource(any(), anyString(), anyMap(), anyString())).thenThrow(invalid);
+            default -> throw new AssertionError(op.id());
         }
+        mvc.perform(authenticated(op, op.teacher() ? TEACHER_TOKEN : STUDENT_TOKEN, true).content("{}"))
+                .andExpect(status().is(422)).andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
-    @Test
-    void p1aContentRoutesRejectAnonymousRequests() throws Exception {
-        for (Operation op : contentOperations().toList()) {
-            MockHttpServletRequestBuilder builder = base(op);
-            if (op.writes()) {
-                CsrfTokenService.PreAuthTicket ticket = csrf.issuePreAuth();
-                builder.cookie(new Cookie("lp_pre_auth", ticket.cookieValue()))
-                        .header("Origin", ORIGIN).header("X-CSRF-Token", ticket.token());
-            }
-            mvc.perform(builder).andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
-        }
+    static Stream<Operation> invalidContentBodies() {
+        return contentOperations().filter(o -> o.writes() && List.of("updateChapterProgress", "recordLearningPosition", "createChapter",
+                "patchChapter", "createKnowledgePoint", "patchKnowledgePoint", "createResource", "patchResource").contains(o.id()));
     }
 
     private static Stream<Operation> contentOperations() {

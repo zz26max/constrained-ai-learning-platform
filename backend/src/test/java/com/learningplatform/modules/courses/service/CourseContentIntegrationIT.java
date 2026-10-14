@@ -48,6 +48,7 @@ class CourseContentIntegrationIT {
     private static final String COURSE = "00000000-0000-4000-8000-000000000071";
     private static final String TERM = "00000000-0000-4000-8000-000000000072";
     private static final UserDTO TEACHER = user("73", "content.teacher", "teacher");
+    private static final UserDTO OTHER_TEACHER = user("76", "other.content.teacher", "teacher");
     private static final UserDTO STUDENT = user("74", "content.student", "student");
     private static final UserDTO OUTSIDER = user("75", "content.outsider", "student");
     private static final JsonMapper JSON = JsonMapper.builder().findAndAddModules().build();
@@ -85,7 +86,7 @@ class CourseContentIntegrationIT {
         jdbc.update("DELETE FROM audit_logs");
         jdbc.update("DELETE FROM auth_sessions");
         jdbc.update("DELETE FROM users");
-        for (UserDTO u : List.of(TEACHER, STUDENT, OUTSIDER)) {
+        for (UserDTO u : List.of(TEACHER, OTHER_TEACHER, STUDENT, OUTSIDER)) {
             jdbc.update("INSERT INTO users(id,username,display_name,password_hash,roles,status,created_at,updated_at) VALUES(?,?,?,?,CAST(? AS JSON),'active',?,?)",
                     u.id(), u.username(), u.displayName(), "TEST_ONLY_NOT_A_REAL_HASH", JSON.writeValueAsString(u.roles()), ts(NOW), ts(NOW));
         }
@@ -117,6 +118,78 @@ class CourseContentIntegrationIT {
     }
 
     @Test
+    void teacherCannotWriteContentAcrossOfferings() {
+        OfferingDTO otherOffering = offering(OTHER_TEACHER);
+        var otherChapter = service.createChapter(OTHER_TEACHER, otherOffering.id(),
+                Map.of("number", 1, "title", "他班章节", "summary", "摘要", "isRequired", true), "other-chapter");
+
+        assertThatThrownBy(() -> service.createChapter(TEACHER, otherOffering.id(),
+                Map.of("number", 2, "title", "越权章节", "summary", "摘要", "isRequired", true), "cross-chapter"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_FOUND"));
+        Map<String, Object> resource = resourceBody(null, "越权资料");
+        assertThatThrownBy(() -> service.createResource(TEACHER, otherChapter.id(), resource, "cross-resource"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_FOUND"));
+        assertThatThrownBy(() -> service.createKnowledgePoint(TEACHER, otherOffering.id(),
+                Map.of("title", "越权知识点", "description", "说明", "order", 1), "cross-knowledge"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_FOUND"));
+    }
+
+    @Test
+    void knowledgePointCanBeUnlinkedWhenItHasNoResourceReferences() {
+        OfferingDTO offering = offering();
+        var chapter = service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 1, "title", "章节", "summary", "摘要", "isRequired", true), "chapter");
+        var point = service.createKnowledgePoint(TEACHER, offering.id(),
+                Map.of("chapterId", chapter.id(), "title", "知识点", "description", "说明", "order", 1), "knowledge");
+        Map<String, Object> patch = new HashMap<>();
+        patch.put("chapterId", null);
+
+        assertThat(service.patchKnowledgePoint(TEACHER, point.id(), patch, "unlink").chapterId()).isNull();
+        assertThat(jdbc.queryForObject("SELECT chapter_id FROM knowledge_points WHERE id=?", String.class, point.id())).isNull();
+    }
+
+    @Test
+    void referencedKnowledgePointCannotChangeChapter() {
+        OfferingDTO offering = offering();
+        var first = service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 1, "title", "第一章", "summary", "摘要", "isRequired", true), "first");
+        var second = service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 2, "title", "第二章", "summary", "摘要", "isRequired", true), "second");
+        var point = service.createKnowledgePoint(TEACHER, offering.id(),
+                Map.of("chapterId", first.id(), "title", "知识点", "description", "说明", "order", 1), "knowledge");
+        service.createResource(TEACHER, first.id(), resourceBody(point.id(), "资料"), "resource");
+
+        Map<String, Object> patch = new HashMap<>();
+        patch.put("chapterId", second.id());
+        assertThatThrownBy(() -> service.patchKnowledgePoint(TEACHER, point.id(), patch, "move"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(e.getStatus().value()).isEqualTo(422);
+                });
+        assertThat(jdbc.queryForObject("SELECT chapter_id FROM knowledge_points WHERE id=?", String.class, point.id()))
+                .isEqualTo(first.id());
+    }
+
+    @Test
+    void archivedResourcePatchReturnsNotFoundWithoutChangingDatabase() {
+        OfferingDTO offering = offering();
+        var chapter = service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 1, "title", "章节", "summary", "摘要", "isRequired", true), "chapter");
+        ResourceDTO resource = service.createResource(TEACHER, chapter.id(), resourceBody(null, "原资料"), "resource");
+        service.archiveResource(TEACHER, resource.id(), "archive");
+        Map<String, Object> before = jdbc.queryForMap(
+                "SELECT title, content_markdown, position, status FROM resources WHERE id=?", resource.id());
+
+        assertThatThrownBy(() -> service.patchResource(TEACHER, resource.id(), Map.of("title", "不应更新"), "patch"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("NOT_FOUND");
+                    assertThat(e.getStatus().value()).isEqualTo(404);
+                });
+        assertThat(jdbc.queryForMap("SELECT title, content_markdown, position, status FROM resources WHERE id=?", resource.id()))
+                .isEqualTo(before);
+    }
+
+    @Test
     void progressUsesHalfUpAndConcurrentCompletionCannotBeDowngraded() throws Exception {
         OfferingDTO offering = offering();
         InviteCreatedDTO invite = service.createInvite(TEACHER, offering.id(), Map.of("expiresAt", NOW.plusSeconds(3600).toString(), "maxUses", 1), "invite");
@@ -138,7 +211,20 @@ class CourseContentIntegrationIT {
     }
 
     private void update(CountDownLatch start, CountDownLatch ready, String id, String status) throws Exception { ready.countDown(); start.await(10, TimeUnit.SECONDS); service.updateChapterProgress(STUDENT, id, Map.of("status", status), status); }
-    private OfferingDTO offering() { return service.createOffering(TEACHER, Map.of("courseId", COURSE, "termId", TERM, "title", "内容班", "groupName", "一班", "progressUnit", "chapter"), "offering"); }
+    private OfferingDTO offering() { return offering(TEACHER); }
+    private OfferingDTO offering(UserDTO teacher) {
+        return service.createOffering(teacher, Map.of("courseId", COURSE, "termId", TERM, "title", "内容班", "groupName", "一班", "progressUnit", "chapter"), "offering");
+    }
+    private static Map<String, Object> resourceBody(String knowledgePointId, String title) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("knowledgePointId", knowledgePointId);
+        body.put("title", title);
+        body.put("type", "markdown");
+        body.put("content", "# 原文");
+        body.put("url", null);
+        body.put("order", 1);
+        return body;
+    }
     private static java.sql.Timestamp ts(Instant i) { return java.sql.Timestamp.from(i); }
     private static UserDTO user(String suffix, String username, String role) { return new UserDTO("00000000-0000-4000-8000-0000000000" + suffix, username, "内容测试用户", List.of(role)); }
 
