@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$DatabaseOnly,
     [switch]$InitializeAccounts,
+    [switch]$InitializeDemoData,
     [ValidateRange(1, 65535)]
     [int]$Port = 8080,
     [string]$JdkPath = $env:JAVA_HOME
@@ -20,8 +21,8 @@ function Invoke-NativeCommand {
     try { & $Command; return $LASTEXITCODE } finally { $ErrorActionPreference = $previousPreference }
 }
 
-if ($DatabaseOnly -and $InitializeAccounts) {
-    throw '-DatabaseOnly 与 -InitializeAccounts 不能同时使用。'
+if (([int]$DatabaseOnly.IsPresent + [int]$InitializeAccounts.IsPresent + [int]$InitializeDemoData.IsPresent) -gt 1) {
+    throw '-DatabaseOnly、-InitializeAccounts 与 -InitializeDemoData 三个开关不能同时使用。'
 }
 
 function New-LocalPassword {
@@ -56,7 +57,7 @@ if (-not (Test-Path -LiteralPath $localConfigPath)) {
 
 # 显式解析 KEY=value，不执行文本；保留密码两端的空格，不支持引号或插值语法。
 $accountKeys = @('LOCAL_STUDENT_PASSWORD', 'LOCAL_TEACHER_PASSWORD', 'LOCAL_ADMIN_PASSWORD')
-$optionalKeys = @('AUTH_PRE_LOGIN_SIGNING_KEY', 'AUTH_ALLOWED_ORIGINS', 'AUTH_COOKIE_SECURE')
+$optionalKeys = @('AUTH_PRE_LOGIN_SIGNING_KEY', 'AUTH_ALLOWED_ORIGINS', 'AUTH_COOKIE_SECURE', 'AUTH_INVITE_SIGNING_KEY')
 $requiredKeys = @('SPRING_PROFILES_ACTIVE', 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'MYSQL_ROOT_PASSWORD')
 $allowedKeys = $requiredKeys + $accountKeys + $optionalKeys
 $configValues = @{}
@@ -77,12 +78,25 @@ try {
     foreach ($key in $requiredKeys) {
         if ([string]::IsNullOrWhiteSpace($configValues[$key])) { throw ('请填写配置项：' + $key) }
     }
-    if ($InitializeAccounts) {
+    $changed = $false
+    # 邀请码摘要需要稳定密钥：缺失时只生成一次并保存在忽略的 .env，重启不轮换。
+    if ([string]::IsNullOrWhiteSpace($configValues['AUTH_INVITE_SIGNING_KEY'])) {
+        $signingKey = New-LocalPassword
+        if ($configValues.ContainsKey('AUTH_INVITE_SIGNING_KEY')) {
+            $configText = $configText -replace '(?m)^AUTH_INVITE_SIGNING_KEY=[^\r\n]*', ('AUTH_INVITE_SIGNING_KEY=' + $signingKey)
+        } else {
+            $configText = $configText.TrimEnd("`r", "`n") + "`r`nAUTH_INVITE_SIGNING_KEY=" + $signingKey + "`r`n"
+        }
+        $configValues['AUTH_INVITE_SIGNING_KEY'] = $signingKey
+        $changed = $true
+    }
+    if ($InitializeAccounts -or $InitializeDemoData) {
         # 初始化命令只操作约定的本地开发库，避免误连远程环境。
         if ($configValues['DB_URL'] -notmatch '^jdbc:mysql://(127\.0\.0\.1|localhost):3307/learning_platform(?:\?.*)?$') {
-            throw '账户初始化仅允许本地 3307 端口的 learning_platform 开发库。'
+            throw '一次性初始化仅允许本地 3307 端口的 learning_platform 开发库。'
         }
-        $changed = $false
+    }
+    if ($InitializeAccounts) {
         foreach ($key in $accountKeys) {
             if ([string]::IsNullOrWhiteSpace($configValues[$key])) {
                 $password = New-LocalPassword
@@ -95,13 +109,13 @@ try {
                 $changed = $true
             }
         }
-        if ($changed) {
-            $configStream.Position = 0
-            $writer = New-Object System.IO.StreamWriter($configStream, (New-Object System.Text.UTF8Encoding($false)), 1024, $true)
-            try { $writer.Write($configText); $writer.Flush(); $configStream.SetLength($configStream.Position) }
-            finally { $writer.Dispose() }
-            Write-Host '演示账户的随机密码已保存到本地 .env；终端不会显示密码。'
-        }
+    }
+    if ($changed) {
+        $configStream.Position = 0
+        $writer = New-Object System.IO.StreamWriter($configStream, (New-Object System.Text.UTF8Encoding($false)), 1024, $true)
+        try { $writer.Write($configText); $writer.Flush(); $configStream.SetLength($configStream.Position) }
+        finally { $writer.Dispose() }
+        Write-Host '本地随机凭据已保存到 .env；终端不会显示密码或密钥。'
     }
 } finally { $configStream.Dispose() }
 foreach ($key in $allowedKeys) {
@@ -126,6 +140,7 @@ try {
     $env:Path = (Join-Path $JdkPath 'bin') + ';' + $env:Path
     $env:SERVER_PORT = [string]$Port
     if ($InitializeAccounts) { $env:SPRING_PROFILES_ACTIVE = 'local-accounts' }
+    if ($InitializeDemoData) { $env:SPRING_PROFILES_ACTIVE = 'local-demo-data' }
     $serverExitCode = Invoke-NativeCommand { .\mvnw.cmd spring-boot:run }
     if ($serverExitCode -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
 } finally {

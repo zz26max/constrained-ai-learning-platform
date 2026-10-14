@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.modules.courses.seed.DemoDataMapper">
+    <select id="termExists" resultType="boolean">SELECT EXISTS(SELECT 1 FROM terms WHERE id=#{id})</select>
+    <select id="currentTermExists" resultType="boolean">SELECT EXISTS(SELECT 1 FROM terms WHERE is_current=1)</select>
+    <select id="courseExists" resultType="boolean">SELECT EXISTS(SELECT 1 FROM courses WHERE code=#{code})</select>
+    <insert id="insertTerm">
+        INSERT INTO terms(id,label,starts_at,ends_at,is_current,created_at,updated_at)
+        VALUES(#{term.id},#{term.label},
+            #{term.startsAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},
+            #{term.endsAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{term.current},
+            #{term.now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},
+            #{term.now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+    </insert>
+    <insert id="insertCourse">
+        INSERT INTO courses(id,code,mark,title,description,status,created_by,created_at,updated_at)
+        VALUES(#{course.id},#{course.code},#{course.mark},#{course.title},#{course.description},'active',NULL,
+            #{course.now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},
+            #{course.now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+    </insert>
+</mapper>
