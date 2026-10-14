@@ -39,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   let loginRecoveryUsed = false
   let logoutRecoveryUsed = false
+  let actionRecoveryUsed = false
   const csrfRefresh = createCsrfRefreshCoordinator(refreshCsrfAndIdentity)
 
   function clearAuthenticatedState(): void {
@@ -158,6 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
       loginStatus.value = 'success'
       loginRecoveryUsed = false
       logoutRecoveryUsed = false
+      actionRecoveryUsed = false
       logoutFailure.value = null
       return true
     } catch (error) {
@@ -253,10 +255,39 @@ export const useAuthStore = defineStore('auth', () => {
     clearAuthenticatedState()
     loginRecoveryUsed = false
     logoutRecoveryUsed = false
+    actionRecoveryUsed = false
     loginStatus.value = 'idle'
     loginFailure.value = null
     logoutFailure.value = null
     return true
+  }
+
+  /** 教学页面复用认证恢复，不自动重复失败的教学写入。 */
+  async function recoverCsrfFailure(requestId: string | null): Promise<string> {
+    lastRequestId.value = requestId
+    if (actionRecoveryUsed) {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'csrf-stalled', message: '安全校验再次失败，请重新登录。' }
+      return loginFailure.value.message
+    }
+    try {
+      await csrfRefresh.recover()
+      return '安全令牌已刷新，原操作尚未完成，请重新操作。'
+    } catch {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'csrf-stalled', message: '安全令牌刷新或身份核对失败，请重新登录。' }
+      return loginFailure.value.message
+    } finally { actionRecoveryUsed = true }
+  }
+
+  async function recoverIdentity(requestId: string | null): Promise<void> {
+    try {
+      await csrfRefresh.recover()
+    } catch {
+      clearAuthenticatedState()
+      loginFailure.value = { kind: 'unavailable', message: '登录身份已失效，请重新登录。' }
+    }
+    lastRequestId.value = requestId
   }
 
   return {
@@ -274,5 +305,8 @@ export const useAuthStore = defineStore('auth', () => {
     retryBoot,
     login,
     logout,
+    ensureCsrfToken,
+    recoverCsrfFailure,
+    recoverIdentity,
   }
 })

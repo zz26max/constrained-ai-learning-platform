@@ -1,6 +1,6 @@
 /** 传输层抽象：真实 fetch 与 mock 层实现同一接口，页面不直接区分模式。 */
 
-export type ApiMethod = 'GET' | 'POST'
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface TransportRequest {
   /** 契约 operationId；mock 层按其路由，真实传输按 path 请求。 */

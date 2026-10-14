@@ -21,6 +21,7 @@
     "verify": "npm run typecheck && npm run build && npm run check:no-mock && npm run test"
   },
   "dependencies": {
+    "marked": "18.1.1",
     "pinia": "^4.0.3",
     "vue": "^3.5.43",
     "vue-router": "^5.4.0"

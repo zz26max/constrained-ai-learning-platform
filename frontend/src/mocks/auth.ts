@@ -1,5 +1,6 @@
 import { randomUUID } from './random'
-import type { MockHandler, MockRequestContext } from './types'
+import type { MockHandler, MockRequestContext, MockResult } from './types'
+import type { components } from '../api/generated/schema'
 
 /**
  * 首批五个认证操作的 mock 处理器（虚构材料，通过同一契约类型校验）。
@@ -8,11 +9,13 @@ import type { MockHandler, MockRequestContext } from './types'
  */
 const MOCK_PASSWORD = 'mock-demo-pass'
 
-interface MockAccount {
-  readonly id: string
-  readonly username: string
-  readonly displayName: string
-  readonly roles: readonly string[]
+type MockAccount = components['schemas']['UserDTO']
+
+export const MOCK_TERM: components['schemas']['TermDTO'] = {
+  id: '00000000-0000-4000-8000-000000000011',
+  label: '2026 秋季学期',
+  startsAt: '2026-09-01T00:00:00Z',
+  endsAt: '2027-01-31T23:59:59Z',
 }
 
 const ACCOUNTS: readonly MockAccount[] = [
@@ -81,13 +84,33 @@ function fail(
   }
 }
 
-function userDto(account: MockAccount): Record<string, unknown> {
+function userDto(account: MockAccount): components['schemas']['UserDTO'] {
   return {
     id: account.id,
     username: account.username,
     displayName: account.displayName,
     roles: [...account.roles],
   }
+}
+
+/** Shared mock modules use this identity; switching accounts does not create a second session. */
+export function mockSession(): Readonly<MockSession> | null {
+  return state.session
+}
+
+export function requireMockSession(context: MockRequestContext): MockResult | null {
+  return state.session === null || context.cookies['lp_session'] === undefined
+    ? fail(401, 'UNAUTHENTICATED', '会话不存在或已过期。')
+    : null
+}
+
+/** Reject a write before touching course state. Mock does not claim to verify browser Origin. */
+export function validateMockCsrf(context: MockRequestContext): MockResult | null {
+  const unavailable = requireMockSession(context)
+  if (unavailable !== null) return unavailable
+  return state.session !== null && context.headers['X-CSRF-Token'] === state.session.csrfToken
+    ? null
+    : fail(403, 'CSRF_INVALID', '登录令牌无效，请重新操作。')
 }
 
 function isBody(context: MockRequestContext): Record<string, unknown> | null {
@@ -165,19 +188,20 @@ export const getMeHandler: MockHandler = (context) => {
   return ok(userDto(state.session.account))
 }
 
-/** getConfig：P0/P1 阶段 features 全部关闭，currentTermId 为空（与契约 ConfigDTO 一致）。 */
+/** getConfig: fictional term supports P1-A filtering; later-stage features remain disabled. */
 export const getConfigHandler: MockHandler = (context) => {
   if (state.session === null || context.cookies['lp_session'] === undefined) {
     return fail(401, 'UNAUTHENTICATED', '会话不存在或已过期。')
   }
-  return ok({
+  const data: components['schemas']['ConfigDTO'] = {
     apiVersion: 'v1',
     serverTime: new Date().toISOString(),
     timezone: 'Asia/Shanghai',
-    currentTermId: null,
-    terms: [],
+    currentTermId: MOCK_TERM.id,
+    terms: [{ ...MOCK_TERM }],
     features: { aiTutoring: false, learningAnalytics: false, serverChecks: false },
-  })
+  }
+  return ok(data)
 }
 
 export const authHandlers: Record<string, MockHandler> = {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mockTransport, resetMockAuthState, resetMockCookies } from '../src/mocks/index'
 import { MockNotImplementedError } from '../src/mocks/types'
+import { MOCK_TERM } from '../src/mocks/auth'
 import type { TransportRequest } from '../src/api/transport'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -154,15 +155,15 @@ describe('mock 层信封与 Cookie（同一契约）', () => {
     expect(failBody(after).error.code).toBe('UNAUTHENTICATED')
   })
 
-  it('getConfig 返回契约要求的 ConfigDTO 形状（P0 全部功能关闭）', async () => {
+  it('getConfig 返回契约要求的学期配置，特色功能保持关闭', async () => {
     await loginAsMock('student.demo', 'mock-demo-pass')
     const result = await call({ operationId: 'getConfig' })
     expect(result.status).toBe(200)
     const data = okBody(result).data
     expect(data['apiVersion']).toBe('v1')
     expect(data['timezone']).toBe('Asia/Shanghai')
-    expect(data['currentTermId']).toBeNull()
-    expect(data['terms']).toEqual([])
+    expect(data['currentTermId']).toBe(MOCK_TERM.id)
+    expect(data['terms']).toEqual([MOCK_TERM])
     expect(data['serverTime']).toMatch(TIMESTAMP_PATTERN)
     const features = data['features'] as Record<string, unknown>
     expect(features['aiTutoring']).toBe(false)

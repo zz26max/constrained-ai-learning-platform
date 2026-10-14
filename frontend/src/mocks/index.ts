@@ -1,5 +1,6 @@
 import type { Transport, TransportRequest, TransportResponse } from '../api/transport'
 import { authHandlers, resetMockAuthState } from './auth'
+import { courseHandlers, resetMockCourseState } from './courses'
 import { applySetCookies, currentCookies, resetMockCookies } from './jar'
 import { MockNotImplementedError, toTransportResponse, type MockHandler } from './types'
 
@@ -9,6 +10,7 @@ void MOCK_LAYER_MARKER
 
 const handlers: Record<string, MockHandler> = {
   ...authHandlers,
+  ...courseHandlers,
 }
 
 function findHandler(operationId: string): MockHandler | undefined {
@@ -39,8 +41,13 @@ export const mockTransport: Transport = {
     }
     const result = handler({ ...request, cookies: currentCookies(), bodyJson })
     applySetCookies(result.setCookies)
-    return toTransportResponse(result)
+    const response = toTransportResponse(result)
+    response.headers['cache-control'] = 'no-store'
+    if (result.bodyJson !== null && typeof result.bodyJson === 'object' && 'requestId' in result.bodyJson && typeof result.bodyJson.requestId === 'string') {
+      response.headers['x-request-id'] = result.bodyJson.requestId
+    }
+    return response
   },
 }
 
-export { resetMockAuthState, resetMockCookies }
+export { resetMockAuthState, resetMockCookies, resetMockCourseState }
