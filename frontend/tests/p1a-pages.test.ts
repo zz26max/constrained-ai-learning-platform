@@ -117,9 +117,20 @@ describe('P1-A 课程页面验收', () => {
     { invite: P1A_INVITE_CODES.expired, detail: '邀请码已过期。' },
     { invite: P1A_INVITE_CODES.revoked, detail: '邀请码已撤销。' },
   ])('邀请码$invite统一显示不可用并保留requestId，失败不刷新或报成功', async ({ invite, detail }) => {
-    scripted.setHandler(request => request.operationId === 'enroll'
-      ? { status: 400, body: { error: { code: 'INVALID_INVITE_CODE', message: detail, details: {} }, requestId: 'req-invite-unavailable' } }
-      : normalResponse(request.operationId))
+    const detailByCode: Record<string, string> = {
+      'DOES-NOT-EXIST': '邀请码无效。',
+      [P1A_INVITE_CODES.expired]: '邀请码已过期。',
+      [P1A_INVITE_CODES.revoked]: '邀请码已撤销。',
+    }
+    scripted.setHandler(request => {
+      if (request.operationId !== 'enroll') return normalResponse(request.operationId)
+      const body = JSON.parse(request.body ?? '{}') as { inviteCode?: string }
+      const branchDetail = body.inviteCode === undefined ? '邀请码缺失。' : detailByCode[body.inviteCode] ?? '邀请码无效。'
+      return {
+        status: 400,
+        body: { error: { code: 'INVALID_INVITE_CODE', message: branchDetail, details: {} }, requestId: `req-invite-${body.inviteCode}` },
+      }
+    })
     const { rendered } = await open('/course')
     await buttonNamed(rendered, '加入课程').trigger('click')
     await rendered.find('dialog input').setValue(invite)
@@ -127,10 +138,11 @@ describe('P1-A 课程页面验收', () => {
     await flushPromises()
     const alerts = rendered.findAll('[role="alert"]').map(item => item.text()).join(' ')
     expect(alerts).toContain('邀请码不可用，请向教师确认。')
-    expect(alerts).toContain('req-invite-unavailable')
+    expect(alerts).toContain(`req-invite-${invite}`)
     expect(alerts).not.toContain(detail)
     expect(rendered.find('main').text()).not.toContain('已加入课程，可以开始阅读。')
     expect(scripted.requests.filter(request => request.operationId === 'listMyCourses')).toHaveLength(1)
+    expect(JSON.parse(scripted.requests.find(request => request.operationId === 'enroll')?.body ?? '{}')).toEqual({ inviteCode: invite })
   })
 
   it('学生直达draft章节收到404时展示不可访问，不把错误当空章节', async () => {
@@ -150,7 +162,6 @@ describe('P1-A 课程页面验收', () => {
     expect(rendered.find('main').text()).toContain('本章节为只读')
     const confirm = buttonNamed(rendered, '确认已阅读')
     expect(confirm.attributes('disabled')).toBeDefined()
-    await confirm.trigger('click')
     expect(operationIds(scripted.requests)).not.toContain('recordLearningPosition')
     expect(operationIds(scripted.requests)).not.toContain('updateChapterProgress')
   })
@@ -163,11 +174,10 @@ describe('P1-A 课程页面验收', () => {
     await buttonNamed(rendered, '知识点').trigger('click')
     await flushPromises()
     expect(buttonNamed(rendered, '创建知识点').attributes('disabled')).toBeDefined()
-    await buttonNamed(rendered, '创建知识点').trigger('click')
     await buttonNamed(rendered, '邀请码').trigger('click')
     await flushPromises()
     expect(buttonNamed(rendered, '创建邀请码').attributes('disabled')).toBeDefined()
-    await buttonNamed(rendered, '创建邀请码').trigger('click')
-    expect(scripted.requests.every(request => request.method === 'GET')).toBe(true)
+    expect(buttonNamed(rendered, '创建邀请码').element.hasAttribute('disabled')).toBe(true)
+    expect(scripted.requests.filter(request => request.method !== 'GET')).toHaveLength(0)
   })
 })

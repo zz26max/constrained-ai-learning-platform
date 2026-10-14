@@ -16,9 +16,11 @@ type Body = Record<string, unknown>
 const uuid = (value: number) => '00000000-0000-4000-8000-' + String(value).padStart(12, '0')
 export const P1A_IDS = {
   term: MOCK_TERM.id, baseWeb: uuid(101), baseDatabase: uuid(102),
-  offeringWeb: uuid(201), offeringDatabase: uuid(202), offeringEmpty: uuid(203),
+  // These IDs exercise contract error branches without exposing unavailable courses in the list.
+  baseConflict: uuid(103), baseForbidden: uuid(104),
+  offeringWeb: uuid(201), offeringDatabase: uuid(202), offeringEmpty: uuid(203), offeringPendingArchive: uuid(204),
   offeringForeign: uuid(299), chapterWeb: uuid(301), chapterSecond: uuid(302),
-  chapterDraft: uuid(303), chapterDatabase: uuid(304),
+  chapterDraft: uuid(303), chapterDatabase: uuid(304), chapterArchived: uuid(305),
   resourceWeb: uuid(401), resourceSecond: uuid(402), resourceDatabase: uuid(403),
   knowledgeWeb: uuid(501), knowledgeDatabase: uuid(502),
   inviteDatabase: uuid(601), inviteEmpty: uuid(602),
@@ -101,7 +103,8 @@ export function resetMockCourseState(): void {
   const database: OfferingDTO = { ...fixtureOffering, id: P1A_IDS.offeringDatabase, courseId: P1A_IDS.baseDatabase, title: '数据库原理', mark: 'DB' }
   const empty: OfferingDTO = { ...fixtureOffering, id: P1A_IDS.offeringEmpty, title: '课程内容准备中', groupName: '计算机 2302 班' }
   const foreign: OfferingDTO = { ...fixtureOffering, id: P1A_IDS.offeringForeign, groupName: '其他教学班', teachers: [{ id: uuid(999), displayName: '其他演示教师' }] }
-  for (const dto of [fixtureOffering, database, empty, foreign]) {
+  const pendingArchive: OfferingDTO = { ...fixtureOffering, id: P1A_IDS.offeringPendingArchive, title: '待批阅归档示例', groupName: '计算机 2303 班' }
+  for (const dto of [fixtureOffering, database, empty, pendingArchive, foreign]) {
     offerings.set(dto.id, { dto: structuredClone(dto), createdAt: fixtureTime })
     members.set(dto.id, [{ userId: dto.teachers[0]?.id || TEACHER_ID, username: dto.id === foreign.id ? 'other.teacher' : 'teacher.demo', displayName: dto.teachers[0]?.displayName || '演示教师', role: 'teacher', joinedAt: fixtureTime }])
   }
@@ -116,6 +119,7 @@ export function resetMockCourseState(): void {
     { ...summary, id: P1A_IDS.chapterSecond, number: 2, title: 'CSS 基础与盒模型', summary: '选择器、尺寸与内外边距' },
     { ...summary, id: P1A_IDS.chapterDraft, number: 3, title: 'CSS 布局与响应式设计', summary: 'Flex 与媒体查询', publicationState: 'draft', resourceCount: 0 },
     { ...summary, id: P1A_IDS.chapterDatabase, offeringId: P1A_IDS.offeringDatabase, title: '关系模式与约束', summary: '理解主键、外键与约束' },
+    { ...summary, id: P1A_IDS.chapterArchived, number: 4, title: '归档章节', summary: '历史内容', publicationState: 'archived', resourceCount: 0 },
   ] satisfies TeacherChapterSummaryDTO[]) chapters.set(item.id, structuredClone(item))
   resources.set(fixtureResource.id, structuredClone(fixtureResource))
   resources.set(P1A_IDS.resourceSecond, { ...fixtureResource, id: P1A_IDS.resourceSecond, chapterId: P1A_IDS.chapterSecond, knowledgePointId: null, title: '盒模型阅读资料', content: '## CSS 盒模型\n\n比较内容、内边距与边框的宽度。' })
@@ -174,8 +178,8 @@ function positionWrite(value: unknown): value is LearningPositionWrite {
 }
 const requestId = (context: MockRequestContext) => context.headers['X-Request-ID'] || randomUUID()
 const ok = (context: MockRequestContext, data: unknown, status = 200): MockResult => ({ status, bodyJson: { data: structuredClone(data), requestId: requestId(context) } })
-const fail = (context: MockRequestContext, status: number, code: string, message: string): MockResult => ({ status, bodyJson: { error: { code, message, details: {} }, requestId: requestId(context) } })
-const invalid = (context: MockRequestContext, message = '输入不符合要求。'): MockResult => ({ status: 422, bodyJson: { error: { code: 'VALIDATION_ERROR', message, details: { fields: [{ field: 'body', message }] } }, requestId: requestId(context) } })
+const fail = (context: MockRequestContext, status: number, code: string, message: string, details: unknown = {}): MockResult => ({ status, bodyJson: { error: { code, message, details }, requestId: requestId(context) } })
+const invalid = (context: MockRequestContext, message = '输入不符合要求。', field = 'body'): MockResult => ({ status: 422, bodyJson: { error: { code: 'VALIDATION_ERROR', message, details: { fields: [{ field, message }] } }, requestId: requestId(context) } })
 const missing = (context: MockRequestContext) => fail(context, 404, 'NOT_FOUND', '对象不存在或不可访问。')
 const archived = (context: MockRequestContext) => fail(context, 409, 'OFFERING_ARCHIVED', '教学班已归档，当前只能查看历史内容。')
 const idFor = (context: MockRequestContext) => new URL(context.path, 'http://mock.local').pathname.split('/')[context.path.startsWith('/api/v1/teacher/') ? 5 : 4] || ''
@@ -260,8 +264,10 @@ function handleCourse(context: MockRequestContext): MockResult {
   }
   if (operation === 'createOffering') {
     if (!offeringWrite(body)) return invalid(context)
+    if (body.courseId === P1A_IDS.baseForbidden) return fail(context, 403, 'FORBIDDEN', '当前教师不能使用该基础课程。')
+    if (body.courseId === P1A_IDS.baseConflict) return fail(context, 409, 'OFFERING_ARCHIVED', '当前教学班状态不允许开班。')
     const base = baseCourses.find(item => item.id === body.courseId)
-    if (!base || body.termId !== MOCK_TERM.id) return invalid(context, '课程或学期不存在。')
+    if (!base || body.termId !== MOCK_TERM.id) return invalid(context, '课程或学期不存在。', body.termId !== MOCK_TERM.id ? 'termId' : 'courseId')
     const dto: OfferingDTO = { id: randomUUID(), courseId: body.courseId, title: body.title, mark: base.mark, groupName: body.groupName, termId: body.termId, termLabel: MOCK_TERM.label, status: 'active', progressUnit: body.progressUnit, teachers: [{ id: userId, displayName: account.displayName }] }
     const createdAt = now()
     offerings.set(dto.id, { dto, createdAt })
@@ -310,10 +316,11 @@ function handleCourse(context: MockRequestContext): MockResult {
     const chapter = chapters.get(id)
     if (!chapter) return missing(context)
     const offering = operation === 'getTeacherChapter' ? teacherOffering(chapter.offeringId, userId) : readableOffering(chapter.offeringId, userId)
-    if (!offering || (operation !== 'getTeacherChapter' && chapter.publicationState !== 'published')) return missing(context)
+    if (!offering || (operation === 'getChapter' && chapter.publicationState !== 'published')) return missing(context)
     if (operation === 'updateChapterProgress') {
       if (!isMember(offering.id, userId, 'student')) return missing(context)
       if (offering.status === 'archived') return archived(context)
+      if (chapter.publicationState === 'archived') return fail(context, 409, 'CHAPTER_ARCHIVED', '归档章节不能继续写入。')
       if (!progressWrite(body)) return invalid(context)
       const key = progressKey(userId, id), previous = chapterProgress.get(key)
       const studentProgress: ChapterProgress = previous?.status === 'completed' ? previous : { status: body.status, completedAt: body.status === 'completed' ? now() : null }
@@ -340,8 +347,13 @@ function handleCourse(context: MockRequestContext): MockResult {
   if (context.method !== 'GET' && offering.status === 'archived' && operation !== 'archiveOffering') return archived(context)
   if (['archiveOffering', 'publishChapter', 'revokeInvite'].includes(operation) && (!object(body) || Object.keys(body).length !== 0)) return invalid(context)
 
+  if (['patchResource', 'archiveResource'].includes(operation)) {
+    const resource = resources.get(id)
+    if (resource && chapters.get(resource.chapterId)?.publicationState === 'archived') return fail(context, 409, 'CHAPTER_ARCHIVED', '归档章节不能继续写入。')
+  }
   switch (operation) {
     case 'archiveOffering':
+      if (offering.id === P1A_IDS.offeringPendingArchive) return fail(context, 409, 'ARCHIVE_PENDING_REVIEWS', '当前教学班存在待批阅提交。')
       offering.status = 'archived'
       return ok(context, offering)
     case 'listMembers': {
@@ -353,7 +365,7 @@ function handleCourse(context: MockRequestContext): MockResult {
       return ok(context, { offeringId: offering.id, items: courseChapters(offering.id).map(chapterSummary) } satisfies components['schemas']['TeacherChapterListDTO'])
     case 'createChapter': {
       if (!chapterWrite(body)) return invalid(context)
-      if (courseChapters(offering.id).some(item => item.number === body.number)) return invalid(context, '章节编号已存在。')
+      if (courseChapters(offering.id).some(item => item.number === body.number)) return invalid(context, '章节编号已存在。', 'number')
       const chapter: TeacherChapterSummaryDTO = { id: randomUUID(), offeringId: offering.id, ...body, publicationState: 'draft', studentProgress: null, contentVersion: 1, resourceCount: 0, assignmentCount: 0 }
       chapters.set(chapter.id, chapter)
       return ok(context, chapter, 201)
@@ -361,6 +373,7 @@ function handleCourse(context: MockRequestContext): MockResult {
     case 'patchChapter': {
       const chapter = chapters.get(id)
       if (!chapter) return missing(context)
+      if (chapter.publicationState === 'archived') return fail(context, 409, 'CHAPTER_ARCHIVED', '归档章节不能继续写入。')
       if (!chapterPatch(body)) return invalid(context)
       if (chapter.publicationState === 'published' && ((body.number !== undefined && body.number !== chapter.number) || (body.isRequired !== undefined && body.isRequired !== chapter.isRequired))) return fail(context, 409, 'CHAPTER_ALREADY_PUBLISHED', '已发布章节不能改变编号或必修属性。')
       if (body.number !== undefined && courseChapters(offering.id).some(item => item.id !== id && item.number === body.number)) return invalid(context, '章节编号已存在。')
@@ -371,7 +384,8 @@ function handleCourse(context: MockRequestContext): MockResult {
     case 'publishChapter': {
       const chapter = chapters.get(id)
       if (!chapter) return missing(context)
-      if (chapter.publicationState === 'published') return fail(context, 409, 'CHAPTER_ALREADY_PUBLISHED', '章节已经发布。')
+      if (chapter.publicationState === 'archived') return fail(context, 409, 'CHAPTER_ARCHIVED', '归档章节不能继续写入。')
+      if (chapter.publicationState === 'published') return ok(context, chapterSummary(chapter))
       chapter.publicationState = 'published'
       return ok(context, chapterSummary(chapter))
     }
@@ -396,6 +410,7 @@ function handleCourse(context: MockRequestContext): MockResult {
     case 'createResource': {
       const chapter = chapters.get(id)
       if (!chapter) return missing(context)
+      if (chapter.publicationState === 'archived') return fail(context, 409, 'CHAPTER_ARCHIVED', '归档章节不能继续写入。')
       if (!resourceWrite(body)) return invalid(context)
       if (!validKnowledge(body.knowledgePointId, offering.id, id)) return invalid(context, '资料知识点必须属于同一教学班和章节。')
       const resource: ResourceDTO = { id: randomUUID(), offeringId: offering.id, chapterId: id, knowledgePointId: body.knowledgePointId ?? null, title: body.title, type: 'markdown', content: body.content, url: null, order: body.order, archived: false }

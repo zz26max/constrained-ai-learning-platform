@@ -24,7 +24,7 @@ const dialog = ref<HTMLDialogElement | null>(null)
 const showCreate = ref(false)
 const selectedCourse = ref<BaseCourseDTO | null>(null)
 const form = reactive<Pick<OfferingWrite, 'title' | 'groupName' | 'termId' | 'progressUnit'>>({ title: '', groupName: '', termId: '', progressUnit: 'chapter' })
-const { pending, error: actionError, message, run } = useCourseActions()
+const { pending, error: actionError, message, clearNotice, run } = useCourseActions()
 const { data, status, error, load } = usePageQuery<OfferingPage>(async signal => (await api.listTeacherOfferings({ page: page.value, pageSize: 20, ...(termId.value ? { termId: termId.value } : {}) }, { signal })).data)
 const bases = usePageQuery<BaseCoursePage>(async signal => (await api.listBaseCourses({ page: basePage.value, pageSize: 20 }, { signal })).data)
 const basesData = bases.data
@@ -35,12 +35,18 @@ const currentTerm = computed(() => terms.value.find(term => term.id === auth.con
 const canCreate = computed(() => auth.config !== null && terms.value.length > 0)
 const formValid = computed(() => selectedCourse.value !== null && form.title.trim().length > 0 && form.groupName.trim().length > 0 && terms.value.some(term => term.id === form.termId))
 
-watch([termId, page], () => void load(), { immediate: true })
+watch([termId, page], ([nextTerm, nextPage], [previousTerm]) => {
+  if (nextTerm !== previousTerm && nextPage !== 1) {
+    page.value = 1
+    return
+  }
+  void load()
+}, { immediate: true })
 watch(basePage, () => { if (showCreate.value) void bases.load() })
-watch(termId, () => { page.value = 1 })
 
 async function openCreate(): Promise<void> {
   if (!canCreate.value || pending.value) return
+  clearNotice()
   selectedCourse.value = null
   form.title = ''
   form.groupName = ''
@@ -94,7 +100,7 @@ onBeforeUnmount(() => { selectedCourse.value = null; dialog.value?.close() })
       <select id="teacher-term" v-model="termId"><option value="">{{ currentTerm ? `当前学期 · ${currentTerm}` : '当前学期（未设置）' }}</option><option v-for="term in terms" :key="term.id" :value="term.id">{{ term.label }}</option></select>
     </form>
     <ApiState :status="status" :error="error" @retry="load" />
-    <template v-if="status === 'success' && data">
+    <template v-if="data">
       <div v-if="!data.items.length" class="surface teacher-empty"><h2>该学期暂无授课教学班</h2><p>切换已有学期，或创建一个教学班开始准备课程内容。</p></div>
       <ul v-else class="surface teacher-offering-list">
         <li v-for="offering in data.items" :key="offering.id" class="teacher-offering-row">

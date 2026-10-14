@@ -77,6 +77,8 @@ router.beforeEach(async (to) => {
   // 首次进入任一页面先恢复会话；刷新浏览器可直接恢复登录态（P0-A 验收链）。
   if (auth.bootStatus === 'idle') {
     await auth.ensureBoot()
+  } else if (auth.bootStatus === 'error') {
+    await auth.retryBoot()
   }
   if (to.meta.requiresAuth === true && auth.phase !== 'authenticated') {
     const query = isInternalPath(to.fullPath) ? { return: to.fullPath } : {}

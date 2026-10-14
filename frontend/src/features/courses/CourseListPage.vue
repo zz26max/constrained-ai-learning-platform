@@ -18,7 +18,7 @@ const query = usePageQuery(async signal => (await api.listMyCourses({
 watch([termId, courseStatus], () => { page.value = 1 })
 watch([termId, courseStatus, page], () => { void query.load() }, { immediate: true })
 const actions = useCourseActions(), inviteCode = ref(''), joinDialog = ref<HTMLDialogElement | null>(null), joinTrigger = ref<HTMLButtonElement | null>(null)
-function openJoin() { inviteCode.value = ''; actions.error.value = null; joinDialog.value?.showModal() }
+function openJoin() { inviteCode.value = ''; actions.clearNotice(); joinDialog.value?.showModal() }
 function closeJoin() { joinDialog.value?.close(); inviteCode.value = ''; joinTrigger.value?.focus() }
 async function join() {
   if (!inviteCode.value.trim()) return

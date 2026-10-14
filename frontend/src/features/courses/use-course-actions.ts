@@ -16,6 +16,11 @@ export function useCourseActions() {
   }, { flush: 'sync' })
   onScopeDispose(() => { alive = false; generation += 1 })
 
+  function clearNotice(): void {
+    error.value = null
+    message.value = null
+  }
+
   async function run<T>(operation: (token: string) => Promise<ApiResult<T>>, successMessage = '操作已完成'): Promise<T | null> {
     if (pending.value) return null
     const current = ++generation, userId = auth.identity?.id
@@ -24,6 +29,7 @@ export function useCourseActions() {
       const token = await auth.ensureCsrfToken()
       const result = await operation(token)
       if (!alive || current !== generation || auth.identity?.id !== userId) return null
+      auth.markActionSucceeded()
       message.value = successMessage
       return result.data
     } catch (cause) {
@@ -35,5 +41,5 @@ export function useCourseActions() {
       if (alive && current === generation) pending.value = false
     }
   }
-  return { pending, error, message, run }
+  return { pending, error, message, clearNotice, run }
 }

@@ -15,7 +15,7 @@ const api = coursesApi()
 const dialog = ref<HTMLDialogElement | null>(null)
 const editing = ref<KnowledgePointDTO | null>(null)
 const form = reactive({ chapterId: '', title: '', description: '', order: 1 })
-const { pending, error: actionError, message, run } = useCourseActions()
+const { pending, error: actionError, message, clearNotice, run } = useCourseActions()
 const { data, status, error, load } = usePageQuery<KnowledgeData>(async signal => {
   const [points, chapters] = await Promise.all([api.listKnowledgePoints(props.offeringId, { signal }), api.listTeacherChapters(props.offeringId, { signal })])
   return { points: points.data, chapters: chapters.data }
@@ -31,6 +31,7 @@ function chapterLabel(id: string | null): string {
 }
 async function openEditor(point: KnowledgePointDTO | null = null): Promise<void> {
   if (!canWrite.value) return
+  clearNotice()
   editing.value = point
   form.chapterId = point?.chapterId ?? ''
   form.title = point?.title ?? ''
@@ -68,7 +69,7 @@ onBeforeUnmount(closeEditor)
     <ApiState :status="status" :error="error" @retry="load" />
     <p v-if="message" class="notice notice-info" role="status">{{ message }}</p>
     <ApiState v-if="actionError" status="error" :error="actionError" />
-    <template v-if="status === 'success' && data">
+    <template v-if="data">
       <div v-if="!data.points.items.length" class="surface teacher-empty"><h3>暂无知识点</h3><p>先创建班级或章节知识点，再把资料与知识点关联。</p></div>
       <ul v-else class="surface teacher-knowledge-list"><li v-for="point in data.points.items" :key="point.id"><span class="teacher-order">{{ point.order }}</span><div><h3>{{ point.title }}</h3><p>{{ point.description }}</p><small>{{ chapterLabel(point.chapterId) }}</small></div><button type="button" class="button secondary" :disabled="!canWrite" :aria-label="`编辑知识点：${point.title}`" @click="openEditor(point)">编辑</button></li></ul>
     </template>

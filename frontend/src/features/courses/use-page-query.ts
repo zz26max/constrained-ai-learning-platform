@@ -17,7 +17,7 @@ export function usePageQuery<T>(loader: (signal: AbortSignal) => Promise<T>) {
     const current = generation, userId = auth.identity?.id
     controller = new AbortController()
     const signal = controller.signal
-    data.value = null
+    // 保留上一次成功数据，刷新时由 status/loading 表示更新中，避免整块内容闪空。
     error.value = null
     status.value = 'loading'
     try {

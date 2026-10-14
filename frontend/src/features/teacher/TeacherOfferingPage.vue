@@ -17,7 +17,7 @@ const id = computed(() => typeof route.params.id === 'string' ? route.params.id 
 const tab = ref<'chapters' | 'knowledge' | 'members' | 'invites'>('chapters')
 const archiveDialog = ref<HTMLDialogElement | null>(null)
 const confirmArchive = ref(false)
-const { pending, error: actionError, message, run } = useCourseActions()
+const { pending, error: actionError, message, clearNotice, run } = useCourseActions()
 const { data, status, error, load } = usePageQuery<components['schemas']['OfferingDTO']>(async signal => (await api.getOffering(id.value, { signal })).data)
 const readOnly = computed(() => data.value?.status !== 'active' || pending.value || status.value !== 'success')
 
@@ -25,6 +25,7 @@ watch(id, () => { tab.value = 'chapters'; closeArchive(); void load() }, { immed
 
 async function openArchive(): Promise<void> {
   if (readOnly.value) return
+  clearNotice()
   confirmArchive.value = false
   await nextTick()
   archiveDialog.value?.showModal()
@@ -53,7 +54,7 @@ onBeforeUnmount(closeArchive)
     <p v-if="data?.status === 'archived'" class="notice notice-info" role="status">教学班已归档。章节、资料、知识点与邀请均为只读，历史成员和内容仍可查看。</p>
     <p v-if="message" class="notice notice-info" role="status">{{ message }}</p>
     <ApiState v-if="actionError" status="error" :error="actionError" />
-    <template v-if="status === 'success' && data">
+    <template v-if="data">
       <nav class="teacher-tabs" aria-label="教学班管理区域">
         <button type="button" :aria-current="tab === 'chapters' ? 'page' : undefined" @click="tab = 'chapters'">章节与资料</button>
         <button type="button" :aria-current="tab === 'knowledge' ? 'page' : undefined" @click="tab = 'knowledge'">知识点</button>
