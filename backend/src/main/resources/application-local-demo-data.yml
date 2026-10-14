@@ -1,0 +1,4 @@
+# 显式的一次性演示配置导入；不占用 HTTP 端口，也不会预建教学班。
+spring:
+  main:
+    web-application-type: none
