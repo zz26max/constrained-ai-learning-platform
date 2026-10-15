@@ -22,4 +22,11 @@ public final class AssignmentRows {
     public record SubmissionFile(String submissionId,String filePath,String content) {}
     public record SubmissionRequirementSnapshot(String submissionId,int requirementIndex,String requirementText) {}
     public record SubmissionRubricSnapshot(String submissionId,String criterionId,String title,String description,BigDecimal maxScore) {}
+    public record Feedback(String id,String submissionId,String assignmentId,String offeringId,String studentId,
+            String teacherId,String status,int baseVersion,String overallComment,BigDecimal finalScore,
+            Instant publishedAt,Instant createdAt,Instant updatedAt) {}
+    public record FeedbackRubricScore(String feedbackId,String criterionId,BigDecimal score,String comment) {}
+    public record Notification(String id,String recipientId,String type,String title,String content,
+            String relatedOfferingId,String relatedAssignmentId,String relatedFeedbackId,
+            boolean isRead,Instant readAt,Instant createdAt) {}
 }

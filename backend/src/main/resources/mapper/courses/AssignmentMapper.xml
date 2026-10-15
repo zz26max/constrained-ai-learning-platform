@@ -279,4 +279,108 @@ ORDER BY s.submitted_at DESC,s.id DESC LIMIT #{size} OFFSET #{offset}
 <select id="countAssignmentSubmissions" resultType="int">
 SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND is_current=1
 </select>
+
+<!-- P1-C 反馈查询与保存 -->
+<resultMap id="feedback" type="com.learningplatform.modules.courses.model.AssignmentRows$Feedback"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="submissionId" column="submission_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="teacherId" column="teacher_id" javaType="java.lang.String"/>
+<arg name="status" column="status" javaType="java.lang.String"/>
+<arg name="baseVersion" column="base_version" javaType="_int"/>
+<arg name="overallComment" column="overall_comment" javaType="java.lang.String"/>
+<arg name="finalScore" column="final_score" javaType="java.math.BigDecimal"/>
+<arg name="publishedAt" column="published_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="updatedAt" column="updated_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<resultMap id="feedbackRubricScore" type="com.learningplatform.modules.courses.model.AssignmentRows$FeedbackRubricScore"><constructor>
+<arg name="feedbackId" column="feedback_id" javaType="java.lang.String"/>
+<arg name="criterionId" column="criterion_id" javaType="java.lang.String"/>
+<arg name="score" column="score" javaType="java.math.BigDecimal"/>
+<arg name="comment" column="comment" javaType="java.lang.String"/>
+</constructor></resultMap>
+
+<resultMap id="notification" type="com.learningplatform.modules.courses.model.AssignmentRows$Notification"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="recipientId" column="recipient_id" javaType="java.lang.String"/>
+<arg name="type" column="type" javaType="java.lang.String"/>
+<arg name="title" column="title" javaType="java.lang.String"/>
+<arg name="content" column="content" javaType="java.lang.String"/>
+<arg name="relatedOfferingId" column="related_offering_id" javaType="java.lang.String"/>
+<arg name="relatedAssignmentId" column="related_assignment_id" javaType="java.lang.String"/>
+<arg name="relatedFeedbackId" column="related_feedback_id" javaType="java.lang.String"/>
+<arg name="isRead" column="is_read" javaType="boolean"/>
+<arg name="readAt" column="read_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<select id="findFeedback" resultMap="feedback">
+SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at
+FROM feedback WHERE id=#{id}
+</select>
+
+<select id="findFeedbackBySubmission" resultMap="feedback">
+SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at
+FROM feedback WHERE submission_id=#{submissionId}
+</select>
+
+<select id="getFeedbackRubricScores" resultMap="feedbackRubricScore">
+SELECT feedback_id,criterion_id,score,comment FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId}
+</select>
+
+<insert id="insertFeedback">
+INSERT INTO feedback (id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at)
+VALUES (#{id},#{submissionId},#{assignmentId},#{offeringId},#{studentId},#{teacherId},'draft',0,#{overallComment},#{finalScore},NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="updateFeedbackDraft">
+UPDATE feedback SET base_version=base_version+1,overall_comment=#{overallComment},final_score=#{finalScore},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft' AND base_version=#{baseVersion}
+</update>
+
+<update id="publishFeedback">
+UPDATE feedback SET status='published',published_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft'
+</update>
+
+<delete id="deleteFeedbackRubricScores">
+DELETE FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId}
+</delete>
+
+<insert id="insertFeedbackRubricScore">
+INSERT INTO feedback_rubric_scores (feedback_id,criterion_id,score,comment) VALUES (#{feedbackId},#{criterionId},#{score},#{comment})
+</insert>
+
+<!-- P1-C 通知查询与标记 -->
+<select id="findNotification" resultMap="notification">
+SELECT id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
+FROM notifications WHERE id=#{id}
+</select>
+
+<select id="listNotifications" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NotificationDTO">
+SELECT id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
+FROM notifications WHERE recipient_id=#{recipientId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countNotifications" resultType="int">
+SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId}
+</select>
+
+<select id="countUnreadNotifications" resultType="int">
+SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId} AND is_read=0
+</select>
+
+<insert id="insertNotification">
+INSERT INTO notifications (id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at)
+VALUES (#{id},#{recipientId},#{type},#{title},#{content},#{relatedOfferingId},#{relatedAssignmentId},#{relatedFeedbackId},0,NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="markNotificationRead">
+UPDATE notifications SET is_read=1,read_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id}
+</update>
 </mapper>

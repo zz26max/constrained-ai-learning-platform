@@ -352,6 +352,109 @@ public class AssignmentService {
         int total=mapper.countAssignmentSubmissions(assignment.id());
         return new SubmissionListResponse(items,page,pageSize,total);
     }
+    @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
+    public FeedbackDTO saveFeedbackDraft(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
+        Submission submission=submissionOr404(submissionId);
+        Assignment assignment=assignmentOr404(submission.assignmentId());
+        access.requireTeacher(user,submission.offeringId(),true);
+        if("archived".equals(assignment.status())) {
+            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
+        }
+        AssignmentInput.validateFeedbackWrite(body);
+        String overallComment=AssignmentInput.text(body,"overallComment",8000);
+        BigDecimal finalScore=AssignmentInput.optionalDecimal(body,"finalScore");
+        @SuppressWarnings("unchecked")
+        List<Map<String,Object>> rubricList=(List<Map<String,Object>>)body.get("rubricScores");
+        Instant now=now();
+        Feedback existing=mapper.findFeedbackBySubmission(submission.id());
+        if(existing==null) {
+            String feedbackId=UUID.randomUUID().toString();
+            mapper.insertFeedback(feedbackId,submission.id(),submission.assignmentId(),submission.offeringId(),
+                    submission.studentId(),user.id(),overallComment,finalScore,now);
+            if(rubricList!=null) {
+                for(Map<String,Object> r:rubricList) {
+                    mapper.insertFeedbackRubricScore(feedbackId,AssignmentInput.text(r,"criterionId",64),
+                            AssignmentInput.decimal(r,"score"),AssignmentInput.text(r,"comment",2000));
+                }
+            }
+            audit.record(user.id(),"FEEDBACK_CREATED","feedback",feedbackId,Map.of(),requestId);
+            return feedbackView(mapper.findFeedback(feedbackId));
+        } else {
+            if("published".equals(existing.status())) {
+                throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","已发布的反馈不可修改。");
+            }
+            int baseVersion=AssignmentInput.integer(body,"baseVersion");
+            if(baseVersion!=existing.baseVersion()) throw versionConflict();
+            int updated=mapper.updateFeedbackDraft(existing.id(),baseVersion,overallComment,finalScore,now);
+            if(updated==0) throw versionConflict();
+            mapper.deleteFeedbackRubricScores(existing.id());
+            if(rubricList!=null) {
+                for(Map<String,Object> r:rubricList) {
+                    mapper.insertFeedbackRubricScore(existing.id(),AssignmentInput.text(r,"criterionId",64),
+                            AssignmentInput.decimal(r,"score"),AssignmentInput.text(r,"comment",2000));
+                }
+            }
+            audit.record(user.id(),"FEEDBACK_UPDATED","feedback",existing.id(),Map.of(),requestId);
+            return feedbackView(mapper.findFeedback(existing.id()));
+        }
+    }
+    @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
+    public FeedbackDTO publishFeedback(UserDTO user,String feedbackId,String requestId) {
+        Feedback feedback=feedbackOr404(feedbackId);
+        Assignment assignment=assignmentOr404(feedback.assignmentId());
+        access.requireTeacher(user,feedback.offeringId(),true);
+        if("archived".equals(assignment.status())) {
+            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
+        }
+        if("published".equals(feedback.status())) {
+            throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","反馈已发布，不可重复发布。");
+        }
+        Instant now=now();
+        int updated=mapper.publishFeedback(feedback.id(),now);
+        if(updated==0) {
+            throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","反馈已发布，不可重复发布。");
+        }
+        String notificationId=UUID.randomUUID().toString();
+        String title="作业 "+assignment.title()+" 已获批阅";
+        String content="教师已对您的提交进行批阅，请查看反馈详情。";
+        mapper.insertNotification(notificationId,feedback.studentId(),"feedback_published",title,content,
+                feedback.offeringId(),feedback.assignmentId(),feedback.id(),now);
+        audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("notificationId",notificationId),requestId);
+        return feedbackView(mapper.findFeedback(feedback.id()));
+    }
+    public FeedbackDTO getFeedback(UserDTO user,String submissionId) {
+        Submission submission=submissionOr404(submissionId);
+        Feedback feedback=mapper.findFeedbackBySubmission(submission.id());
+        if(feedback==null) throw CourseAccess.notFound();
+        try {
+            access.requireTeacher(user,submission.offeringId(),false);
+            return feedbackView(feedback);
+        } catch(BusinessException e) {
+            access.requireStudent(user,submission.offeringId(),false);
+            if(!submission.studentId().equals(user.id())) throw CourseAccess.notFound();
+            if("draft".equals(feedback.status())) throw CourseAccess.notFound();
+            return feedbackView(feedback);
+        }
+    }
+    public NotificationListResponse listMyNotifications(UserDTO user,int page,int pageSize) {
+        CourseAccess.role(user,"student");
+        AssignmentInput.page(page,pageSize);
+        List<NotificationDTO> items=mapper.listNotifications(user.id(),offset(page,pageSize),pageSize);
+        int total=mapper.countNotifications(user.id());
+        int unread=mapper.countUnreadNotifications(user.id());
+        return new NotificationListResponse(items,page,pageSize,total,unread);
+    }
+    @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
+    public void markNotificationRead(UserDTO user,String notificationId,String requestId) {
+        CourseAccess.role(user,"student");
+        Notification notification=notificationOr404(notificationId);
+        if(!notification.recipientId().equals(user.id())) throw CourseAccess.notFound();
+        if(!notification.isRead()) {
+            Instant now=now();
+            mapper.markNotificationRead(notification.id(),now);
+            audit.record(user.id(),"NOTIFICATION_READ","notification",notification.id(),Map.of(),requestId);
+        }
+    }
     // 辅助方法
     private Assignment assignmentOr404(String id) {
         Assignment a=mapper.findAssignment(AssignmentInput.uuid(id));
@@ -362,6 +465,22 @@ public class AssignmentService {
         Submission s=mapper.findSubmission(AssignmentInput.uuid(id));
         if(s==null) throw CourseAccess.notFound();
         return s;
+    }
+    private Feedback feedbackOr404(String id) {
+        Feedback f=mapper.findFeedback(AssignmentInput.uuid(id));
+        if(f==null) throw CourseAccess.notFound();
+        return f;
+    }
+    private Notification notificationOr404(String id) {
+        Notification n=mapper.findNotification(AssignmentInput.uuid(id));
+        if(n==null) throw CourseAccess.notFound();
+        return n;
+    }
+    private FeedbackDTO feedbackView(Feedback f) {
+        List<FeedbackRubricScore> scores=mapper.getFeedbackRubricScores(f.id());
+        return new FeedbackDTO(f.id(),f.submissionId(),f.status(),f.baseVersion(),f.overallComment(),
+                f.finalScore(),scores.stream().map(s->new RubricScore(s.criterionId(),s.score(),s.comment())).toList(),
+                f.publishedAt(),f.updatedAt());
     }
     private boolean canSave(Assignment assignment,CourseAccess.Context context) {
         if(!"active".equals(context.offering().status())) return false;
@@ -483,4 +602,5 @@ public class AssignmentService {
     public record AssignmentListResponse(List<?> items,int page,int pageSize,int total,Map<String,Integer> summary) {}
     public record SubmissionListResponse(List<?> items,int page,int pageSize,int total) {}
     public record SubmissionCreatedResponse(SubmissionSummaryDTO submission,boolean created) {}
+    public record NotificationListResponse(List<NotificationDTO> items,int page,int pageSize,int total,int unreadCount) {}
 }

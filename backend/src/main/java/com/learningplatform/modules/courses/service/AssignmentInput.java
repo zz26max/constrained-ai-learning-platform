@@ -60,6 +60,11 @@ public final class AssignmentInput {
         }
         throw invalid();
     }
+    public static BigDecimal optionalDecimal(Map<String,Object> body,String name) {
+        Object value=body.get(name);
+        if(value==null) return null;
+        return decimal(body,name);
+    }
     public static List<String> stringList(Map<String,Object> body,String name) {
         Object value=body.get(name);
         if(!(value instanceof List<?> list)) throw invalid();
@@ -107,6 +112,14 @@ public final class AssignmentInput {
         int revision=integer(body,"workspaceRevision");
         if(revision<1) throw invalid();
         text(body,"reflection",8000);
+    }
+    public static void validateFeedbackWrite(Map<String,Object> body) {
+        requireKeys(body,"overallComment","finalScore","rubricScores");
+        text(body,"overallComment",8000);
+        if(body.get("finalScore")!=null) optionalDecimal(body,"finalScore");
+        Object rubricScores=body.get("rubricScores");
+        if(rubricScores!=null&&!(rubricScores instanceof List<?>)) throw invalid();
+        if(body.containsKey("baseVersion")) integer(body,"baseVersion");
     }
     public static void validateAssignmentWrite(Map<String,Object> body) {
         requireKeys(body,"chapterId","title","description","estimatedMinutes","type","isRequired",

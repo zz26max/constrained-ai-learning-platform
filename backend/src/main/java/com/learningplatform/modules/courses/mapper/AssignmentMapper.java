@@ -85,6 +85,30 @@ public interface AssignmentMapper {
             @Param("offset") long offset,@Param("size") int size);
     int countAssignmentSubmissions(String assignmentId);
 
+    // P1-C 反馈查询与保存
+    Feedback findFeedback(String id);
+    Feedback findFeedbackBySubmission(String submissionId);
+    List<FeedbackRubricScore> getFeedbackRubricScores(String feedbackId);
+    int insertFeedback(@Param("id") String id,@Param("submissionId") String submissionId,@Param("assignmentId") String assignmentId,
+            @Param("offeringId") String offeringId,@Param("studentId") String studentId,@Param("teacherId") String teacherId,
+            @Param("overallComment") String overallComment,@Param("finalScore") BigDecimal finalScore,@Param("now") Instant now);
+    int updateFeedbackDraft(@Param("id") String id,@Param("baseVersion") int baseVersion,@Param("overallComment") String overallComment,
+            @Param("finalScore") BigDecimal finalScore,@Param("now") Instant now);
+    int publishFeedback(@Param("id") String id,@Param("now") Instant now);
+    int deleteFeedbackRubricScores(String feedbackId);
+    int insertFeedbackRubricScore(@Param("feedbackId") String feedbackId,@Param("criterionId") String criterionId,
+            @Param("score") BigDecimal score,@Param("comment") String comment);
+
+    // P1-C 通知查询与标记
+    Notification findNotification(String id);
+    List<NotificationDTO> listNotifications(@Param("recipientId") String recipientId,@Param("offset") long offset,@Param("size") int size);
+    int countNotifications(@Param("recipientId") String recipientId);
+    int countUnreadNotifications(String recipientId);
+    int insertNotification(@Param("id") String id,@Param("recipientId") String recipientId,@Param("type") String type,
+            @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
+            @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,@Param("now") Instant now);
+    int markNotificationRead(@Param("id") String id,@Param("now") Instant now);
+
     // 辅助记录
     record AssignmentCounts(int allCount,int todoCount,int doneCount,int archivedIncompleteCount) {}
 }

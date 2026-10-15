@@ -34,4 +34,9 @@ public final class AssignmentDTOs {
             boolean allowResubmit,int maxAttempts,BigDecimal maxScore,List<RubricCriterion> rubric,List<FileDTO> initialFiles,
             Integer aiPolicyVersion,String id,String offeringId,String publicationState,Instant publishedAt,
             int submittedStudentCount,int pendingReviewCount) {}
+    public record RubricScore(String criterionId,BigDecimal score,String comment) {}
+    public record FeedbackDTO(String id,String submissionId,String status,int baseVersion,String overallComment,
+            BigDecimal finalScore,List<RubricScore> rubricScores,Instant publishedAt,Instant updatedAt) {}
+    public record NotificationDTO(String id,String type,String title,String content,String relatedOfferingId,
+            String relatedAssignmentId,String relatedFeedbackId,boolean isRead,Instant readAt,Instant createdAt) {}
 }
