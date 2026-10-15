@@ -565,7 +565,7 @@ paths:
     put:
       operationId: markMessagesAsRead
       summary: markMessagesAsRead
-      description: 权限：本班学生，需 CSRF。请求约定：`{messageIds}`。结果约定：200 `{markedCount}`。业务规则以 DEVELOPMENT.md 为准。
+      description: 权限：本班学生，需 CSRF。请求约定：空对象 `{}`，可选查询参数 `type` 用于过滤消息类型。结果约定：200 `{markedAt}`。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - student
       x-phase: P1
@@ -579,6 +579,11 @@ paths:
         in: path
         required: true
         schema: {$ref: '#/components/schemas/UUID'}
+      - name: type
+        in: query
+        required: false
+        schema: {type: string}
+        description: 可选消息类型过滤器
       - name: X-Request-ID
         in: header
         required: false
@@ -606,7 +611,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: {type: object}
+            schema:
+              type: object
+              additionalProperties: false
+              properties: {}
   /api/v1/me/assignments:
     get:
       operationId: listMyAssignments
