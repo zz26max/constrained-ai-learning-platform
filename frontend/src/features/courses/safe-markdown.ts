@@ -113,7 +113,7 @@ function renderTokens(tokens: readonly Token[]): VNodeChild[] {
         return h('div', { class: 'markdown-table-scroll', tabindex: 0, role: 'region', 'aria-label': '资料表格，可横向滚动' }, [
           h('table', [
             h('thead', [h('tr', token.header.map(renderCell))]),
-            h('tbody', token.rows.map(row => h('tr', row.map(renderCell)))),
+            h('tbody', token.rows.map((row: Tokens.TableCell[]) => h('tr', row.map(renderCell)))),
           ]),
         ])
     }

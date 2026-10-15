@@ -4,9 +4,12 @@
 
 ## 1. 当前真实状态
 
-契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-14，**P0-A 已完成并通过浏览器验收**：契约 83 个操作中，5 个认证操作（getCsrfToken、login、logout、getMe、getConfig）为 verified，2 个健康检查为 implemented，其余 76 个为 planned。已有账户初始化、数据库会话、认证 HTTP 链、原子登录限流、审计和 Flyway V1～V4；frontend/ 包含登录、会话联调页、身份恢复、退出、同源代理与 mock。website-prototype/ 仅保留静态原型。
+契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-15，**P0-A 与 P1-A 已完成**：
 
-P1 教学业务与 P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
+- **P0-A**（master `b3c4f0e`）：5 个认证操作为 verified，2 个健康检查为 implemented。已有账户初始化、数据库会话、认证 HTTP 链、原子登录限流、审计和 Flyway V1～V4；前端包含登录、会话联调页、身份恢复、退出、同源代理与 mock。
+- **P1-A**（master `4d62379`）：27 个课程操作为 implemented（11 个教学班 + 16 个内容），Flyway V5 建表。教师开班→发布章节→邀请码→学生加入→阅读完成→跨班被拒的验收链路已实现；前端包含教师工作台与学生课程页，mock 与测试覆盖写路径。
+
+契约 83 个操作中，32 个已实现（5 认证 + 2 健康 + 25 课程，getOffering 为 11 个教学班操作之一但归在教学班组），其余 51 个为 planned。P1-B/C/D 与 P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
 
 <a id="handoff"></a>
 

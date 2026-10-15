@@ -1,6 +1,7 @@
 import type { Transport, TransportRequest, TransportResponse } from '../api/transport'
 import { authHandlers, resetMockAuthState } from './auth'
 import { courseHandlers, resetMockCourseState } from './courses'
+import { assignmentHandlers, resetMockAssignmentState } from './assignments'
 import { applySetCookies, currentCookies, resetMockCookies } from './jar'
 import { MockNotImplementedError, toTransportResponse, type MockHandler } from './types'
 
@@ -11,6 +12,7 @@ void MOCK_LAYER_MARKER
 const handlers: Record<string, MockHandler> = {
   ...authHandlers,
   ...courseHandlers,
+  ...assignmentHandlers,
 }
 
 function findHandler(operationId: string): MockHandler | undefined {
@@ -50,4 +52,4 @@ export const mockTransport: Transport = {
   },
 }
 
-export { resetMockAuthState, resetMockCookies, resetMockCourseState }
+export { resetMockAuthState, resetMockCookies, resetMockCourseState, resetMockAssignmentState }

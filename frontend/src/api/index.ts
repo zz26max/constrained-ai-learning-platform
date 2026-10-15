@@ -1,11 +1,13 @@
 import { AuthApi } from './auth'
 import { CoursesApi } from './courses'
+import { AssignmentsApi } from './assignments'
 import { ApiClient } from './client'
 import { realTransport } from './real-transport'
 import type { ApiMode } from '../app/api-mode'
 
 let registered: AuthApi | null = null
 let registeredCourses: CoursesApi | null = null
+let registeredAssignments: AssignmentsApi | null = null
 
 export function registerCoursesApi(api: CoursesApi): void {
   registeredCourses = api
@@ -26,8 +28,29 @@ export async function createDefaultCoursesApi(): Promise<CoursesApi> {
   return new CoursesApi(new ApiClient(realTransport))
 }
 
+export function registerAssignmentsApi(api: AssignmentsApi): void {
+  registeredAssignments = api
+}
+
+export function assignmentsApi(): AssignmentsApi {
+  if (registeredAssignments === null) {
+    throw new Error('AssignmentsApi 尚未注册：请先在应用启动时调用 registerAssignmentsApi()。')
+  }
+  return registeredAssignments
+}
+
+export async function createDefaultAssignmentsApi(): Promise<AssignmentsApi> {
+  if (import.meta.env.VITE_API_MODE === 'mock') {
+    const { mockTransport } = await import('../mocks/index')
+    return new AssignmentsApi(new ApiClient(mockTransport))
+  }
+  return new AssignmentsApi(new ApiClient(realTransport))
+}
+
 export { CoursesApi } from './courses'
+export { AssignmentsApi } from './assignments'
 export type * from './courses'
+export type * from './assignments'
 
 /** 应用启动时注册默认 AuthApi（main.ts）；测试中可注册脚本化实例。 */
 export function registerAuthApi(api: AuthApi): void {

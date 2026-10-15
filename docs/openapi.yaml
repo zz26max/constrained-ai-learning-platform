@@ -538,7 +538,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 学生
       x-csrf-required: false
@@ -587,7 +587,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生或授课教师
       x-csrf-required: false
@@ -619,7 +619,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -651,7 +651,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
@@ -699,7 +699,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
@@ -747,7 +747,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -788,7 +788,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 提交本人或该班授课教师
       x-csrf-required: false
@@ -1971,7 +1971,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2015,7 +2015,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2063,7 +2063,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2095,7 +2095,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2142,7 +2142,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2190,7 +2190,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2238,7 +2238,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false

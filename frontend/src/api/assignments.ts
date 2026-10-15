@@ -1,0 +1,127 @@
+import type { components, operations, paths } from './generated/schema'
+import type { ApiClient, ApiResult, OperationSpec, RequestOptions } from './client'
+
+type Schemas = components['schemas']
+
+export type AssignmentSummaryDTO = Schemas['AssignmentSummaryDTO']
+export type AssignmentDetailDTO = Schemas['AssignmentDetailDTO']
+export type WorkspaceDTO = Schemas['WorkspaceDTO']
+export type TeacherAssignmentDTO = Schemas['TeacherAssignmentDTO']
+export type AssignmentWriteDTO = Schemas['AssignmentWriteDTO']
+export type AssignmentPatch = Schemas['AssignmentPatch']
+export type WorkspaceWrite = Schemas['WorkspaceWrite']
+export type SubmissionWrite = Schemas['SubmissionWrite']
+export type SubmissionSummaryDTO = Schemas['SubmissionSummaryDTO']
+
+export type MyAssignmentsQuery = NonNullable<operations['listMyAssignments']['parameters']['query']>
+export type TeacherAssignmentsQuery = NonNullable<operations['listTeacherAssignments']['parameters']['query']>
+export type AssignmentRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToken'>
+
+export type AssignmentOperationId = keyof Pick<operations,
+  | 'listMyAssignments'
+  | 'getAssignment'
+  | 'getWorkspace'
+  | 'saveWorkspace'
+  | 'submitAssignment'
+  | 'listMySubmissions'
+  | 'listTeacherAssignments'
+  | 'createAssignment'
+  | 'getTeacherAssignment'
+  | 'patchAssignment'
+  | 'publishAssignment'
+  | 'archiveAssignment'
+>
+
+type AssignmentPayloads = { [K in AssignmentOperationId]: Schemas[`Response_${K}`]['data'] }
+type AssignmentSpecs = { [K in AssignmentOperationId]: OperationSpec & { id: K; path: keyof paths } }
+
+export const ASSIGNMENT_SPECS = {
+  listMyAssignments: { id: 'listMyAssignments', method: 'GET', path: '/api/v1/me/assignments', csrf: false },
+  getAssignment: { id: 'getAssignment', method: 'GET', path: '/api/v1/assignments/{assignmentId}', csrf: false },
+  getWorkspace: { id: 'getWorkspace', method: 'GET', path: '/api/v1/assignments/{assignmentId}/workspace', csrf: false },
+  saveWorkspace: { id: 'saveWorkspace', method: 'PUT', path: '/api/v1/assignments/{assignmentId}/workspace', csrf: true },
+  submitAssignment: { id: 'submitAssignment', method: 'POST', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: true },
+  listMySubmissions: { id: 'listMySubmissions', method: 'GET', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: false },
+  listTeacherAssignments: { id: 'listTeacherAssignments', method: 'GET', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: false },
+  createAssignment: { id: 'createAssignment', method: 'POST', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: true },
+  getTeacherAssignment: { id: 'getTeacherAssignment', method: 'GET', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: false },
+  patchAssignment: { id: 'patchAssignment', method: 'PATCH', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: true },
+  publishAssignment: { id: 'publishAssignment', method: 'POST', path: '/api/v1/teacher/assignments/{assignmentId}/publish', csrf: true },
+  archiveAssignment: { id: 'archiveAssignment', method: 'POST', path: '/api/v1/teacher/assignments/{assignmentId}/archive', csrf: true },
+} satisfies AssignmentSpecs
+
+function queryStrings(query: object): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) result[key] = String(value)
+  }
+  return result
+}
+
+export class AssignmentsApi {
+  constructor(private readonly client: ApiClient) {}
+
+  private request<K extends AssignmentOperationId>(
+    operationId: K,
+    options: AssignmentRequestOptions,
+    id?: string,
+    body?: unknown,
+    query?: object
+  ): Promise<ApiResult<AssignmentPayloads[K]>> {
+    const spec = ASSIGNMENT_SPECS[operationId]
+    const path = id === undefined ? spec.path : spec.path.replace(/\{[^}]+\}/, encodeURIComponent(id))
+    return this.client.request<AssignmentPayloads[K]>({ ...spec, path }, {
+      ...options,
+      ...(body === undefined ? {} : { body }),
+      ...(query === undefined ? {} : { query: queryStrings(query) }),
+    })
+  }
+
+  listMyAssignments(query: MyAssignmentsQuery = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listMyAssignments']>> {
+    return this.request('listMyAssignments', options, undefined, undefined, query)
+  }
+
+  getAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getAssignment']>> {
+    return this.request('getAssignment', options, id)
+  }
+
+  getWorkspace(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getWorkspace']>> {
+    return this.request('getWorkspace', options, id)
+  }
+
+  saveWorkspace(id: string, body: WorkspaceWrite, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['saveWorkspace']>> {
+    return this.request('saveWorkspace', options, id, body)
+  }
+
+  submitAssignment(id: string, body: SubmissionWrite, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['submitAssignment']>> {
+    return this.request('submitAssignment', options, id, body)
+  }
+
+  listMySubmissions(id: string, query: { page?: number; pageSize?: number } = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listMySubmissions']>> {
+    return this.request('listMySubmissions', options, id, undefined, query)
+  }
+
+  listTeacherAssignments(offeringId: string, query: TeacherAssignmentsQuery = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listTeacherAssignments']>> {
+    return this.request('listTeacherAssignments', options, offeringId, undefined, query)
+  }
+
+  createAssignment(offeringId: string, body: AssignmentWriteDTO, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['createAssignment']>> {
+    return this.request('createAssignment', options, offeringId, body)
+  }
+
+  getTeacherAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getTeacherAssignment']>> {
+    return this.request('getTeacherAssignment', options, id)
+  }
+
+  patchAssignment(id: string, body: AssignmentPatch, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['patchAssignment']>> {
+    return this.request('patchAssignment', options, id, body)
+  }
+
+  publishAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['publishAssignment']>> {
+    return this.request('publishAssignment', options, id, {})
+  }
+
+  archiveAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['archiveAssignment']>> {
+    return this.request('archiveAssignment', options, id, {})
+  }
+}
