@@ -1153,7 +1153,6 @@ paths:
       - student
       x-phase: P1
       x-implementation-status: implemented
-      x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班成员
       x-csrf-required: false
@@ -2497,7 +2496,6 @@ paths:
       - teacher
       x-phase: P1
       x-implementation-status: implemented
-      x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2531,8 +2529,6 @@ paths:
       - teacher
       x-phase: P1
       x-implementation-status: implemented
-      x-phase: P1/P2
-      x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2612,7 +2608,6 @@ paths:
       - teacher
       x-phase: P1
       x-implementation-status: implemented
-      x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
