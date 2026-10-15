@@ -611,10 +611,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties: {}
+            schema: {$ref: '#/components/schemas/Empty'}
   /api/v1/me/assignments:
     get:
       operationId: listMyAssignments
