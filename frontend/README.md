@@ -1,6 +1,6 @@
 # 学习平台前端（frontend）
 
-P0-A 首批交付：Vue 3 + TypeScript strict 工程、`#/login` 登录页、身份恢复与退出、按 operationId 组织的 mock 层。正式业务页面随 P1 工作包迁移；当前已认证后仅显示 P0-A 会话联调页。
+Vue 3 + TypeScript strict 工程。已交付登录页与身份恢复退出、课程与章节阅读、作业列表与工作区编辑器、提交与评价、通知中心，以及按 operationId 组织的 mock 层。P1-D 多班聚合的后端接口已就绪，仪表盘、公告列表与教师统计页面尚在开发。
 
 ## 工具链（首次开工锁定，见 docs/FRONTEND.md 第 1 节）
 
