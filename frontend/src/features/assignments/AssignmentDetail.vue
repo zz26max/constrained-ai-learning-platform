@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
+import StudentFeedbackView from './StudentFeedbackView.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { assignmentStateLabel, formatDueTime, isUuid } from './format'
 

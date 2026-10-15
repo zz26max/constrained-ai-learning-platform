@@ -4,20 +4,22 @@
 
 ## 1. 当前真实状态
 
-契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-15，**P0-A 与 P1-A 已完成**：
+契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-15，**P0-A、P1-A、P1-B、P1-C 已完成**：
 
 - **P0-A**（master `b3c4f0e`）：5 个认证操作为 verified，2 个健康检查为 implemented。已有账户初始化、数据库会话、认证 HTTP 链、原子登录限流、审计和 Flyway V1～V4；前端包含登录、会话联调页、身份恢复、退出、同源代理与 mock。
 - **P1-A**（master `4d62379`）：27 个课程操作为 implemented（11 个教学班 + 16 个内容），Flyway V5 建表。教师开班→发布章节→邀请码→学生加入→阅读完成→跨班被拒的验收链路已实现；前端包含教师工作台与学生课程页，mock 与测试覆盖写路径。
+- **P1-B**（master `8c4cb52`）：12 个作业与工作区操作为 implemented，Flyway V6 建表。包含作业列表、工作区读写、提交管理；前端包含作业列表、工作区编辑器与提交界面。
+- **P1-C**（master `68eb7d3`）：7 个提交评价与通知操作为 implemented，Flyway V7 建表。包含教师评价草稿-发布流程、学生查看评价、通知中心；前端包含教师评价编辑器与学生通知中心。
 
-契约 83 个操作中，32 个已实现（5 认证 + 2 健康 + 25 课程，getOffering 为 11 个教学班操作之一但归在教学班组），其余 51 个为 planned。P1-B/C/D 与 P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
+契约 83 个操作中，48 个已实现（5 认证 + 2 健康 + 25 课程 + 12 作业 + 4 评价），其余 35 个为 planned。P1-D 与 P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
 
 <a id="handoff"></a>
 
-## 2. 交接说明（2026-10-14）
+## 2. 交接说明（2026-10-15）
 
 - **接手方式**：先读本节，再按任务阅读本端手册及契约切片。前端只实现 frontend/，后端只实现 backend/。
-- **代码基点**：master `b3c4f0e`。P0-A 认证收尾已合并：后端 [#4](https://github.com/zz26max/constrained-ai-learning-platform/pull/4)（`3f43c1c`、`1496396`），前端 [#5](https://github.com/zz26max/constrained-ai-learning-platform/pull/5)（`bdbbb45`）。
-- **下一包**：按 [DEVELOPMENT 第 11 节](DEVELOPMENT.md#11-开发顺序与工作包) 进入 P1-A（教学班、邀请与内容）。不重新创建已有工程或重复实现认证接口。
+- **代码基点**：master `68eb7d3`。P1-B/C 作业与评价模块已完成。
+- **下一包**：按 [DEVELOPMENT 第 11 节](DEVELOPMENT.md#11-开发顺序与工作包) 进入 P1-D（多班聚合）或 P2-A（受限式 AI）。不重新创建已有工程或重复实现认证、课程、作业接口。
 
 2026-10-13 定向检查发现的 5 个认证问题均已修复，各有先失败后通过的回归测试：
 
