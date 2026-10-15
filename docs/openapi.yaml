@@ -191,7 +191,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 学生
       x-csrf-required: false
@@ -1110,7 +1110,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班成员
       x-csrf-required: false
@@ -1152,6 +1152,7 @@ paths:
       tags:
       - student
       x-phase: P1
+      x-implementation-status: implemented
       x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班成员
@@ -2495,6 +2496,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
+      x-implementation-status: implemented
       x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班授课教师
@@ -2527,6 +2529,8 @@ paths:
         `commonIssues:[]`。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - teacher
+      x-phase: P1
+      x-implementation-status: implemented
       x-phase: P1/P2
       x-implementation-status: planned
       x-contract-status: reviewed
@@ -2560,9 +2564,9 @@ paths:
         DEVELOPMENT.md 为准。
       tags:
       - teacher
-      x-phase: P2
-      x-implementation-status: planned
-      x-contract-status: draft
+      x-phase: P1
+      x-implementation-status: implemented
+      x-contract-status: reviewed
       x-permission: 本班授课教师，目标是本班学生
       x-csrf-required: false
       x-idempotency: none
@@ -2607,6 +2611,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
+      x-implementation-status: implemented
       x-implementation-status: planned
       x-contract-status: reviewed
       x-permission: 本班授课教师
