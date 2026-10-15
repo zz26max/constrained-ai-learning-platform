@@ -15,7 +15,7 @@ const currentPage = ref(1)
 const pageSize = 20
 
 const query = usePageQuery(async signal => {
-  const result = await api.getNotifications(
+  const result = await api.listMessages(
     { page: currentPage.value, pageSize },
     { signal }
   )
@@ -29,32 +29,32 @@ watch(() => auth.identity?.id, () => {
 }, { immediate: true })
 
 const notifications = computed(() => query.data.value?.items ?? [])
-const unreadCount = computed(() => query.data.value?.unreadCount ?? 0)
+const unreadCount = computed(() => query.data.value?.summary?.unreadCount ?? 0)
 const totalPages = computed(() => {
   const total = query.data.value?.total ?? 0
   return Math.ceil(total / pageSize)
 })
 
 async function handleNotificationClick(notification: NotificationDTO) {
-  if (!notification.isRead) {
+  if (!notification.readAt) {
     try {
       const token = await auth.ensureCsrfToken()
-      await api.markNotificationRead(notification.id, { csrfToken: token })
+      await api.readMessage(notification.id, { csrfToken: token })
       await query.load()
     } catch (error) {
       console.error('Failed to mark notification as read', error)
     }
   }
 
-  if (notification.relatedAssignmentId) {
+  if (notification.target?.type === 'assignment') {
     await router.push({
       name: 'student-assignment',
-      params: { id: notification.relatedAssignmentId }
+      params: { id: notification.target.id }
     })
-  } else if (notification.relatedOfferingId) {
+  } else if (notification.target?.type === 'offering') {
     await router.push({
       name: 'course',
-      params: { offeringId: notification.relatedOfferingId }
+      params: { offeringId: notification.target.id }
     })
   }
 }
@@ -111,7 +111,7 @@ function goToPage(page: number) {
           v-for="notification in notifications"
           :key="notification.id"
           class="notification-item"
-          :class="{ unread: !notification.isRead }"
+          :class="{ unread: !notification.readAt }"
           @click="handleNotificationClick(notification)"
         >
           <div class="notification-header">

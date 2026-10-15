@@ -399,8 +399,11 @@ public class AssignmentService {
         }
     }
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
-    public FeedbackDTO publishFeedback(UserDTO user,String feedbackId,String requestId) {
-        Feedback feedback=feedbackOr404(feedbackId);
+    public FeedbackDTO publishFeedback(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
+        int baseVersion=AssignmentInput.integer(body,"baseVersion");
+        Submission submission=submissionOr404(submissionId);
+        Feedback feedback=mapper.findFeedbackBySubmission(submission.id());
+        if(feedback==null) throw CourseAccess.notFound();
         Assignment assignment=assignmentOr404(feedback.assignmentId());
         access.requireTeacher(user,feedback.offeringId(),true);
         if("archived".equals(assignment.status())) {
@@ -408,6 +411,9 @@ public class AssignmentService {
         }
         if("published".equals(feedback.status())) {
             throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","反馈已发布，不可重复发布。");
+        }
+        if(feedback.baseVersion()!=baseVersion) {
+            throw new BusinessException(HttpStatus.CONFLICT,"VERSION_CONFLICT","反馈版本冲突，请刷新后重试。");
         }
         Instant now=now();
         int updated=mapper.publishFeedback(feedback.id(),now);
@@ -417,15 +423,14 @@ public class AssignmentService {
         String notificationId=UUID.randomUUID().toString();
         String title="作业 "+assignment.title()+" 已获批阅";
         String content="教师已对您的提交进行批阅，请查看反馈详情。";
-        mapper.insertNotification(notificationId,feedback.studentId(),"feedback_published",title,content,
+        mapper.insertNotification(notificationId,feedback.studentId(),"feedback",title,content,
                 feedback.offeringId(),feedback.assignmentId(),feedback.id(),now);
         audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("notificationId",notificationId),requestId);
         return feedbackView(mapper.findFeedback(feedback.id()));
     }
-    public FeedbackDTO getFeedback(UserDTO user,String submissionId) {
-        Submission submission=submissionOr404(submissionId);
-        Feedback feedback=mapper.findFeedbackBySubmission(submission.id());
-        if(feedback==null) throw CourseAccess.notFound();
+    public FeedbackDTO getFeedback(UserDTO user,String feedbackId) {
+        Feedback feedback=feedbackOr404(feedbackId);
+        Submission submission=submissionOr404(feedback.submissionId());
         try {
             access.requireTeacher(user,submission.offeringId(),false);
             return feedbackView(feedback);
@@ -449,7 +454,7 @@ public class AssignmentService {
         CourseAccess.role(user,"student");
         Notification notification=notificationOr404(notificationId);
         if(!notification.recipientId().equals(user.id())) throw CourseAccess.notFound();
-        if(!notification.isRead()) {
+        if(!notification.read()) {
             Instant now=now();
             mapper.markNotificationRead(notification.id(),now);
             audit.record(user.id(),"NOTIFICATION_READ","notification",notification.id(),Map.of(),requestId);

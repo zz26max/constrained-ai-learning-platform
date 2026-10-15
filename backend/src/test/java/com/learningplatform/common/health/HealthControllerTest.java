@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.json.JsonCompareMode;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
  * 真正的 MySQL、Flyway 与连接失效另由 DatabaseIntegrationIT 验证。</p>
  */
 @WebMvcTest(HealthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class HealthControllerTest {
 
     @Autowired

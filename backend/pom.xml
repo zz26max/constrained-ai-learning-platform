@@ -81,6 +81,11 @@
         <!-- 测试依赖只在测试阶段使用，包括 JUnit Jupiter、MockMvc 和 JSON 断言。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
@@ -99,6 +104,16 @@
 
     <build>
         <plugins>
+            <!-- 编译时保留构造函数参数名，MyBatis 才能根据名称映射到 Java Record 构造器。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
             <!-- 将普通 jar 打包为可用 java -jar 独立启动的 Spring Boot 应用。 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { assignmentsApi } from '../../api'
-import type { FeedbackWrite, RubricScore } from '../../api/assignments'
+import type { FeedbackWrite, RubricResult } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
@@ -27,18 +27,19 @@ const query = usePageQuery(async signal => {
   const id = submissionId.value
   if (!id) throw new Error('提交ID无效')
   const [submissionResult, feedbackResult] = await Promise.all([
-    api.listMySubmissions(id, {}, { signal }),
-    api.getFeedback(id, { signal }).catch(() => null)
+    api.getSubmission(id, { signal }),
+    api.getFeedbackDraft(id, { signal }).catch(() => ({ data: { feedback: null, baseVersion: 0 } }))
   ])
   return {
-    submission: submissionResult.data.items[0] ?? null,
-    feedback: feedbackResult?.data ?? null
+    submission: submissionResult.data,
+    feedback: feedbackResult.data.feedback,
+    feedbackBaseVersion: feedbackResult.data.baseVersion
   }
 })
 
-const overallComment = ref('')
-const finalScore = ref<number>(0)
-const rubricScores = ref<RubricScore[]>([])
+const comment = ref('')
+const score = ref<number>(0)
+const rubricResults = ref<RubricResult[]>([])
 const baseVersion = ref(0)
 const publishing = ref(false)
 const showPublishDialog = ref(false)
@@ -46,20 +47,22 @@ const conflictError = ref<string | null>(null)
 
 watch(() => route.fullPath, async () => {
   await query.load()
-  if (query.data.value?.feedback) {
-    const feedback = query.data.value.feedback
-    overallComment.value = feedback.overallComment
-    finalScore.value = Number(feedback.finalScore)
-    rubricScores.value = feedback.rubricScores.map(s => ({
+  const feedback = query.data.value?.feedback
+  if (feedback) {
+    comment.value = feedback.comment
+    score.value = Number(feedback.score)
+    rubricResults.value = feedback.rubricResults.map((s: { criterionId: string; score: number; comment: string }) => ({
       criterionId: s.criterionId,
       score: s.score,
       comment: s.comment
     }))
-    baseVersion.value = feedback.baseVersion
+    baseVersion.value = feedback.version
+  } else if (query.data.value?.feedbackBaseVersion !== undefined) {
+    baseVersion.value = query.data.value.feedbackBaseVersion
   }
 }, { immediate: true })
 
-const maxScore = computed(() => query.data.value?.submission?.maxScore ?? 100)
+const maxScore = computed(() => query.data.value?.submission?.assignmentSnapshot?.maxScore ?? 100)
 
 const canSave = computed(() => {
   return !actions.pending.value && !publishing.value
@@ -71,15 +74,16 @@ async function saveDraft() {
 
   const feedbackWrite: FeedbackWrite = {
     baseVersion: baseVersion.value,
-    overallComment: overallComment.value,
-    finalScore: String(finalScore.value),
-    rubricScores: rubricScores.value
+    comment: comment.value,
+    score: score.value,
+    rubricResults: rubricResults.value,
+    knowledgeEvaluations: []
   }
 
   try {
     const token = await auth.ensureCsrfToken()
     const result = await api.saveFeedback(submissionId.value, feedbackWrite, { csrfToken: token })
-    baseVersion.value = result.data.baseVersion
+    baseVersion.value = result.data.version
     actions.message.value = '反馈草稿已保存'
   } catch (error) {
     if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
@@ -104,14 +108,14 @@ async function confirmPublish() {
     await saveDraft()
     if (conflictError.value) return
 
-    const feedbackId = query.data.value?.feedback?.id
-    if (!feedbackId) {
-      actions.error.value = { kind: 'unavailable', message: '无法发布：反馈ID不存在' }
+    const submissionIdValue = submissionId.value
+    if (!submissionIdValue) {
+      actions.error.value = { kind: 'failure', message: '无法发布：提交ID不存在', requestId: null }
       return
     }
 
     const token = await auth.ensureCsrfToken()
-    await api.publishFeedback(feedbackId, { csrfToken: token })
+    await api.publishFeedback(submissionIdValue, { baseVersion: baseVersion.value }, { csrfToken: token })
     actions.message.value = '反馈已发布，学生将收到通知'
     setTimeout(() => router.back(), 2000)
   } finally {
@@ -119,12 +123,12 @@ async function confirmPublish() {
   }
 }
 
-function updateRubricScore(criterionId: string, score: number, comment: string) {
-  const index = rubricScores.value.findIndex(s => s.criterionId === criterionId)
+function updateRubricScore(criterionId: string, scoreValue: number, commentText: string) {
+  const index = rubricResults.value.findIndex((s: { criterionId: string }) => s.criterionId === criterionId)
   if (index >= 0) {
-    rubricScores.value[index] = { criterionId, score: String(score), comment }
+    rubricResults.value[index] = { criterionId, score: scoreValue, comment: commentText }
   } else {
-    rubricScores.value.push({ criterionId, score: String(score), comment })
+    rubricResults.value.push({ criterionId, score: scoreValue, comment: commentText })
   }
 }
 </script>
@@ -157,20 +161,20 @@ function updateRubricScore(criterionId: string, score: number, comment: string) 
         <h2>批阅反馈</h2>
 
         <div class="form-group">
-          <label for="overall-comment">总体评论</label>
+          <label for="comment">总体评论</label>
           <textarea
-            id="overall-comment"
-            v-model="overallComment"
+            id="comment"
+            v-model="comment"
             rows="6"
             @blur="saveDraft"
           />
         </div>
 
         <div class="form-group">
-          <label for="final-score">总分 (满分 {{ maxScore }})</label>
+          <label for="score">总分 (满分 {{ maxScore }})</label>
           <input
-            id="final-score"
-            v-model.number="finalScore"
+            id="score"
+            v-model.number="score"
             type="number"
             :max="maxScore"
             min="0"
@@ -180,7 +184,7 @@ function updateRubricScore(criterionId: string, score: number, comment: string) 
 
         <h3>量表评分</h3>
         <div
-          v-for="criterion in query.data.value.submission?.rubric ?? []"
+          v-for="criterion in query.data.value.submission?.assignmentSnapshot?.rubric ?? []"
           :key="criterion.criterionId"
           class="rubric-item"
         >
@@ -190,11 +194,11 @@ function updateRubricScore(criterionId: string, score: number, comment: string) 
           <div class="form-group">
             <label>得分</label>
             <input
-              :value="rubricScores.find(s => s.criterionId === criterion.criterionId)?.score ?? 0"
+              :value="rubricResults.find(s => s.criterionId === criterion.criterionId)?.score ?? 0"
               type="number"
               :max="criterion.maxScore"
               min="0"
-              @change="e => updateRubricScore(criterion.criterionId, Number((e.target as HTMLInputElement).value), rubricScores.find(s => s.criterionId === criterion.criterionId)?.comment ?? '')"
+              @change="e => updateRubricScore(criterion.criterionId, Number((e.target as HTMLInputElement).value), rubricResults.find(s => s.criterionId === criterion.criterionId)?.comment ?? '')"
               @blur="saveDraft"
             />
           </div>
@@ -202,9 +206,9 @@ function updateRubricScore(criterionId: string, score: number, comment: string) 
           <div class="form-group">
             <label>评语</label>
             <textarea
-              :value="rubricScores.find(s => s.criterionId === criterion.criterionId)?.comment ?? ''"
+              :value="rubricResults.find(s => s.criterionId === criterion.criterionId)?.comment ?? ''"
               rows="3"
-              @input="e => updateRubricScore(criterion.criterionId, Number(rubricScores.find(s => s.criterionId === criterion.criterionId)?.score ?? 0), (e.target as HTMLTextAreaElement).value)"
+              @input="e => updateRubricScore(criterion.criterionId, Number(rubricResults.find(s => s.criterionId === criterion.criterionId)?.score ?? 0), (e.target as HTMLTextAreaElement).value)"
               @blur="saveDraft"
             />
           </div>

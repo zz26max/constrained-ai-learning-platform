@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FeedbackDTO } from '../../api/assignments'
+import type { StudentFeedbackDTO } from '../../api/assignments'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
 
 interface Props {
-  feedback: FeedbackDTO | null
+  feedback: StudentFeedbackDTO | null
   rubric: Array<{ criterionId: string; title: string; description: string; maxScore: number }>
 }
 
@@ -13,7 +13,7 @@ const props = defineProps<Props>()
 const isPublished = computed(() => props.feedback?.status === 'published')
 
 const getRubricScore = (criterionId: string) => {
-  return props.feedback?.rubricScores.find(s => s.criterionId === criterionId)
+  return props.feedback?.rubricResults.find((s: { criterionId: string }) => s.criterionId === criterionId)
 }
 
 const formatDate = (date: string | null | undefined) => {
@@ -32,16 +32,16 @@ const formatDate = (date: string | null | undefined) => {
     <div class="feedback-summary">
       <div class="score-display">
         <span class="label">总分</span>
-        <span class="score">{{ feedback?.finalScore }} 分</span>
+        <span class="score">{{ feedback?.score }} 分</span>
       </div>
       <div class="publish-time">
         <span class="muted">发布时间: {{ formatDate(feedback?.publishedAt) }}</span>
       </div>
     </div>
 
-    <div v-if="feedback?.overallComment" class="overall-comment">
+    <div v-if="feedback?.comment" class="overall-comment">
       <h4>总体评论</h4>
-      <SafeMarkdown :content="feedback.overallComment" />
+      <SafeMarkdown :content="feedback.comment" />
     </div>
 
     <div v-if="rubric.length > 0" class="rubric-scores">

@@ -64,8 +64,9 @@ CREATE TABLE notifications (
     CONSTRAINT ck_notifications_read_at CHECK ((is_read=0 AND read_at IS NULL) OR (is_read=1 AND read_at IS NOT NULL))
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-COMMENT ON TABLE feedback IS '教师对提交的批阅反馈：draft 可编辑、published 不可变';
-COMMENT ON COLUMN feedback.status IS '状态：draft-草稿可编辑, published-已发布不可变';
-COMMENT ON COLUMN feedback.base_version IS '乐观锁版本号，draft 更新时递增';
-COMMENT ON TABLE notifications IS '学生通知：反馈发布、作业发布等事件';
-COMMENT ON COLUMN notifications.type IS '通知类型：feedback_published, assignment_published, offering_archived';
+-- MySQL 使用 ALTER TABLE 添加表和列注释
+ALTER TABLE feedback COMMENT '教师对提交的批阅反馈：draft 可编辑、published 不可变';
+ALTER TABLE feedback MODIFY COLUMN status VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'draft' COMMENT '状态：draft-草稿可编辑, published-已发布不可变';
+ALTER TABLE feedback MODIFY COLUMN base_version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号，draft 更新时递增';
+ALTER TABLE notifications COMMENT '学生通知：反馈发布、作业发布等事件';
+ALTER TABLE notifications MODIFY COLUMN type VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '通知类型：feedback_published, assignment_published, offering_archived';

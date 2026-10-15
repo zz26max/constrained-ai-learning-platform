@@ -28,5 +28,7 @@ public final class AssignmentRows {
     public record FeedbackRubricScore(String feedbackId,String criterionId,BigDecimal score,String comment) {}
     public record Notification(String id,String recipientId,String type,String title,String content,
             String relatedOfferingId,String relatedAssignmentId,String relatedFeedbackId,
-            boolean isRead,Instant readAt,Instant createdAt) {}
+            boolean read,Instant readAt,Instant createdAt) {}
+    public record NoticeRow(String id,String offeringId,String authorId,String targetStudentId,
+            String title,String content,Instant createdAt) {}
 }

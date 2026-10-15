@@ -112,4 +112,5 @@ ORDER BY CASE WHEN c.id=#{lastChapterId} THEN 0 WHEN p.status IS NULL OR p.statu
 <update id="touchProgress">UPDATE chapter_progress SET last_opened_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} WHERE member_id=#{memberId} AND chapter_id=#{chapterId}</update>
 <update id="updateLearningPosition">UPDATE offering_members SET last_chapter_id=#{chapterId},last_studied_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} WHERE offering_id=#{offeringId} AND user_id=#{userId} AND role='student' AND status='active'</update>
 <select id="resourceCountForKnowledgePoint" resultType="int">SELECT COUNT(*) FROM resources WHERE knowledge_point_id=#{knowledgePointId}</select>
+<select id="findStudentIdsByOffering" resultType="java.lang.String">SELECT user_id FROM offering_members WHERE offering_id=#{offeringId} AND role='student' AND status='active'</select>
 </mapper>

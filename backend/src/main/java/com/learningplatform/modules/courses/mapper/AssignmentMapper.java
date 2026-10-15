@@ -5,6 +5,7 @@ import java.util.List;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.*;
 import com.learningplatform.modules.courses.model.AssignmentRows;
 import com.learningplatform.modules.courses.model.AssignmentRows.*;
+import com.learningplatform.modules.courses.model.CourseRows.Chapter;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 /** P1-B 作业与工作区持久化；所有值使用 MyBatis 绑定参数。 */
@@ -108,6 +109,43 @@ public interface AssignmentMapper {
             @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
             @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,@Param("now") Instant now);
     int markNotificationRead(@Param("id") String id,@Param("now") Instant now);
+
+    // P1-D 首页仪表盘
+    int countStudentOfferings(@Param("userId") String userId,@Param("termId") String termId);
+    int countPendingAssignments(@Param("userId") String userId,@Param("termId") String termId);
+    int countUnreadMessages(@Param("userId") String userId);
+    AssignmentSummaryDTO findCurrentAssignment(@Param("userId") String userId,@Param("termId") String termId);
+    Chapter findCurrentLearningChapter(@Param("userId") String userId,@Param("termId") String termId);
+    List<AssignmentSummaryDTO> listOtherPendingAssignments(@Param("userId") String userId,@Param("termId") String termId,
+            @Param("excludeId") String excludeId,@Param("limit") int limit);
+    StudentFeedbackDTO findRecentFeedback(@Param("userId") String userId);
+    List<CourseSummaryDTO> listDashboardCourses(@Param("userId") String userId,@Param("termId") String termId,@Param("limit") int limit);
+    NotificationDTO findRecentNotice(@Param("userId") String userId);
+
+    // P1-D 学习记录
+    LearningRecordSummary getLearningRecordSummary(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
+    List<StudentFeedbackDTO> listStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
+            @Param("offset") int offset,@Param("limit") int limit);
+    int countStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
+
+    // P1-D 批量标记消息已读
+    int markMessagesRead(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId,
+            @Param("type") String type,@Param("readAt") Instant readAt);
+
+    // P1-D 公告系统
+    int insertNotice(@Param("notice") NoticeRow notice);
+    NoticeDTO findNoticeById(@Param("id") String id);
+    List<NoticeDTO> listNotices(@Param("offeringId") String offeringId,@Param("offset") int offset,@Param("limit") int limit);
+    int countNotices(@Param("offeringId") String offeringId);
+    int insertNotification(@Param("id") String id,@Param("recipientId") String recipientId,@Param("type") String type,
+            @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
+            @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,
+            @Param("noticeId") String noticeId,@Param("isRead") boolean isRead,@Param("readAt") java.time.Instant readAt,
+            @Param("createdAt") java.time.Instant createdAt);
+
+    // P1-D 教师统计
+    OfferingStatsDTO getOfferingStats(@Param("offeringId") String offeringId);
+    AssignmentStatsDTO getAssignmentStats(@Param("assignmentId") String assignmentId);
 
     // 辅助记录
     record AssignmentCounts(int allCount,int todoCount,int doneCount,int archivedIncompleteCount) {}

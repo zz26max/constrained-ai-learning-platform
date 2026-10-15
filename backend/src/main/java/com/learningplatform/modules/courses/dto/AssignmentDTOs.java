@@ -39,4 +39,27 @@ public final class AssignmentDTOs {
             BigDecimal finalScore,List<RubricScore> rubricScores,Instant publishedAt,Instant updatedAt) {}
     public record NotificationDTO(String id,String type,String title,String content,String relatedOfferingId,
             String relatedAssignmentId,String relatedFeedbackId,boolean isRead,Instant readAt,Instant createdAt) {}
+    public record PaginationInfo(int page,int pageSize,int totalItems,int totalPages) {}
+    public record DashboardDTO(String termId,String termLabel,Instant serverTime,int courseCount,
+            int pendingAssignmentCount,int unreadMessageCount,Object currentLearning,
+            List<AssignmentSummaryDTO> otherPendingAssignments,StudentFeedbackDTO recentFeedback,
+            List<CourseSummaryDTO> courses,NotificationDTO recentNotice) {}
+    public record CourseSummaryDTO(String offeringId,String courseName,String offeringLabel,
+            int completedCount,int totalCount,String progressUnit,int percent) {}
+    public record CurrentAssignment(String type,String assignmentId,String title,Instant dueAt,String status) {}
+    public record CurrentLearningChapter(String type,String offeringId,String chapterId,String chapterTitle) {}
+    public record LearningRecordsDTO(String offeringId,LearningRecordSummary summary,
+            List<StudentFeedbackDTO> recentFeedback,PaginationInfo feedbackPage,
+            Object knowledgeEvidence,Object nextRecommendation) {}
+    public record LearningRecordSummary(int completedChapterCount,int totalChapterCount,
+            int completedLabCount,int totalLabCount,int feedbackCount) {}
+    public record StudentFeedbackDTO(String feedbackId,String assignmentId,String assignmentTitle,
+            String overallComment,BigDecimal finalScore,Instant publishedAt) {}
+    public record OfferingStatsDTO(int studentCount,int activeAssignmentCount,
+            int pendingReviewCount,int pendingHelpCount) {}
+    public record AssignmentStatsDTO(int submittedStudentCount,int pendingReviewCount,BigDecimal avgScore) {}
+    public record NoticeDTO(String id,String offeringId,String authorId,String authorName,
+            String targetStudentId,String targetStudentName,String title,String content,Instant createdAt) {}
+    public record NoticeWrite(String targetStudentId,String title,String content) {}
+    public record PagedResult<T>(List<T> items,int page,int pageSize,int total,int totalPages,Object metadata) {}
 }

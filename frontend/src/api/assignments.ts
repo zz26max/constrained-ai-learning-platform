@@ -12,6 +12,12 @@ export type AssignmentPatch = Schemas['AssignmentPatch']
 export type WorkspaceWrite = Schemas['WorkspaceWrite']
 export type SubmissionWrite = Schemas['SubmissionWrite']
 export type SubmissionSummaryDTO = Schemas['SubmissionSummaryDTO']
+export type SubmissionDetailDTO = Schemas['SubmissionDetailDTO']
+export type TeacherFeedbackDTO = Schemas['TeacherFeedbackDTO']
+export type StudentFeedbackDTO = Schemas['StudentFeedbackDTO']
+export type RubricResult = Schemas['RubricResult']
+export type FeedbackWrite = Schemas['FeedbackWrite']
+export type NotificationDTO = Schemas['NotificationDTO']
 
 export type MyAssignmentsQuery = NonNullable<operations['listMyAssignments']['parameters']['query']>
 export type TeacherAssignmentsQuery = NonNullable<operations['listTeacherAssignments']['parameters']['query']>
@@ -24,12 +30,19 @@ export type AssignmentOperationId = keyof Pick<operations,
   | 'saveWorkspace'
   | 'submitAssignment'
   | 'listMySubmissions'
+  | 'getSubmission'
   | 'listTeacherAssignments'
   | 'createAssignment'
   | 'getTeacherAssignment'
   | 'patchAssignment'
   | 'publishAssignment'
   | 'archiveAssignment'
+  | 'getFeedbackDraft'
+  | 'saveFeedback'
+  | 'publishFeedback'
+  | 'getFeedback'
+  | 'listMessages'
+  | 'readMessage'
 >
 
 type AssignmentPayloads = { [K in AssignmentOperationId]: Schemas[`Response_${K}`]['data'] }
@@ -42,12 +55,19 @@ export const ASSIGNMENT_SPECS = {
   saveWorkspace: { id: 'saveWorkspace', method: 'PUT', path: '/api/v1/assignments/{assignmentId}/workspace', csrf: true },
   submitAssignment: { id: 'submitAssignment', method: 'POST', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: true },
   listMySubmissions: { id: 'listMySubmissions', method: 'GET', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: false },
+  getSubmission: { id: 'getSubmission', method: 'GET', path: '/api/v1/submissions/{submissionId}', csrf: false },
   listTeacherAssignments: { id: 'listTeacherAssignments', method: 'GET', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: false },
   createAssignment: { id: 'createAssignment', method: 'POST', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: true },
   getTeacherAssignment: { id: 'getTeacherAssignment', method: 'GET', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: false },
   patchAssignment: { id: 'patchAssignment', method: 'PATCH', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: true },
   publishAssignment: { id: 'publishAssignment', method: 'POST', path: '/api/v1/teacher/assignments/{assignmentId}/publish', csrf: true },
   archiveAssignment: { id: 'archiveAssignment', method: 'POST', path: '/api/v1/teacher/assignments/{assignmentId}/archive', csrf: true },
+  getFeedbackDraft: { id: 'getFeedbackDraft', method: 'GET', path: '/api/v1/teacher/submissions/{submissionId}/feedback', csrf: false },
+  saveFeedback: { id: 'saveFeedback', method: 'POST', path: '/api/v1/teacher/submissions/{submissionId}/feedback', csrf: true },
+  publishFeedback: { id: 'publishFeedback', method: 'POST', path: '/api/v1/teacher/submissions/{submissionId}/feedback/publish', csrf: true },
+  getFeedback: { id: 'getFeedback', method: 'GET', path: '/api/v1/me/feedback/{feedbackId}', csrf: false },
+  listMessages: { id: 'listMessages', method: 'GET', path: '/api/v1/me/messages', csrf: false },
+  readMessage: { id: 'readMessage', method: 'PUT', path: '/api/v1/me/messages/{messageId}/read', csrf: true },
 } satisfies AssignmentSpecs
 
 function queryStrings(query: object): Record<string, string> {
@@ -101,6 +121,10 @@ export class AssignmentsApi {
     return this.request('listMySubmissions', options, id, undefined, query)
   }
 
+  getSubmission(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getSubmission']>> {
+    return this.request('getSubmission', options, id)
+  }
+
   listTeacherAssignments(offeringId: string, query: TeacherAssignmentsQuery = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listTeacherAssignments']>> {
     return this.request('listTeacherAssignments', options, offeringId, undefined, query)
   }
@@ -123,5 +147,29 @@ export class AssignmentsApi {
 
   archiveAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['archiveAssignment']>> {
     return this.request('archiveAssignment', options, id, {})
+  }
+
+  getFeedbackDraft(submissionId: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getFeedbackDraft']>> {
+    return this.request('getFeedbackDraft', options, submissionId)
+  }
+
+  saveFeedback(submissionId: string, body: FeedbackWrite, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['saveFeedback']>> {
+    return this.request('saveFeedback', options, submissionId, body)
+  }
+
+  publishFeedback(submissionId: string, body: { baseVersion: number }, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['publishFeedback']>> {
+    return this.request('publishFeedback', options, submissionId, body)
+  }
+
+  getFeedback(feedbackId: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getFeedback']>> {
+    return this.request('getFeedback', options, feedbackId)
+  }
+
+  listMessages(query: { page?: number; pageSize?: number } = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listMessages']>> {
+    return this.request('listMessages', options, undefined, undefined, query)
+  }
+
+  readMessage(messageId: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['readMessage']>> {
+    return this.request('readMessage', options, messageId, {})
   }
 }
