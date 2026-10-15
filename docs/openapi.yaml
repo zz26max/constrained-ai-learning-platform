@@ -191,7 +191,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 学生
       x-csrf-required: false
@@ -529,6 +529,84 @@ paths:
         content:
           application/json:
             schema: {$ref: '#/components/schemas/LearningPositionWrite'}
+  /api/v1/me/offerings/{offeringId}/learning-records:
+    get:
+      operationId: getMyLearningRecords
+      summary: getMyLearningRecords
+      description: 权限：本班学生。请求约定：无。结果约定：200 `LearningRecordsDTO`；返回当前学生在该班级的学习记录与统计。业务规则以 DEVELOPMENT.md 为准。
+      tags:
+      - student
+      x-phase: P1
+      x-implementation-status: implemented
+      x-contract-status: reviewed
+      x-permission: 本班学生
+      x-csrf-required: false
+      x-idempotency: none
+      parameters:
+      - name: offeringId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+      - name: X-Request-ID
+        in: header
+        required: false
+        schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
+      responses:
+        '200': {$ref: '#/components/responses/getCsrfToken_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/getMe_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+  /api/v1/me/offerings/{offeringId}/messages/mark-read:
+    put:
+      operationId: markMessagesAsRead
+      summary: markMessagesAsRead
+      description: 权限：本班学生，需 CSRF。请求约定：`{messageIds}`。结果约定：200 `{markedCount}`。业务规则以 DEVELOPMENT.md 为准。
+      tags:
+      - student
+      x-phase: P1
+      x-implementation-status: implemented
+      x-contract-status: reviewed
+      x-permission: 本班学生，需 CSRF
+      x-csrf-required: true
+      x-idempotency: none
+      parameters:
+      - name: offeringId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+      - name: X-Request-ID
+        in: header
+        required: false
+        schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: {type: string, maxLength: 512, minLength: 1}
+      - name: Origin
+        in: header
+        required: true
+        schema: {type: string, format: uri}
+      responses:
+        '200': {$ref: '#/components/responses/getCsrfToken_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/logout_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '415': {$ref: '#/components/responses/login_415'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object}
   /api/v1/me/assignments:
     get:
       operationId: listMyAssignments
@@ -538,7 +616,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 学生
       x-csrf-required: false
@@ -587,7 +665,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生或授课教师
       x-csrf-required: false
@@ -619,7 +697,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -651,7 +729,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
@@ -699,7 +777,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
@@ -747,7 +825,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -788,7 +866,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 提交本人或该班授课教师
       x-csrf-required: false
@@ -862,7 +940,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 评价归属学生本人
       x-csrf-required: false
@@ -895,7 +973,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 学生或教师本人
       x-csrf-required: false
@@ -944,7 +1022,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 收件人本人，需 CSRF
       x-csrf-required: true
@@ -1032,7 +1110,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班成员
       x-csrf-required: false
@@ -1074,7 +1152,7 @@ paths:
       tags:
       - student
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班成员
       x-csrf-required: false
@@ -1971,7 +2049,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2015,7 +2093,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2063,7 +2141,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2095,7 +2173,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2142,7 +2220,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2190,7 +2268,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2238,7 +2316,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2320,7 +2398,7 @@ paths:
       tags:
       - teacher
       x-phase: P1/P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2369,7 +2447,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2417,7 +2495,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2449,8 +2527,8 @@ paths:
         `commonIssues:[]`。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - teacher
-      x-phase: P1/P2
-      x-implementation-status: planned
+      x-phase: P1
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2482,9 +2560,9 @@ paths:
         DEVELOPMENT.md 为准。
       tags:
       - teacher
-      x-phase: P2
-      x-implementation-status: planned
-      x-contract-status: draft
+      x-phase: P1
+      x-implementation-status: implemented
+      x-contract-status: reviewed
       x-permission: 本班授课教师，目标是本班学生
       x-csrf-required: false
       x-idempotency: none
@@ -2529,7 +2607,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true

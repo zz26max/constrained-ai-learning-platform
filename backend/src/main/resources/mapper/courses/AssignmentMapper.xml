@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.modules.courses.mapper.AssignmentMapper">
+<resultMap id="assignment" type="com.learningplatform.modules.courses.model.AssignmentRows$Assignment"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="chapterId" column="chapter_id" javaType="java.lang.String"/>
+<arg name="title" column="title" javaType="java.lang.String"/>
+<arg name="description" column="description" javaType="java.lang.String"/>
+<arg name="estimatedMinutes" column="estimated_minutes" javaType="_int"/>
+<arg name="type" column="type" javaType="java.lang.String"/>
+<arg name="status" column="status" javaType="java.lang.String"/>
+<arg name="isRequired" column="is_required" javaType="_boolean"/>
+<arg name="dueAt" column="due_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="lateUntil" column="late_until" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="allowResubmit" column="allow_resubmit" javaType="_boolean"/>
+<arg name="maxAttempts" column="max_attempts" javaType="_int"/>
+<arg name="maxScore" column="max_score" javaType="java.math.BigDecimal"/>
+<arg name="contentVersion" column="content_version" javaType="_int"/>
+<arg name="currentAiPolicyId" column="current_ai_policy_id" javaType="java.lang.String"/>
+<arg name="publishedAt" column="published_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="createdBy" column="created_by" javaType="java.lang.String"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="updatedAt" column="updated_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+<resultMap id="workspace" type="com.learningplatform.modules.courses.model.AssignmentRows$Workspace"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="revision" column="revision" javaType="_int"/>
+<arg name="activeFile" column="active_file" javaType="java.lang.String"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="updatedAt" column="updated_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+<resultMap id="submission" type="com.learningplatform.modules.courses.model.AssignmentRows$Submission"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="workspaceId" column="workspace_id" javaType="java.lang.String"/>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="attemptNo" column="attempt_no" javaType="_int"/>
+<arg name="workspaceRevision" column="workspace_revision" javaType="_int"/>
+<arg name="reflection" column="reflection" javaType="java.lang.String"/>
+<arg name="contentVersion" column="content_version" javaType="_int"/>
+<arg name="assignmentTitleSnapshot" column="assignment_title_snapshot" javaType="java.lang.String"/>
+<arg name="maxScoreSnapshot" column="max_score_snapshot" javaType="java.math.BigDecimal"/>
+<arg name="aiPolicyId" column="ai_policy_id" javaType="java.lang.String"/>
+<arg name="dueAtSnapshot" column="due_at_snapshot" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="submittedAt" column="submitted_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="isLate" column="is_late" javaType="_boolean"/>
+<arg name="isCurrent" column="is_current" javaType="_boolean"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<!-- 作业查询 -->
+<select id="findAssignment" resultMap="assignment">
+SELECT id,offering_id,chapter_id,title,description,estimated_minutes,type,status,is_required,due_at,late_until,allow_resubmit,max_attempts,max_score,content_version,current_ai_policy_id,published_at,created_by,created_at,updated_at FROM assignments WHERE id=#{id}
+</select>
+
+<select id="listStudentAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,a.status AS publication_state,a.description,a.due_at,
+CASE WHEN s.id IS NULL THEN 'NOT_STARTED' WHEN s.id IS NOT NULL THEN 'IN_PROGRESS' END AS assignment_state,
+CASE WHEN a.due_at &lt; #{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} THEN 1 ELSE 0 END AS overdue,
+s.id AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
+FROM assignments a
+JOIN course_offerings o ON o.id=a.offering_id
+JOIN offering_members m ON m.offering_id=a.offering_id
+LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
+WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>
+<if test='filter == "todo"'>AND s.id IS NULL</if>
+<if test='filter == "done"'>AND s.id IS NOT NULL</if>
+ORDER BY a.due_at,a.id LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countStudentAssignments" resultType="int">
+SELECT COUNT(*) FROM assignments a
+JOIN course_offerings o ON o.id=a.offering_id
+JOIN offering_members m ON m.offering_id=a.offering_id
+LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
+WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>
+<if test='filter == "todo"'>AND s.id IS NULL</if>
+<if test='filter == "done"'>AND s.id IS NOT NULL</if>
+</select>
+
+<select id="getAssignmentCounts" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$AssignmentCounts">
+SELECT
+(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>) AS all_count,
+(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived') AND s.id IS NULL
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>) AS todo_count,
+(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived') AND s.id IS NOT NULL
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>) AS done_count,
+(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status='archived' AND s.id IS NULL
+<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>) AS archived_incomplete_count
+</select>
+
+<select id="getRequirements" resultType="com.learningplatform.modules.courses.model.AssignmentRows$AssignmentRequirement">
+SELECT assignment_id,requirement_index,requirement_text FROM assignment_requirements WHERE assignment_id=#{assignmentId} ORDER BY requirement_index
+</select>
+
+<select id="getRubric" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$RubricCriterion">
+SELECT criterion_id,title,description,max_score FROM assignment_rubric_criteria WHERE assignment_id=#{assignmentId} ORDER BY criterion_id
+</select>
+
+<select id="getKnowledgePointIds" resultType="string">
+SELECT knowledge_point_id FROM assignment_knowledge_points WHERE assignment_id=#{assignmentId} ORDER BY knowledge_point_id
+</select>
+
+<select id="countSubmissions" resultType="int">
+SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
+</select>
+
+<!-- 工作区查询与保存 -->
+<select id="findWorkspace" resultMap="workspace">
+SELECT id,offering_id,assignment_id,student_id,revision,active_file,created_at,updated_at FROM workspaces WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
+</select>
+
+<select id="getWorkspaceFiles" resultType="com.learningplatform.modules.courses.model.AssignmentRows$WorkspaceFile">
+SELECT workspace_id,file_path,content FROM workspace_files WHERE workspace_id=#{workspaceId} ORDER BY file_path
+</select>
+
+<select id="getInitialFiles" resultType="com.learningplatform.modules.courses.model.AssignmentRows$InitialFile">
+SELECT assignment_id,file_path,content FROM assignment_initial_files WHERE assignment_id=#{assignmentId} ORDER BY file_path
+</select>
+
+<insert id="insertWorkspace">
+INSERT INTO workspaces (id,offering_id,assignment_id,student_id,revision,active_file,created_at,updated_at)
+VALUES (#{id},#{offeringId},#{assignmentId},#{studentId},1,#{activeFile},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="updateWorkspace">
+UPDATE workspaces SET revision=revision+1,active_file=#{activeFile},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND revision=#{baseRevision}
+</update>
+
+<delete id="deleteWorkspaceFiles">DELETE FROM workspace_files WHERE workspace_id=#{workspaceId}</delete>
+
+<insert id="insertWorkspaceFile">
+INSERT INTO workspace_files (workspace_id,file_path,content) VALUES (#{workspaceId},#{path},#{content})
+</insert>
+
+<!-- 提交查询与创建 -->
+<select id="findSubmission" resultMap="submission">
+SELECT id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace_revision,reflection,content_version,assignment_title_snapshot,max_score_snapshot,ai_policy_id,due_at_snapshot,submitted_at,is_late,is_current,created_at
+FROM submissions WHERE id=#{id}
+</select>
+
+<select id="findSubmissionByRevision" resultMap="submission">
+SELECT id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace_revision,reflection,content_version,assignment_title_snapshot,max_score_snapshot,ai_policy_id,due_at_snapshot,submitted_at,is_late,is_current,created_at
+FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId} AND workspace_revision=#{revision}
+</select>
+
+<select id="listStudentSubmissions" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$SubmissionSummaryDTO">
+SELECT id,assignment_id,offering_id,attempt_no AS attempt_number,workspace_revision,submitted_at,is_late AS late,CASE WHEN is_current=0 THEN 1 ELSE 0 END AS superseded,'none' AS feedback_status
+FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
+ORDER BY attempt_no DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countStudentSubmissions" resultType="int">
+SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
+</select>
+
+<select id="getSubmissionFiles" resultType="com.learningplatform.modules.courses.model.AssignmentRows$SubmissionFile">
+SELECT submission_id,file_path,content FROM submission_files WHERE submission_id=#{submissionId} ORDER BY file_path
+</select>
+
+<select id="getSubmissionRequirements" resultType="com.learningplatform.modules.courses.model.AssignmentRows$SubmissionRequirementSnapshot">
+SELECT submission_id,requirement_index,requirement_text FROM submission_requirements_snapshot WHERE submission_id=#{submissionId} ORDER BY requirement_index
+</select>
+
+<select id="getSubmissionRubric" resultType="com.learningplatform.modules.courses.model.AssignmentRows$SubmissionRubricSnapshot">
+SELECT submission_id,criterion_id,title,description,max_score FROM submission_rubric_snapshot WHERE submission_id=#{submissionId} ORDER BY criterion_id
+</select>
+
+<insert id="insertSubmission">
+INSERT INTO submissions (id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace_revision,reflection,content_version,assignment_title_snapshot,max_score_snapshot,ai_policy_id,due_at_snapshot,submitted_at,is_late,is_current,created_at)
+VALUES (#{id},#{offeringId},#{assignmentId},#{workspaceId},#{studentId},#{attemptNo},#{workspaceRevision},#{reflection},#{contentVersion},#{assignmentTitle},#{maxScore},#{aiPolicyId},#{dueAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{submittedAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{isLate},1,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="markPreviousSubmissionsAsSuperseded">
+UPDATE submissions SET is_current=0 WHERE assignment_id=#{assignmentId} AND student_id=#{studentId} AND id!=#{currentSubmissionId}
+</update>
+
+<insert id="insertSubmissionFile">
+INSERT INTO submission_files (submission_id,file_path,content) VALUES (#{submissionId},#{path},#{content})
+</insert>
+
+<insert id="insertSubmissionRequirement">
+INSERT INTO submission_requirements_snapshot (submission_id,requirement_index,requirement_text) VALUES (#{submissionId},#{index},#{text})
+</insert>
+
+<insert id="insertSubmissionRubric">
+INSERT INTO submission_rubric_snapshot (submission_id,criterion_id,title,description,max_score) VALUES (#{submissionId},#{criterionId},#{title},#{description},#{maxScore})
+</insert>
+
+<!-- 教师端作业管理 -->
+<select id="listTeacherAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$TeacherAssignmentDTO">
+SELECT a.chapter_id,a.title,a.type,a.is_required,a.description,a.estimated_minutes,a.due_at,a.late_until,a.allow_resubmit,a.max_attempts,a.max_score,a.current_ai_policy_id AS ai_policy_version,a.id,a.offering_id,a.status AS publication_state,a.published_at,
+(SELECT COUNT(DISTINCT s.student_id) FROM submissions s WHERE s.assignment_id=a.id) AS submitted_student_count,
+0 AS pending_review_count
+FROM assignments a WHERE a.offering_id=#{offeringId}
+<if test="publicationState != null">AND a.status=#{publicationState}</if>
+ORDER BY a.created_at DESC,a.id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countTeacherAssignments" resultType="int">
+SELECT COUNT(*) FROM assignments WHERE offering_id=#{offeringId}
+<if test="publicationState != null">AND status=#{publicationState}</if>
+</select>
+
+<insert id="insertAssignment">
+INSERT INTO assignments (id,offering_id,chapter_id,title,description,estimated_minutes,type,status,is_required,due_at,late_until,allow_resubmit,max_attempts,max_score,content_version,current_ai_policy_id,created_by,created_at,updated_at)
+VALUES (#{id},#{offeringId},#{chapterId},#{title},#{description},#{estimatedMinutes},#{type},#{status},#{isRequired},#{dueAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{lateUntil,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{allowResubmit},#{maxAttempts},#{maxScore},0,#{currentAiPolicyId},#{createdBy},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<insert id="insertRequirement">
+INSERT INTO assignment_requirements (assignment_id,requirement_index,requirement_text) VALUES (#{assignmentId},#{index},#{text})
+</insert>
+
+<insert id="insertRubric">
+INSERT INTO assignment_rubric_criteria (assignment_id,criterion_id,title,description,max_score) VALUES (#{assignmentId},#{criterionId},#{title},#{description},#{maxScore})
+</insert>
+
+<insert id="insertInitialFile">
+INSERT INTO assignment_initial_files (assignment_id,file_path,content) VALUES (#{assignmentId},#{path},#{content})
+</insert>
+
+<insert id="insertKnowledgePoint">
+INSERT INTO assignment_knowledge_points (assignment_id,offering_id,knowledge_point_id) VALUES (#{assignmentId},#{offeringId},#{knowledgePointId})
+</insert>
+
+<update id="updateAssignmentDraft">
+UPDATE assignments SET chapter_id=#{chapterId},title=#{title},description=#{description},estimated_minutes=#{estimatedMinutes},type=#{type},is_required=#{isRequired},due_at=#{dueAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},late_until=#{lateUntil,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},allow_resubmit=#{allowResubmit},max_attempts=#{maxAttempts},max_score=#{maxScore},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft'
+</update>
+
+<update id="updateAssignmentPublished">
+UPDATE assignments SET description=#{description},due_at=#{dueAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},late_until=#{lateUntil,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='published'
+</update>
+
+<delete id="deleteRequirements">DELETE FROM assignment_requirements WHERE assignment_id=#{assignmentId}</delete>
+<delete id="deleteRubric">DELETE FROM assignment_rubric_criteria WHERE assignment_id=#{assignmentId}</delete>
+<delete id="deleteInitialFiles">DELETE FROM assignment_initial_files WHERE assignment_id=#{assignmentId}</delete>
+<delete id="deleteKnowledgePoints">DELETE FROM assignment_knowledge_points WHERE assignment_id=#{assignmentId}</delete>
+
+<update id="publishAssignment">
+UPDATE assignments SET status='published',content_version=content_version+1,published_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft'
+</update>
+
+<update id="archiveAssignment">
+UPDATE assignments SET status='archived',updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='published'
+</update>
+
+<select id="countPendingReviews" resultType="int">
+SELECT COUNT(*) FROM submissions s WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+</select>
+
+<select id="listAssignmentSubmissions" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$TeacherSubmissionSummaryDTO">
+SELECT s.id,s.assignment_id,s.offering_id,s.attempt_no AS attempt_number,s.workspace_revision,s.submitted_at,s.is_late AS late,CASE WHEN s.is_current=0 THEN 1 ELSE 0 END AS superseded,'none' AS feedback_status,
+u.id AS student_id,u.username AS student_username,u.display_name AS student_display_name
+FROM submissions s
+JOIN users u ON u.id=s.student_id
+WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+ORDER BY s.submitted_at DESC,s.id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countAssignmentSubmissions" resultType="int">
+SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND is_current=1
+</select>
+
+<!-- P1-C 反馈查询与保存 -->
+<resultMap id="feedback" type="com.learningplatform.modules.courses.model.AssignmentRows$Feedback"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="submissionId" column="submission_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="teacherId" column="teacher_id" javaType="java.lang.String"/>
+<arg name="status" column="status" javaType="java.lang.String"/>
+<arg name="baseVersion" column="base_version" javaType="_int"/>
+<arg name="overallComment" column="overall_comment" javaType="java.lang.String"/>
+<arg name="finalScore" column="final_score" javaType="java.math.BigDecimal"/>
+<arg name="publishedAt" column="published_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="updatedAt" column="updated_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<resultMap id="feedbackRubricScore" type="com.learningplatform.modules.courses.model.AssignmentRows$FeedbackRubricScore"><constructor>
+<arg name="feedbackId" column="feedback_id" javaType="java.lang.String"/>
+<arg name="criterionId" column="criterion_id" javaType="java.lang.String"/>
+<arg name="score" column="score" javaType="java.math.BigDecimal"/>
+<arg name="comment" column="comment" javaType="java.lang.String"/>
+</constructor></resultMap>
+
+<resultMap id="notification" type="com.learningplatform.modules.courses.model.AssignmentRows$Notification"><constructor>
+<arg column="id" javaType="java.lang.String"/>
+<arg column="recipient_id" javaType="java.lang.String"/>
+<arg column="type" javaType="java.lang.String"/>
+<arg column="title" javaType="java.lang.String"/>
+<arg column="content" javaType="java.lang.String"/>
+<arg column="related_offering_id" javaType="java.lang.String"/>
+<arg column="related_assignment_id" javaType="java.lang.String"/>
+<arg column="related_feedback_id" javaType="java.lang.String"/>
+<arg column="is_read" javaType="boolean"/>
+<arg column="read_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<select id="findFeedback" resultMap="feedback">
+SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at
+FROM feedback WHERE id=#{id}
+</select>
+
+<select id="findFeedbackBySubmission" resultMap="feedback">
+SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at
+FROM feedback WHERE submission_id=#{submissionId}
+</select>
+
+<select id="getFeedbackRubricScores" resultMap="feedbackRubricScore">
+SELECT feedback_id,criterion_id,score,comment FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId}
+</select>
+
+<insert id="insertFeedback">
+INSERT INTO feedback (id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at)
+VALUES (#{id},#{submissionId},#{assignmentId},#{offeringId},#{studentId},#{teacherId},'draft',0,#{overallComment},#{finalScore},NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="updateFeedbackDraft">
+UPDATE feedback SET base_version=base_version+1,overall_comment=#{overallComment},final_score=#{finalScore},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft' AND base_version=#{baseVersion}
+</update>
+
+<update id="publishFeedback">
+UPDATE feedback SET status='published',published_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft'
+</update>
+
+<delete id="deleteFeedbackRubricScores">
+DELETE FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId}
+</delete>
+
+<insert id="insertFeedbackRubricScore">
+INSERT INTO feedback_rubric_scores (feedback_id,criterion_id,score,comment) VALUES (#{feedbackId},#{criterionId},#{score},#{comment})
+</insert>
+
+<!-- P1-C 通知查询与标记 -->
+<select id="findNotification" resultMap="notification">
+SELECT id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
+FROM notifications WHERE id=#{id}
+</select>
+
+<select id="listNotifications" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NotificationDTO">
+SELECT id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
+FROM notifications WHERE recipient_id=#{recipientId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countNotifications" resultType="int">
+SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId}
+</select>
+
+<select id="countUnreadNotifications" resultType="int">
+SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId} AND is_read=0
+</select>
+
+<insert id="insertNotification">
+INSERT INTO notifications (id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at)
+VALUES (#{id},#{recipientId},#{type},#{title},#{content},#{relatedOfferingId},#{relatedAssignmentId},#{relatedFeedbackId},0,NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<update id="markNotificationRead">
+UPDATE notifications SET is_read=1,read_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id}
+</update>
+
+<!-- P1-D 首页仪表盘查询 -->
+<select id="countStudentOfferings" resultType="int">
+SELECT COUNT(DISTINCT o.id) FROM course_offerings o
+JOIN offering_members m ON m.offering_id=o.id
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active' AND o.status='active'
+<if test="termId != null">AND o.term_id=#{termId}</if>
+</select>
+
+<select id="countPendingAssignments" resultType="int">
+SELECT COUNT(*) FROM assignments a
+JOIN course_offerings o ON o.id=a.offering_id
+JOIN offering_members m ON m.offering_id=a.offering_id
+LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
+AND a.status='published' AND o.status='active' AND s.id IS NULL
+<if test="termId != null">AND o.term_id=#{termId}</if>
+</select>
+
+<select id="countUnreadMessages" resultType="int">
+SELECT COUNT(*) FROM notifications WHERE recipient_id=#{userId} AND is_read=0
+</select>
+
+<select id="findCurrentAssignment" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,
+a.status AS publication_state,a.description,a.due_at,
+'NOT_STARTED' AS assignment_state,
+CASE WHEN a.due_at &lt; NOW() THEN 1 ELSE 0 END AS overdue,
+NULL AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
+FROM assignments a
+JOIN course_offerings o ON o.id=a.offering_id
+JOIN offering_members m ON m.offering_id=a.offering_id
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
+AND a.status='published' AND o.status='active'
+AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1)
+<if test="termId != null">AND o.term_id=#{termId}</if>
+ORDER BY COALESCE(a.due_at,'9999-12-31 23:59:59'),a.id LIMIT 1
+</select>
+
+<select id="findCurrentLearningChapter" resultType="com.learningplatform.modules.courses.model.CourseRows$Chapter">
+SELECT c.id,c.offering_id,c.position,c.title,c.summary,c.status,c.is_required,c.content_version,c.published_at
+FROM chapters c
+JOIN offering_members m ON m.offering_id=c.offering_id
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
+AND c.status='published' AND m.last_chapter_id IS NOT NULL AND c.id=m.last_chapter_id
+<if test="termId != null">
+JOIN course_offerings o ON o.id=c.offering_id WHERE o.term_id=#{termId}
+</if>
+ORDER BY m.last_studied_at DESC LIMIT 1
+</select>
+
+<select id="listOtherPendingAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,
+a.status AS publication_state,a.description,a.due_at,
+'NOT_STARTED' AS assignment_state,
+CASE WHEN a.due_at &lt; NOW() THEN 1 ELSE 0 END AS overdue,
+NULL AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
+FROM assignments a
+JOIN course_offerings o ON o.id=a.offering_id
+JOIN offering_members m ON m.offering_id=a.offering_id
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
+AND a.status='published' AND o.status='active'
+AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1)
+<if test="excludeId != null">AND a.id != #{excludeId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>
+ORDER BY COALESCE(a.due_at,'9999-12-31 23:59:59'),a.id LIMIT #{limit}
+</select>
+
+<select id="findRecentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$StudentFeedbackDTO">
+SELECT f.id AS feedback_id,a.id AS assignment_id,a.title AS assignment_title,
+f.overall_comment,f.final_score,f.published_at
+FROM feedback f
+JOIN assignments a ON a.id=f.assignment_id
+WHERE f.student_id=#{userId} AND f.status='published'
+ORDER BY f.published_at DESC LIMIT 1
+</select>
+
+<select id="listDashboardCourses" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$CourseSummaryDTO">
+SELECT o.id AS offering_id,bc.name AS course_name,o.title AS offering_label,
+0 AS completed_count,0 AS total_count,'chapter' AS progress_unit,0 AS percent
+FROM course_offerings o
+JOIN base_courses bc ON bc.id=o.course_id
+JOIN offering_members m ON m.offering_id=o.id
+WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active' AND o.status='active'
+<if test="termId != null">AND o.term_id=#{termId}</if>
+ORDER BY m.last_studied_at DESC,o.created_at DESC LIMIT #{limit}
+</select>
+
+<select id="findRecentNotice" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NotificationDTO">
+SELECT id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
+FROM notifications WHERE recipient_id=#{userId} ORDER BY created_at DESC LIMIT 1
+</select>
+
+<!-- P1-D 学习记录查询 -->
+<select id="getLearningRecordSummary" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LearningRecordSummary">
+SELECT
+(SELECT COUNT(*) FROM chapters c
+ LEFT JOIN chapter_progress cp ON cp.chapter_id=c.id AND cp.student_id=#{studentId}
+ WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1 AND cp.completed_at IS NOT NULL) AS completed_chapter_count,
+(SELECT COUNT(*) FROM chapters c WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1) AS total_chapter_count,
+(SELECT COUNT(DISTINCT a.id) FROM assignments a
+ JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
+ WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='lab') AS completed_lab_count,
+(SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='lab') AS total_lab_count,
+(SELECT COUNT(*) FROM feedback f WHERE f.offering_id=#{offeringId} AND f.student_id=#{studentId} AND f.status='published') AS feedback_count
+</select>
+
+<select id="listStudentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$StudentFeedbackDTO">
+SELECT f.id AS feedback_id,a.id AS assignment_id,a.title AS assignment_title,
+f.overall_comment,f.final_score,f.published_at
+FROM feedback f
+JOIN assignments a ON a.id=f.assignment_id
+WHERE f.offering_id=#{offeringId} AND f.student_id=#{studentId} AND f.status='published'
+ORDER BY f.published_at DESC LIMIT #{limit} OFFSET #{offset}
+</select>
+
+<select id="countStudentFeedback" resultType="int">
+SELECT COUNT(*) FROM feedback WHERE offering_id=#{offeringId} AND student_id=#{studentId} AND status='published'
+</select>
+
+<!-- P1-D 批量标记消息已读 -->
+<update id="markMessagesRead">
+UPDATE notifications SET is_read=1,read_at=#{readAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE recipient_id=#{recipientId} AND is_read=0
+<if test="offeringId != null">AND related_offering_id=#{offeringId}</if>
+<if test="type != null">AND type=#{type}</if>
+</update>
+
+<!-- P1-D 公告系统 -->
+<resultMap id="noticeRow" type="com.learningplatform.modules.courses.model.AssignmentRows$NoticeRow"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="authorId" column="author_id" javaType="java.lang.String"/>
+<arg name="targetStudentId" column="target_student_id" javaType="java.lang.String"/>
+<arg name="title" column="title" javaType="java.lang.String"/>
+<arg name="content" column="content" javaType="java.lang.String"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<insert id="insertNotice">
+INSERT INTO notices (id,offering_id,author_id,target_student_id,title,content,created_at)
+VALUES (#{notice.id},#{notice.offeringId},#{notice.authorId},#{notice.targetStudentId},#{notice.title},#{notice.content},#{notice.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+</insert>
+
+<select id="findNoticeById" resultMap="noticeRow">
+SELECT id,offering_id,author_id,target_student_id,title,content,created_at FROM notices WHERE id=#{id}
+</select>
+
+<select id="listNotices" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NoticeDTO">
+SELECT n.id,n.offering_id,n.author_id,u1.display_name AS author_name,
+n.target_student_id,u2.display_name AS target_student_name,
+n.title,n.content,n.created_at
+FROM notices n
+JOIN users u1 ON u1.id=n.author_id
+LEFT JOIN users u2 ON u2.id=n.target_student_id
+WHERE n.offering_id=#{offeringId}
+ORDER BY n.created_at DESC,n.id DESC LIMIT #{limit} OFFSET #{offset}
+</select>
+
+<select id="countNotices" resultType="int">
+SELECT COUNT(*) FROM notices WHERE offering_id=#{offeringId}
+</select>
+
+<!-- P1-D 教师统计查询 -->
+<select id="getOfferingStats" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$OfferingStatsDTO">
+SELECT
+(SELECT COUNT(*) FROM offering_members WHERE offering_id=#{offeringId} AND role='student' AND status='active') AS student_count,
+(SELECT COUNT(*) FROM assignments WHERE offering_id=#{offeringId} AND status='published') AS active_assignment_count,
+(SELECT COUNT(*) FROM submissions s
+ WHERE s.offering_id=#{offeringId} AND s.is_current=1
+ AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')) AS pending_review_count,
+0 AS pending_help_count
+</select>
+
+<select id="getAssignmentStats" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentStatsDTO">
+SELECT
+(SELECT COUNT(DISTINCT student_id) FROM submissions WHERE assignment_id=#{assignmentId} AND is_current=1) AS submitted_student_count,
+(SELECT COUNT(*) FROM submissions s
+ WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+ AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')) AS pending_review_count,
+(SELECT AVG(final_score) FROM feedback WHERE assignment_id=#{assignmentId} AND status='published') AS avg_score
+</select>
+</mapper>

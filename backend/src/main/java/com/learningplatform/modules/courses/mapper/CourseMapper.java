@@ -21,6 +21,7 @@ public interface CourseMapper {
     List<TeacherBrief> teachers(String offeringId);
     List<MemberDTO> members(@Param("offeringId") String offeringId,@Param("offset") long offset,@Param("size") int size);
     int countMembers(String offeringId);
+    List<String> findStudentIdsByOffering(String offeringId);
     int insertOffering(@Param("id") String id,@Param("courseId") String courseId,@Param("termId") String termId,
             @Param("title") String title,@Param("groupName") String groupName,@Param("unit") String unit,@Param("userId") String userId,@Param("now") Instant now);
     int insertMember(@Param("id") String id,@Param("offeringId") String offeringId,@Param("userId") String userId,@Param("role") String role,@Param("now") Instant now);

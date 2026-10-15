@@ -12,6 +12,11 @@ import ChapterPage from '../features/courses/ChapterPage.vue'
 import ResourcePage from '../features/courses/ResourcePage.vue'
 import TeacherOfferingsPage from '../features/teacher/TeacherOfferingsPage.vue'
 import TeacherOfferingPage from '../features/teacher/TeacherOfferingPage.vue'
+import AssignmentList from '../features/assignments/AssignmentList.vue'
+import AssignmentDetail from '../features/assignments/AssignmentDetail.vue'
+import WorkspaceEditor from '../features/assignments/WorkspaceEditor.vue'
+import AssignmentManagement from '../features/assignments/AssignmentManagement.vue'
+import AssignmentEditor from '../features/assignments/AssignmentEditor.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -54,8 +59,14 @@ const routes: RouteRecordRaw[] = [
   { name: 'course', path: '/course/:offeringId', component: OfferingPage, meta: { requiresAuth: true, requiresRole: 'student', title: '课程详情 · 学习空间' } },
   { name: 'chapter', path: '/course/:offeringId/chapter/:chapterId', component: ChapterPage, meta: { requiresAuth: true, requiresRole: 'student', title: '章节阅读 · 学习空间' } },
   { name: 'resource', path: '/resource/:resourceId', component: ResourcePage, meta: { requiresAuth: true, requiresRole: 'student', title: '学习资料 · 学习空间' } },
+  { name: 'student-assignments', path: '/student/assignments', component: AssignmentList, meta: { requiresAuth: true, requiresRole: 'student', title: '我的作业 · 学习空间' } },
+  { name: 'student-assignment', path: '/student/assignments/:id', component: AssignmentDetail, meta: { requiresAuth: true, requiresRole: 'student', title: '作业详情 · 学习空间' } },
+  { name: 'student-workspace', path: '/student/workspaces/:id', component: WorkspaceEditor, meta: { requiresAuth: true, requiresRole: 'student', title: '工作区 · 学习空间' } },
   { name: 'teacher', path: '/teacher', component: TeacherOfferingsPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学班 · 学习空间' } },
   { name: 'teacher-offering', path: '/teacher/offerings/:id', component: TeacherOfferingPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学工作台 · 学习空间' } },
+  { name: 'teacher-assignments', path: '/teacher/offerings/:offeringId/assignments', component: AssignmentManagement, meta: { requiresAuth: true, requiresRole: 'teacher', title: '作业管理 · 学习空间' } },
+  { name: 'teacher-assignment', path: '/teacher/assignments/:id', component: AssignmentEditor, meta: { requiresAuth: true, requiresRole: 'teacher', title: '编辑作业 · 学习空间' } },
+  { name: 'teacher-assignment-new', path: '/teacher/offerings/:offeringId/assignments/new', component: AssignmentEditor, meta: { requiresAuth: true, requiresRole: 'teacher', title: '创建作业 · 学习空间' } },
   { name: 'access-denied', path: '/access-denied', component: AccessDeniedPage, meta: { requiresAuth: true, title: '权限不足 · 学习空间' } },
   {
     name: 'not-found',
