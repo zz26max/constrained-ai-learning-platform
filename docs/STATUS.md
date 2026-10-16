@@ -8,7 +8,7 @@
 
 > **2026-10-16 全量核对与后端对齐（以 openapi.yaml 1.1.0 为准）**：核对发现下列"已完成"自述不实，P1-B 核对的 10 个操作中 9 个与契约不符，P1-C 的 9 个、P1-D 的 9 个全部不符。同日已按契约逐项修复后端并分批提交：`3008f19`、`5f5fa22`（P1-B）、`e716dde`、`443a5f9`（P1-C）、`2dac32e`、`b4fcf42`（P1-D）；契约占位响应修复见 `82977c9`。最近一次 `./mvnw.cmd --batch-mode verify`（`b4fcf42` 工作区）结果：379 个单测/契约测试、198 个 IT（Testcontainers + MySQL）全部通过，BUILD SUCCESS。
 >
-> 可信度：P0-A 高（有真实联调）；P1-A 基本符合（抽样 18 个操作中 11 个一致，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异，未修）；P1-B/C/D 后端已对齐并有逐字段断言与真实数据库用例，但 `x-implementation-status` 仍为 `implemented`，未做跨端联调，不得标为 `verified`。
+> 可信度：P0-A 高（有真实联调）；P1-A 基本符合（抽样 18 个操作中 11 个一致，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异，未修）；P1-B/C/D 后端已对齐并有逐字段断言与真实数据库用例，但 `x-implementation-status` 仍为 `implemented`，不得标为 `verified`（原因见下方 2026-10-16 联调记录）。
 >
 > 已修复的运行时错误：`publishFeedback` 通知类型违反 `ck_notifications_type`（现为 `feedback_published`，并有真实库用例）；`listMyAssignments` 的 `#{now}` 缺参；`createNotice` 的 12 参 `insertNotification` 死重载；看板 SQL 引用不存在的 `base_courses`、`cp.student_id`、`a.type='lab'`；`findCurrentLearningChapter` JOIN 位置；`listTeacherAssignments` 默认 `all` 被当作 `status='all'`。
 >
@@ -19,6 +19,11 @@
 > - 量规评语长度：V9 把 `feedback_rubric_scores.comment` 改为 `VARCHAR(8000)`，后端校验同步改为 8000。
 > - `knowledgeEvaluations` / `issueTags`：推迟到 P2-B，与知识证据、规则版本一起设计存储；P1 继续只接受空数组，P1 验收不依赖它们。
 > - 实施方式：派一个 Sonnet 子代理写 V9、后端校验与真实库 IT；主会话在 backend/ 下跑 `./mvnw.cmd --batch-mode verify` 通过后，以 `backend:` 前缀提交，并更新下方遗留清单。
+>
+> **P1-B/C 主链路 HTTP 联调（2026-10-16，V9 之后）**：环境为本地 MySQL 3307（Flyway 到 V9，已执行 `-InitializeAccounts` 与 `local-demo-data`）、后端 8080、Vite dev 4173，所有请求经 4173 代理。脚本在本机 `D:/tmp/lp/`（未入库）。走通：开班→章节→邀请码→学生加入→三类作业发布→工作区保存（旧 revision 409）→提交幂等→教师评价草稿（8000 字评语通过、8001 字 422）→草稿对学生不可见→发布→学生消息未读→已读→看板与学习记录反映；带 `target` 的公告（`assignment` 目标 201，offeringId 不符、他班 id、`help_request` 均 422）；归档后保存被拒、历史可读；未登录/越权/缺 CSRF/缺 Origin/外域 Origin 的负例 30 项（重跑 30/30）。未发现后端硬性偏离契约，代理、Cookie、CSRF 链路无问题。
+> - **仍不能标 `verified`**：以上是 HTTP 级联调，没有在浏览器里用正式前端页面走一遍，FRONTEND.md §8 矩阵中的并发编辑、双标签页、慢网络、XSS/预览沙箱等场景未验证；P1-D 页面也还没实现。
+> - **联调中的观察（均未改，待决定）**：① 已归档作业上用已提交过的 revision 重发 `submitAssignment` 返回 200 原提交而非 409，契约未规定优先级；② 公告生成的 `course_notice` 消息 `target` 为 null，若前端要从消息跳到作业需决定是否继承公告 target；③ 已发布后用陈旧 `baseVersion` 重发 `publishFeedback` 返回 200（幂等）而非 409，契约未说明；④ 全班公告可指向某学生的 `feedback` id，其他学生打开会 404，风险低。
+> - 第二个班里没有提交，未用他班 `submissionId` 做跨班读取，该项只依赖较早的 `s7` 越权结果。
 >
 > **后端遗留（未改）**：
 > - `createNotice`：V9 起支持 `target`（`notices.target_type/target_id`，Service 校验类型、`offeringId` 与归属，失败 422；`help_request` 因 P1 无对应表恒 422）；`recipientCount` 靠通知记录推算；通知内容截断到 2000 字（`notifications.content` 为 VARCHAR(2000)）。
@@ -32,7 +37,7 @@
 >
 > **前端仍缺**：P1-D 页面（学生看板、公告列表、教师统计页）尚未实现；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
 >
-> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI；③ 按验收场景走通后标 `verified`；④ 进入 P2-A。
+> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调（HTTP 级已完成，浏览器级待做）；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI；③ 按验收场景走通后标 `verified`；④ 进入 P2-A。
 
 截至 2026-10-15 的提交自述如下（仅作历史记录）：
 
