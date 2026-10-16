@@ -24,9 +24,9 @@
 >
 > **前端（`9578059`、`51b000f`）**：已按契约 1.1.0 重新生成 `schema.d.ts`；`dashboard.ts`/`notices.ts`/`stats.ts` 改用生成类型，方法名、路径和分页字段与契约一致，删除了契约中为 planned 的 `listTeacherNotices`；`main.ts` 注册了 Auth、Courses、Assignments、Dashboard、Notices、Stats 六个客户端；mock 补全了 P1-C 缺失操作和 P1-D 全部 9 个操作；`NotificationCenter` 接入 `/student/messages`，`TeacherFeedbackEditor` 接入 `/teacher/submissions/:submissionId/feedback`，`getFeedback` 接入 `AssignmentDetail`；新增 `p1d-api`、`p1d-mocks`、`p1d-pages` 三个测试文件。`npm --prefix frontend run verify`：16 个测试文件、152 个用例通过，`check:no-mock` PASS。
 >
-> **前端仍缺**：P1-D 页面（学生看板、公告列表、教师统计页）尚未实现；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由沿用 `/student/...`、`/teacher/...`，与 FRONTEND.md §4 的 `#/xxx` 约定不一致，需用户决定以哪个为准；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
+> **前端仍缺**：P1-D 页面（学生看板、公告列表、教师统计页）尚未实现；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
 >
-> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。下一步先定路由约定，再做 P1-D 前端 UI，最后做跨端联调。
+> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI；③ 按验收场景走通后标 `verified`；④ 进入 P2-A。
 
 截至 2026-10-15 的提交自述如下（仅作历史记录）：
 

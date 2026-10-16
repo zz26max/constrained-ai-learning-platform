@@ -69,32 +69,33 @@ frontend/
 
 路由参数是服务端 UUID。解析完整路径后再匹配路由；不能沿用 `split('/')` 后仅取前两个元素的实现。浏览器刷新可直接恢复详情，不要求先进入列表建立内存状态。
 
+路由使用 hash 模式（`createWebHashHistory`），下表省略 `#` 前缀。学生作业类页面用 `/student/...`，教师页面用 `/teacher/...`；P1-A 已上线的课程类路由保持原路径不迁移（2026-10-16 决定，见 DEVELOPMENT 第 14 节）。
+
 | 路由 | 页面与阶段 | 主要读取 / 操作 |
 | --- | --- | --- |
-| `#/login` | 登录，P0 | 匿名 CSRF、登录；成功后验证并恢复站内返回路径 |
-| `#/home` | 学生首页，P1 | `/me/dashboard`，课程、待办、公开反馈、公告摘要 |
-| `#/course` | 我的课程，P1 | `/me/courses`、邀请码加入；按学期/状态筛选 |
-| `#/course/{offeringId}` | 课程入口，P1 | 教学班详情与章节目录；按服务端章节恢复信息进入章节 |
-| `#/course/{offeringId}/chapter/{chapterId}` | 章节，P1 | 章节详情、资料、章内作业、阅读进度；校验归属 |
-| `#/resource/{resourceId}` | 资料，P1 | `/resources/{resourceId}`；从响应恢复课程与章节上下文 |
-| `#/assignments` | 个人作业，P1 | `/me/assignments` 的班级、状态筛选和分页 |
-| `#/task/{assignmentId}` | 作业要求，P1 | 作业详情、正式提交限制和最近提交入口 |
-| `#/lab/{assignmentId}` | 作业编辑，P1 | 工作区读取/保存/提交；按 `type` 选择编辑模式 |
-| `#/submission/{submissionId}` | 本人提交详情，P1 | `/submissions/{submissionId}`，不可变文件、反思和公开评价 |
-| `#/feedback/{feedbackId}` | 本人公开评价，P1 | `/me/feedback/{feedbackId}`，成功展示后标记对应通知已读 |
-| `#/progress/{offeringId}` | 学习记录，P1/P2 | `/me/learning-records?offeringId=...`；P2 再显示知识分析 |
-| `#/messages` | 消息中心，P1/P2 | `/me/messages`、标记已读及全部已读 |
-| `#/notices/{offeringId}` / `#/notice/{noticeId}` | 课程公告，P1 | 课程公告列表与详情，支持晚加入成员读取 |
-| `#/help-request/{id}` | 本人求助详情，P2 | `/me/help-requests/{id}`、教师回复 |
-| `#/teacher` | 授课教学班选择，P1 | `/teacher/offerings`；显示本人授课范围 |
-| `#/teacher/offerings/{id}` | 教师工作台，P1 | 班级统计、成员、章节、资料、作业、公告和邀请 |
-| `#/teacher/assignments/new/{offeringId}` | 布置作业，P1 | 班级章节/知识点；建立草稿后进入草稿详情 |
-| `#/teacher/assignments/{id}` | 作业编辑与提交列表，P1 | `/teacher/assignments/{id}`、提交列表、发布及归档 |
-| `#/teacher/review/{submissionId}` | 批阅，P1 | 提交快照、学生信息、草稿评价；保存 draft 后显式发布 |
-| `#/teacher/help-request/{id}` | 求助处理，P2 | 教师求助详情、回复和关闭；包含提问学生身份 |
-| `#/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2 | `/teacher/offerings/{id}/students/{studentId}/learning-records` |
+| `/login` | 登录，P0 | 匿名 CSRF、登录；成功后验证并恢复站内返回路径 |
+| `/student/home` | 学生首页，P1；学生默认入口 | `/me/dashboard`，课程、待办、公开反馈、公告摘要 |
+| `/course` | 我的课程，P1 | `/me/courses`、邀请码加入；按学期/状态筛选 |
+| `/course/{offeringId}` | 课程入口，P1 | 教学班详情与章节目录；按服务端章节恢复信息进入章节 |
+| `/course/{offeringId}/chapter/{chapterId}` | 章节，P1 | 章节详情、资料、章内作业、阅读进度；校验归属 |
+| `/resource/{resourceId}` | 资料，P1 | `/resources/{resourceId}`；从响应恢复课程与章节上下文 |
+| `/student/assignments` | 个人作业，P1 | `/me/assignments` 的班级、状态筛选和分页 |
+| `/student/assignments/{assignmentId}` | 作业详情，P1 | 作业要求、提交限制、最近提交与公开评价（提交详情与评价在此页展示，不另设路由） |
+| `/student/workspaces/{assignmentId}` | 作业编辑，P1 | 工作区读取/保存/提交；按 `type` 选择编辑模式 |
+| `/student/progress` / `/student/progress/{offeringId}` | 学习记录，P1/P2 | `/me/learning-records?offeringId=...`；P2 再显示知识分析 |
+| `/student/messages` | 消息中心，P1/P2 | `/me/messages`、标记已读及全部已读 |
+| `/student/offerings/{offeringId}/notices` / `/student/notices/{noticeId}` | 课程公告，P1 | 课程公告列表与详情，支持晚加入成员读取 |
+| `/student/help-requests/{id}` | 本人求助详情，P2 | `/me/help-requests/{id}`、教师回复 |
+| `/teacher` | 授课教学班选择，P1 | `/teacher/offerings`；显示本人授课范围 |
+| `/teacher/offerings/{id}` | 教师工作台，P1 | 班级统计、成员、章节、资料、公告和邀请 |
+| `/teacher/offerings/{offeringId}/assignments` | 作业管理，P1 | 本班作业列表、发布及归档 |
+| `/teacher/offerings/{offeringId}/assignments/new` | 布置作业，P1 | 班级章节/知识点；建立草稿后进入草稿详情 |
+| `/teacher/assignments/{id}` | 作业编辑与提交列表，P1 | `/teacher/assignments/{id}`、提交列表 |
+| `/teacher/submissions/{submissionId}/feedback` | 批阅，P1 | 提交快照、学生信息、草稿评价；保存 draft 后显式发布 |
+| `/teacher/help-requests/{id}` | 求助处理，P2 | 教师求助详情、回复和关闭；包含提问学生身份 |
+| `/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2 | `/teacher/offerings/{id}/students/{studentId}/learning-records` |
 
-`#/progress` 等无上下文入口先提供教学班选择，不能隐式固定 Web 课程。章节恢复采用服务器持久化指针和回退规则；浏览器缓存只改善加载速度，不成为唯一恢复来源。
+`/student/progress` 等无上下文入口先提供教学班选择，不能隐式固定 Web 课程。章节恢复采用服务器持久化指针和回退规则；浏览器缓存只改善加载速度，不成为唯一恢复来源。
 
 反馈详情按 `feedbackId` 直接读取，不扫描分页列表寻找。`StudentFeedbackDTO` 的 `offeringId/assignmentId/assignmentTitle` 支持课程上下文、卡片标题和作业跳转。教师草稿详情使用教师专用接口，批阅使用提交时冻结的要求、量规与知识点，不从当前工作区读取待评价代码。
 
