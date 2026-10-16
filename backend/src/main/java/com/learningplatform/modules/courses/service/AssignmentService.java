@@ -203,45 +203,14 @@ public class AssignmentService {
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public TeacherAssignmentDTO createAssignment(UserDTO user,String offeringId,Map<String,Object> body,String requestId) {
         access.requireTeacher(user,AssignmentInput.uuid(offeringId),true);
-        AssignmentInput.validateAssignmentWrite(body);
+        AssignmentInput.checkCreateBody(body);
+        AssignmentInput.Draft draft=AssignmentInput.parseDraft(body);
+        validateAssociations(offeringId,draft,false);
         Instant now=now();String id=UUID.randomUUID().toString();
-        String chapterId=AssignmentInput.optionalUuid(body,"chapterId");
-        String title=AssignmentInput.text(body,"title",200);
-        String description=AssignmentInput.text(body,"description",8000);
-        int estimatedMinutes=AssignmentInput.integer(body,"estimatedMinutes");
-        String type=AssignmentInput.text(body,"type",16);
-        boolean isRequired=AssignmentInput.bool(body,"isRequired");
-        Instant dueAt=AssignmentInput.timestamp(body,"dueAt");
-        Instant lateUntil=AssignmentInput.optionalTimestamp(body,"lateUntil");
-        boolean allowResubmit=AssignmentInput.bool(body,"allowResubmit");
-        int maxAttempts=AssignmentInput.integer(body,"maxAttempts");
-        BigDecimal maxScore=AssignmentInput.decimal(body,"maxScore");
-        if(lateUntil!=null&&!lateUntil.isAfter(dueAt)) throw AssignmentInput.invalid();
-        if(!List.of("web_lab","sql_text","text").contains(type)) throw AssignmentInput.invalid();
-        mapper.insertAssignment(id,offeringId,chapterId,title,description,estimatedMinutes,type,"draft",
-                isRequired,dueAt,lateUntil,allowResubmit,maxAttempts,maxScore,null,user.id(),now);
-        List<String> requirements=AssignmentInput.stringList(body,"requirements");
-        for(int i=0;i<requirements.size();i++) mapper.insertRequirement(id,i+1,requirements.get(i));
-        @SuppressWarnings("unchecked")
-        List<Map<String,Object>> rubricList=(List<Map<String,Object>>)body.get("rubric");
-        if(rubricList!=null) {
-            for(Map<String,Object> r:rubricList) {
-                mapper.insertRubric(id,AssignmentInput.text(r,"criterionId",64),
-                        AssignmentInput.text(r,"title",200),AssignmentInput.text(r,"description",8000),
-                        AssignmentInput.decimal(r,"maxScore"));
-            }
-        }
-        @SuppressWarnings("unchecked")
-        List<Map<String,Object>> filesList=(List<Map<String,Object>>)body.get("initialFiles");
-        if(filesList!=null) {
-            for(Map<String,Object> f:filesList) {
-                mapper.insertInitialFile(id,AssignmentInput.text(f,"path",64),AssignmentInput.text(f,"content",102400));
-            }
-        }
-        List<String> knowledgePointIds=AssignmentInput.optionalStringList(body,"knowledgePointIds");
-        if(knowledgePointIds!=null) {
-            for(String kpId:knowledgePointIds) mapper.insertKnowledgePoint(id,offeringId,kpId);
-        }
+        mapper.insertAssignment(id,offeringId,draft.chapterId(),draft.title(),draft.description(),draft.estimatedMinutes(),
+                draft.type(),"draft",draft.isRequired(),draft.dueAt(),draft.lateUntil(),draft.allowResubmit(),
+                draft.maxAttempts(),draft.maxScore(),null,user.id(),now);
+        insertRequirements(id,draft);insertRubric(id,draft);insertInitialFiles(id,draft);insertKnowledgePoints(id,offeringId,draft);
         audit.record(user.id(),"ASSIGNMENT_CREATED","assignment",id,Map.of(),requestId);
         return teacherAssignmentView(mapper.findAssignment(id));
     }
@@ -250,87 +219,70 @@ public class AssignmentService {
         access.requireTeacher(user,assignment.offeringId(),false);
         return teacherAssignmentView(assignment);
     }
+    /** draft：与当前内容合并后整体重新校验（省略保持不变，null 仅清空 chapterId/lateUntil，数组整体替换）；
+     *  published：仅 description/dueAt/lateUntil，改核心字段或缩短窗口为 409 ASSIGNMENT_ALREADY_PUBLISHED。 */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public TeacherAssignmentDTO patchAssignment(UserDTO user,String assignmentId,Map<String,Object> body,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),true);
-        if("archived".equals(assignment.status())) {
-            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
-        }
+        if("archived".equals(assignment.status())) throw assignmentArchived();
+        AssignmentInput.checkPatchBody(body);
         Instant now=now();
         if("draft".equals(assignment.status())) {
-            // draft 可更新完整字段。
-            AssignmentInput.validateAssignmentWrite(body);
-            String chapterId=AssignmentInput.optionalUuid(body,"chapterId");
-            String title=AssignmentInput.text(body,"title",200);
-            String description=AssignmentInput.text(body,"description",8000);
-            int estimatedMinutes=AssignmentInput.integer(body,"estimatedMinutes");
-            String type=AssignmentInput.text(body,"type",16);
-            boolean isRequired=AssignmentInput.bool(body,"isRequired");
-            Instant dueAt=AssignmentInput.timestamp(body,"dueAt");
-            Instant lateUntil=AssignmentInput.optionalTimestamp(body,"lateUntil");
-            boolean allowResubmit=AssignmentInput.bool(body,"allowResubmit");
-            int maxAttempts=AssignmentInput.integer(body,"maxAttempts");
-            BigDecimal maxScore=AssignmentInput.decimal(body,"maxScore");
-            if(lateUntil!=null&&!lateUntil.isAfter(dueAt)) throw AssignmentInput.invalid();
-            if(!List.of("web_lab","sql_text","text").contains(type)) throw AssignmentInput.invalid();
-            mapper.updateAssignmentDraft(assignment.id(),chapterId,title,description,estimatedMinutes,type,
-                    isRequired,dueAt,lateUntil,allowResubmit,maxAttempts,maxScore,now);
-            mapper.deleteRequirements(assignment.id());
-            mapper.deleteRubric(assignment.id());
-            mapper.deleteInitialFiles(assignment.id());
-            mapper.deleteKnowledgePoints(assignment.id());
-            List<String> requirements=AssignmentInput.stringList(body,"requirements");
-            for(int i=0;i<requirements.size();i++) mapper.insertRequirement(assignment.id(),i+1,requirements.get(i));
-            @SuppressWarnings("unchecked")
-            List<Map<String,Object>> rubricList=(List<Map<String,Object>>)body.get("rubric");
-            if(rubricList!=null) {
-                for(Map<String,Object> r:rubricList) {
-                    mapper.insertRubric(assignment.id(),AssignmentInput.text(r,"criterionId",64),
-                            AssignmentInput.text(r,"title",200),AssignmentInput.text(r,"description",8000),
-                            AssignmentInput.decimal(r,"maxScore"));
-                }
+            Map<String,Object> merged=contentMap(assignment);
+            merged.putAll(body);
+            AssignmentInput.Draft draft=AssignmentInput.parseDraft(merged);
+            validateAssociations(assignment.offeringId(),draft,false);
+            if(mapper.updateAssignmentDraft(assignment.id(),draft.chapterId(),draft.title(),draft.description(),
+                    draft.estimatedMinutes(),draft.type(),draft.isRequired(),draft.dueAt(),draft.lateUntil(),
+                    draft.allowResubmit(),draft.maxAttempts(),draft.maxScore(),now)==0) throw assignmentAlreadyPublished();
+            if(body.containsKey("requirements")) { mapper.deleteRequirements(assignment.id());insertRequirements(assignment.id(),draft); }
+            if(body.containsKey("rubric")) { mapper.deleteRubric(assignment.id());insertRubric(assignment.id(),draft); }
+            if(body.containsKey("initialFiles")||body.containsKey("type")) {
+                mapper.deleteInitialFiles(assignment.id());insertInitialFiles(assignment.id(),draft);
             }
-            @SuppressWarnings("unchecked")
-            List<Map<String,Object>> filesList=(List<Map<String,Object>>)body.get("initialFiles");
-            if(filesList!=null) {
-                for(Map<String,Object> f:filesList) {
-                    mapper.insertInitialFile(assignment.id(),AssignmentInput.text(f,"path",64),
-                            AssignmentInput.text(f,"content",102400));
-                }
-            }
-            List<String> knowledgePointIds=AssignmentInput.optionalStringList(body,"knowledgePointIds");
-            if(knowledgePointIds!=null) {
-                for(String kpId:knowledgePointIds) mapper.insertKnowledgePoint(assignment.id(),assignment.offeringId(),kpId);
+            if(body.containsKey("knowledgePointIds")) {
+                mapper.deleteKnowledgePoints(assignment.id());insertKnowledgePoints(assignment.id(),assignment.offeringId(),draft);
             }
         } else {
-            // published 仅允许更新 description、dueAt、lateUntil。
-            AssignmentInput.validatePatch(body,"description","dueAt","lateUntil");
-            String description=body.containsKey("description")?AssignmentInput.text(body,"description",8000):assignment.description();
+            for(String key:body.keySet()) {
+                if(!List.of("description","dueAt","lateUntil").contains(key)) throw assignmentAlreadyPublished();
+            }
+            String description=body.containsKey("description")?AssignmentInput.textOrEmpty(body,"description",8000):assignment.description();
             Instant dueAt=body.containsKey("dueAt")?AssignmentInput.timestamp(body,"dueAt"):assignment.dueAt();
             Instant lateUntil=body.containsKey("lateUntil")?AssignmentInput.optionalTimestamp(body,"lateUntil"):assignment.lateUntil();
+            // 不得缩短窗口：dueAt 不能提前；已有补交窗口不能清空或提前；原本为 null 保持 null 不算缩短。
+            if(dueAt.isBefore(assignment.dueAt())) throw assignmentAlreadyPublished();
+            if(assignment.lateUntil()!=null&&(lateUntil==null||lateUntil.isBefore(assignment.lateUntil()))) throw assignmentAlreadyPublished();
             if(lateUntil!=null&&!lateUntil.isAfter(dueAt)) throw AssignmentInput.invalid();
-            // 不得缩短窗口。
-            if(dueAt.isBefore(assignment.dueAt())||
-                    (lateUntil!=null&&assignment.lateUntil()!=null&&lateUntil.isBefore(assignment.lateUntil()))) {
-                throw new BusinessException(HttpStatus.CONFLICT,"CANNOT_SHORTEN_DEADLINE","不得缩短已发布作业的截止时间。");
-            }
             mapper.updateAssignmentPublished(assignment.id(),description,dueAt,lateUntil,now);
         }
         audit.record(user.id(),"ASSIGNMENT_UPDATED","assignment",assignment.id(),Map.of(),requestId);
         return teacherAssignmentView(mapper.findAssignment(assignment.id()));
     }
+    /** 首次发布：完整性校验（与创建同一套规则，另要求关联章节已发布）→ 条件更新 draft→published 并递增 contentVersion
+     *  → 同事务为本班 active 学生写 assignment_published 通知。已发布重复调用按原结果返回，不重复提醒。 */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public TeacherAssignmentDTO publishAssignment(UserDTO user,String assignmentId,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),true);
-        if("archived".equals(assignment.status())) {
-            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
-        }
+        if("archived".equals(assignment.status())) throw assignmentArchived();
         if("draft".equals(assignment.status())) {
+            AssignmentInput.Draft draft=AssignmentInput.parseDraft(contentMap(assignment));
+            validateAssociations(assignment.offeringId(),draft,true);
             Instant now=now();
-            mapper.publishAssignment(assignment.id(),now);
-            audit.record(user.id(),"ASSIGNMENT_PUBLISHED","assignment",assignment.id(),Map.of(),requestId);
+            if(mapper.publishAssignment(assignment.id(),now)==1) {
+                // P1 无 AI 规则版本：current_ai_policy_id 保持 null，响应 aiPolicyVersion=null。
+                int notified=0;
+                for(String studentId:mapper.listActiveStudentIds(assignment.offeringId())) {
+                    mapper.insertNotification(UUID.randomUUID().toString(),studentId,"assignment_published",
+                            "新作业：".concat(assignment.title()),
+                            "教师发布了新作业《".concat(assignment.title()).concat("》，请在截止前完成并提交。"),
+                            assignment.offeringId(),assignment.id(),null,now);
+                    notified++;
+                }
+                audit.record(user.id(),"ASSIGNMENT_PUBLISHED","assignment",assignment.id(),Map.of("notified",notified),requestId);
+            }
         }
         return teacherAssignmentView(mapper.findAssignment(assignment.id()));
     }
@@ -338,17 +290,71 @@ public class AssignmentService {
     public TeacherAssignmentDTO archiveAssignment(UserDTO user,String assignmentId,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),true);
+        if("draft".equals(assignment.status())) {
+            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_NOT_PUBLISHED","草稿作业不能归档。");
+        }
         if("published".equals(assignment.status())) {
-            // 归档检查：拒绝有待评阅提交的归档。
-            int pendingReviews=mapper.countPendingReviews(assignment.id());
-            if(pendingReviews>0) {
-                throw new BusinessException(HttpStatus.CONFLICT,"PENDING_REVIEWS_EXIST","存在待评阅提交，无法归档作业。");
+            if(mapper.countPendingReviews(assignment.id())>0) {
+                throw new BusinessException(HttpStatus.CONFLICT,"ARCHIVE_PENDING_REVIEWS","存在未批阅的当前提交，无法归档作业。");
             }
-            Instant now=now();
-            mapper.archiveAssignment(assignment.id(),now);
+            mapper.archiveAssignment(assignment.id(),now());
             audit.record(user.id(),"ASSIGNMENT_ARCHIVED","assignment",assignment.id(),Map.of(),requestId);
         }
         return teacherAssignmentView(mapper.findAssignment(assignment.id()));
+    }
+    /** 同班校验：章节必须属于本班（发布时还须已发布）；知识点必须属于本班，且绑定章节时须与作业章节一致。 */
+    private void validateAssociations(String offeringId,AssignmentInput.Draft draft,boolean requirePublishedChapter) {
+        if(draft.chapterId()!=null) {
+            String status=mapper.findChapterStatus(draft.chapterId(),offeringId);
+            if(status==null||(requirePublishedChapter&&!"published".equals(status))) throw AssignmentInput.invalid();
+        }
+        if(!draft.knowledgePointIds().isEmpty()) {
+            List<AssignmentMapper.KnowledgePointRef> refs=mapper.listKnowledgePointRefs(offeringId,draft.knowledgePointIds());
+            if(refs.size()!=draft.knowledgePointIds().size()) throw AssignmentInput.invalid();
+            for(AssignmentMapper.KnowledgePointRef ref:refs) {
+                if(ref.chapterId()!=null&&!ref.chapterId().equals(draft.chapterId())) throw AssignmentInput.invalid();
+            }
+        }
+    }
+    /** 把数据库中的作业内容还原为 AssignmentWriteDTO 形状的 Map，用于 PATCH 合并与发布前整体校验。 */
+    private Map<String,Object> contentMap(Assignment a) {
+        Map<String,Object> m=new java.util.HashMap<>();
+        m.put("chapterId",a.chapterId());m.put("title",a.title());m.put("description",a.description());
+        m.put("estimatedMinutes",a.estimatedMinutes());m.put("type",a.type());m.put("isRequired",a.isRequired());
+        m.put("dueAt",a.dueAt().toString());m.put("lateUntil",a.lateUntil()==null?null:a.lateUntil().toString());
+        m.put("allowResubmit",a.allowResubmit());m.put("maxAttempts",a.maxAttempts());m.put("maxScore",a.maxScore());
+        m.put("requirements",mapper.getRequirements(a.id()).stream().map(AssignmentRequirement::requirementText).toList());
+        List<Object> rubric=new ArrayList<>();
+        for(AssignmentRows.RubricCriterion r:mapper.getRubric(a.id())) {
+            Map<String,Object> item=new java.util.HashMap<>();
+            item.put("criterionId",r.criterionId());item.put("title",r.title());
+            item.put("description",r.description());item.put("maxScore",r.maxScore());
+            rubric.add(item);
+        }
+        m.put("rubric",rubric);
+        List<Object> files=new ArrayList<>();
+        for(InitialFile f:mapper.getInitialFiles(a.id())) files.add(Map.of("path",f.filePath(),"content",f.content()));
+        m.put("initialFiles",files);
+        m.put("knowledgePointIds",new ArrayList<Object>(mapper.getKnowledgePointIds(a.id())));
+        return m;
+    }
+    private void insertRequirements(String id,AssignmentInput.Draft d) {
+        for(int i=0;i<d.requirements().size();i++) mapper.insertRequirement(id,i+1,d.requirements().get(i));
+    }
+    private void insertRubric(String id,AssignmentInput.Draft d) {
+        for(AssignmentDTOs.RubricCriterion r:d.rubric()) mapper.insertRubric(id,r.criterionId(),r.title(),r.description(),r.maxScore());
+    }
+    private void insertInitialFiles(String id,AssignmentInput.Draft d) {
+        for(FileDTO f:d.initialFiles()) mapper.insertInitialFile(id,f.path(),f.content());
+    }
+    private void insertKnowledgePoints(String id,String offeringId,AssignmentInput.Draft d) {
+        for(String kp:d.knowledgePointIds()) mapper.insertKnowledgePoint(id,offeringId,kp);
+    }
+    private BusinessException assignmentArchived() {
+        return new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
+    }
+    private BusinessException assignmentAlreadyPublished() {
+        return new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ALREADY_PUBLISHED","已发布作业不能修改核心字段或缩短提交窗口。");
     }
     public SubmissionListResponse listTeacherSubmissions(UserDTO user,String assignmentId,int page,int pageSize) {
         Assignment assignment=assignmentOr404(assignmentId);

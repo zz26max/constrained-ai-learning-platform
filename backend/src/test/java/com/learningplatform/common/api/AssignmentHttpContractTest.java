@@ -405,11 +405,142 @@ class AssignmentHttpContractTest {
 
     @Test
     void archiveWithPendingReviewsReturns409() throws Exception {
-        BusinessException pending = new BusinessException(HttpStatus.CONFLICT, "PENDING_REVIEWS_EXIST", "存在待评阅提交，无法归档作业。");
+        BusinessException pending = new BusinessException(HttpStatus.CONFLICT, "ARCHIVE_PENDING_REVIEWS", "存在未批阅的当前提交，无法归档作业。");
         when(service.archiveAssignment(any(), anyString(), anyString())).thenThrow(pending);
         Operation archive = operations().filter(o -> "archiveAssignment".equals(o.id())).findFirst().orElseThrow();
         mvc.perform(authenticated(archive, TEACHER_TOKEN, true)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("PENDING_REVIEWS_EXIST"));
+                .andExpect(jsonPath("$.error.code").value("ARCHIVE_PENDING_REVIEWS"));
+    }
+
+    // ---- 阶段2：五个教师端作业操作的强形状与错误码断言 ----
+
+    private void assertTeacherAssignmentShape(org.springframework.test.web.servlet.ResultActions result) throws Exception {
+        result.andExpect(jsonPath("$.data.id").value(ID))
+                .andExpect(jsonPath("$.data.offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.chapterId").value(CHAPTER))
+                .andExpect(jsonPath("$.data.title").value("作业一"))
+                .andExpect(jsonPath("$.data.type").value("web_lab"))
+                .andExpect(jsonPath("$.data.isRequired").value(true))
+                .andExpect(jsonPath("$.data.description").value("说明"))
+                .andExpect(jsonPath("$.data.requirements[0]").value("完成功能"))
+                .andExpect(jsonPath("$.data.estimatedMinutes").value(30))
+                .andExpect(jsonPath("$.data.knowledgePointIds").isArray())
+                .andExpect(jsonPath("$.data.dueAt").value("2099-01-01T00:00:00Z"))
+                .andExpect(jsonPath("$.data.lateUntil").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.allowResubmit").value(true))
+                .andExpect(jsonPath("$.data.maxAttempts").value(3))
+                .andExpect(jsonPath("$.data.maxScore").value(100.0))
+                .andExpect(jsonPath("$.data.rubric").isArray())
+                .andExpect(jsonPath("$.data.initialFiles").isArray())
+                .andExpect(jsonPath("$.data.aiPolicyVersion").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.publicationState").value("draft"))
+                .andExpect(jsonPath("$.data.publishedAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.submittedStudentCount").value(0))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(0))
+                // 教师 DTO 不得混入学生视图字段
+                .andExpect(jsonPath("$.data.attemptsUsed").doesNotExist())
+                .andExpect(jsonPath("$.data.canSubmit").doesNotExist())
+                .andExpect(jsonPath("$.data.assignmentState").doesNotExist());
+    }
+
+    @Test
+    void createAssignmentReturns201TeacherAssignmentShape() throws Exception {
+        Operation op = operations().filter(o -> "createAssignment".equals(o.id())).findFirst().orElseThrow();
+        assertTeacherAssignmentShape(mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isCreated()));
+    }
+
+    @Test
+    void getTeacherAssignmentReturnsFullTeacherDtoWithInitialFiles() throws Exception {
+        TeacherAssignmentDTO full = new TeacherAssignmentDTO(null, "作业一", "web_lab", true, "说明",
+                List.of("完成功能"), 30, List.of(CHAPTER), FUTURE, FUTURE.plusSeconds(3600), true, 3,
+                new BigDecimal("100.00"), List.of(new RubricCriterion("c1", "布局", "说明", new BigDecimal("100.00"))),
+                List.of(new FileDTO("index.html", "<h1>x</h1>")), null, ID, OFFERING, "published",
+                Instant.parse("2026-10-14T00:00:00Z"), 2, 1);
+        when(service.getTeacherAssignment(any(), anyString())).thenReturn(full);
+        Operation op = operations().filter(o -> "getTeacherAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chapterId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.publicationState").value("published"))
+                .andExpect(jsonPath("$.data.publishedAt").value("2026-10-14T00:00:00Z"))
+                .andExpect(jsonPath("$.data.lateUntil").value("2099-01-01T01:00:00Z"))
+                .andExpect(jsonPath("$.data.rubric[0].criterionId").value("c1"))
+                .andExpect(jsonPath("$.data.rubric[0].title").value("布局"))
+                .andExpect(jsonPath("$.data.rubric[0].maxScore").value(100.0))
+                .andExpect(jsonPath("$.data.initialFiles[0].path").value("index.html"))
+                .andExpect(jsonPath("$.data.initialFiles[0].content").value("<h1>x</h1>"))
+                .andExpect(jsonPath("$.data.submittedStudentCount").value(2))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(1));
+    }
+
+    @Test
+    void patchAssignmentReturns200TeacherAssignmentShape() throws Exception {
+        Operation op = operations().filter(o -> "patchAssignment".equals(o.id())).findFirst().orElseThrow();
+        assertTeacherAssignmentShape(mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isOk()));
+    }
+
+    @Test
+    void publishAssignmentReturns200TeacherAssignmentShape() throws Exception {
+        Operation op = operations().filter(o -> "publishAssignment".equals(o.id())).findFirst().orElseThrow();
+        assertTeacherAssignmentShape(mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isOk()));
+    }
+
+    @Test
+    void archiveAssignmentReturns200TeacherAssignmentShape() throws Exception {
+        Operation op = operations().filter(o -> "archiveAssignment".equals(o.id())).findFirst().orElseThrow();
+        assertTeacherAssignmentShape(mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isOk()));
+    }
+
+    @Test
+    void patchAfterPublishReturns409AssignmentAlreadyPublished() throws Exception {
+        when(service.patchAssignment(any(), anyString(), anyMap(), anyString())).thenThrow(
+                new BusinessException(HttpStatus.CONFLICT, "ASSIGNMENT_ALREADY_PUBLISHED", "已发布作业不能修改核心字段或缩短提交窗口。"));
+        Operation op = operations().filter(o -> "patchAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ASSIGNMENT_ALREADY_PUBLISHED"));
+    }
+
+    @Test
+    void publishAndPatchOnArchivedAssignmentReturn409AssignmentArchived() throws Exception {
+        BusinessException archived = new BusinessException(HttpStatus.CONFLICT, "ASSIGNMENT_ARCHIVED", "归档作业拒绝继续教学写入。");
+        when(service.publishAssignment(any(), anyString(), anyString())).thenThrow(archived);
+        when(service.patchAssignment(any(), anyString(), anyMap(), anyString())).thenThrow(archived);
+        for (String id : List.of("publishAssignment", "patchAssignment")) {
+            Operation op = operations().filter(o -> id.equals(o.id())).findFirst().orElseThrow();
+            mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("ASSIGNMENT_ARCHIVED"));
+        }
+    }
+
+    @Test
+    void archiveDraftReturns409AssignmentNotPublished() throws Exception {
+        when(service.archiveAssignment(any(), anyString(), anyString())).thenThrow(
+                new BusinessException(HttpStatus.CONFLICT, "ASSIGNMENT_NOT_PUBLISHED", "草稿作业不能归档。"));
+        Operation op = operations().filter(o -> "archiveAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ASSIGNMENT_NOT_PUBLISHED"));
+    }
+
+    @Test
+    void invalidAssignmentContentReturns422AndUnknownFieldReturns400() throws Exception {
+        Operation op = operations().filter(o -> "createAssignment".equals(o.id())).findFirst().orElseThrow();
+        org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_ERROR", "请求参数不符合要求。"))
+                .when(service).createAssignment(any(), anyString(), anyMap(), anyString());
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().is(422))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "请求体包含未知字段。"))
+                .when(service).createAssignment(any(), anyString(), anyMap(), anyString());
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void publishAndArchiveRejectNonEmptyBody() throws Exception {
+        for (String id : List.of("publishAssignment", "archiveAssignment")) {
+            Operation base = operations().filter(o -> id.equals(o.id())).findFirst().orElseThrow();
+            Operation op = new Operation(id, base.method(), base.path(), true, "{\"x\":1}", 200, false);
+            mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
     }
 
     private MockHttpServletRequestBuilder authenticated(Operation op, String token, boolean validCsrf) {

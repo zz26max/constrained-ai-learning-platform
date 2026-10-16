@@ -72,6 +72,10 @@ class AssignmentIntegrationIT {
 
     @BeforeEach
     void reset() {
+        jdbc.update("DELETE FROM notifications");
+        jdbc.update("DELETE FROM notices");
+        jdbc.update("DELETE FROM feedback_rubric_scores");
+        jdbc.update("DELETE FROM feedback");
         jdbc.update("DELETE FROM submission_rubric_snapshot");
         jdbc.update("DELETE FROM submission_requirements_snapshot");
         jdbc.update("DELETE FROM submission_files");
@@ -177,7 +181,7 @@ class AssignmentIntegrationIT {
         // 归档作业（有待评阅提交时拒绝）
         assertThatThrownBy(() -> assignmentService.archiveAssignment(TEACHER, published.id(), "archive-fail"))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("PENDING_REVIEWS_EXIST");
+                    assertThat(e.getCode()).isEqualTo("ARCHIVE_PENDING_REVIEWS");
                     assertThat(e.getStatus().value()).isEqualTo(409);
                 });
 
@@ -410,6 +414,271 @@ class AssignmentIntegrationIT {
                 });
     }
 
+    private static void assertCode(Throwable t, int status, String code) {
+        assertThat(t).isInstanceOfSatisfying(BusinessException.class, e -> {
+            assertThat(e.getCode()).isEqualTo(code);
+            assertThat(e.getStatus().value()).isEqualTo(status);
+        });
+    }
+
+    @Test
+    void publishCreatesAssignmentPublishedNotificationsForActiveStudentsOnly() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        enrollStudent(offering.id(), OTHER_STUDENT);
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        // 草稿阶段不产生通知
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE related_assignment_id=?", Integer.class, draft.id())).isZero();
+
+        TeacherAssignmentDTO published = assignmentService.publishAssignment(TEACHER, draft.id(), "publish");
+        assertThat(published.aiPolicyVersion()).isNull();
+        assertThat(jdbc.queryForObject("SELECT content_version FROM assignments WHERE id=?", Integer.class, draft.id())).isEqualTo(1);
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT recipient_id,type,related_offering_id,related_assignment_id,is_read FROM notifications WHERE related_assignment_id=? ORDER BY recipient_id",
+                draft.id());
+        assertThat(rows).hasSize(2);
+        assertThat(rows).extracting(r -> r.get("recipient_id")).containsExactlyInAnyOrder(STUDENT.id(), OTHER_STUDENT.id());
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.get("type")).isEqualTo("assignment_published");
+            assertThat(r.get("related_offering_id")).isEqualTo(offering.id());
+            assertThat(((Number) r.get("is_read")).intValue()).isZero();
+        });
+        // 教师不收到通知；学生可经通知接口读到该类型
+        assertThat(assignmentService.listMyNotifications(STUDENT, 1, 20).items())
+                .extracting(NotificationDTO::type).containsExactly("assignment_published");
+
+        // 重复发布不重复提醒
+        assignmentService.publishAssignment(TEACHER, draft.id(), "publish-again");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE related_assignment_id=?", Integer.class, draft.id())).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT content_version FROM assignments WHERE id=?", Integer.class, draft.id())).isEqualTo(1);
+    }
+
+    @Test
+    void publishRejectsIncompleteOrInconsistentDraftAndArchivedAssignment() {
+        OfferingDTO offering = createOffering();
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        // 绕过校验写入量规总分不一致的数据，发布时必须再次校验
+        jdbc.update("UPDATE assignment_rubric_criteria SET max_score=10 WHERE assignment_id=? AND criterion_id='layout'", draft.id());
+        assertThatThrownBy(() -> assignmentService.publishAssignment(TEACHER, draft.id(), "publish"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        assertThat(jdbc.queryForObject("SELECT status FROM assignments WHERE id=?", String.class, draft.id())).isEqualTo("draft");
+
+        // 关联章节未发布 -> 不能发布
+        TeacherAssignmentDTO chapterDraft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create2");
+        String chapterId = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO chapters(id,offering_id,position,title,summary,status,is_required,content_version,published_at,created_at,updated_at) VALUES(?,?,1,'章','','draft',1,1,NULL,?,?)",
+                chapterId, offering.id(), ts(NOW), ts(NOW));
+        jdbc.update("UPDATE assignments SET chapter_id=? WHERE id=?", chapterId, chapterDraft.id());
+        assertThatThrownBy(() -> assignmentService.publishAssignment(TEACHER, chapterDraft.id(), "publish2"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+
+        // 归档作业再发布 -> 409 ASSIGNMENT_ARCHIVED
+        TeacherAssignmentDTO ok = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create3");
+        assignmentService.publishAssignment(TEACHER, ok.id(), "publish3");
+        assignmentService.archiveAssignment(TEACHER, ok.id(), "archive3");
+        assertThatThrownBy(() -> assignmentService.publishAssignment(TEACHER, ok.id(), "publish4"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
+    }
+
+    @Test
+    void archiveDraftReturns409AssignmentNotPublishedAndIsIdempotentWhenArchived() {
+        OfferingDTO offering = createOffering();
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assertThatThrownBy(() -> assignmentService.archiveAssignment(TEACHER, draft.id(), "archive"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_NOT_PUBLISHED"));
+        assertThat(jdbc.queryForObject("SELECT status FROM assignments WHERE id=?", String.class, draft.id())).isEqualTo("draft");
+
+        assignmentService.publishAssignment(TEACHER, draft.id(), "publish");
+        assertThat(assignmentService.archiveAssignment(TEACHER, draft.id(), "archive").publicationState()).isEqualTo("archived");
+        // 幂等归档：再次归档返回原结果
+        assertThat(assignmentService.archiveAssignment(TEACHER, draft.id(), "archive-again").publicationState()).isEqualTo("archived");
+    }
+
+    @Test
+    void archiveWithPendingReviewReturns409ThenSucceedsAfterFeedbackPublished() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 0);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V1")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), save, "save");
+        Map<String, Object> submit = new HashMap<>();
+        submit.put("workspaceRevision", 1);
+        submit.put("reflection", "完成");
+        var created = assignmentService.submitAssignment(STUDENT, assignment.id(), submit, "submit");
+
+        assertThatThrownBy(() -> assignmentService.archiveAssignment(TEACHER, assignment.id(), "archive"))
+                .satisfies(t -> assertCode(t, 409, "ARCHIVE_PENDING_REVIEWS"));
+        assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).pendingReviewCount()).isEqualTo(1);
+
+        // 直接写入已发布评价行：P1-C publishFeedback 的通知类型与 ck_notifications_type 不一致（见汇报），此处不依赖它。
+        jdbc.update("INSERT INTO feedback(id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'published',1,'不错',90,?,?,?)",
+                UUID.randomUUID().toString(), created.submission().id(), assignment.id(), offering.id(), STUDENT.id(),
+                TEACHER.id(), ts(NOW), ts(NOW), ts(NOW));
+
+        assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).pendingReviewCount()).isZero();
+        assertThat(assignmentService.archiveAssignment(TEACHER, assignment.id(), "archive").publicationState()).isEqualTo("archived");
+    }
+
+    @Test
+    void patchPublishedCoreFieldReturns409AndDeadlineRulesFollowContract() {
+        OfferingDTO offering = createOffering();
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, draft.id(), "publish");
+
+        for (Map<String, Object> core : List.of(Map.<String, Object>of("title", "新标题"), Map.<String, Object>of("maxScore", 50),
+                Map.<String, Object>of("requirements", List.of("x")), Map.<String, Object>of("maxAttempts", 9))) {
+            assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), core, "patch"))
+                    .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ALREADY_PUBLISHED"));
+        }
+        assertThat(jdbc.queryForObject("SELECT title FROM assignments WHERE id=?", String.class, draft.id())).isEqualTo("作业一");
+
+        // 缩短 dueAt / 清空既有补交窗口 / 提前 lateUntil -> 409 ASSIGNMENT_ALREADY_PUBLISHED
+        Instant due = NOW.plus(Duration.ofDays(7));
+        Instant late = NOW.plus(Duration.ofDays(10));
+        Map<String, Object> shorten = new HashMap<>();
+        shorten.put("dueAt", due.minusSeconds(60).toString());
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), shorten, "p1"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ALREADY_PUBLISHED"));
+        Map<String, Object> clear = new HashMap<>();
+        clear.put("lateUntil", null);
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), clear, "p2"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ALREADY_PUBLISHED"));
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("lateUntil", late.minusSeconds(60).toString()), "p3"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ALREADY_PUBLISHED"));
+
+        // 延长窗口与澄清 description 允许
+        TeacherAssignmentDTO updated = assignmentService.patchAssignment(TEACHER, draft.id(),
+                Map.of("description", "补充说明", "dueAt", due.plus(Duration.ofDays(1)).toString(),
+                        "lateUntil", late.plus(Duration.ofDays(1)).toString()), "p4");
+        assertThat(updated.description()).isEqualTo("补充说明");
+        assertThat(updated.dueAt()).isEqualTo(due.plus(Duration.ofDays(1)));
+        assertThat(updated.publicationState()).isEqualTo("published");
+
+        // 归档后修改 -> ASSIGNMENT_ARCHIVED
+        assignmentService.archiveAssignment(TEACHER, draft.id(), "archive");
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("description", "x"), "p5"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
+    }
+
+    @Test
+    void patchDraftAppliesPartialUpdateAndRevalidatesMergedContent() {
+        OfferingDTO offering = createOffering();
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+
+        TeacherAssignmentDTO renamed = assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("title", "改名"), "p1");
+        assertThat(renamed.title()).isEqualTo("改名");
+        assertThat(renamed.rubric()).hasSize(2);
+        assertThat(renamed.requirements()).containsExactly("实现响应式布局", "通过所有测试");
+        assertThat(renamed.initialFiles()).hasSize(1);
+
+        // null 仅清空可空字段
+        Map<String, Object> clearLate = new HashMap<>();
+        clearLate.put("lateUntil", null);
+        assertThat(assignmentService.patchAssignment(TEACHER, draft.id(), clearLate, "p2").lateUntil()).isNull();
+
+        // 合并后量规总分与 maxScore 不一致 -> 422，且不落库
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("maxScore", 80), "p3"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        assertThat(jdbc.queryForObject("SELECT max_score FROM assignments WHERE id=?", BigDecimal.class, draft.id()))
+                .isEqualByComparingTo("100");
+        // 同时改 maxScore 与量规 -> 通过
+        TeacherAssignmentDTO rescored = assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("maxScore", 50,
+                "rubric", List.of(Map.of("criterionId", "all", "title", "整体", "description", "d", "maxScore", 50))), "p4");
+        assertThat(rescored.maxScore()).isEqualByComparingTo("50");
+        assertThat(rescored.rubric()).extracting(RubricCriterion::criterionId).containsExactly("all");
+        // 改 type 但文件不匹配 -> 400 INVALID_FILE_PATH
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("type", "sql_text"), "p5"))
+                .satisfies(t -> assertCode(t, 400, "INVALID_FILE_PATH"));
+        // 未知字段 400；空对象 422
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of("bogus", 1), "p6"))
+                .satisfies(t -> assertCode(t, 400, "INVALID_REQUEST"));
+        assertThatThrownBy(() -> assignmentService.patchAssignment(TEACHER, draft.id(), Map.of(), "p7"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+    }
+
+    @Test
+    void createAssignmentValidatesContractRulesAndDefaultsOptionalFields() {
+        OfferingDTO offering = createOffering();
+        // chapterId / lateUntil 可省略，默认 null；响应为教师 DTO
+        Map<String, Object> minimal = assignmentBody();
+        minimal.remove("chapterId");
+        minimal.remove("lateUntil");
+        TeacherAssignmentDTO created = assignmentService.createAssignment(TEACHER, offering.id(), minimal, "create");
+        assertThat(created.chapterId()).isNull();
+        assertThat(created.lateUntil()).isNull();
+        assertThat(created.publicationState()).isEqualTo("draft");
+        assertThat(created.publishedAt()).isNull();
+        assertThat(created.aiPolicyVersion()).isNull();
+        assertThat(created.initialFiles()).hasSize(1);
+        assertThat(created.rubric()).hasSize(2);
+
+        // 量规总分 != maxScore
+        Map<String, Object> badSum = assignmentBody();
+        badSum.put("maxScore", new BigDecimal("90.00"));
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), badSum, "c1"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // criterionId 重复
+        Map<String, Object> dup = assignmentBody();
+        dup.put("rubric", List.of(
+                Map.of("criterionId", "a", "title", "t", "description", "d", "maxScore", new BigDecimal("50.00")),
+                Map.of("criterionId", "a", "title", "t", "description", "d", "maxScore", new BigDecimal("50.00"))));
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), dup, "c2"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // 文件与 type 不匹配
+        Map<String, Object> badFile = assignmentBody();
+        badFile.put("initialFiles", List.of(Map.of("path", "answer.sql", "content", "SELECT 1")));
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), badFile, "c3"))
+                .satisfies(t -> assertCode(t, 400, "INVALID_FILE_PATH"));
+        // lateUntil <= dueAt
+        Map<String, Object> badLate = assignmentBody();
+        badLate.put("lateUntil", badLate.get("dueAt"));
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), badLate, "c4"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // aiPolicyVersion 非 null / 缺必填 / 未知字段
+        Map<String, Object> ai = assignmentBody();
+        ai.put("aiPolicyVersion", 1);
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), ai, "c5"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        Map<String, Object> missing = assignmentBody();
+        missing.remove("requirements");
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), missing, "c6"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        Map<String, Object> unknown = assignmentBody();
+        unknown.put("bogus", true);
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), unknown, "c7"))
+                .satisfies(t -> assertCode(t, 400, "INVALID_REQUEST"));
+        // 章节 / 知识点不属于本班
+        Map<String, Object> foreignChapter = assignmentBody();
+        foreignChapter.put("chapterId", UUID.randomUUID().toString());
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), foreignChapter, "c8"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        Map<String, Object> foreignKp = assignmentBody();
+        foreignKp.put("knowledgePointIds", List.of(UUID.randomUUID().toString()));
+        assertThatThrownBy(() -> assignmentService.createAssignment(TEACHER, offering.id(), foreignKp, "c9"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // 校验失败不留脏数据
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assignments", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void teacherAssignmentAccessHidesOtherTeachersAndStudents() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO draft = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        TeacherAssignmentDTO fetched = assignmentService.getTeacherAssignment(TEACHER, draft.id());
+        assertThat(fetched.id()).isEqualTo(draft.id());
+        assertThat(fetched.initialFiles()).hasSize(1);
+        assertThat(fetched.submittedStudentCount()).isZero();
+        // 学生角色 -> 403；
+        assertThatThrownBy(() -> assignmentService.getTeacherAssignment(STUDENT, draft.id()))
+                .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+    }
+
     private OfferingDTO createOffering() {
         return courseService.createOffering(TEACHER, Map.of("courseId", COURSE, "termId", TERM,
                 "title", "作业测试班", "groupName", "一班", "progressUnit", "chapter"), "offering");
@@ -435,7 +704,9 @@ class AssignmentIntegrationIT {
         body.put("maxAttempts", 3);
         body.put("maxScore", new BigDecimal("100.00"));
         body.put("requirements", List.of("实现响应式布局", "通过所有测试"));
-        body.put("rubric", List.of());
+        body.put("rubric", List.of(
+                Map.of("criterionId", "layout", "title", "布局", "description", "响应式布局", "maxScore", new BigDecimal("60.00")),
+                Map.of("criterionId", "quality", "title", "代码质量", "description", "结构清晰", "maxScore", new BigDecimal("40.00"))));
         body.put("initialFiles", List.of(Map.of("path", "index.html", "content", "<!DOCTYPE html>\n<html>\n<body>\n</body>\n</html>")));
         body.put("knowledgePointIds", List.of());
         return body;
