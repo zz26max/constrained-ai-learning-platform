@@ -6,6 +6,8 @@
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
+> **2026-10-16 P1 浏览器续验结论：未通过，不能整体标为 `verified`。** 正式页面已验证登录、开班/发章/入班、三类文件保存与提交、评价草稿隔离和发布、消息手动已读、首页/学习记录/公告、归档只读与跨班拒绝；但复现了立即提交丢失最新编辑、切页无提醒丢失未保存文字、教师创建/编辑作业失败，以及教师缺提交选择入口、Web 预览未实现等阻塞。详情、资源 ID 和证据位置见 [3.4 浏览器联调](#p1-browser-integration)。本轮仅测试与定位，未修生产代码、未改接口契约或实现状态；常规检查仍为前端 170、后端 379 + 202 项全部通过，HTTP 负例 30/30 通过。
+
 > **2026-10-16 全量核对与后端对齐（以 openapi.yaml 1.1.0 为准）**：核对发现下列"已完成"自述不实，P1-B 核对的 10 个操作中 9 个与契约不符，P1-C 的 9 个、P1-D 的 9 个全部不符。同日已按契约逐项修复后端并分批提交：`3008f19`、`5f5fa22`（P1-B）、`e716dde`、`443a5f9`（P1-C）、`2dac32e`、`b4fcf42`（P1-D）；契约占位响应修复见 `82977c9`。最近一次 `./mvnw.cmd --batch-mode verify`（`b4fcf42` 工作区）结果：379 个单测/契约测试、198 个 IT（Testcontainers + MySQL）全部通过，BUILD SUCCESS。
 >
 > 可信度：P0-A 高（有真实联调）；P1-A 基本符合（抽样 18 个操作中 11 个一致，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异，未修）；P1-B/C/D 后端已对齐并有逐字段断言与真实数据库用例，但 `x-implementation-status` 仍为 `implemented`，不得标为 `verified`（原因见下方 2026-10-16 联调记录）。
@@ -37,7 +39,7 @@
 >
 > **P1-D 前端 UI（`f4a1e1a`，2026-10-16）**：已实现学生首页 `/student/home`、学习记录 `/student/progress[/:offeringId]`、课程公告列表与详情、教师工作台四张统计卡片、`targetRoute` 消息目标跳转，作业列表与详情补"已归档/已逾期"标签与 `submissionBlockedReason` 文案；学生默认入口改为 `/student/home`。`npm --prefix frontend run verify`：17 个测试文件、170 个用例通过，`check:no-mock` PASS。实现中确认两处设计稿与契约不符并已更正：`getMyLearningRecords` 无分页参数（前端对 `feedbackPage.items` 本地切片，每页 10 条）；`dueAt` 为必填（"无截止时间"仅为防御显示）。教师作业统计页、教师查看学生学习记录页按设计不做。`src/mocks/dashboard.ts` 未补场景数据。
 
-**前端仍缺**：浏览器级走查（P1-D 页面从未在真实浏览器里打开过）；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
+**前端仍缺**：浏览器级续验已开展，P1-D 页面已在真实后端上打开验证，但 P1 闭环被本次发现的问题阻断，详见 3.4；慢网络、保存超时恢复与预览隔离等尚未完成验收。`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图。不能整体标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
 >
 > 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调（HTTP 级已完成，浏览器级待做）；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI（已完成，`f4a1e1a`）；③ 浏览器级走查，按验收场景走通后标 `verified`；④ 进入 P2-A。
 
@@ -62,6 +64,8 @@
   - 接通前端：`main.ts` 注册 `AssignmentsApi`，通知中心与教师评价编辑器接入路由，P1-D 客户端改用生成类型
   - 之后才做 P1-D 前端 UI 或进入 P2
   - 不重新创建已有工程或重复实现认证、课程接口。
+
+- **最新接手入口（2026-10-16 浏览器续验后，覆盖上面的历史“下一包”）**：后端契约对齐、前端客户端与 P1-D 最小 UI 已完成，现应先处理 [3.4](#p1-browser-integration) 的 P1 阻塞：工作区保存/提交协调及离开保护 → 教师作业创建/PATCH → 提交列表与批阅入口 → Web 受限预览；每包按本端检查、提交、续验。测试发现不代表已修复；本次没有授权或实施契约调整，不提前进入 P2。
 
 2026-10-13 定向检查发现的 5 个认证问题均已修复，各有先失败后通过的回归测试：
 
@@ -119,6 +123,49 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 | 非归档 `.md` 本地链接逐一解析 | 无失效链接 | 文档内部引用自洽 |
 
 本次仅调整文档结构与事实描述，未改动业务代码、契约字段与业务规则。README 中与代码不符的两处描述（教学业务端点状态、Flyway 版本范围）已修正；原 README 的 IDEA 调试内容迁至 [DEBUGGING](DEBUGGING.md)，新增 [文档索引](README.md)。
+
+<a id="p1-browser-integration"></a>
+
+### 3.4 P1 正式页面浏览器续验（2026-10-16，代码基点 `4e9abe1`）
+
+**结论：P1 尚不能验收。** 本轮用户指派为继续前后端联调测试，因此只记录测试证据与定位，不修改前后端生产代码、契约或 `x-implementation-status`。正常路径与失败路径均使用真实 API，没有 mock 回退。静态/集成测试全通过不抵消下表的浏览器失败。
+
+环境与数据：现有后端 8080、Vite 4173、本地 MySQL 3307/Flyway V9；浏览器分别用 `localhost:4173` 与 `127.0.0.1:4173` 保持教师和学生会话，均经同源代理。凭据仅在内存从 `backend/.env` 读取用于登录，未写入证据或 Git。新建独立验收教学班 `a7c51322-4426-48d9-8630-17e18078d56e`（浏览器联调-1016-P1）、章节 `caaba527-3ef5-4a9b-8c8d-c9c4cf5008c0`；开班、发章、邀请码、学生加入和确认阅读均通过页面完成。教师作业表单被阻断后，为继续验证下游，用真实 HTTP 建立并发布三类作业、过期作业及公告；这些准备步骤不算教师创建页面通过。临时脚本的部分夹具中文有编码损坏，按 UUID 验证，不将其误报为产品编码问题；未清除既有或本轮测试数据。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| `npm --prefix frontend run verify` | 类型检查、构建、`check:no-mock` PASS；17 个测试文件、170 个用例通过 |
+| backend：`./mvnw.cmd --batch-mode verify` | 379 个单元/HTTP 测试 + 202 个真实 MySQL IT；0 failure/error/skipped，BUILD SUCCESS，耗时 4:29，20:38:57 +08:00 完成 |
+| `.contract-venv/Scripts/python.exe scripts/validate_contract.py` | PASS；83 个业务操作 + 2 个健康检查、325 个 schema、29 个示例、41 个回归场景、93 个当前文档链接（本轮添加链接前） |
+| 既有 HTTP 负例脚本 `D:/tmp/lp/s7.py` 安全重跑 | 30/30 PASS：未登录、角色越权、不可见对象、CSRF、坏 JSON/未知字段、无效邀请码、requestId 与退出失效；无 Origin/外域 Origin 均观察到 403。脚本末尾旧路径 `/me/learning-records` 的额外探测不计入通过项，真实学习记录路径已另按契约验证 |
+| 浏览器动作后的 HTTP 读回 | 25 个 GET 全部 200；核对三类 workspace/提交快照、已发布评价/消息、dashboard/learningRecords/overview；Web revision 2 旧内容、SQL/Text revision 1；过期作业 revision 1 且 0 提交。另按前端请求重现无时区创建 422 `VALIDATION_ERROR`、完整草稿 PATCH 400 `INVALID_REQUEST`，前后草稿与作业列表相同（6→6），负例未写入 |
+| 登录/导航/课程 | 教师与学生登录、切换账号、整页刷新恢复；开班→发章→邀请码→入班→确认阅读，刷新仍为已读；学生教师路由进入权限不足页；他班作业显示不可访问且无数据残留（requestId `8fec5188-80ec-4ac6-b51a-fec11cc5cd84`） |
+| 三类工作区 | Web 的 HTML/CSS 切换保留内存修改；三类保存到服务端并提交，SQL/Text 在确认已保存后正常提交；Text 整页刷新恢复 revision 1。SQL/文字无执行入口。立即提交另见失败项 B1 |
+| 双标签页 | SQL 两页从 revision 0 打开；第一页保存 `SELECT 101 AS tab_one_saved;` 成为 revision 1；第二页保存 `SELECT 202 AS tab_two_local;` 被拒，显示“工作区版本冲突，请刷新后重试。”且本地文本保留。无比较/恢复入口，未证明完整冲突恢复通过 |
+| 批阅/反馈 | 经已知 submissionId 深链打开教师页；看到不可变文件快照；88 分总分与量规保存草稿，整页刷新恢复；独立学生会话看不到草稿；发布后教师只读、学生能看到 88 分及评语。消息发布可见；阅读后的已读缺陷见 B5 |
+| P1-D 页面 | 首页两班、课程进度与待办；学习记录从空态变为 1 个实验、1 份公开评价，P2 掌握分析明确未开放；公告列表空态/详情及 assignment target 跳转；教师卡片反映学生 1、进行中作业 4、待批阅 2。SQL/Text 不计入“实验已完成”符合既定口径 |
+| 归档/期限/文本安全 | 既有归档 Text 作业详情可读，工作区 textarea 与提交禁用；过期作业可练习保存，正式提交被服务端拒绝（B6）。标题/公告中的 img/script 探针未生成标题图片或设置 DOM 标记，反馈 Markdown 未执行探针；Web 沙箱因尚无实现而无法验收 |
+
+浏览器复现与代码定位（**以下均未修复**）：
+
+| 编号 | 影响与可复现结果 | 定位/证据 |
+| --- | --- | --- |
+| B1 · 阻塞/丢作品 | Web 已保存到 revision 2 后，把 `BASELINE_V1` 改成 `LATEST_MUST_BE_SUBMITTED`，在 859ms 内完成打开提交、填写反思、确认。页面显示已提交，返回工作区仍为 revision 2/旧文本；教师提交快照同样只有 `BASELINE_V1`，最新编辑被取消且丢失 | `frontend/src/features/assignments/WorkspaceEditor.vue` 的 `submitAssignment()` 先 `cancelPending()`、直接提交 `lastSavedRevision`；`use-debounced-save.ts` 防抖时也未及时置待保存。提交 `5c996cf0-049b-4635-913a-10ce79cacb93`；证据 `04`、`08` 及 `readback-web-immediate.json` |
+| B2 · 阻塞/丢作品 | Text 输入 `UNSAVED_ROUTE_CHANGE_MUST_WARN`，65ms 后点击“我的作业”，没有离开确认；重进工作区已回到模板，未保存文本丢失 | `WorkspaceEditor.vue` 卸载时取消待保存，没有路由离开/刷新保护 |
+| B3 · 阻塞/教师创建与编辑失败 | 创建页按日期控件填写 `2026-10-23T22:00` 后保存提示参数不符合要求（requestId `509b1e71-3cc3-4bf7-92d6-b20c0d11c141`）；已有正常中文 Web 草稿仅改描述再保存提示未知字段（`d1da38e8-1e16-49d2-880d-82764fbbdac3`）；重开草稿的截止时间控件为空；按同样字段独立 HTTP 复现分别为 422 `VALIDATION_ERROR` 与 400 `INVALID_REQUEST` | `AssignmentEditor.vue` 原样发送 `datetime-local`，未转换契约 UTC；PATCH 发送完整对象并包含不允许的 `aiPolicyVersion`；后端 `AssignmentInput` 拒绝。证据 `01`、`07`、`final-http-audit.json`。创建页也没有 SQL/Text 类型、章节、模板与量规配置控件 |
+| B4 · 阻塞/页面主链不完整 | 有待评后工作台会显示“去批阅”，但只进入作业列表；点作业只到编辑表单，没有学生提交列表或选择批阅入口。本轮批阅靠已知提交深链；学生作业详情也没有已提交作品/历史快照展示 | `AssignmentManagement.vue`、`AssignmentEditor.vue`、`AssignmentDetail.vue`；不能把深链页面可用等同完整教师操作链通过 |
+| B5 · 一致性 | 学生刷新成功看到正式评价，或从新反馈消息“查看”进入评价后，回消息页仍为“未读”（14 条）；点击手动“标为已读”后才变 13 条，首页随后也显示 13 | `AssignmentDetail.vue`/`StudentFeedbackView.vue` 不按 `messageId` 显式标读；证据 `09`。代码另见消息只保留 assignmentId、丢指定 feedbackId，未制造旧评价场景复现 |
+| B6 · 一致性 | 过期作业详情正确提示“提交窗口已关闭”，但进入工作区并练习保存后“提交作业”可点；确认后才显示同一拒绝原因（requestId `f60977bb-0ba9-4512-8923-b94cdf9a4bd0`） | `WorkspaceEditor.vue` 以 `canSave` 代替正式 `canSubmit`；证据 `06`；后端拒绝有效 |
+| B7 · 未实现 | Web 工作区仅三个文本文件，没有“预览效果”、iframe、sandbox 或消息桥 | 无法执行 DEVELOPMENT §6/FRONTEND §8 的恶意预览隔离验收；不能标为通过 |
+| B8 · 错误未呈现 | Web 尚有待评提交时点“归档”，仍留原列表，无原因或 requestId 提示 | `AssignmentManagement.vue` 没有渲染 `actions.error/message`；`use-debounced-save.ts` 冲突分支另外写成不存在的 `VERSION_CONFLICT`，未实现暂停/比较/恢复流程 |
+
+额外代码审查发现（**未构造 21 份评价做浏览器复现**）：`DashboardService` 固定返回最近 20 份评价，`LearningRecordsPage.vue` 按 `items.length` 本地切页，忽略更大的 `total`；超过 20 份的历史不可访问且无截断说明。契约没有分页请求参数，后续若扩分页须按 AGENTS 先确认契约/产品规则，不能自行加兼容字段。
+
+本轮未完成：慢网络连续编辑与迟到响应、保存超时/断网后的结果核对、完整双标签冲突恢复、截止瞬间竞态、晚加入学生的旧公告浏览器场景、旧反馈身份跳转、完整预览安全矩阵、21 份以上评价历史。P2/P3 功能仍未实现；本轮不将这些场景写成通过。
+
+证据均在本机 `D:/tmp/lp/browser-p1/`，不入库：`fixture.json`、`http-negative-s7.txt`、`fixture-readonly-check.json`；`evidence/` 下 `01-create-assignment-rejected.png`、`02-cross-offering-denied.png`、`03-archived-workspace-readonly.png`、`04-immediate-submit-lost-edit.png`、`05-two-tab-conflict.png`、`06-expired-submit-rejected.png`、`07-draft-patch-rejected.png`、`08-teacher-snapshot-old-content.png`、`09-feedback-still-unread.png`、`readback-web-immediate.json`、`final-http-audit.json`、`browser-observations.json`。这些是本机测试证据，不是可移植自动化测试。Maven 报告仍在 `backend/target/surefire-reports/`、`failsafe-reports/`。浏览器测试结束后两个会话均已退出；原有服务继续运行。文档变更后重跑契约校验 PASS（95 个当前文档链接），`git diff --check` 无错误。
+
+工具链：Node v24.17.0/npm 11.13.0（低于仓库 24.21.0/11.19.0 基线，不等同 CI）；Java 21.0.11、Docker 29.3.1、Testcontainers MySQL 8.4.11。本轮自主决定：复用现有服务、增加独立虚构验收班、在教师表单阻断后用 HTTP 准备下游数据，并保留证据和数据供修复后复验。
 
 ## 4. 已知限制
 
