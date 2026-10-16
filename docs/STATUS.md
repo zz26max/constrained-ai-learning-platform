@@ -14,7 +14,13 @@
 >
 > 其他已修复：错误码改为契约登记值；`DashboardDTO`、`LearningRecordsDTO`、`AssignmentStatsDTO`、`NoticeDTO` 等按契约重写；`getAssignment`、`getSubmission` 增加教师视图；`publishedFeedbackId`、`feedbackStatus`、`pendingReviewCount` 改为真实值；评价保存/发布、提交增加行锁与幂等；个人公告不再对全班可见；`getMyLearningRecords`/`markMessagesAsRead` 的 200 响应占位已替换。
 >
-> **后端遗留（未改，部分需要迁移，属红线，须你决定）**：
+> **迁移遗留处置（2026-10-16 已决定，V9 待用户回复"执行 V9"后实施，放在跨端联调之前）**：
+> - 公告 `target`：原描述有误。契约 `NoticeDTO.target` 是关联内容（`TargetDTO`：type/id/offeringId），不是定向学生，不能复用 `target_student_id`。V9 给 `notices` 加可空的 `target_type`、`target_id`，CHECK 两列同为空或同非空，type 取值与 `TargetDTO.type` 一致；后端取消"非 null 返回 422"，写入时校验目标属于本班。实现前先用 `contract_slice.py createNotice` 核对请求体。
+> - 量规评语长度：V9 把 `feedback_rubric_scores.comment` 改为 `VARCHAR(8000)`，后端校验同步改为 8000。
+> - `knowledgeEvaluations` / `issueTags`：推迟到 P2-B，与知识证据、规则版本一起设计存储；P1 继续只接受空数组，P1 验收不依赖它们。
+> - 实施方式：派一个 Sonnet 子代理写 V9、后端校验与真实库 IT；主会话在 backend/ 下跑 `./mvnw.cmd --batch-mode verify` 通过后，以 `backend:` 前缀提交，并更新下方遗留清单。
+>
+> **后端遗留（未改）**：
 > - `createNotice` 部分对齐：`notices` 表没有 target 列，`target` 只接受 null，非 null 返回 422，定向公告目前无法通过 API 创建；`recipientCount` 靠通知记录推算；通知内容截断到 2000 字（`notifications.content` 为 VARCHAR(2000)）。
 > - `saveFeedback`：`knowledgeEvaluations`、`issueTags` 无存储列，只接受空数组；量规项 comment 按 2000 校验（契约 8000）；`issueTagVersion` 恒为 null。
 > - 恒为空或 null：`needsPracticeCount`、`aiPolicyVersion`、`commonIssues`、`pendingHelpCount`；`course_notice`、`help_reply` 类消息 P1 无数据来源。
