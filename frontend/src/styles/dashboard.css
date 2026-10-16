@@ -1,0 +1,28 @@
+/* P1-D：首页、学习记录、公告、教师统计卡片。颜色：蓝=操作、绿=完成、橙=逾期、红=错误；状态均带文字。 */
+.dashboard-page .dash-section{padding:20px 24px;margin-bottom:16px}
+.dashboard-page .dash-section h2{font-size:16px;font-weight:600;margin:0 0 12px}
+.dashboard-page .dash-section h3{font-size:16px;font-weight:600;margin:0 0 6px}
+.dashboard-page .section-heading h2{margin:0}
+.dash-summary{display:flex;flex-wrap:wrap;gap:12px 28px;list-style:none;margin:0 0 16px;padding:0;font-size:14px}
+.dash-summary a{display:inline-flex;align-items:center;min-height:var(--min-touch)}
+.dash-summary strong{font-size:20px;font-variant-numeric:tabular-nums}
+.dash-list{list-style:none;margin:0;padding:0}
+.dash-list>li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;min-height:var(--min-touch);padding:8px 0}
+.dash-list>li+li{border-top:1px solid var(--line)}
+.dash-list a{display:inline-flex;align-items:center;min-height:var(--min-touch)}
+.dash-text{font-size:14px;line-height:1.7;margin:4px 0 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.dash-courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;list-style:none;margin:0;padding:0}
+.dash-course{border:1px solid var(--line);border-radius:var(--radius-panel);padding:16px;min-width:0}
+.dash-course p{margin:6px 0}
+.dash-badges,.dash-links{display:flex;flex-wrap:wrap;gap:8px 14px}
+.dash-links a{display:inline-flex;align-items:center;min-height:var(--min-touch)}
+.workspace-page .tag.tag-overdue{color:var(--orange);background:var(--orange-soft)}
+.workspace-page .tag.tag-error{color:var(--red);background:var(--red-soft)}
+.heading-links{display:flex;flex-wrap:wrap;gap:10px}
+.notice-title{font-size:16px;font-weight:600;margin:0}
+.notice-content{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.8;margin:0 0 16px}
+.stat-cards{margin-bottom:16px}
+.stat-card-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;list-style:none;margin:0;padding:0}
+.stat-card{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:var(--radius-panel);background:var(--surface);padding:14px 16px;min-width:0}
+.stat-card strong{font-size:24px;font-variant-numeric:tabular-nums}
+.stat-card a{display:inline-flex;align-items:center;min-height:var(--min-touch)}

@@ -61,7 +61,7 @@ describe('P1-A 路由守卫', () => {
     setActivePinia(createPinia())
     setAuthenticated('student')
     const studentRouter = await newRouter('/login')
-    expect(studentRouter.currentRoute.value.path).toBe('/course')
+    expect(studentRouter.currentRoute.value.path).toBe('/student/home')
   })
 
   it('bootStatus 为 error 时导航会调用重试并继续分流', async () => {

@@ -6,7 +6,7 @@ import ApiState from '../../components/ApiState.vue'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import StudentFeedbackView from './StudentFeedbackView.vue'
 import { usePageQuery } from '../courses/use-page-query'
-import { assignmentStateLabel, formatDueTime, isUuid } from './format'
+import { assignmentStateLabel, dueText, isUuid } from './format'
 
 const route = useRoute()
 const api = assignmentsApi()
@@ -34,6 +34,16 @@ watch(() => route.fullPath, async () => {
   if (query.status.value === 'success') await feedbackQuery.load()
 }, { immediate: true })
 
+// 文案只翻译后端 submissionBlockedReason，不自行推断是否可提交。
+const BLOCKED_LABELS: Record<string, string> = {
+  OFFERING_ARCHIVED: '教学班已归档',
+  ASSIGNMENT_ARCHIVED: '作业已归档',
+  RESUBMIT_AFTER_REVIEW: '已评价，不能再次提交',
+  RESUBMIT_NOT_ALLOWED: '本作业不允许重新提交',
+  ATTEMPT_LIMIT_REACHED: '提交次数已用完',
+  SUBMISSION_CLOSED: '提交窗口已关闭',
+}
+
 const canStartWork = computed(() => {
   const data = query.data.value
   if (!data) return false
@@ -49,8 +59,10 @@ const canStartWork = computed(() => {
       <div>
         <h1 tabindex="-1">{{ query.data.value?.title ?? '作业详情' }}</h1>
         <p v-if="query.data.value">
-          {{ formatDueTime(query.data.value.dueAt, query.data.value.overdue ?? false) }}
+          {{ dueText(query.data.value.dueAt, query.data.value.overdue ?? false) }}
           · {{ assignmentStateLabel(query.data.value.assignmentState ?? 'NOT_STARTED') }}
+          <span v-if="query.data.value.overdue" class="tag tag-overdue">已逾期</span>
+          <span v-if="query.data.value.publicationState === 'archived'" class="tag">已归档</span>
         </p>
       </div>
       <RouterLink class="button secondary" to="/student/assignments">← 返回列表</RouterLink>
@@ -97,8 +109,11 @@ const canStartWork = computed(() => {
           <p v-if="!canStartWork" class="muted">
             {{ query.data.value.publicationState === 'archived' ? '作业已归档' : '教学班已归档' }}，无法编辑工作区。
           </p>
+          <p v-if="canStartWork && !query.data.value.canSubmit" class="muted">
+            暂不能提交：{{ BLOCKED_LABELS[query.data.value.submissionBlockedReason ?? ''] ?? '当前不可提交' }}。
+          </p>
           <RouterLink
-            v-else
+            v-if="canStartWork"
             class="button"
             :to="{ name: 'student-workspace', params: { id: assignmentId } }"
           >

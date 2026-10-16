@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
-import { assignmentStateLabel, formatDueTime } from './format'
+import { assignmentStateLabel, dueText } from './format'
 
 const route = useRoute()
 const api = assignmentsApi()
@@ -51,10 +51,12 @@ const sortedAssignments = computed(() => {
             <RouterLink :to="{ name: 'student-assignment', params: { id: assignment.id } }">
               <div>
                 <span><strong>{{ assignment.title }}</strong></span>
-                <span class="muted">{{ formatDueTime(assignment.dueAt, assignment.overdue) }}</span>
+                <span class="muted">{{ dueText(assignment.dueAt, assignment.overdue) }}</span>
               </div>
               <div>
-                <span :class="assignment.overdue ? 'tag tag-error' : 'tag'">{{ assignmentStateLabel(assignment.assignmentState) }}</span>
+                <span v-if="assignment.publicationState === 'archived'" class="tag">已归档</span>
+                <span v-if="assignment.overdue" class="tag tag-overdue">已逾期</span>
+                <span class="tag">{{ assignmentStateLabel(assignment.assignmentState) }}</span>
                 <span v-if="assignment.latestSubmissionId" class="muted">→</span>
               </div>
             </RouterLink>

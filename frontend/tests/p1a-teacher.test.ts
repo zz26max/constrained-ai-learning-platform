@@ -4,7 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, type Router } from 'vue-router'
 import App from '../src/app/App.vue'
 import { createAppRouter } from '../src/app/router'
-import { registerAuthApi, registerCoursesApi } from '../src/api'
+import { registerAuthApi, registerCoursesApi, registerStatsApi } from '../src/api'
+import { StatsApi } from '../src/api/stats'
 import { AuthApi } from '../src/api/auth'
 import { ApiClient } from '../src/api/client'
 import { CoursesApi } from '../src/api/courses'
@@ -87,6 +88,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
     case 'listKnowledgePoints': return okEnvelope({ offeringId: P1A_IDS.offeringWeb, items: [P1A_FIXTURES.knowledgePoint] })
     case 'listInvites': return okEnvelope(invitePage())
     case 'listMembers': return okEnvelope({ items: [], page: 1, pageSize: 20, total: 0 })
+    case 'getOfferingStats': return okEnvelope({ studentCount: 1, activeAssignmentCount: 0, pendingReviewCount: 0, pendingHelpCount: 0 })
     case 'createChapter': {
       const body = JSON.parse(request.body ?? '{}') as { number: number; title: string; summary: string; isRequired: boolean }
       createdChapter = detailFor({ ...chapterSummary(createdChapterId, 'draft'), number: body.number, title: body.title, summary: body.summary, isRequired: body.isRequired })
@@ -128,6 +130,7 @@ beforeEach(() => {
   const client = new ApiClient(scripted.transport)
   registerAuthApi(new AuthApi(client))
   registerCoursesApi(new CoursesApi(client))
+  registerStatsApi(new StatsApi(client))
 })
 
 afterEach(() => {

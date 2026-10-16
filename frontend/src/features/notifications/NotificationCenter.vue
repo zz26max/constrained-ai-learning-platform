@@ -9,6 +9,7 @@ import { pageError, type PageError } from '../courses/page-error'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
+import { targetRoute } from './target-route'
 
 const router = useRouter()
 const api = assignmentsApi()
@@ -49,25 +50,27 @@ async function markRead(notification: NotificationDTO): Promise<void> {
 }
 
 function canOpen(notification: NotificationDTO): boolean {
-  const type = notification.target?.type
-  return type === 'assignment' || type === 'offering' || type === 'feedback'
+  return notification.target !== null && targetRoute(notification.target) !== null
 }
 
 async function open(notification: NotificationDTO): Promise<void> {
   const target = notification.target
   if (target === null) return
+  const route = targetRoute(target)
+  if (route === null) return
   navigateError.value = null
   try {
-    if (target.type === 'assignment') {
-      await router.push({ name: 'student-assignment', params: { id: target.id } })
-    } else if (target.type === 'offering') {
-      await router.push({ name: 'course', params: { offeringId: target.id } })
-    } else if (target.type === 'feedback') {
+    if (route === 'needs-feedback-lookup') {
       const feedback = await api.getFeedback(target.id)
       await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId } })
+    } else {
+      await router.push(route)
     }
   } catch (cause) {
-    navigateError.value = await pageError(cause)
+    const failure = await pageError(cause)
+    navigateError.value = failure.kind === 'not-found' || failure.kind === 'forbidden'
+      ? { ...failure, message: '该内容已不可访问' }
+      : failure
   }
 }
 

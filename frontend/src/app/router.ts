@@ -19,6 +19,10 @@ import AssignmentManagement from '../features/assignments/AssignmentManagement.v
 import AssignmentEditor from '../features/assignments/AssignmentEditor.vue'
 import TeacherFeedbackEditor from '../features/assignments/TeacherFeedbackEditor.vue'
 import NotificationCenter from '../features/notifications/NotificationCenter.vue'
+import StudentHomePage from '../features/dashboard/StudentHomePage.vue'
+import LearningRecordsPage from '../features/dashboard/LearningRecordsPage.vue'
+import NoticeListPage from '../features/notices/NoticeListPage.vue'
+import NoticeDetailPage from '../features/notices/NoticeDetailPage.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -36,7 +40,7 @@ export function isInternalPath(value: string): boolean {
 
 export function defaultEntry(user: components['schemas']['UserDTO'] | null): string {
   if (user?.roles.includes('teacher')) return '/teacher'
-  if (user?.roles.includes('student')) return '/course'
+  if (user?.roles.includes('student')) return '/student/home'
   return '/debug/session'
 }
 
@@ -57,6 +61,11 @@ const routes: RouteRecordRaw[] = [
     component: SessionPanel,
     meta: { requiresAuth: true, title: '学习空间 · 会话联调页' },
   },
+  { name: 'student-home', path: '/student/home', component: StudentHomePage, meta: { requiresAuth: true, requiresRole: 'student', title: '首页 · 学习空间' } },
+  { name: 'student-progress-select', path: '/student/progress', component: LearningRecordsPage, meta: { requiresAuth: true, requiresRole: 'student', title: '学习记录 · 学习空间' } },
+  { name: 'student-progress', path: '/student/progress/:offeringId', component: LearningRecordsPage, meta: { requiresAuth: true, requiresRole: 'student', title: '学习记录 · 学习空间' } },
+  { name: 'student-notices', path: '/student/offerings/:offeringId/notices', component: NoticeListPage, meta: { requiresAuth: true, requiresRole: 'student', title: '课程公告 · 学习空间' } },
+  { name: 'student-notice', path: '/student/notices/:noticeId', component: NoticeDetailPage, meta: { requiresAuth: true, requiresRole: 'student', title: '公告详情 · 学习空间' } },
   { name: 'courses', path: '/course', component: CourseListPage, meta: { requiresAuth: true, requiresRole: 'student', title: '我的课程 · 学习空间' } },
   { name: 'course', path: '/course/:offeringId', component: OfferingPage, meta: { requiresAuth: true, requiresRole: 'student', title: '课程详情 · 学习空间' } },
   { name: 'chapter', path: '/course/:offeringId/chapter/:chapterId', component: ChapterPage, meta: { requiresAuth: true, requiresRole: 'student', title: '章节阅读 · 学习空间' } },

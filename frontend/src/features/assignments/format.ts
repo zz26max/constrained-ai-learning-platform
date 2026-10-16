@@ -26,6 +26,12 @@ export function formatDueTime(dueAt: string, overdue: boolean): string {
   return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
 }
 
+/** 截止文案：dueAt 为空显示"无截止时间"；逾期判断只信后端 overdue。 */
+export function dueText(dueAt: string | null | undefined, overdue: boolean): string {
+  if (dueAt === null || dueAt === undefined || dueAt === '') return '无截止时间'
+  return formatDueTime(dueAt, overdue)
+}
+
 export function formatScore(score: number | null, maxScore: number): string {
   if (score === null) return '未评分'
   return `${score}/${maxScore}`

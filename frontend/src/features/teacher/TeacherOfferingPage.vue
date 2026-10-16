@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { coursesApi } from '../../api'
+import { coursesApi, statsApi } from '../../api'
 import type { components } from '../../api/generated/schema'
 import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
@@ -21,7 +21,10 @@ const { pending, error: actionError, message, clearNotice, run } = useCourseActi
 const { data, status, error, load } = usePageQuery<components['schemas']['OfferingDTO']>(async signal => (await api.getOffering(id.value, { signal })).data)
 const readOnly = computed(() => data.value?.status !== 'active' || pending.value || status.value !== 'success')
 
-watch(id, () => { tab.value = 'chapters'; closeArchive(); void load() }, { immediate: true })
+// 统计卡片独立请求：失败只影响卡片区，不影响工作台其余部分。
+const stats = usePageQuery(async signal => (await statsApi().getOfferingStats(id.value, { signal })).data)
+
+watch(id, () => { tab.value = 'chapters'; closeArchive(); void load(); void stats.load() }, { immediate: true })
 
 async function openArchive(): Promise<void> {
   if (readOnly.value) return
@@ -50,6 +53,18 @@ onBeforeUnmount(closeArchive)
       <div><h1 tabindex="-1">{{ data?.title ?? '教学班工作台' }}</h1><p v-if="data">{{ data.groupName }} · {{ data.termLabel }} · {{ data.teachers.map(teacher => teacher.displayName).join('、') }}</p><p v-else>管理当前教学班的课程内容与成员。</p></div>
       <button type="button" class="button secondary" :disabled="readOnly" @click="openArchive">归档教学班</button>
     </header>
+    <section class="stat-cards" aria-label="班级统计">
+      <ApiState :status="stats.status.value" :error="stats.error.value" @retry="stats.load" />
+      <ul v-if="stats.data.value && stats.status.value !== 'error'" class="stat-card-list">
+        <li class="stat-card"><span class="muted">学生</span><strong>{{ stats.data.value.studentCount }}</strong></li>
+        <li class="stat-card"><span class="muted">进行中作业</span><strong>{{ stats.data.value.activeAssignmentCount }}</strong></li>
+        <li class="stat-card">
+          <span class="muted">待批阅</span><strong>{{ stats.data.value.pendingReviewCount }}</strong>
+          <RouterLink v-if="stats.data.value.pendingReviewCount > 0" :to="{ name: 'teacher-assignments', params: { offeringId: id } }">去批阅</RouterLink>
+        </li>
+        <li class="stat-card"><span class="muted">待处理求助</span><strong>{{ stats.data.value.pendingHelpCount }}</strong><span class="muted">P2 开放</span></li>
+      </ul>
+    </section>
     <ApiState :status="status" :error="error" @retry="load" />
     <p v-if="data?.status === 'archived'" class="notice notice-info" role="status">教学班已归档。章节、资料、知识点与邀请均为只读，历史成员和内容仍可查看。</p>
     <p v-if="message" class="notice notice-info" role="status">{{ message }}</p>
