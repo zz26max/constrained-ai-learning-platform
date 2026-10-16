@@ -1,0 +1,59 @@
+# 交接说明（2026-10-16，master `8314f36`）
+
+写给接手继续开发的人。规范以 [AGENTS.md](../AGENTS.md) 为准，进度与证据以 [STATUS.md](STATUS.md) 为准；本文只告诉你从哪里接、先做什么、哪些坑已经踩过。两者冲突时以 STATUS 和代码为准。
+
+## 1. 一句话现状
+
+P1（课程、作业、评价、聚合）后端已按契约 1.1.0 对齐，前端 P1-D 最小 UI 已实现。浏览器续验发现 8 个阻塞/一致性问题（STATUS §3.4 的 B1～B8），其中 B1、B2、B6 已修代码但**未经浏览器复验**，其余未修。P1 整体不能标 `verified`，不要提前进入 P2。
+
+## 2. 先读什么（按顺序）
+
+1. [AGENTS.md](../AGENTS.md)：文档归属、修改权限、提交约定。重点：除 STATUS.md 外，`docs/` 下的文件和 `openapi.yaml` 未经项目负责人同意不改；字段以 OpenAPI 为准，不在代码里加兼容字段。
+2. [STATUS.md](STATUS.md) §1 和 §3.4：当前真实状态、B1～B8 的复现步骤、代码定位和证据位置。
+3. 按任务读 [FRONTEND.md](FRONTEND.md) 或 [BACKEND.md](BACKEND.md)。工作区保存/提交规则在 FRONTEND §6（第 108～126 行），验收矩阵在 FRONTEND §8。
+4. 查接口用 `scripts/contract_slice.py <operationId>` 取切片，不要通读 `openapi.yaml`（上万行）。
+5. 项目根的 `CLAUDE.md` 是 Claude Code 会话规则（设计→并行实现→审查三步法、成本控制）；不用 Claude Code 可以只当参考。
+
+## 3. 本地环境
+
+- 组成：MySQL 3307（Docker，Flyway 到 V9）、后端 8080、Vite 4173（同源代理到后端）。启动方法见根目录 `README.md` 和 [DEBUGGING.md](DEBUGGING.md)，入口脚本 `backend/scripts/Start-Local.ps1`（JDK 21）。
+- 健康检查：`http://127.0.0.1:8080/health/live`、`/health/ready`（不是 `/actuator/health`）。
+- 演示账号：`student.demo`、`teacher.demo`、`admin.demo`。密码是初始化时随机生成的，在被 Git 忽略的 `backend/.env`（键名 `LOCAL_STUDENT_PASSWORD` 等）。**不要提交、截图或贴到聊天里。**
+- 浏览器联调数据：验收教学班 `a7c51322-4426-48d9-8630-17e18078d56e`（浏览器联调-1016-P1）及其作业、提交都保留在本地库里，供复验使用。部分夹具中文因脚本编码损坏，按 UUID 识别。
+- 联调脚本与截图证据在原机器 `D:/tmp/lp/`、`D:/tmp/lp/browser-p1/`，**未入库**。换机器接手时这些文件不存在，需要的话向原负责人索取。
+
+## 4. 接下来做什么（建议顺序）
+
+| 顺序 | 任务 | 要点 |
+| --- | --- | --- |
+| 1 | 浏览器复验 B1、B2、B6 | 按 STATUS §3.4 原步骤重放：Web 改完立即提交、Text 输入后 65ms 内切页、过期作业的提交按钮。通过后在 STATUS 里把对应行标为已复验 |
+| 2 | B3 教师作业创建/编辑 | `AssignmentEditor.vue` 把 `datetime-local` 原样发出，需转成契约的 UTC 时间戳；PATCH 发了完整对象且含后端不接受的 `aiPolicyVersion`。先用 `contract_slice.py createAssignment` / `updateAssignment` 核对请求体再改。创建页还缺 SQL/Text 类型、章节、模板、量规控件。若发现必须改契约，先停下找负责人 |
+| 3 | B4 提交列表与批阅入口 | 教师从"去批阅"只能到作业列表，没有学生提交列表；学生详情页没有已提交快照。涉及新页面，建议先写设计稿再实现 |
+| 4 | B8 错误呈现与冲突恢复 | `AssignmentManagement.vue` 未渲染 `actions.error/message`；409 后需要"暂停自动保存→读取服务端版本→比较/恢复"流程（FRONTEND §116） |
+| 5 | B5 已读一致性 | 从反馈消息进入评价后消息仍未读。注意 P1-D 设计规定"GET 不改变已读状态"，修之前先确认产品规则：是在评价页显式调用 `markMessagesAsRead`，还是保持手动标读 |
+| 6 | B7 Web 受限预览 | 沙箱 iframe、消息桥、恶意预览隔离（DEVELOPMENT §6、FRONTEND §8）。安全敏感，需要单独设计与审查 |
+
+全部走通 FRONTEND §8 的 P1 矩阵（含慢网络、保存超时、双标签冲突恢复、截止竞态）后，才能把相关操作的 `x-implementation-status` 改为 `verified`，改契约状态同样需要负责人确认。
+
+## 5. 检查与提交
+
+- 前端：`npm --prefix frontend run verify`（类型检查、构建、`check:no-mock`、vitest）。最近结果：18 个测试文件、184 个用例通过。
+- 后端：在 `backend/` 下 `./mvnw.cmd --batch-mode verify`（需要 Docker，跑 Testcontainers MySQL，约 4～5 分钟）。最近结果：379 个单测 + 202 个 IT 通过。
+- 契约：`.contract-venv/Scripts/python.exe scripts/validate_contract.py`。
+- 提交前缀：`frontend:`、`backend:`、`docs:`，一个提交只含一端；只 `git add` 具体文件。每包完成后更新 STATUS.md 并写明提交哈希。
+- 本地 master 比 `origin/master` 领先 21 个提交，**尚未推送**。是否推送、推到哪个分支由负责人决定。
+
+## 6. 已踩过的坑
+
+- **单独跑某个前端测试文件要在 `frontend/` 目录下执行** `npx vitest run tests/xxx.test.ts`。在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom 环境，会报 `window is not defined`。
+- happy-dom 没有 `window.confirm`，`HTMLDialogElement.showModal/close` 也可能缺失；测试里需要自己补桩，写法见 `frontend/tests/workspace-editor.test.ts` 的 `beforeEach`。
+- 不读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件和日志。生成类型以 `openapi.yaml` 为源头。
+- `docs/features/p1d-aggregation.md` 已作废，不要参考。
+- 仓库根目录出现了一个未跟踪的 `node_modules/`，来源不明，可能是在根目录执行 npm 命令时产生的。不要把它提交进去；确认没有用处后可以删除，删除前先告知负责人。
+- 修 bug 时先写能复现的测试，再改代码。验证方法：把源文件暂时退回修复前（`git stash push -- <文件>`），确认新测试失败，再 `git stash pop` 恢复。B1/B2/B6 就是这样验证的。
+
+## 7. 待负责人决定的事项
+
+- STATUS §1 联调观察 ①～④：已归档作业重发旧 revision 返回 200、公告消息 `target` 为 null、陈旧 `baseVersion` 重发 `publishFeedback` 返回 200、全班公告可指向个人 feedback。均未改。
+- `getMyLearningRecords` 契约没有分页参数，后端固定返回最近 20 份评价，超过 20 份的历史看不到。要扩分页须先改契约。
+- 工作区离开确认目前是 `window.confirm`，FRONTEND §124 要求"等待保存/留在页面/放弃修改"三选一；是否在 P1 内补齐。
