@@ -29,6 +29,10 @@ interface StoredSubmission { dto: SubmissionSummaryDTO; files: FileDTO[]; reflec
 const assignments = new Map<string, StoredAssignment>()
 const workspaces = new Map<string, StoredWorkspace>()
 const submissions = new Map<string, StoredSubmission>()
+const publishedFeedbackByAssignment = new Map<string, string>()
+
+/** 供 feedback/dashboard mock 读取同一份内存数据。 */
+export const mockAssignmentStore = { assignments, workspaces, submissions, publishedFeedbackByAssignment }
 
 const fixtureRubric: RubricCriterion[] = [
   { criterionId: 'c1', title: '代码正确性', description: '实现符合需求', maxScore: 50 },
@@ -58,6 +62,7 @@ export function resetMockAssignmentState(): void {
   assignments.clear()
   workspaces.clear()
   submissions.clear()
+  publishedFeedbackByAssignment.clear()
   seedAssignment(P1B_IDS.assignmentWeb, P1A_IDS.offeringWeb, P1A_IDS.chapterWeb, 'published', 'HTML 表单实现')
   seedAssignment(P1B_IDS.assignmentDraft, P1A_IDS.offeringWeb, P1A_IDS.chapterWeb, 'draft', '草稿作业')
   seedAssignment(P1B_IDS.assignmentArchived, P1A_IDS.offeringWeb, P1A_IDS.chapterArchived, 'archived', '归档作业')
@@ -65,10 +70,18 @@ export function resetMockAssignmentState(): void {
   workspaces.set(P1B_IDS.assignmentWeb, {
     assignmentId: P1B_IDS.assignmentWeb,
     dto: {
-      assignmentId: P1B_IDS.assignmentWeb, revision: 1,
+      assignmentId: P1B_IDS.assignmentWeb, revision: 2,
       files: [{ path: 'script.js', content: '// 学生工作区代码\n' }],
       activeFile: 'script.js', savedAt: fixtureTime, canSave: true, saveBlockedReason: null,
     },
+  })
+  submissions.set(P1B_IDS.submissionWeb1, {
+    dto: {
+      id: P1B_IDS.submissionWeb1, assignmentId: P1B_IDS.assignmentWeb, offeringId: P1A_IDS.offeringWeb,
+      attemptNumber: 1, workspaceRevision: 1, submittedAt: fixtureTime, late: false, superseded: false, feedbackStatus: 'none',
+    },
+    files: [{ path: 'script.js', content: '// 学生提交代码\n' }],
+    reflection: '用原生 JavaScript 完成了表单校验。',
   })
 }
 resetMockAssignmentState()
@@ -115,10 +128,11 @@ function submissionWrite(value: unknown): value is SubmissionWrite {
   return optional(value, 'reflection', v => typeof v === 'string')
 }
 
-function toSummary(assignment: TeacherAssignmentDTO, userId: string): AssignmentSummaryDTO {
+export function toSummary(assignment: TeacherAssignmentDTO, userId: string): AssignmentSummaryDTO {
   const workspace = workspaces.get(assignment.id)
   const userSubmissions = [...submissions.values()].filter(s => s.dto.assignmentId === assignment.id)
   const latest = userSubmissions.sort((a, b) => b.dto.submittedAt.localeCompare(a.dto.submittedAt))[0]
+  const publishedFeedbackId = publishedFeedbackByAssignment.get(assignment.id) ?? null
 
   const pubState = assignment.publicationState === 'draft' ? 'published' : assignment.publicationState
   return {
@@ -126,9 +140,9 @@ function toSummary(assignment: TeacherAssignmentDTO, userId: string): Assignment
     chapterId: assignment.chapterId, title: assignment.title, type: assignment.type,
     isRequired: assignment.isRequired, publicationState: pubState,
     description: assignment.description, dueAt: assignment.dueAt,
-    assignmentState: latest ? 'SUBMITTED' : (workspace ? 'IN_PROGRESS' : 'NOT_STARTED'),
+    assignmentState: publishedFeedbackId !== null ? 'REVIEWED' : latest ? 'SUBMITTED' : (workspace ? 'IN_PROGRESS' : 'NOT_STARTED'),
     overdue: new Date(assignment.dueAt) < new Date() && !latest,
-    latestSubmissionId: latest?.dto.id || null, publishedFeedbackId: null, unreadFeedback: false,
+    latestSubmissionId: latest?.dto.id || null, publishedFeedbackId, unreadFeedback: false,
   }
 }
 

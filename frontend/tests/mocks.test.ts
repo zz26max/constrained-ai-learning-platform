@@ -3,6 +3,7 @@ import { mockTransport, resetMockAuthState, resetMockCookies } from '../src/mock
 import { MockNotImplementedError } from '../src/mocks/types'
 import { MOCK_TERM } from '../src/mocks/auth'
 import { P1A_IDS } from '../src/mocks/courses'
+import { P1B_IDS } from '../src/mocks/assignments'
 import type { TransportRequest } from '../src/api/transport'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -184,7 +185,7 @@ describe('mock 层信封与 Cookie（同一契约）', () => {
 
   it('未实现的操作显式失败，不转发真实请求', async () => {
     await expect(
-      call({ operationId: 'getDashboard', path: '/api/v1/me/dashboard' }),
+      call({ operationId: 'getFeedbackDraft', path: `/api/v1/teacher/submissions/${P1B_IDS.submissionWeb1}/feedback` }),
     ).rejects.toBeInstanceOf(MockNotImplementedError)
   })
 

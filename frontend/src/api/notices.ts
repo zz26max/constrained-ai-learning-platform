@@ -1,39 +1,30 @@
+import type { components, operations, paths } from './generated/schema'
 import type { ApiClient, ApiResult, OperationSpec, RequestOptions } from './client'
 
-export interface NoticeDTO {
-  id: string
-  offeringId: string
-  authorId: string
-  authorName: string
-  targetStudentId: string | null
-  targetStudentName: string | null
-  title: string
-  content: string
-  createdAt: string
-}
+type Schemas = components['schemas']
 
-export interface NoticeWrite {
-  targetStudentId?: string | null
-  title: string
-  content: string
-}
+export type NoticeDTO = Schemas['NoticeDTO']
+export type NoticePage = Schemas['NoticePage']
+export type NoticeWrite = Schemas['NoticeWrite']
+export type TargetDTO = Schemas['TargetDTO']
 
-export interface Page<T> {
-  items: T[]
-  page: number
-  pageSize: number
-  totalItems: number
-  totalPages: number
-}
-
+export type NoticesQuery = NonNullable<operations['listNotices']['parameters']['query']>
 export type NoticeRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToken'>
 
-const NOTICE_SPECS = {
+export type NoticeOperationId = keyof Pick<operations,
+  | 'listNotices'
+  | 'getNotice'
+  | 'createNotice'
+>
+
+type NoticePayloads = { [K in NoticeOperationId]: Schemas[`Response_${K}`]['data'] }
+type NoticeSpecs = { [K in NoticeOperationId]: OperationSpec & { id: K; path: keyof paths } }
+
+export const NOTICE_SPECS = {
   listNotices: { id: 'listNotices', method: 'GET', path: '/api/v1/offerings/{offeringId}/notices', csrf: false },
   getNotice: { id: 'getNotice', method: 'GET', path: '/api/v1/notices/{noticeId}', csrf: false },
   createNotice: { id: 'createNotice', method: 'POST', path: '/api/v1/teacher/offerings/{offeringId}/notices', csrf: true },
-  listTeacherNotices: { id: 'listTeacherNotices', method: 'GET', path: '/api/v1/teacher/offerings/{offeringId}/notices', csrf: false },
-} as const
+} satisfies NoticeSpecs
 
 function queryStrings(query: object): Record<string, string> {
   const result: Record<string, string> = {}
@@ -46,50 +37,31 @@ function queryStrings(query: object): Record<string, string> {
 export class NoticesApi {
   constructor(private readonly client: ApiClient) {}
 
-  listNotices(
-    offeringId: string,
-    page = 1,
-    pageSize = 20,
-    options: NoticeRequestOptions = {}
-  ): Promise<ApiResult<Page<NoticeDTO>>> {
-    const spec = NOTICE_SPECS.listNotices
-    const path = spec.path.replace('{offeringId}', encodeURIComponent(offeringId))
-    return this.client.request<Page<NoticeDTO>>({ ...spec, path } as OperationSpec, {
+  private request<K extends NoticeOperationId>(
+    operationId: K,
+    options: NoticeRequestOptions,
+    id: string,
+    body?: unknown,
+    query?: object
+  ): Promise<ApiResult<NoticePayloads[K]>> {
+    const spec = NOTICE_SPECS[operationId]
+    const path = spec.path.replace(/\{[^}]+\}/, encodeURIComponent(id))
+    return this.client.request<NoticePayloads[K]>({ ...spec, path }, {
       ...options,
-      query: queryStrings({ page, pageSize }),
+      ...(body === undefined ? {} : { body }),
+      ...(query === undefined ? {} : { query: queryStrings(query) }),
     })
   }
 
-  getNotice(noticeId: string, options: NoticeRequestOptions = {}): Promise<ApiResult<NoticeDTO>> {
-    const spec = NOTICE_SPECS.getNotice
-    const path = spec.path.replace('{noticeId}', encodeURIComponent(noticeId))
-    return this.client.request<NoticeDTO>({ ...spec, path } as OperationSpec, options)
+  listNotices(offeringId: string, query: NoticesQuery = {}, options: NoticeRequestOptions = {}): Promise<ApiResult<NoticePayloads['listNotices']>> {
+    return this.request('listNotices', options, offeringId, undefined, query)
   }
 
-  createNotice(
-    offeringId: string,
-    input: NoticeWrite,
-    options: NoticeRequestOptions = {}
-  ): Promise<ApiResult<NoticeDTO>> {
-    const spec = NOTICE_SPECS.createNotice
-    const path = spec.path.replace('{offeringId}', encodeURIComponent(offeringId))
-    return this.client.request<NoticeDTO>({ ...spec, path } as OperationSpec, {
-      ...options,
-      body: input,
-    })
+  getNotice(noticeId: string, options: NoticeRequestOptions = {}): Promise<ApiResult<NoticePayloads['getNotice']>> {
+    return this.request('getNotice', options, noticeId)
   }
 
-  listTeacherNotices(
-    offeringId: string,
-    page = 1,
-    pageSize = 20,
-    options: NoticeRequestOptions = {}
-  ): Promise<ApiResult<Page<NoticeDTO>>> {
-    const spec = NOTICE_SPECS.listTeacherNotices
-    const path = spec.path.replace('{offeringId}', encodeURIComponent(offeringId))
-    return this.client.request<Page<NoticeDTO>>({ ...spec, path } as OperationSpec, {
-      ...options,
-      query: queryStrings({ page, pageSize }),
-    })
+  createNotice(offeringId: string, body: NoticeWrite, options: NoticeRequestOptions = {}): Promise<ApiResult<NoticePayloads['createNotice']>> {
+    return this.request('createNotice', options, offeringId, body)
   }
 }

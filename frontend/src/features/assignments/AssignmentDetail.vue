@@ -23,7 +23,16 @@ const query = usePageQuery(async signal => {
   return result.data
 })
 
-watch(() => route.fullPath, () => { void query.load() }, { immediate: true })
+const feedbackQuery = usePageQuery(async signal => {
+  const feedbackId = query.data.value?.publishedFeedbackId
+  if (!feedbackId) return null
+  return (await api.getFeedback(feedbackId, { signal })).data
+})
+
+watch(() => route.fullPath, async () => {
+  await query.load()
+  if (query.status.value === 'success') await feedbackQuery.load()
+}, { immediate: true })
 
 const canStartWork = computed(() => {
   const data = query.data.value
@@ -97,6 +106,15 @@ const canStartWork = computed(() => {
           </RouterLink>
         </section>
       </section>
+
+      <template v-if="query.data.value.publishedFeedbackId">
+        <ApiState :status="feedbackQuery.status.value" :error="feedbackQuery.error.value" @retry="feedbackQuery.load" />
+        <StudentFeedbackView
+          v-if="feedbackQuery.status.value === 'success' && feedbackQuery.data.value"
+          :feedback="feedbackQuery.data.value"
+          :rubric="query.data.value.rubric"
+        />
+      </template>
     </template>
   </div>
 </template>

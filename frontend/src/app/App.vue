@@ -37,7 +37,7 @@ function skipToMain(event: MouseEvent): void {
     <div :class="{ 'authenticated-layout': auth.phase === 'authenticated' }">
     <aside v-if="auth.phase === 'authenticated'" class="workspace-sidebar" aria-label="学习空间导航">
       <RouterLink class="workspace-brand" :to="defaultEntry(auth.identity)"><span>学</span><strong>学习空间</strong></RouterLink>
-      <nav><RouterLink v-if="auth.identity?.roles.includes('student')" to="/course">我的课程</RouterLink><RouterLink v-if="auth.identity?.roles.includes('teacher')" to="/teacher">教学班</RouterLink><RouterLink to="/debug/session">会话调试</RouterLink></nav>
+      <nav><RouterLink v-if="auth.identity?.roles.includes('student')" to="/course">我的课程</RouterLink><RouterLink v-if="auth.identity?.roles.includes('student')" to="/student/assignments">我的作业</RouterLink><RouterLink v-if="auth.identity?.roles.includes('student')" to="/student/messages">消息</RouterLink><RouterLink v-if="auth.identity?.roles.includes('teacher')" to="/teacher">教学班</RouterLink><RouterLink to="/debug/session">会话调试</RouterLink></nav>
       <div class="workspace-user"><span>{{ auth.identity?.displayName }}</span><button class="button secondary" :disabled="loggingOut" @click="logout">退出登录</button><p v-if="auth.logoutFailure" role="alert">{{ auth.logoutFailure }}</p></div>
     </aside>
     <main id="main-content" class="app-main" :class="{ 'business-main': auth.phase === 'authenticated' }" tabindex="-1">

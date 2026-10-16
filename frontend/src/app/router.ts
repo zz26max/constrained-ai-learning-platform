@@ -17,6 +17,8 @@ import AssignmentDetail from '../features/assignments/AssignmentDetail.vue'
 import WorkspaceEditor from '../features/assignments/WorkspaceEditor.vue'
 import AssignmentManagement from '../features/assignments/AssignmentManagement.vue'
 import AssignmentEditor from '../features/assignments/AssignmentEditor.vue'
+import TeacherFeedbackEditor from '../features/assignments/TeacherFeedbackEditor.vue'
+import NotificationCenter from '../features/notifications/NotificationCenter.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -62,6 +64,8 @@ const routes: RouteRecordRaw[] = [
   { name: 'student-assignments', path: '/student/assignments', component: AssignmentList, meta: { requiresAuth: true, requiresRole: 'student', title: '我的作业 · 学习空间' } },
   { name: 'student-assignment', path: '/student/assignments/:id', component: AssignmentDetail, meta: { requiresAuth: true, requiresRole: 'student', title: '作业详情 · 学习空间' } },
   { name: 'student-workspace', path: '/student/workspaces/:id', component: WorkspaceEditor, meta: { requiresAuth: true, requiresRole: 'student', title: '工作区 · 学习空间' } },
+  { name: 'student-messages', path: '/student/messages', component: NotificationCenter, meta: { requiresAuth: true, requiresRole: 'student', title: '消息 · 学习空间' } },
+  { name: 'teacher-feedback', path: '/teacher/submissions/:submissionId/feedback', component: TeacherFeedbackEditor, meta: { requiresAuth: true, requiresRole: 'teacher', title: '批阅作业 · 学习空间' } },
   { name: 'teacher', path: '/teacher', component: TeacherOfferingsPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学班 · 学习空间' } },
   { name: 'teacher-offering', path: '/teacher/offerings/:id', component: TeacherOfferingPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学工作台 · 学习空间' } },
   { name: 'teacher-assignments', path: '/teacher/offerings/:offeringId/assignments', component: AssignmentManagement, meta: { requiresAuth: true, requiresRole: 'teacher', title: '作业管理 · 学习空间' } },

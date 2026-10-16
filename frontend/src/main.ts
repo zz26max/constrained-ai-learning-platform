@@ -2,7 +2,14 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './app/App.vue'
 import { router } from './app/router'
-import { createDefaultAuthApi, registerAuthApi, createDefaultCoursesApi, registerCoursesApi } from './api'
+import {
+  createDefaultAuthApi, registerAuthApi,
+  createDefaultCoursesApi, registerCoursesApi,
+  createDefaultAssignmentsApi, registerAssignmentsApi,
+  createDefaultDashboardApi, registerDashboardApi,
+  createDefaultNoticesApi, registerNoticesApi,
+  createDefaultStatsApi, registerStatsApi,
+} from './api'
 import './styles/base.css'
 import './styles/courses.css'
 import './styles/teacher.css'
@@ -11,6 +18,10 @@ import './styles/teacher.css'
 // 路由守卫首次导航时会用它恢复会话。
 registerAuthApi(await createDefaultAuthApi())
 registerCoursesApi(await createDefaultCoursesApi())
+registerAssignmentsApi(await createDefaultAssignmentsApi())
+registerDashboardApi(await createDefaultDashboardApi())
+registerNoticesApi(await createDefaultNoticesApi())
+registerStatsApi(await createDefaultStatsApi())
 
 const app = createApp(App)
 app.use(createPinia())
