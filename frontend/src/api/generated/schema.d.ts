@@ -284,6 +284,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/offerings/{offeringId}/learning-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * getMyLearningRecords
+         * @description 权限：本班学生。请求约定：无。结果约定：200 `LearningRecordsDTO`；返回当前学生在该班级的学习记录与统计。业务规则以 DEVELOPMENT.md 为准。
+         */
+        get: operations["getMyLearningRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/offerings/{offeringId}/messages/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * markMessagesAsRead
+         * @description 权限：本班学生，需 CSRF。请求约定：空对象 `{}`，可选查询参数 `type` 用于过滤消息类型。结果约定：200 `{markedAt}`。业务规则以 DEVELOPMENT.md 为准。
+         */
+        put: operations["markMessagesAsRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/assignments": {
         parameters: {
             query?: never;
@@ -2294,6 +2334,9 @@ export interface components {
         ReadAllDTO: {
             updatedCount: number;
         };
+        MarkedReadDTO: {
+            markedAt: components["schemas"]["Timestamp"];
+        };
         BaseCourseDTO: {
             id: components["schemas"]["UUID"];
             title: string;
@@ -4047,6 +4090,14 @@ export interface components {
             data: components["schemas"]["ReadAllDTO"];
             requestId: string;
         };
+        Response_markMessagesAsRead: {
+            data: components["schemas"]["MarkedReadDTO"];
+            requestId: string;
+        };
+        Response_getMyLearningRecords: {
+            data: components["schemas"]["LearningRecordsDTO"];
+            requestId: string;
+        };
         Response_listNotices: {
             data: components["schemas"]["NoticePage"];
             requestId: string;
@@ -4800,6 +4851,28 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Response_readAllMessages"];
+            };
+        };
+        /** @description 200 `{markedAt}`；只更新本人在该教学班内、可选 `type` 范围内的未读消息 */
+        markMessagesAsRead_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_markMessagesAsRead"];
+            };
+        };
+        /** @description 200 `LearningRecordsDTO`；当前学生在该教学班的学习记录与统计 */
+        getMyLearningRecords_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_getMyLearningRecords"];
             };
         };
         /** @description 200 通知分页，字段同教师创建公告响应；按 `createdAt` 降序 */
@@ -5963,6 +6036,64 @@ export interface operations {
             404: components["responses"]["logout_404"];
             406: components["responses"]["getCsrfToken_406"];
             409: components["responses"]["recordLearningPosition_409"];
+            415: components["responses"]["login_415"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    getMyLearningRecords: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string;
+            };
+            path: {
+                offeringId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["getMyLearningRecords_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["getMe_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    markMessagesAsRead: {
+        parameters: {
+            query?: {
+                /** @description 可选消息类型过滤器 */
+                type?: string;
+            };
+            header: {
+                "X-Request-ID"?: string;
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path: {
+                offeringId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Empty"];
+            };
+        };
+        responses: {
+            200: components["responses"]["markMessagesAsRead_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["logout_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
             415: components["responses"]["login_415"];
             422: components["responses"]["getCsrfToken_422"];
             500: components["responses"]["getCsrfToken_500"];
