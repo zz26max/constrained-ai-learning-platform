@@ -494,113 +494,95 @@ UPDATE notifications SET is_read=1,read_at=#{now,typeHandler=com.learningplatfor
 WHERE id=#{id} AND recipient_id=#{recipientId} AND is_read=0
 </update>
 
-<!-- P1-D 首页仪表盘查询 -->
-<select id="countStudentOfferings" resultType="int">
-SELECT COUNT(DISTINCT o.id) FROM course_offerings o
+<!-- P1-D 首页仪表盘查询：作业计数/列表复用 getAssignmentCounts 与 listStudentAssignments（studentAssignmentBase 派生状态）。 -->
+<sql id="dashboardOfferingScope">
+FROM course_offerings o JOIN courses c ON c.id=o.course_id JOIN terms t ON t.id=o.term_id
 JOIN offering_members m ON m.offering_id=o.id
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active' AND o.status='active'
-<if test="termId != null">AND o.term_id=#{termId}</if>
+WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND o.status='active' AND o.term_id=#{termId}
+</sql>
+
+<select id="countDashboardOfferings" resultType="int">
+SELECT COUNT(*) <include refid="dashboardOfferingScope"/>
 </select>
 
-<select id="countPendingAssignments" resultType="int">
-SELECT COUNT(*) FROM assignments a
-JOIN course_offerings o ON o.id=a.offering_id
-JOIN offering_members m ON m.offering_id=a.offering_id
-LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
-AND a.status='published' AND o.status='active' AND s.id IS NULL
-<if test="termId != null">AND o.term_id=#{termId}</if>
+<select id="listDashboardOfferings" resultType="com.learningplatform.modules.courses.model.AssignmentRows$DashboardOfferingRow">
+SELECT o.id AS offering_id,o.course_id,o.title,c.mark,o.group_name,o.term_id,t.label AS term_label,o.status,o.progress_unit,
+m.id AS member_id,m.last_studied_at,m.last_chapter_id
+<include refid="dashboardOfferingScope"/>
+ORDER BY (m.last_studied_at IS NULL),m.last_studied_at DESC,o.created_at DESC,o.id DESC LIMIT #{limit}
 </select>
 
-<select id="countUnreadMessages" resultType="int">
-SELECT COUNT(*) FROM notifications WHERE recipient_id=#{userId} AND is_read=0
+<!-- 学期范围内的未读消息：按消息关联教学班所属学期统计；不关联教学班的消息计入每个学期。 -->
+<select id="countUnreadMessagesInTerm" resultType="int">
+SELECT COUNT(*) FROM notifications n LEFT JOIN course_offerings o ON o.id=n.related_offering_id
+WHERE n.recipient_id=#{recipientId} AND n.is_read=0 AND (n.related_offering_id IS NULL OR o.term_id=#{termId})
 </select>
 
-<select id="findCurrentAssignment" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
-SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,
-a.status AS publication_state,a.description,a.due_at,
-'NOT_STARTED' AS assignment_state,
-CASE WHEN a.due_at &lt; NOW() THEN 1 ELSE 0 END AS overdue,
-NULL AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
-FROM assignments a
-JOIN course_offerings o ON o.id=a.offering_id
-JOIN offering_members m ON m.offering_id=a.offering_id
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
-AND a.status='published' AND o.status='active'
-AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1)
-<if test="termId != null">AND o.term_id=#{termId}</if>
-ORDER BY COALESCE(a.due_at,'9999-12-31 23:59:59'),a.id LIMIT 1
+<!-- 课程未读反馈：不同的已发布评价对应的未读 feedback_published 消息。 -->
+<select id="countUnreadFeedbackInOffering" resultType="int">
+SELECT COUNT(DISTINCT f.id) FROM notifications n
+JOIN feedback f ON f.id=n.related_feedback_id AND f.status='published' AND f.student_id=n.recipient_id
+WHERE n.recipient_id=#{recipientId} AND n.type='feedback_published' AND n.is_read=0 AND f.offering_id=#{offeringId}
 </select>
 
-<select id="findCurrentLearningChapter" resultType="com.learningplatform.modules.courses.model.CourseRows$Chapter">
-SELECT c.id,c.offering_id,c.position,c.title,c.summary,c.status,c.is_required,c.content_version,c.published_at
-FROM chapters c
-JOIN offering_members m ON m.offering_id=c.offering_id
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
-AND c.status='published' AND m.last_chapter_id IS NOT NULL AND c.id=m.last_chapter_id
-<if test="termId != null">
-JOIN course_offerings o ON o.id=c.offering_id WHERE o.term_id=#{termId}
-</if>
-ORDER BY m.last_studied_at DESC LIMIT 1
-</select>
-
-<select id="listOtherPendingAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
-SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,
-a.status AS publication_state,a.description,a.due_at,
-'NOT_STARTED' AS assignment_state,
-CASE WHEN a.due_at &lt; NOW() THEN 1 ELSE 0 END AS overdue,
-NULL AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
-FROM assignments a
-JOIN course_offerings o ON o.id=a.offering_id
-JOIN offering_members m ON m.offering_id=a.offering_id
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active'
-AND a.status='published' AND o.status='active'
-AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{userId} AND s.is_current=1)
-<if test="excludeId != null">AND a.id != #{excludeId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>
-ORDER BY COALESCE(a.due_at,'9999-12-31 23:59:59'),a.id LIMIT #{limit}
-</select>
-
-<select id="findRecentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$StudentFeedbackDTO">
-SELECT f.id AS feedback_id,a.id AS assignment_id,a.title AS assignment_title,
-f.overall_comment,f.final_score,f.published_at
-FROM feedback f
-JOIN assignments a ON a.id=f.assignment_id
-WHERE f.student_id=#{userId} AND f.status='published'
-ORDER BY f.published_at DESC LIMIT 1
-</select>
-
-<select id="listDashboardCourses" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$CourseSummaryDTO">
-SELECT o.id AS offering_id,bc.name AS course_name,o.title AS offering_label,
-0 AS completed_count,0 AS total_count,'chapter' AS progress_unit,0 AS percent
-FROM course_offerings o
-JOIN base_courses bc ON bc.id=o.course_id
-JOIN offering_members m ON m.offering_id=o.id
-WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active' AND o.status='active'
-<if test="termId != null">AND o.term_id=#{termId}</if>
-ORDER BY m.last_studied_at DESC,o.created_at DESC LIMIT #{limit}
-</select>
-
+<!-- 最近公告：只取公告类（notice_published）个人消息，按学期过滤。 -->
 <select id="findRecentNotice" resultMap="messageRow">
 SELECT <include refid="messageColumns"/> FROM notifications n <include refid="messageJoins"/>
-WHERE n.recipient_id=#{userId} ORDER BY n.created_at DESC,n.id DESC LIMIT 1
+JOIN course_offerings o ON o.id=n.related_offering_id
+WHERE n.recipient_id=#{recipientId} AND n.type='notice_published' AND o.term_id=#{termId}
+ORDER BY n.created_at DESC,n.id DESC LIMIT 1
 </select>
 
-<!-- P1-D 学习记录查询 -->
-<select id="getLearningRecordSummary" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LearningRecordSummary">
+<!-- progressUnit=assignment：分母为本班已发布必做作业，分子为至少有一次提交的必做作业。 -->
+<select id="assignmentProgressTotal" resultType="int">
+SELECT COUNT(*) FROM assignments WHERE offering_id=#{offeringId} AND status='published' AND is_required=1
+</select>
+
+<select id="assignmentProgressCompleted" resultType="int">
+SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1
+AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{studentId})
+</select>
+
+<!-- P1-D 学习记录与最近反馈：本人在仍为活动成员的教学班内的已发布评价。 -->
+<sql id="publishedFeedbackScope">
+FROM feedback f
+JOIN course_offerings o ON o.id=f.offering_id
+JOIN offering_members m ON m.offering_id=f.offering_id AND m.user_id=f.student_id AND m.role='student' AND m.status='active'
+WHERE f.student_id=#{studentId} AND f.status='published'
+<if test="offeringId != null">AND f.offering_id=#{offeringId}</if>
+<if test="termId != null">AND o.term_id=#{termId}</if>
+</sql>
+
+<select id="listPublishedFeedbackIds" resultType="string">
+SELECT f.id <include refid="publishedFeedbackScope"/> ORDER BY f.published_at DESC,f.id DESC LIMIT #{limit}
+</select>
+
+<select id="countPublishedFeedback" resultType="int">
+SELECT COUNT(*) <include refid="publishedFeedbackScope"/>
+</select>
+
+<!-- 实验类（web_lab）作业且存在当前有效提交；SQL/文字作业不计入。 -->
+<select id="countCompletedLabs" resultType="int">
+SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.type='web_lab' AND a.status IN ('published','archived')
+AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1)
+</select>
+
+<!-- 教师端学生学习记录（下一批对齐，暂保留旧形状；仅修正不存在的列与作业类型枚举）。 -->
+<select id="getLearningRecordSummary" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LegacyLearningRecordSummary">
 SELECT
 (SELECT COUNT(*) FROM chapters c
- LEFT JOIN chapter_progress cp ON cp.chapter_id=c.id AND cp.student_id=#{studentId}
- WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1 AND cp.completed_at IS NOT NULL) AS completed_chapter_count,
+ JOIN offering_members om ON om.offering_id=c.offering_id AND om.user_id=#{studentId}
+ JOIN chapter_progress cp ON cp.chapter_id=c.id AND cp.member_id=om.id
+ WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1 AND cp.status='completed') AS completed_chapter_count,
 (SELECT COUNT(*) FROM chapters c WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1) AS total_chapter_count,
 (SELECT COUNT(DISTINCT a.id) FROM assignments a
  JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
- WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='lab') AS completed_lab_count,
-(SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='lab') AS total_lab_count,
+ WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='web_lab') AS completed_lab_count,
+(SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='web_lab') AS total_lab_count,
 (SELECT COUNT(*) FROM feedback f WHERE f.offering_id=#{offeringId} AND f.student_id=#{studentId} AND f.status='published') AS feedback_count
 </select>
 
-<select id="listStudentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$StudentFeedbackDTO">
+<select id="listStudentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LegacyStudentFeedbackDTO">
 SELECT f.id AS feedback_id,a.id AS assignment_id,a.title AS assignment_title,
 f.overall_comment,f.final_score,f.published_at
 FROM feedback f

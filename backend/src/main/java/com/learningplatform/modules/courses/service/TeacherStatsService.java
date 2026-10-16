@@ -28,14 +28,14 @@ public class TeacherStatsService {
         return mapper.getAssignmentStats(assignmentId);
     }
     @Transactional(readOnly=true)
-    public LearningRecordsDTO getStudentLearningRecords(String offeringId,String studentId,UserDTO teacher,int page,int pageSize) {
+    public LegacyLearningRecordsDTO getStudentLearningRecords(String offeringId,String studentId,UserDTO teacher,int page,int pageSize) {
         access.requireTeacher(teacher,offeringId,false);
-        LearningRecordSummary summary=mapper.getLearningRecordSummary(offeringId,studentId);
+        LegacyLearningRecordSummary summary=mapper.getLearningRecordSummary(offeringId,studentId);
         int offset=(page-1)*pageSize;
-        List<StudentFeedbackDTO> feedback=mapper.listStudentFeedback(offeringId,studentId,offset,pageSize);
+        List<LegacyStudentFeedbackDTO> feedback=mapper.listStudentFeedback(offeringId,studentId,offset,pageSize);
         int totalFeedback=mapper.countStudentFeedback(offeringId,studentId);
         int totalPages=(totalFeedback+pageSize-1)/pageSize;
         PaginationInfo pageInfo=new PaginationInfo(page,pageSize,totalFeedback,totalPages);
-        return new LearningRecordsDTO(offeringId,summary,feedback,pageInfo,null,null);
+        return new LegacyLearningRecordsDTO(offeringId,summary,feedback,pageInfo,null,null);
     }
 }

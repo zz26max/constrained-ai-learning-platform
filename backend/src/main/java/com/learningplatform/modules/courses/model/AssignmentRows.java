@@ -36,6 +36,10 @@ public final class AssignmentRows {
     public record TeacherSubmissionRow(String id,String assignmentId,String offeringId,int attemptNumber,int workspaceRevision,
             Instant submittedAt,boolean late,boolean superseded,String feedbackStatus,
             String studentId,String studentUsername,String studentDisplayName) {}
+    /** 首页课程行：教学班 + 本人成员信息，Service 再组装进度、教师与当前章节。 */
+    public record DashboardOfferingRow(String offeringId,String courseId,String title,String mark,String groupName,
+            String termId,String termLabel,String status,String progressUnit,String memberId,
+            Instant lastStudiedAt,String lastChapterId) {}
     public record NoticeRow(String id,String offeringId,String authorId,String targetStudentId,
             String title,String content,Instant createdAt) {}
 }

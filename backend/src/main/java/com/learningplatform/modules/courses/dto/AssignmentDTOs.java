@@ -47,8 +47,8 @@ public final class AssignmentDTOs {
             boolean allowResubmit,int maxAttempts,BigDecimal maxScore,List<RubricCriterion> rubric,List<FileDTO> initialFiles,
             Integer aiPolicyVersion,String id,String offeringId,String publicationState,Instant publishedAt,
             int submittedStudentCount,int pendingReviewCount) {}
-    // P1-C 契约 RubricResult / TeacherFeedbackDTO / StudentFeedbackDTO。契约的 StudentFeedbackDTO 与下方 P1-D 同名旧记录
-    // 结构不同（P1-D 本批不动），故学生视图在 Java 中命名为 StudentFeedbackViewDTO，JSON 形状以契约为准。
+    // P1-C 契约 RubricResult / TeacherFeedbackDTO / StudentFeedbackDTO。学生视图在 Java 中命名为 StudentFeedbackViewDTO
+    // （避免与下一批教师端旧记录混淆），JSON 形状以契约 StudentFeedbackDTO 为准。
     public record RubricResultDTO(String criterionId,BigDecimal score,String comment) {}
     public record TeacherFeedbackDTO(String id,String submissionId,String offeringId,String assignmentId,String assignmentTitle,
             int version,String status,BigDecimal score,BigDecimal maxScore,List<RubricResultDTO> rubricResults,String comment,
@@ -66,20 +66,29 @@ public final class AssignmentDTOs {
     /** 契约 MessageReadDTO：readAt 为首次阅读时间。 */
     public record MessageReadDTO(String id,Instant readAt) {}
     public record PaginationInfo(int page,int pageSize,int totalItems,int totalPages) {}
+    // P1-D 契约 DashboardDTO；courses 复用 CourseDTOs.CourseSummaryDTO（与 listMyCourses 同一结构）。
+    // currentLearning 为 CurrentAssignment、CurrentLearningChapter 或 null。
     public record DashboardDTO(String termId,String termLabel,Instant serverTime,int courseCount,
             int pendingAssignmentCount,int unreadMessageCount,Object currentLearning,
-            List<AssignmentSummaryDTO> otherPendingAssignments,StudentFeedbackDTO recentFeedback,
-            List<CourseSummaryDTO> courses,NotificationDTO recentNotice) {}
-    public record CourseSummaryDTO(String offeringId,String courseName,String offeringLabel,
-            int completedCount,int totalCount,String progressUnit,int percent) {}
-    public record CurrentAssignment(String type,String assignmentId,String title,Instant dueAt,String status) {}
-    public record CurrentLearningChapter(String type,String offeringId,String chapterId,String chapterTitle) {}
-    public record LearningRecordsDTO(String offeringId,LearningRecordSummary summary,
-            List<StudentFeedbackDTO> recentFeedback,PaginationInfo feedbackPage,
+            List<AssignmentSummaryDTO> otherPendingAssignments,StudentFeedbackViewDTO recentFeedback,
+            List<CourseDTOs.CourseSummaryDTO> courses,NotificationDTO recentNotice) {}
+    public record ResumeDTO(String activeFile,Instant savedAt,int workspaceRevision) {}
+    public record CurrentAssignment(String type,String offeringId,String chapterId,String assignmentId,String title,
+            String description,String assignmentType,String assignmentState,Instant dueAt,boolean overdue,ResumeDTO resume) {}
+    public record CurrentLearningChapter(String type,String offeringId,String chapterId,String title,String description) {}
+    // P1-D 契约 LearningRecordsDTO / LearningSummary / FeedbackPage / MarkedReadDTO。
+    public record LearningRecordsDTO(String offeringId,LearningSummary summary,StudentFeedbackViewDTO recentFeedback,
+            FeedbackPage feedbackPage,List<Object> knowledgeEvidence,Object nextRecommendation) {}
+    public record LearningSummary(int completedLabCount,int publishedFeedbackCount,Integer needsPracticeCount) {}
+    public record FeedbackPage(List<StudentFeedbackViewDTO> items,int page,int pageSize,int total) {}
+    public record MarkedReadDTO(Instant markedAt) {}
+    // 教师端学生学习记录（getStudentLearningRecords）属下一批对齐，暂保留旧形状。
+    public record LegacyLearningRecordsDTO(String offeringId,LegacyLearningRecordSummary summary,
+            List<LegacyStudentFeedbackDTO> recentFeedback,PaginationInfo feedbackPage,
             Object knowledgeEvidence,Object nextRecommendation) {}
-    public record LearningRecordSummary(int completedChapterCount,int totalChapterCount,
+    public record LegacyLearningRecordSummary(int completedChapterCount,int totalChapterCount,
             int completedLabCount,int totalLabCount,int feedbackCount) {}
-    public record StudentFeedbackDTO(String feedbackId,String assignmentId,String assignmentTitle,
+    public record LegacyStudentFeedbackDTO(String feedbackId,String assignmentId,String assignmentTitle,
             String overallComment,BigDecimal finalScore,Instant publishedAt) {}
     public record OfferingStatsDTO(int studentCount,int activeAssignmentCount,
             int pendingReviewCount,int pendingHelpCount) {}

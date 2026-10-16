@@ -481,12 +481,13 @@ public class AssignmentService {
     private BusinessException submissionSuperseded() {
         return new BusinessException(HttpStatus.CONFLICT,"SUBMISSION_SUPERSEDED","该提交已被新提交替代，不能再批阅。");
     }
-    /** 契约 type 枚举 → 数据库类型；course_notice/help_reply 在 P1 没有对应的个人消息类型，返回 null 表示恒为空。 */
-    private static String dbMessageType(String contractType) {
+    /** 契约 type 枚举 → 数据库类型；help_reply 在 P1 没有对应的个人消息类型，返回 null 表示恒为空。 */
+    static String dbMessageType(String contractType) {
         return switch(contractType) {
             case "feedback"->"feedback_published";
             case "assignment_published"->"assignment_published";
             case "system"->"offering_archived";
+            case "course_notice"->"notice_published";
             default->null;
         };
     }
@@ -494,6 +495,7 @@ public class AssignmentService {
         return switch(dbType) {
             case "feedback_published"->"feedback";
             case "offering_archived"->"system";
+            case "notice_published"->"course_notice";
             default->dbType;
         };
     }

@@ -142,20 +142,27 @@ public interface AssignmentMapper {
     int markNotificationRead(@Param("id") String id,@Param("recipientId") String recipientId,@Param("now") Instant now);
 
     // P1-D 首页仪表盘
-    int countStudentOfferings(@Param("userId") String userId,@Param("termId") String termId);
-    int countPendingAssignments(@Param("userId") String userId,@Param("termId") String termId);
-    int countUnreadMessages(@Param("userId") String userId);
-    AssignmentSummaryDTO findCurrentAssignment(@Param("userId") String userId,@Param("termId") String termId);
-    Chapter findCurrentLearningChapter(@Param("userId") String userId,@Param("termId") String termId);
-    List<AssignmentSummaryDTO> listOtherPendingAssignments(@Param("userId") String userId,@Param("termId") String termId,
-            @Param("excludeId") String excludeId,@Param("limit") int limit);
-    StudentFeedbackDTO findRecentFeedback(@Param("userId") String userId);
-    List<CourseSummaryDTO> listDashboardCourses(@Param("userId") String userId,@Param("termId") String termId,@Param("limit") int limit);
-    MessageRow findRecentNotice(@Param("userId") String userId);
+    // 待办数与待办列表复用 getAssignmentCounts / listStudentAssignments（studentAssignmentBase 派生状态）。
+    int countDashboardOfferings(@Param("studentId") String studentId,@Param("termId") String termId);
+    List<DashboardOfferingRow> listDashboardOfferings(@Param("studentId") String studentId,@Param("termId") String termId,
+            @Param("limit") int limit);
+    int countUnreadMessagesInTerm(@Param("recipientId") String recipientId,@Param("termId") String termId);
+    int countUnreadFeedbackInOffering(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId);
+    /** 最近公告类（notice_published）个人消息；termId 必填。 */
+    MessageRow findRecentNotice(@Param("recipientId") String recipientId,@Param("termId") String termId);
+    int assignmentProgressTotal(String offeringId);
+    int assignmentProgressCompleted(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
 
-    // P1-D 学习记录
-    LearningRecordSummary getLearningRecordSummary(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
-    List<StudentFeedbackDTO> listStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
+    // P1-D 学习记录与最近反馈（offeringId/termId 可为 null）
+    List<String> listPublishedFeedbackIds(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
+            @Param("termId") String termId,@Param("limit") int limit);
+    int countPublishedFeedback(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
+            @Param("termId") String termId);
+    int countCompletedLabs(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
+
+    // 教师端学生学习记录（下一批对齐，暂保留旧形状）
+    LegacyLearningRecordSummary getLearningRecordSummary(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
+    List<LegacyStudentFeedbackDTO> listStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
             @Param("offset") int offset,@Param("limit") int limit);
     int countStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
 

@@ -166,18 +166,16 @@ public class AssignmentController {
     }
     @GetMapping("/me/offerings/{offeringId}/learning-records")
     public ApiResponse<LearningRecordsDTO> getLearningRecords(Authentication auth,HttpServletRequest req,
-            @PathVariable String offeringId,@RequestParam(defaultValue="1") int page,
-            @RequestParam(defaultValue="20") int pageSize) {
-        AssignmentInput.uuid(offeringId);AssignmentInput.page(page,pageSize);
-        return response(dashboardService.getLearningRecords(user(auth),offeringId,page,pageSize),req);
+            @PathVariable String offeringId) {
+        AssignmentInput.uuid(offeringId);
+        return response(dashboardService.getLearningRecords(user(auth),offeringId),req);
     }
     @PutMapping("/me/offerings/{offeringId}/messages/mark-read")
-    public ApiResponse<?> markMessagesRead(Authentication auth,HttpServletRequest req,
+    public ApiResponse<MarkedReadDTO> markMessagesRead(Authentication auth,HttpServletRequest req,
             @PathVariable String offeringId,@RequestParam(required=false) String type,
             @RequestBody Map<String,Object> body) {
         AssignmentInput.uuid(offeringId);AssignmentInput.empty(body);
-        dashboardService.markMessagesRead(user(auth),offeringId,type);
-        return response(Map.of("markedAt",java.time.Instant.now().toString()),req);
+        return response(dashboardService.markMessagesRead(user(auth),offeringId,type),req);
     }
     // P1-D 公告系统
     @PostMapping("/teacher/offerings/{offeringId}/notices")
@@ -216,7 +214,7 @@ public class AssignmentController {
         return response(statsService.getAssignmentStats(assignmentId,user(auth)),req);
     }
     @GetMapping("/teacher/offerings/{offeringId}/students/{studentId}/learning-records")
-    public ApiResponse<LearningRecordsDTO> getStudentLearningRecords(Authentication auth,HttpServletRequest req,
+    public ApiResponse<LegacyLearningRecordsDTO> getStudentLearningRecords(Authentication auth,HttpServletRequest req,
             @PathVariable String offeringId,@PathVariable String studentId,
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(offeringId);AssignmentInput.uuid(studentId);AssignmentInput.page(page,pageSize);
