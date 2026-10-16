@@ -27,6 +27,8 @@ public interface AssignmentMapper {
 
     // 工作区查询与保存
     Workspace findWorkspace(@Param("assignmentId") String assignmentId,@Param("studentId") String studentId);
+    /** 提交串行化入口：锁该学生该作业的工作区行（FOR UPDATE），同一学生同一作业的提交在此排队。 */
+    Workspace findWorkspaceForUpdate(@Param("assignmentId") String assignmentId,@Param("studentId") String studentId);
     List<WorkspaceFile> getWorkspaceFiles(String workspaceId);
     List<InitialFile> getInitialFiles(String assignmentId);
     int insertWorkspace(@Param("id") String id,@Param("offeringId") String offeringId,@Param("assignmentId") String assignmentId,
@@ -41,6 +43,11 @@ public interface AssignmentMapper {
     List<SubmissionSummaryDTO> listStudentSubmissions(@Param("assignmentId") String assignmentId,@Param("studentId") String studentId,
             @Param("offset") long offset,@Param("size") int size);
     int countStudentSubmissions(@Param("assignmentId") String assignmentId,@Param("studentId") String studentId);
+    /** 锁该学生该作业的当前提交行（FOR UPDATE）；无当前提交返回 null。与 saveFeedback/publishFeedback 的锁同一行。 */
+    Submission findCurrentSubmissionForUpdate(@Param("assignmentId") String assignmentId,@Param("studentId") String studentId);
+    /** 作业关联知识点的当前标题/描述；P1 没有提交时知识点快照表，详情中按作业当前值读取。 */
+    List<KnowledgeSnapshot> listKnowledgeSnapshots(String assignmentId);
+    StudentBrief findStudentBrief(String id);
     List<SubmissionFile> getSubmissionFiles(String submissionId);
     List<SubmissionRequirementSnapshot> getSubmissionRequirements(String submissionId);
     List<SubmissionRubricSnapshot> getSubmissionRubric(String submissionId);
@@ -89,8 +96,13 @@ public interface AssignmentMapper {
     int publishAssignment(@Param("id") String id,@Param("now") Instant now);
     int archiveAssignment(@Param("id") String id,@Param("now") Instant now);
     int countPendingReviews(String assignmentId);
-    List<TeacherSubmissionSummaryDTO> listAssignmentSubmissions(@Param("assignmentId") String assignmentId,
+    /** feedbackStatus 为 null 表示不过滤；latestOnly=true 只含当前提交。 */
+    List<TeacherSubmissionRow> listAssignmentSubmissions(@Param("assignmentId") String assignmentId,
+            @Param("feedbackStatus") String feedbackStatus,@Param("latestOnly") boolean latestOnly,
             @Param("offset") long offset,@Param("size") int size);
+    int countTeacherSubmissions(@Param("assignmentId") String assignmentId,
+            @Param("feedbackStatus") String feedbackStatus,@Param("latestOnly") boolean latestOnly);
+    /** 当前提交数（教师作业统计用，与列表过滤无关）。 */
     int countAssignmentSubmissions(String assignmentId);
 
     // P1-C 反馈查询与保存
@@ -115,13 +127,19 @@ public interface AssignmentMapper {
 
     // P1-C 通知查询与标记
     Notification findNotification(String id);
-    List<NotificationDTO> listNotifications(@Param("recipientId") String recipientId,@Param("offset") long offset,@Param("size") int size);
-    int countNotifications(@Param("recipientId") String recipientId);
-    int countUnreadNotifications(String recipientId);
+    /** type 为数据库类型值（Service 已把契约枚举换算）；read 为 all/unread/read；offeringId/type 可为 null。 */
+    List<MessageRow> listMessages(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId,
+            @Param("type") String type,@Param("read") String read,@Param("offset") long offset,@Param("size") int size);
+    int countMessages(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId,
+            @Param("type") String type,@Param("read") String read);
+    /** summary.unreadCount：受 offeringId/type 过滤影响，不受 read 与分页影响。 */
+    int countUnreadInScope(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId,
+            @Param("type") String type);
     int insertNotification(@Param("id") String id,@Param("recipientId") String recipientId,@Param("type") String type,
             @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
             @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,@Param("now") Instant now);
-    int markNotificationRead(@Param("id") String id,@Param("now") Instant now);
+    /** 仅当本人且尚未已读时写入；已读不更新，保留首次 readAt。返回受影响行数。 */
+    int markNotificationRead(@Param("id") String id,@Param("recipientId") String recipientId,@Param("now") Instant now);
 
     // P1-D 首页仪表盘
     int countStudentOfferings(@Param("userId") String userId,@Param("termId") String termId);
@@ -133,7 +151,7 @@ public interface AssignmentMapper {
             @Param("excludeId") String excludeId,@Param("limit") int limit);
     StudentFeedbackDTO findRecentFeedback(@Param("userId") String userId);
     List<CourseSummaryDTO> listDashboardCourses(@Param("userId") String userId,@Param("termId") String termId,@Param("limit") int limit);
-    NotificationDTO findRecentNotice(@Param("userId") String userId);
+    MessageRow findRecentNotice(@Param("userId") String userId);
 
     // P1-D 学习记录
     LearningRecordSummary getLearningRecordSummary(@Param("offeringId") String offeringId,@Param("studentId") String studentId);

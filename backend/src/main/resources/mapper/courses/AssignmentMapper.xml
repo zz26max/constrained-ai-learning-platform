@@ -125,6 +125,11 @@ SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND student
 SELECT id,offering_id,assignment_id,student_id,revision,active_file,created_at,updated_at FROM workspaces WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
 </select>
 
+<!-- 提交串行化：锁工作区行，同一学生同一作业的并发提交在此排队。 -->
+<select id="findWorkspaceForUpdate" resultMap="workspace">
+SELECT id,offering_id,assignment_id,student_id,revision,active_file,created_at,updated_at FROM workspaces WHERE assignment_id=#{assignmentId} AND student_id=#{studentId} FOR UPDATE
+</select>
+
 <select id="getWorkspaceFiles" resultType="com.learningplatform.modules.courses.model.AssignmentRows$WorkspaceFile">
 SELECT workspace_id,file_path,content FROM workspace_files WHERE workspace_id=#{workspaceId} ORDER BY file_path
 </select>
@@ -160,10 +165,30 @@ SELECT id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace
 FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId} AND workspace_revision=#{revision}
 </select>
 
+<!-- 学生视图 feedbackStatus 只有 none/published：草稿不外露。 -->
 <select id="listStudentSubmissions" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$SubmissionSummaryDTO">
-SELECT id,assignment_id,offering_id,attempt_no AS attempt_number,workspace_revision,submitted_at,is_late AS late,CASE WHEN is_current=0 THEN 1 ELSE 0 END AS superseded,'none' AS feedback_status
-FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId}
-ORDER BY attempt_no DESC LIMIT #{size} OFFSET #{offset}
+SELECT s.id,s.assignment_id,s.offering_id,s.attempt_no AS attempt_number,s.workspace_revision,s.submitted_at,s.is_late AS late,CASE WHEN s.is_current=0 THEN 1 ELSE 0 END AS superseded,
+CASE WHEN f.status='published' THEN 'published' ELSE 'none' END AS feedback_status
+FROM submissions s LEFT JOIN feedback f ON f.submission_id=s.id
+WHERE s.assignment_id=#{assignmentId} AND s.student_id=#{studentId}
+ORDER BY s.attempt_no DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<!-- 锁该学生该作业当前提交行，与 saveFeedback/publishFeedback 锁同一行。 -->
+<select id="findCurrentSubmissionForUpdate" resultMap="submission">
+SELECT id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace_revision,reflection,content_version,assignment_title_snapshot,max_score_snapshot,ai_policy_id,due_at_snapshot,submitted_at,is_late,is_current,created_at
+FROM submissions WHERE assignment_id=#{assignmentId} AND student_id=#{studentId} AND is_current=1 FOR UPDATE
+</select>
+
+<!-- P1 无提交时知识点快照表：按作业当前关联的知识点读取。 -->
+<select id="listKnowledgeSnapshots" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$KnowledgeSnapshot">
+SELECT k.id,k.title,k.description FROM assignment_knowledge_points akp
+JOIN knowledge_points k ON k.id=akp.knowledge_point_id AND k.offering_id=akp.offering_id
+WHERE akp.assignment_id=#{assignmentId} ORDER BY k.position,k.id
+</select>
+
+<select id="findStudentBrief" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$StudentBrief">
+SELECT id,username,display_name FROM users WHERE id=#{id}
 </select>
 
 <select id="countStudentSubmissions" resultType="int">
@@ -280,13 +305,28 @@ SELECT COUNT(*) FROM submissions s WHERE s.assignment_id=#{assignmentId} AND s.i
 AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')
 </select>
 
-<select id="listAssignmentSubmissions" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$TeacherSubmissionSummaryDTO">
-SELECT s.id,s.assignment_id,s.offering_id,s.attempt_no AS attempt_number,s.workspace_revision,s.submitted_at,s.is_late AS late,CASE WHEN s.is_current=0 THEN 1 ELSE 0 END AS superseded,'none' AS feedback_status,
+<sql id="teacherSubmissionFilter">
+WHERE s.assignment_id=#{assignmentId}
+<if test="latestOnly">AND s.is_current=1</if>
+<if test='feedbackStatus == "none"'>AND f.id IS NULL</if>
+<if test='feedbackStatus == "draft"'>AND f.status='draft'</if>
+<if test='feedbackStatus == "published"'>AND f.status='published'</if>
+</sql>
+
+<select id="listAssignmentSubmissions" resultType="com.learningplatform.modules.courses.model.AssignmentRows$TeacherSubmissionRow">
+SELECT s.id,s.assignment_id,s.offering_id,s.attempt_no AS attempt_number,s.workspace_revision,s.submitted_at,s.is_late AS late,CASE WHEN s.is_current=0 THEN 1 ELSE 0 END AS superseded,
+COALESCE(f.status,'none') AS feedback_status,
 u.id AS student_id,u.username AS student_username,u.display_name AS student_display_name
 FROM submissions s
 JOIN users u ON u.id=s.student_id
-WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+LEFT JOIN feedback f ON f.submission_id=s.id
+<include refid="teacherSubmissionFilter"/>
 ORDER BY s.submitted_at DESC,s.id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="countTeacherSubmissions" resultType="int">
+SELECT COUNT(*) FROM submissions s LEFT JOIN feedback f ON f.submission_id=s.id
+<include refid="teacherSubmissionFilter"/>
 </select>
 
 <select id="countAssignmentSubmissions" resultType="int">
@@ -326,7 +366,7 @@ SELECT COUNT(*) FROM submissions WHERE assignment_id=#{assignmentId} AND is_curr
 <arg column="related_offering_id" javaType="java.lang.String"/>
 <arg column="related_assignment_id" javaType="java.lang.String"/>
 <arg column="related_feedback_id" javaType="java.lang.String"/>
-<arg column="is_read" javaType="boolean"/>
+<arg column="is_read" javaType="_boolean"/>
 <arg column="read_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 <arg column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 </constructor></resultMap>
@@ -394,17 +434,54 @@ SELECT id,recipient_id,type,title,content,related_offering_id,related_assignment
 FROM notifications WHERE id=#{id}
 </select>
 
-<select id="listNotifications" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NotificationDTO">
-SELECT id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
-FROM notifications WHERE recipient_id=#{recipientId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+<resultMap id="messageRow" type="com.learningplatform.modules.courses.model.AssignmentRows$MessageRow"><constructor>
+<arg column="id" javaType="java.lang.String"/>
+<arg column="type" javaType="java.lang.String"/>
+<arg column="title" javaType="java.lang.String"/>
+<arg column="content" javaType="java.lang.String"/>
+<arg column="offering_id" javaType="java.lang.String"/>
+<arg column="assignment_id" javaType="java.lang.String"/>
+<arg column="feedback_id" javaType="java.lang.String"/>
+<arg column="sender_id" javaType="java.lang.String"/>
+<arg column="sender_display_name" javaType="java.lang.String"/>
+<arg column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg column="read_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+
+<!-- 发送者仅评价发布消息可推出（评价教师）；其余类型 sender 为 null。 -->
+<sql id="messageColumns">
+n.id,n.type,n.title,n.content,n.related_offering_id AS offering_id,n.related_assignment_id AS assignment_id,n.related_feedback_id AS feedback_id,
+fb.teacher_id AS sender_id,tu.display_name AS sender_display_name,n.created_at,n.read_at
+</sql>
+<sql id="messageJoins">
+LEFT JOIN feedback fb ON fb.id=n.related_feedback_id AND n.type='feedback_published'
+LEFT JOIN users tu ON tu.id=fb.teacher_id
+</sql>
+<sql id="messageScope">
+WHERE n.recipient_id=#{recipientId}
+<if test="offeringId != null">AND n.related_offering_id=#{offeringId}</if>
+<if test="type != null">AND n.type=#{type}</if>
+</sql>
+
+<select id="listMessages" resultMap="messageRow">
+SELECT <include refid="messageColumns"/> FROM notifications n <include refid="messageJoins"/>
+<include refid="messageScope"/>
+<if test='read == "unread"'>AND n.is_read=0</if>
+<if test='read == "read"'>AND n.is_read=1</if>
+ORDER BY n.created_at DESC,n.id DESC LIMIT #{size} OFFSET #{offset}
 </select>
 
-<select id="countNotifications" resultType="int">
-SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId}
+<select id="countMessages" resultType="int">
+SELECT COUNT(*) FROM notifications n
+<include refid="messageScope"/>
+<if test='read == "unread"'>AND n.is_read=0</if>
+<if test='read == "read"'>AND n.is_read=1</if>
 </select>
 
-<select id="countUnreadNotifications" resultType="int">
-SELECT COUNT(*) FROM notifications WHERE recipient_id=#{recipientId} AND is_read=0
+<select id="countUnreadInScope" resultType="int">
+SELECT COUNT(*) FROM notifications n
+<include refid="messageScope"/>
+AND n.is_read=0
 </select>
 
 <insert id="insertNotification">
@@ -414,7 +491,7 @@ VALUES (#{id},#{recipientId},#{type},#{title},#{content},#{relatedOfferingId},#{
 
 <update id="markNotificationRead">
 UPDATE notifications SET is_read=1,read_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
-WHERE id=#{id}
+WHERE id=#{id} AND recipient_id=#{recipientId} AND is_read=0
 </update>
 
 <!-- P1-D 首页仪表盘查询 -->
@@ -504,9 +581,9 @@ WHERE m.user_id=#{userId} AND m.role='student' AND m.status='active' AND o.statu
 ORDER BY m.last_studied_at DESC,o.created_at DESC LIMIT #{limit}
 </select>
 
-<select id="findRecentNotice" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NotificationDTO">
-SELECT id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at
-FROM notifications WHERE recipient_id=#{userId} ORDER BY created_at DESC LIMIT 1
+<select id="findRecentNotice" resultMap="messageRow">
+SELECT <include refid="messageColumns"/> FROM notifications n <include refid="messageJoins"/>
+WHERE n.recipient_id=#{userId} ORDER BY n.created_at DESC,n.id DESC LIMIT 1
 </select>
 
 <!-- P1-D 学习记录查询 -->

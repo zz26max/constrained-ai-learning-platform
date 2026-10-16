@@ -29,6 +29,13 @@ public final class AssignmentRows {
     public record Notification(String id,String recipientId,String type,String title,String content,
             String relatedOfferingId,String relatedAssignmentId,String relatedFeedbackId,
             boolean read,Instant readAt,Instant createdAt) {}
+    /** 站内消息扁平行：type 为数据库值；发送者仅 feedback_published 可由评价教师推出，其余为 null。 */
+    public record MessageRow(String id,String type,String title,String content,String offeringId,String assignmentId,
+            String feedbackId,String senderId,String senderDisplayName,Instant createdAt,Instant readAt) {}
+    /** 教师提交列表扁平行（含学生信息），由 Service 组装嵌套 student。 */
+    public record TeacherSubmissionRow(String id,String assignmentId,String offeringId,int attemptNumber,int workspaceRevision,
+            Instant submittedAt,boolean late,boolean superseded,String feedbackStatus,
+            String studentId,String studentUsername,String studentDisplayName) {}
     public record NoticeRow(String id,String offeringId,String authorId,String targetStudentId,
             String title,String content,Instant createdAt) {}
 }

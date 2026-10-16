@@ -70,7 +70,7 @@ public class AssignmentController {
                 "total",result.total()),req);
     }
     @GetMapping("/submissions/{submissionId}")
-    public ApiResponse<SubmissionDetailDTO> getSubmission(Authentication auth,HttpServletRequest req,
+    public ApiResponse<Object> getSubmission(Authentication auth,HttpServletRequest req,
             @PathVariable String submissionId) {
         AssignmentInput.uuid(submissionId);return response(service.getSubmission(user(auth),submissionId),req);
     }
@@ -114,10 +114,11 @@ public class AssignmentController {
     }
     @GetMapping("/teacher/assignments/{assignmentId}/submissions")
     public ApiResponse<?> listTeacherSubmissions(Authentication auth,HttpServletRequest req,
-            @PathVariable String assignmentId,@RequestParam(defaultValue="1") int page,
+            @PathVariable String assignmentId,@RequestParam(required=false) String feedbackStatus,
+            @RequestParam(defaultValue="true") boolean latestOnly,@RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(assignmentId);AssignmentInput.page(page,pageSize);
-        SubmissionListResponse result=service.listTeacherSubmissions(user(auth),assignmentId,page,pageSize);
+        SubmissionListResponse result=service.listTeacherSubmissions(user(auth),assignmentId,feedbackStatus,latestOnly,page,pageSize);
         return response(Map.of("items",result.items(),"page",result.page(),"pageSize",result.pageSize(),
                 "total",result.total()),req);
     }
@@ -142,19 +143,20 @@ public class AssignmentController {
         return response(service.getFeedback(user(auth),feedbackId),req);
     }
     @GetMapping("/me/messages")
-    public ApiResponse<?> listMyNotifications(Authentication auth,HttpServletRequest req,
+    public ApiResponse<?> listMessages(Authentication auth,HttpServletRequest req,
+            @RequestParam(required=false) String offeringId,@RequestParam(required=false) String type,
+            @RequestParam(defaultValue="all") String read,
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.page(page,pageSize);
-        NotificationListResponse result=service.listMyNotifications(user(auth),page,pageSize);
+        NotificationListResponse result=service.listMessages(user(auth),offeringId,type,read,page,pageSize);
         return response(Map.of("items",result.items(),"page",result.page(),"pageSize",result.pageSize(),
-                "total",result.total(),"unreadCount",result.unreadCount()),req);
+                "total",result.total(),"summary",Map.of("unreadCount",result.unreadCount())),req);
     }
     @PutMapping("/me/messages/{messageId}/read")
-    public ApiResponse<?> markNotificationRead(Authentication auth,HttpServletRequest req,
+    public ApiResponse<MessageReadDTO> readMessage(Authentication auth,HttpServletRequest req,
             @PathVariable String messageId,@RequestBody Map<String,Object> body) {
         AssignmentInput.uuid(messageId);AssignmentInput.empty(body);
-        service.markNotificationRead(user(auth),messageId,id(req));
-        return response(Map.of("id",messageId,"readAt",java.time.Instant.now().toString()),req);
+        return response(service.readMessage(user(auth),messageId,id(req)),req);
     }
     // P1-D 学生仪表盘与聚合
     @GetMapping("/me/dashboard")

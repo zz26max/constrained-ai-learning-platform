@@ -126,26 +126,31 @@ public class AssignmentService {
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public SubmissionCreatedResponse submitAssignment(UserDTO user,String assignmentId,Map<String,Object> body,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
-        CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),true);
+        // 不在此处用 write=true：归档拦截要放在幂等检查之后，同 revision 重复提交即使班级已归档也应返回原提交。
+        CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),false);
         if("draft".equals(assignment.status())) throw CourseAccess.notFound();
-        // 业务检查优先于输入校验，避免归档状态返回 VALIDATION_ERROR；错误码即契约的 SubmissionBlockedReason 枚举。
-        int attemptsUsed=mapper.countSubmissions(assignment.id(),user.id());
-        AssignmentSummaryDTO mine=mapper.findStudentAssignmentSummary(user.id(),null,null,assignment.id(),now());
-        if(mine==null) throw CourseAccess.notFound();
-        String blocked=submitBlockedReason(assignment,context,attemptsUsed,"REVIEWED".equals(mine.assignmentState()),now());
-        if(blocked!=null) throw blockedException(blocked);
         AssignmentInput.validateSubmissionWrite(body);
         int workspaceRevision=AssignmentInput.integer(body,"workspaceRevision");
         String reflection=AssignmentInput.text(body,"reflection",8000);
-        // 幂等性：检查是否已提交过相同 workspaceRevision。
-        Submission existing=mapper.findSubmissionByRevision(assignment.id(),user.id(),workspaceRevision);
-        if(existing!=null) {
-            // 自然幂等：返回原提交，不新建、不占次数、不覆盖 reflection。
-            return new SubmissionCreatedResponse(submissionSummary(existing),false);
+        Instant now=now();
+        // 锁顺序：工作区行 → 当前提交行。同一学生同一作业的并发提交在工作区行上排队；
+        // 与 saveFeedback/publishFeedback（submission 行 → feedback 行）没有交叉锁序。
+        Workspace workspace=mapper.findWorkspaceForUpdate(assignment.id(),user.id());
+        if(workspace!=null) {
+            // 自然幂等（先于任何业务阻断）：同 revision 已提交则返回原提交，不新建、不占次数、不覆盖 reflection。
+            Submission existing=mapper.findSubmissionByRevision(assignment.id(),user.id(),workspaceRevision);
+            if(existing!=null) return new SubmissionCreatedResponse(submissionSummary(existing),false);
         }
-        Workspace workspace=mapper.findWorkspace(assignment.id(),user.id());
-        if(workspace==null||workspace.revision()<workspaceRevision) throw AssignmentInput.invalid();
-        Instant now=now();boolean isLate=assignment.dueAt().isBefore(now);
+        Submission currentSubmission=mapper.findCurrentSubmissionForUpdate(assignment.id(),user.id());
+        Feedback currentFeedback=currentSubmission==null?null:mapper.findFeedbackBySubmission(currentSubmission.id());
+        boolean reviewed=currentFeedback!=null&&"published".equals(currentFeedback.status());
+        int attemptsUsed=mapper.countSubmissions(assignment.id(),user.id());
+        String blocked=submitBlockedReason(assignment,context,attemptsUsed,reviewed,now);
+        if(blocked!=null) throw blockedException(blocked);
+        // 提交的必须是服务器当前已保存的 revision；否则 WORKSPACE_CONFLICT 并带回当前版本。
+        if(workspace==null) throw versionConflict(0);
+        if(workspaceRevision!=workspace.revision()) throw versionConflict(workspace.revision());
+        boolean isLate=assignment.dueAt().isBefore(now);
         String submissionId=UUID.randomUUID().toString();
         int attemptNo=attemptsUsed+1;
         // 标记之前的提交为 superseded。
@@ -178,13 +183,13 @@ public class AssignmentService {
         int total=mapper.countStudentSubmissions(assignment.id(),user.id());
         return new SubmissionListResponse(items,page,pageSize,total);
     }
-    public SubmissionDetailDTO getSubmission(UserDTO user,String submissionId) {
-        CourseAccess.role(user,"student");
+    /** 本班授课教师返回 TeacherSubmissionDetailDTO；提交本人返回 SubmissionDetailDTO；其他人（含同班他人）404。 */
+    public Object getSubmission(UserDTO user,String submissionId) {
         Submission submission=submissionOr404(submissionId);
-        CourseAccess.Context context=access.requireStudent(user,submission.offeringId(),false);
-        // 学生只能查看自己的提交。
+        CourseAccess.Context context=access.requireReader(user,submission.offeringId());
+        if("teacher".equals(context.member().role())) return teacherSubmissionDetail(submission);
         if(!submission.studentId().equals(user.id())) throw CourseAccess.notFound();
-        return submissionDetail(submission);
+        return studentSubmissionDetail(submission);
     }
     // 教师端作业管理
     public AssignmentListResponse listTeacherAssignments(UserDTO user,String offeringId,String publicationState,int page,int pageSize) {
@@ -357,12 +362,21 @@ public class AssignmentService {
     private BusinessException assignmentAlreadyPublished() {
         return new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ALREADY_PUBLISHED","已发布作业不能修改核心字段或缩短提交窗口。");
     }
-    public SubmissionListResponse listTeacherSubmissions(UserDTO user,String assignmentId,int page,int pageSize) {
+    /** feedbackStatus 可选 none/draft/published；latestOnly 默认 true（只含当前提交），false 含历史版本。 */
+    public SubmissionListResponse listTeacherSubmissions(UserDTO user,String assignmentId,String feedbackStatus,
+            boolean latestOnly,int page,int pageSize) {
         Assignment assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),false);
         AssignmentInput.page(page,pageSize);
-        List<TeacherSubmissionSummaryDTO> items=mapper.listAssignmentSubmissions(assignment.id(),offset(page,pageSize),pageSize);
-        int total=mapper.countAssignmentSubmissions(assignment.id());
+        if(feedbackStatus!=null&&!List.of("none","draft","published").contains(feedbackStatus)) {
+            throw AssignmentInput.invalidField("feedbackStatus","必须是 none、draft 或 published。");
+        }
+        List<TeacherSubmissionSummaryDTO> items=mapper.listAssignmentSubmissions(assignment.id(),feedbackStatus,latestOnly,
+                offset(page,pageSize),pageSize).stream()
+                .map(r->new TeacherSubmissionSummaryDTO(r.id(),r.assignmentId(),r.offeringId(),r.attemptNumber(),
+                        r.workspaceRevision(),r.submittedAt(),r.late(),r.superseded(),r.feedbackStatus(),
+                        new StudentBrief(r.studentId(),r.studentUsername(),r.studentDisplayName()))).toList();
+        int total=mapper.countTeacherSubmissions(assignment.id(),feedbackStatus,latestOnly);
         return new SubmissionListResponse(items,page,pageSize,total);
     }
     /** saveFeedback 的结果：created=true 对应 201，否则 200。 */
@@ -467,24 +481,73 @@ public class AssignmentService {
     private BusinessException submissionSuperseded() {
         return new BusinessException(HttpStatus.CONFLICT,"SUBMISSION_SUPERSEDED","该提交已被新提交替代，不能再批阅。");
     }
-    public NotificationListResponse listMyNotifications(UserDTO user,int page,int pageSize) {
-        CourseAccess.role(user,"student");
+    /** 契约 type 枚举 → 数据库类型；course_notice/help_reply 在 P1 没有对应的个人消息类型，返回 null 表示恒为空。 */
+    private static String dbMessageType(String contractType) {
+        return switch(contractType) {
+            case "feedback"->"feedback_published";
+            case "assignment_published"->"assignment_published";
+            case "system"->"offering_archived";
+            default->null;
+        };
+    }
+    private static String contractMessageType(String dbType) {
+        return switch(dbType) {
+            case "feedback_published"->"feedback";
+            case "offering_archived"->"system";
+            default->dbType;
+        };
+    }
+    /** 消息行 → 契约 NotificationDTO；关联对象被删除（外键置空）时 target 为 null。 */
+    static NotificationDTO notification(AssignmentRows.MessageRow r) {
+        CourseDTOs.TeacherBrief sender=r.senderId()==null?null
+                :new CourseDTOs.TeacherBrief(r.senderId(),r.senderDisplayName()==null||r.senderDisplayName().isEmpty()?"教师":r.senderDisplayName());
+        TargetDTO target=null;
+        if(r.offeringId()!=null) {
+            switch(r.type()) {
+                case "feedback_published"->{ if(r.feedbackId()!=null) target=new TargetDTO("feedback",r.feedbackId(),r.offeringId()); }
+                case "assignment_published"->{ if(r.assignmentId()!=null) target=new TargetDTO("assignment",r.assignmentId(),r.offeringId()); }
+                case "offering_archived"->target=new TargetDTO("offering",r.offeringId(),r.offeringId());
+                default->{}
+            }
+        }
+        return new NotificationDTO(r.id(),r.offeringId(),contractMessageType(r.type()),r.title(),r.content(),
+                sender,r.createdAt(),r.readAt(),target);
+    }
+    private static void requireMessageUser(UserDTO user) {
+        if(!user.roles().contains("student")&&!user.roles().contains("teacher")) throw CourseAccess.forbidden();
+    }
+    /** 本人消息列表。summary.unreadCount 受 offeringId/type 过滤影响，不受 read 与分页影响。 */
+    public NotificationListResponse listMessages(UserDTO user,String offeringId,String type,String read,int page,int pageSize) {
+        requireMessageUser(user);
         AssignmentInput.page(page,pageSize);
-        List<NotificationDTO> items=mapper.listNotifications(user.id(),offset(page,pageSize),pageSize);
-        int total=mapper.countNotifications(user.id());
-        int unread=mapper.countUnreadNotifications(user.id());
+        String offering=offeringId==null?null:AssignmentInput.uuid(offeringId);
+        String readFilter=read==null?"all":read;
+        if(!List.of("all","unread","read").contains(readFilter)) throw AssignmentInput.invalidField("read","必须是 all、unread 或 read。");
+        String dbType=null;
+        if(type!=null) {
+            if(!List.of("course_notice","assignment_published","feedback","system","help_reply").contains(type)) {
+                throw AssignmentInput.invalidField("type","不是受支持的消息类型。");
+            }
+            dbType=dbMessageType(type);
+            if(dbType==null) return new NotificationListResponse(List.of(),page,pageSize,0,0);
+        }
+        List<NotificationDTO> items=mapper.listMessages(user.id(),offering,dbType,readFilter,offset(page,pageSize),pageSize)
+                .stream().map(AssignmentService::notification).toList();
+        int total=mapper.countMessages(user.id(),offering,dbType,readFilter);
+        int unread=mapper.countUnreadInScope(user.id(),offering,dbType);
         return new NotificationListResponse(items,page,pageSize,total,unread);
     }
+    /** 仅收件人本人；条件更新只在未读时写入，重复调用返回首次 readAt。别人的消息按不存在处理。 */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
-    public void markNotificationRead(UserDTO user,String notificationId,String requestId) {
-        CourseAccess.role(user,"student");
-        Notification notification=notificationOr404(notificationId);
+    public MessageReadDTO readMessage(UserDTO user,String messageId,String requestId) {
+        requireMessageUser(user);
+        Notification notification=notificationOr404(messageId);
         if(!notification.recipientId().equals(user.id())) throw CourseAccess.notFound();
-        if(!notification.read()) {
-            Instant now=now();
-            mapper.markNotificationRead(notification.id(),now);
-            audit.record(user.id(),"NOTIFICATION_READ","notification",notification.id(),Map.of(),requestId);
-        }
+        int updated=mapper.markNotificationRead(notification.id(),user.id(),now());
+        if(updated==1) audit.record(user.id(),"NOTIFICATION_READ","notification",notification.id(),Map.of(),requestId);
+        Notification current=mapper.findNotification(notification.id());
+        if(current==null||current.readAt()==null) throw CourseAccess.notFound();
+        return new MessageReadDTO(current.id(),current.readAt());
     }
     // 辅助方法
     private Assignment assignmentOr404(String id) {
@@ -611,23 +674,41 @@ public class AssignmentService {
                 a.currentAiPolicyId()!=null?1:null,a.id(),a.offeringId(),a.status(),a.publishedAt(),
                 submittedCount,pendingReviewCount);
     }
+    /** 学生口径摘要：feedbackStatus 只有 none/published，草稿不外露（提交接口只返回学生本人）。 */
     private SubmissionSummaryDTO submissionSummary(Submission s) {
+        Feedback f=mapper.findFeedbackBySubmission(s.id());
         return new SubmissionSummaryDTO(s.id(),s.assignmentId(),s.offeringId(),s.attemptNo(),s.workspaceRevision(),
-                s.submittedAt(),s.isLate(),!s.isCurrent(),"pending");
+                s.submittedAt(),s.isLate(),!s.isCurrent(),f!=null&&"published".equals(f.status())?"published":"none");
     }
-    private SubmissionDetailDTO submissionDetail(Submission s) {
-        List<SubmissionFile> files=mapper.getSubmissionFiles(s.id());
+    /** 提交冻结的标准快照；知识点没有提交时快照表，按作业当前关联读取；P1 无 AI 政策版本，aiPolicyVersion 恒 null。 */
+    private AssignmentSnapshot assignmentSnapshot(Submission s) {
         List<SubmissionRequirementSnapshot> requirements=mapper.getSubmissionRequirements(s.id());
         List<SubmissionRubricSnapshot> rubric=mapper.getSubmissionRubric(s.id());
-        List<String> knowledgePointIds=mapper.getKnowledgePointIds(s.assignmentId());
-        AssignmentSnapshot snapshot=new AssignmentSnapshot(s.assignmentTitleSnapshot(),
+        return new AssignmentSnapshot(s.assignmentTitleSnapshot(),
                 requirements.stream().map(SubmissionRequirementSnapshot::requirementText).toList(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
-                s.maxScoreSnapshot(),List.of(),s.contentVersion(),s.dueAtSnapshot(),s.aiPolicyId()!=null?1:null);
+                s.maxScoreSnapshot(),mapper.listKnowledgeSnapshots(s.assignmentId()),s.contentVersion(),s.dueAtSnapshot(),null);
+    }
+    private List<FileDTO> submissionFiles(Submission s) {
+        return mapper.getSubmissionFiles(s.id()).stream().map(f->new FileDTO(f.filePath(),f.content())).toList();
+    }
+    /** 学生视图：只含已发布评价，草稿状态不可见。 */
+    private SubmissionDetailDTO studentSubmissionDetail(Submission s) {
+        Feedback f=mapper.findFeedbackBySubmission(s.id());
+        boolean published=f!=null&&"published".equals(f.status());
         return new SubmissionDetailDTO(s.id(),s.assignmentId(),s.offeringId(),s.attemptNo(),s.workspaceRevision(),
-                s.submittedAt(),s.isLate(),!s.isCurrent(),"pending",
-                files.stream().map(f->new FileDTO(f.filePath(),f.content())).toList(),
-                s.reflection(),snapshot,null);
+                s.submittedAt(),s.isLate(),!s.isCurrent(),published?"published":"none",
+                submissionFiles(s),s.reflection(),assignmentSnapshot(s),published?studentFeedbackView(f,s):null);
+    }
+    /** 教师视图：附学生信息；评价为草稿时填 draftFeedback，已发布时填 publishedFeedback。 */
+    private TeacherSubmissionDetailDTO teacherSubmissionDetail(Submission s) {
+        Feedback f=mapper.findFeedbackBySubmission(s.id());
+        StudentBrief student=mapper.findStudentBrief(s.studentId());
+        TeacherFeedbackDTO published=f!=null&&"published".equals(f.status())?teacherFeedbackView(f,s):null;
+        TeacherFeedbackDTO draft=f!=null&&"draft".equals(f.status())?teacherFeedbackView(f,s):null;
+        return new TeacherSubmissionDetailDTO(s.id(),s.assignmentId(),s.offeringId(),s.attemptNo(),s.workspaceRevision(),
+                s.submittedAt(),s.isLate(),!s.isCurrent(),f==null?"none":f.status(),student,
+                submissionFiles(s),s.reflection(),assignmentSnapshot(s),published,draft);
     }
     private int count(AssignmentCounts counts,String filter) {
         return switch(filter) {

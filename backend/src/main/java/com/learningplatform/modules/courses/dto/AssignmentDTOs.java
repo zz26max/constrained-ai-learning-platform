@@ -30,10 +30,16 @@ public final class AssignmentDTOs {
     public record KnowledgeSnapshot(String id,String title,String description) {}
     public record AssignmentSnapshot(String title,List<String> requirements,List<RubricCriterion> rubric,
             BigDecimal maxScore,List<KnowledgeSnapshot> knowledgePoints,int contentVersion,Instant dueAt,Integer aiPolicyVersion) {}
+    /** 学生视图（契约 SubmissionDetailDTO）：feedbackStatus 仅 none/published，只含已发布评价。 */
     public record SubmissionDetailDTO(String id,String assignmentId,String offeringId,int attemptNumber,
             int workspaceRevision,Instant submittedAt,boolean late,boolean superseded,String feedbackStatus,
-            List<FileDTO> files,String reflection,AssignmentSnapshot assignmentSnapshot,Object publishedFeedback) {}
+            List<FileDTO> files,String reflection,AssignmentSnapshot assignmentSnapshot,StudentFeedbackViewDTO publishedFeedback) {}
     public record StudentBrief(String id,String username,String displayName) {}
+    /** 教师视图（契约 TeacherSubmissionDetailDTO）：附学生信息与草稿评价，feedbackStatus 为 none/draft/published。 */
+    public record TeacherSubmissionDetailDTO(String id,String assignmentId,String offeringId,int attemptNumber,
+            int workspaceRevision,Instant submittedAt,boolean late,boolean superseded,String feedbackStatus,
+            StudentBrief student,List<FileDTO> files,String reflection,AssignmentSnapshot assignmentSnapshot,
+            TeacherFeedbackDTO publishedFeedback,TeacherFeedbackDTO draftFeedback) {}
     public record TeacherSubmissionSummaryDTO(String id,String assignmentId,String offeringId,int attemptNumber,
             int workspaceRevision,Instant submittedAt,boolean late,boolean superseded,String feedbackStatus,StudentBrief student) {}
     public record TeacherAssignmentDTO(String chapterId,String title,String type,boolean isRequired,String description,
@@ -52,8 +58,13 @@ public final class AssignmentDTOs {
             int version,String status,BigDecimal score,BigDecimal maxScore,List<RubricResultDTO> rubricResults,String comment,
             List<Object> knowledgeEvaluations,List<String> issueTags,Integer issueTagVersion,
             CourseDTOs.TeacherBrief teacher,Instant publishedAt,String messageId) {}
-    public record NotificationDTO(String id,String type,String title,String content,String relatedOfferingId,
-            String relatedAssignmentId,String relatedFeedbackId,boolean isRead,Instant readAt,Instant createdAt) {}
+    /** 契约 TargetDTO；type 取 offering/chapter/resource/assignment/feedback/help_request。 */
+    public record TargetDTO(String type,String id,String offeringId) {}
+    /** 契约 NotificationDTO：type 为对外枚举（feedback_published 对外为 feedback，offering_archived 为 system）。 */
+    public record NotificationDTO(String id,String offeringId,String type,String title,String content,
+            CourseDTOs.TeacherBrief sender,Instant createdAt,Instant readAt,TargetDTO target) {}
+    /** 契约 MessageReadDTO：readAt 为首次阅读时间。 */
+    public record MessageReadDTO(String id,Instant readAt) {}
     public record PaginationInfo(int page,int pageSize,int totalItems,int totalPages) {}
     public record DashboardDTO(String termId,String termLabel,Instant serverTime,int courseCount,
             int pendingAssignmentCount,int unreadMessageCount,Object currentLearning,

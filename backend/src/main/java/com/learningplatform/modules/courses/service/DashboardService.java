@@ -42,7 +42,8 @@ public class DashboardService {
         List<AssignmentSummaryDTO> otherPending=mapper.listOtherPendingAssignments(user.id(),termId,excludeId,2);
         StudentFeedbackDTO recentFeedback=mapper.findRecentFeedback(user.id());
         List<CourseSummaryDTO> courses=mapper.listDashboardCourses(user.id(),termId,6);
-        NotificationDTO recentNotice=mapper.findRecentNotice(user.id());
+        com.learningplatform.modules.courses.model.AssignmentRows.MessageRow recentRow=mapper.findRecentNotice(user.id());
+        NotificationDTO recentNotice=recentRow==null?null:AssignmentService.notification(recentRow);
         return new DashboardDTO(termId,termLabel,Instant.now(),courseCount,pendingAssignmentCount,
                 unreadMessageCount,currentLearning,otherPending,recentFeedback,courses,recentNotice);
     }

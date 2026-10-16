@@ -173,7 +173,7 @@ class AssignmentIntegrationIT {
         assertThat(submission.submission().late()).isFalse();
 
         // 验证提交快照
-        SubmissionDetailDTO detail = assignmentService.getSubmission(STUDENT, submission.submission().id());
+        SubmissionDetailDTO detail = (SubmissionDetailDTO) assignmentService.getSubmission(STUDENT, submission.submission().id());
         assertThat(detail.files()).hasSize(1);
         assertThat(detail.files().get(0).content()).isEqualTo("<h1>Updated</h1>");
         assertThat(detail.reflection()).isEqualTo("已完成所有功能");
@@ -446,7 +446,7 @@ class AssignmentIntegrationIT {
             assertThat(((Number) r.get("is_read")).intValue()).isZero();
         });
         // 教师不收到通知；学生可经通知接口读到该类型
-        assertThat(assignmentService.listMyNotifications(STUDENT, 1, 20).items())
+        assertThat(assignmentService.listMessages(STUDENT, null, null, null, 1, 20).items())
                 .extracting(NotificationDTO::type).containsExactly("assignment_published");
 
         // 重复发布不重复提醒
@@ -900,6 +900,334 @@ class AssignmentIntegrationIT {
                 .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
         assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(2, "50", "30"), "x"))
                 .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
+    }
+
+    // ---- P1-C 提交与消息对齐用例 ----
+
+    private AssignmentService.SubmissionCreatedResponse saveAndSubmit(String assignmentId, int baseRevision, String content, String reflection) {
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", baseRevision);
+        save.put("files", List.of(Map.of("path", "index.html", "content", content)));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignmentId, save, "save");
+        return assignmentService.submitAssignment(STUDENT, assignmentId,
+                new HashMap<>(Map.of("workspaceRevision", baseRevision + 1, "reflection", reflection)), "submit");
+    }
+
+    @Test
+    void sameRevisionRetryReturnsOriginalWhenResubmitNotAllowed() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        Map<String, Object> body = assignmentBody();
+        body.put("allowResubmit", false);
+        body.put("maxAttempts", 1);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), body, "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        var first = saveAndSubmit(assignment.id(), 0, "V1", "第一次");
+        assertThat(first.created()).isTrue();
+
+        var retry = assignmentService.submitAssignment(STUDENT, assignment.id(),
+                new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "不应覆盖")), "retry");
+        assertThat(retry.created()).isFalse();
+        assertThat(retry.submission().id()).isEqualTo(first.submission().id());
+        assertThat(jdbc.queryForObject("SELECT reflection FROM submissions WHERE id=?", String.class, first.submission().id()))
+                .isEqualTo("第一次");
+
+        // 新 revision 才被业务阻断。
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 1);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V2")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), save, "save2");
+        assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, assignment.id(),
+                new HashMap<>(Map.of("workspaceRevision", 2, "reflection", "x")), "blocked"))
+                .satisfies(t -> assertCode(t, 409, "RESUBMIT_NOT_ALLOWED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM submissions WHERE assignment_id=?", Integer.class, assignment.id())).isEqualTo(1);
+    }
+
+    @Test
+    void sameRevisionRetryReturnsOriginalWhenAttemptsExhaustedOrReviewed() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        Map<String, Object> body = assignmentBody();
+        body.put("maxAttempts", 1);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), body, "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        var first = saveAndSubmit(assignment.id(), 0, "V1", "第一次");
+
+        var retry = assignmentService.submitAssignment(STUDENT, assignment.id(),
+                new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "重试")), "retry");
+        assertThat(retry.created()).isFalse();
+        assertThat(retry.submission().id()).isEqualTo(first.submission().id());
+
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 1);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V2")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), save, "save2");
+        assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, assignment.id(),
+                new HashMap<>(Map.of("workspaceRevision", 2, "reflection", "x")), "blocked"))
+                .satisfies(t -> assertCode(t, 409, "ATTEMPT_LIMIT_REACHED"));
+    }
+
+    @Test
+    void sameRevisionRetryReturnsOriginalAfterFeedbackPublishedAndNewRevisionIsBlocked() {
+        Ctx c = submittedAssignment();
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p1");
+
+        var retry = assignmentService.submitAssignment(STUDENT, c.assignment().id(),
+                new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "重试")), "retry");
+        assertThat(retry.created()).isFalse();
+        assertThat(retry.submission().id()).isEqualTo(c.submissionId());
+        assertThat(retry.submission().feedbackStatus()).isEqualTo("published");
+
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 1);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V2")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, c.assignment().id(), save, "save2");
+        assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, c.assignment().id(),
+                new HashMap<>(Map.of("workspaceRevision", 2, "reflection", "x")), "blocked"))
+                .satisfies(t -> assertCode(t, 409, "RESUBMIT_AFTER_REVIEW"));
+    }
+
+    @Test
+    void concurrentDuplicateSubmitCreatesSingleRow() throws Exception {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 0);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V1")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), save, "save");
+
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch go = new CountDownLatch(1);
+            List<java.util.concurrent.Future<AssignmentService.SubmissionCreatedResponse>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                final int n = i;
+                futures.add(pool.submit(() -> {
+                    ready.countDown();
+                    go.await(10, TimeUnit.SECONDS);
+                    return assignmentService.submitAssignment(STUDENT, assignment.id(),
+                            new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "并发" + n)), "submit" + n);
+                }));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+            var r1 = futures.get(0).get(30, TimeUnit.SECONDS);
+            var r2 = futures.get(1).get(30, TimeUnit.SECONDS);
+            assertThat(r1.submission().id()).isEqualTo(r2.submission().id());
+            assertThat(List.of(r1.created(), r2.created())).containsExactlyInAnyOrder(true, false);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM submissions WHERE assignment_id=?", Integer.class, assignment.id())).isEqualTo(1);
+    }
+
+    @Test
+    void consecutiveDuplicateSubmitsDoNotCreateExtraRows() {
+        Ctx c = submittedAssignment();
+        for (int i = 0; i < 3; i++) {
+            var retry = assignmentService.submitAssignment(STUDENT, c.assignment().id(),
+                    new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "重试" + i)), "retry" + i);
+            assertThat(retry.created()).isFalse();
+            assertThat(retry.submission().id()).isEqualTo(c.submissionId());
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM submissions WHERE assignment_id=?", Integer.class, c.assignment().id())).isEqualTo(1);
+    }
+
+    @Test
+    void getSubmissionReturnsRoleSpecificViewsAndRejectsOthers() {
+        Ctx c = submittedAssignment();
+        enrollStudent(c.offering().id(), OTHER_STUDENT);
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+
+        Object teacherView = assignmentService.getSubmission(TEACHER, c.submissionId());
+        assertThat(teacherView).isInstanceOf(TeacherSubmissionDetailDTO.class);
+        TeacherSubmissionDetailDTO td = (TeacherSubmissionDetailDTO) teacherView;
+        assertThat(td.student().id()).isEqualTo(STUDENT.id());
+        assertThat(td.student().username()).isEqualTo(STUDENT.username());
+        assertThat(td.feedbackStatus()).isEqualTo("draft");
+        assertThat(td.draftFeedback()).isNotNull();
+        assertThat(td.draftFeedback().status()).isEqualTo("draft");
+        assertThat(td.publishedFeedback()).isNull();
+        assertThat(td.files()).hasSize(1);
+        assertThat(td.assignmentSnapshot().title()).isEqualTo("作业一");
+
+        Object studentView = assignmentService.getSubmission(STUDENT, c.submissionId());
+        assertThat(studentView).isInstanceOf(SubmissionDetailDTO.class);
+        SubmissionDetailDTO sd = (SubmissionDetailDTO) studentView;
+        assertThat(sd.feedbackStatus()).isEqualTo("none");
+        assertThat(sd.publishedFeedback()).isNull();
+        assertThat(sd.reflection()).isEqualTo("完成");
+
+        assertThatThrownBy(() -> assignmentService.getSubmission(OTHER_STUDENT, c.submissionId()))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.getSubmission(OTHER_TEACHER, c.submissionId()))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p1");
+        Object afterTeacher = assignmentService.getSubmission(TEACHER, c.submissionId());
+        TeacherSubmissionDetailDTO td2 = (TeacherSubmissionDetailDTO) afterTeacher;
+        assertThat(td2.feedbackStatus()).isEqualTo("published");
+        assertThat(td2.publishedFeedback()).isNotNull();
+        assertThat(td2.draftFeedback()).isNull();
+        SubmissionDetailDTO sd2 = (SubmissionDetailDTO) assignmentService.getSubmission(STUDENT, c.submissionId());
+        assertThat(sd2.feedbackStatus()).isEqualTo("published");
+        assertThat(sd2.publishedFeedback()).isNotNull();
+        assertThat(sd2.publishedFeedback().status()).isEqualTo("published");
+        assertThat(sd2.publishedFeedback().messageId()).isNotNull();
+    }
+
+    @Test
+    void feedbackStatusFollowsDraftAndPublishInListings() {
+        Ctx c = submittedAssignment();
+        String aid = c.assignment().id();
+
+        var mine = assignmentService.listMySubmissions(STUDENT, aid, 1, 20);
+        assertThat(((SubmissionSummaryDTO) mine.items().get(0)).feedbackStatus()).isEqualTo("none");
+        var teacherNone = assignmentService.listTeacherSubmissions(TEACHER, aid, "none", true, 1, 20);
+        assertThat(teacherNone.total()).isEqualTo(1);
+
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        mine = assignmentService.listMySubmissions(STUDENT, aid, 1, 20);
+        assertThat(((SubmissionSummaryDTO) mine.items().get(0)).feedbackStatus()).isEqualTo("none");
+        var teacherDraft = assignmentService.listTeacherSubmissions(TEACHER, aid, "draft", true, 1, 20);
+        assertThat(teacherDraft.total()).isEqualTo(1);
+        TeacherSubmissionSummaryDTO row = (TeacherSubmissionSummaryDTO) teacherDraft.items().get(0);
+        assertThat(row.feedbackStatus()).isEqualTo("draft");
+        assertThat(row.student().id()).isEqualTo(STUDENT.id());
+        assertThat(assignmentService.listTeacherSubmissions(TEACHER, aid, "none", true, 1, 20).total()).isZero();
+        assertThat(assignmentService.listTeacherSubmissions(TEACHER, aid, "published", true, 1, 20).total()).isZero();
+
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p1");
+        mine = assignmentService.listMySubmissions(STUDENT, aid, 1, 20);
+        assertThat(((SubmissionSummaryDTO) mine.items().get(0)).feedbackStatus()).isEqualTo("published");
+        assertThat(assignmentService.listTeacherSubmissions(TEACHER, aid, "published", true, 1, 20).total()).isEqualTo(1);
+        assertThat(assignmentService.listTeacherSubmissions(TEACHER, aid, "draft", true, 1, 20).total()).isZero();
+
+        assertThatThrownBy(() -> assignmentService.listTeacherSubmissions(TEACHER, aid, "bogus", true, 1, 20))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        assertThatThrownBy(() -> assignmentService.listTeacherSubmissions(OTHER_TEACHER, aid, null, true, 1, 20))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.listTeacherSubmissions(STUDENT, aid, null, true, 1, 20))
+                .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+    }
+
+    @Test
+    void listTeacherSubmissionsLatestOnlyHidesSupersededAttempts() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        var first = saveAndSubmit(assignment.id(), 0, "V1", "一");
+        var second = saveAndSubmit(assignment.id(), 1, "V2", "二");
+        assertThat(second.created()).isTrue();
+
+        var latest = assignmentService.listTeacherSubmissions(TEACHER, assignment.id(), null, true, 1, 20);
+        assertThat(latest.total()).isEqualTo(1);
+        assertThat(((TeacherSubmissionSummaryDTO) latest.items().get(0)).id()).isEqualTo(second.submission().id());
+        assertThat(((TeacherSubmissionSummaryDTO) latest.items().get(0)).superseded()).isFalse();
+
+        var all = assignmentService.listTeacherSubmissions(TEACHER, assignment.id(), null, false, 1, 20);
+        assertThat(all.total()).isEqualTo(2);
+        assertThat(all.items()).extracting(i -> ((TeacherSubmissionSummaryDTO) i).id())
+                .containsExactlyInAnyOrder(first.submission().id(), second.submission().id());
+        assertThat(all.items().stream().filter(i -> ((TeacherSubmissionSummaryDTO) i).superseded()).count()).isEqualTo(1);
+    }
+
+    @Test
+    void listMessagesSummaryFiltersAndNotificationShape() {
+        Ctx c = submittedAssignment();
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p1");
+        String offeringId = c.offering().id();
+
+        var all = assignmentService.listMessages(STUDENT, null, null, "all", 1, 20);
+        assertThat(all.total()).isEqualTo(2);
+        assertThat(all.unreadCount()).isEqualTo(2);
+        NotificationDTO feedback = all.items().stream().filter(n -> "feedback".equals(n.type())).findFirst().orElseThrow();
+        assertThat(feedback.offeringId()).isEqualTo(offeringId);
+        assertThat(feedback.readAt()).isNull();
+        assertThat(feedback.sender()).isNotNull();
+        assertThat(feedback.sender().id()).isEqualTo(TEACHER.id());
+        assertThat(feedback.target().type()).isEqualTo("feedback");
+        assertThat(feedback.target().id()).isEqualTo(feedbackIdOf(c.submissionId()));
+        assertThat(feedback.target().offeringId()).isEqualTo(offeringId);
+        NotificationDTO published = all.items().stream().filter(n -> "assignment_published".equals(n.type())).findFirst().orElseThrow();
+        assertThat(published.target().type()).isEqualTo("assignment");
+        assertThat(published.target().id()).isEqualTo(c.assignment().id());
+
+        var onlyFeedback = assignmentService.listMessages(STUDENT, null, "feedback", "all", 1, 20);
+        assertThat(onlyFeedback.total()).isEqualTo(1);
+        assertThat(onlyFeedback.unreadCount()).isEqualTo(1);
+        assertThat(onlyFeedback.items().get(0).id()).isEqualTo(feedback.id());
+        assertThat(assignmentService.listMessages(STUDENT, null, "assignment_published", "all", 1, 20).total()).isEqualTo(1);
+        assertThat(assignmentService.listMessages(STUDENT, null, "system", "all", 1, 20).total()).isZero();
+        assertThat(assignmentService.listMessages(STUDENT, null, "course_notice", "all", 1, 20).total()).isZero();
+        assertThat(assignmentService.listMessages(STUDENT, null, "help_reply", "all", 1, 20).items()).isEmpty();
+        assertThatThrownBy(() -> assignmentService.listMessages(STUDENT, null, "bogus", "all", 1, 20))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        assertThatThrownBy(() -> assignmentService.listMessages(STUDENT, null, null, "bogus", 1, 20))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+
+        assertThat(assignmentService.listMessages(STUDENT, offeringId, null, "all", 1, 20).total()).isEqualTo(2);
+        var otherOffering = assignmentService.listMessages(STUDENT, UUID.randomUUID().toString(), null, "all", 1, 20);
+        assertThat(otherOffering.total()).isZero();
+        assertThat(otherOffering.unreadCount()).isZero();
+
+        // 已读后：unreadCount 减少，read 过滤生效，unreadCount 不受 read 过滤与分页影响。
+        assignmentService.readMessage(STUDENT, feedback.id(), "read");
+        var unread = assignmentService.listMessages(STUDENT, null, null, "unread", 1, 20);
+        assertThat(unread.total()).isEqualTo(1);
+        assertThat(unread.unreadCount()).isEqualTo(1);
+        assertThat(unread.items().get(0).type()).isEqualTo("assignment_published");
+        var read = assignmentService.listMessages(STUDENT, null, null, "read", 1, 20);
+        assertThat(read.total()).isEqualTo(1);
+        assertThat(read.unreadCount()).isEqualTo(1);
+        assertThat(read.items().get(0).readAt()).isNotNull();
+        var paged = assignmentService.listMessages(STUDENT, null, null, "all", 1, 1);
+        assertThat(paged.items()).hasSize(1);
+        assertThat(paged.total()).isEqualTo(2);
+        assertThat(paged.unreadCount()).isEqualTo(1);
+
+        // 他人的消息不会出现在列表里。
+        assertThat(assignmentService.listMessages(OTHER_STUDENT, null, null, "all", 1, 20).total()).isZero();
+    }
+
+    @Test
+    void readMessageKeepsFirstReadAtAndRejectsOtherUsers() {
+        Ctx c = submittedAssignment();
+        String messageId = jdbc.queryForObject(
+                "SELECT id FROM notifications WHERE recipient_id=? AND type='assignment_published'", String.class, STUDENT.id());
+
+        MessageReadDTO first = assignmentService.readMessage(STUDENT, messageId, "r1");
+        assertThat(first.id()).isEqualTo(messageId);
+        assertThat(first.readAt()).isNotNull();
+
+        // 固定时钟下改写库内 read_at，证明重复调用返回的是首次值而不是当前时间。
+        jdbc.update("UPDATE notifications SET read_at=? WHERE id=?",
+                java.sql.Timestamp.from(NOW.minus(Duration.ofDays(1))), messageId);
+        MessageReadDTO again = assignmentService.readMessage(STUDENT, messageId, "r2");
+        assertThat(again.readAt()).isEqualTo(NOW.minus(Duration.ofDays(1)));
+        MessageReadDTO third = assignmentService.readMessage(STUDENT, messageId, "r3");
+        assertThat(third.readAt()).isEqualTo(again.readAt());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE id=? AND is_read=1", Integer.class, messageId)).isEqualTo(1);
+
+        // 他人的消息一律 404；不存在的消息同样 404。
+        enrollStudent(c.offering().id(), OTHER_STUDENT);
+        assertThatThrownBy(() -> assignmentService.readMessage(OTHER_STUDENT, messageId, "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.readMessage(TEACHER, messageId, "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.readMessage(STUDENT, UUID.randomUUID().toString(), "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
     }
 
     private OfferingDTO createOffering() {
