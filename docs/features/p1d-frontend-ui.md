@@ -1,6 +1,6 @@
 # P1-D 前端 UI：首页、学习记录、公告与边界场景
 
-> 状态：设计稿（2026-10-16）。字段一律以 `docs/openapi.yaml` 1.1.0 与 `frontend/src/api/generated/schema.d.ts` 为准，本文不重复定义 DTO；业务口径见 DEVELOPMENT.md 第 9、10 节，交互规则见 FRONTEND.md 第 4、6、9 节。`docs/features/p1d-aggregation.md` 已作废，不得参考。
+> 状态：已实现（2026-10-16，`f4a1e1a`），`npm --prefix frontend run verify` 通过（17 个测试文件、170 个用例）；未做浏览器级走查，不得据此标 `verified`。字段一律以 `docs/openapi.yaml` 1.1.0 与 `frontend/src/api/generated/schema.d.ts` 为准，本文不重复定义 DTO；业务口径见 DEVELOPMENT.md 第 9、10 节，交互规则见 FRONTEND.md 第 4、6、9 节。`docs/features/p1d-aggregation.md` 已作废，不得参考。
 
 ## 1. 目标与完成线
 
@@ -66,7 +66,7 @@ API 客户端（`dashboardApi()`、`noticesApi()`、`statsApi()`）、注册与 
 ## 6. U2 学习记录
 
 - `/student/progress`（无参数）：用 `CoursesApi` 现有的我的教学班列表接口列出本学期教学班，点选后 `router.replace` 到 `/student/progress/:offeringId`；只有一个教学班时直接 replace。列表为空显示"尚未加入教学班"并链接 `/course`。
-- `/student/progress/:offeringId`：`getMyLearningRecords(offeringId, { page, pageSize: 10 })`，`page` 存在 query 中，翻页即新 generation。
+- `/student/progress/:offeringId`：`getMyLearningRecords(offeringId)`。契约该操作无分页参数，`feedbackPage` 由后端一次返回；前端按每页 10 条对 `feedbackPage.items` 本地切片，页码存在 query 的 `page` 中，翻页只改 query、不重新请求。（原稿写 `{ page, pageSize }`，与契约不符，2026-10-16 更正。）
 - 内容：
   1. 汇总：`completedLabCount` 个实验已完成、`publishedFeedbackCount` 份评价已发布；`needsPracticeCount` 为 null 时显示"P2 开放"，不显示 0。
   2. 最近反馈：同 U1 第 5 项。
@@ -111,7 +111,7 @@ API 客户端（`dashboardApi()`、`noticesApi()`、`statsApi()`）、注册与 
 
 - 归档教学班（`offeringStatus === 'archived'`）的作业详情、工作区：只读提示可见；保存、提交按钮的禁用与文案以后端 `canSave`、`canSubmit`、`blockedReason` 为准，前端不自行推断。
 - 归档作业（`publicationState === 'archived'`）在列表与首页中带"已归档"文字标签，仍可打开查看历史提交与评价。
-- 逾期：`overdue` 为 true 显示橙色"已逾期"；未逾期且有 `dueAt` 显示截止时间；`dueAt` 为 null 显示"无截止时间"。
+- 逾期：`overdue` 为 true 显示橙色"已逾期"；未逾期显示截止时间。契约中 `dueAt` 为必填 Timestamp，不会为 null；前端 `dueText` 对空值做防御显示"无截止时间"，不是契约场景（2026-10-16 更正）。
 - 已归档教学班的公告列表、学习记录仍可读。
 - 已读：首页、公告页、学习记录页加载后，transport 中不得出现任何已读写请求。
 
@@ -134,7 +134,7 @@ mock（`src/mocks/dashboard.ts`）缺场景时可补数据，但不改 API 层�
 
 ## 12. 修改文件清单
 
-- 新增：`features/dashboard/StudentHomePage.vue`、`LearningRecordsPage.vue`；`features/notices/NoticeListPage.vue`、`NoticeDetailPage.vue`；`features/notifications/target-route.ts`；`tests/p1d-ui.test.ts`；必要时 `styles/dashboard.css`（在 `main.ts` 引入）。
+- 新增：`features/dashboard/StudentHomePage.vue`、`LearningRecordsPage.vue`；`features/notices/NoticeListPage.vue`、`NoticeDetailPage.vue`；`features/notifications/target-route.ts`、`features/notifications/use-open-target.ts`（首页公告摘要与公告详情共用的跳转 composable，实现时新增）；`tests/p1d-ui.test.ts`；必要时 `styles/dashboard.css`（在 `main.ts` 引入）。
 - 修改：`app/router.ts`（新路由、`defaultEntry`）、`app/App.vue`（导航）、`features/notifications/NotificationCenter.vue`、`features/teacher/TeacherOfferingPage.vue`、`features/courses/OfferingPage.vue`（公告入口）、`tests/router.test.ts`，以及 U6 核查中需修正的页面。
 - 不改：`src/api/**`、`src/api/generated/**`、backend、契约。
 

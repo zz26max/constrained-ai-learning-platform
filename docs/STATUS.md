@@ -21,7 +21,7 @@
 > - 实施方式：派一个 Sonnet 子代理写 V9、后端校验与真实库 IT；主会话在 backend/ 下跑 `./mvnw.cmd --batch-mode verify` 通过后，以 `backend:` 前缀提交，并更新下方遗留清单。
 >
 > **P1-B/C 主链路 HTTP 联调（2026-10-16，V9 之后）**：环境为本地 MySQL 3307（Flyway 到 V9，已执行 `-InitializeAccounts` 与 `local-demo-data`）、后端 8080、Vite dev 4173，所有请求经 4173 代理。脚本在本机 `D:/tmp/lp/`（未入库）。走通：开班→章节→邀请码→学生加入→三类作业发布→工作区保存（旧 revision 409）→提交幂等→教师评价草稿（8000 字评语通过、8001 字 422）→草稿对学生不可见→发布→学生消息未读→已读→看板与学习记录反映；带 `target` 的公告（`assignment` 目标 201，offeringId 不符、他班 id、`help_request` 均 422）；归档后保存被拒、历史可读；未登录/越权/缺 CSRF/缺 Origin/外域 Origin 的负例 30 项（重跑 30/30）。未发现后端硬性偏离契约，代理、Cookie、CSRF 链路无问题。
-> - **仍不能标 `verified`**：以上是 HTTP 级联调，没有在浏览器里用正式前端页面走一遍，FRONTEND.md §8 矩阵中的并发编辑、双标签页、慢网络、XSS/预览沙箱等场景未验证；P1-D 页面也还没实现。
+> - **仍不能标 `verified`**：以上是 HTTP 级联调，没有在浏览器里用正式前端页面走一遍，FRONTEND.md §8 矩阵中的并发编辑、双标签页、慢网络、XSS/预览沙箱等场景未验证；P1-D 页面已实现（`f4a1e1a`）但同样未经浏览器走查。
 > - **联调中的观察（均未改，待决定）**：① 已归档作业上用已提交过的 revision 重发 `submitAssignment` 返回 200 原提交而非 409，契约未规定优先级；② 公告生成的 `course_notice` 消息 `target` 为 null，若前端要从消息跳到作业需决定是否继承公告 target；③ 已发布后用陈旧 `baseVersion` 重发 `publishFeedback` 返回 200（幂等）而非 409，契约未说明；④ 全班公告可指向某学生的 `feedback` id，其他学生打开会 404，风险低。
 > - 第二个班里没有提交，未用他班 `submissionId` 做跨班读取，该项只依赖较早的 `s7` 越权结果。
 >
@@ -35,9 +35,11 @@
 >
 > **前端（`9578059`、`51b000f`）**：已按契约 1.1.0 重新生成 `schema.d.ts`；`dashboard.ts`/`notices.ts`/`stats.ts` 改用生成类型，方法名、路径和分页字段与契约一致，删除了契约中为 planned 的 `listTeacherNotices`；`main.ts` 注册了 Auth、Courses、Assignments、Dashboard、Notices、Stats 六个客户端；mock 补全了 P1-C 缺失操作和 P1-D 全部 9 个操作；`NotificationCenter` 接入 `/student/messages`，`TeacherFeedbackEditor` 接入 `/teacher/submissions/:submissionId/feedback`，`getFeedback` 接入 `AssignmentDetail`；新增 `p1d-api`、`p1d-mocks`、`p1d-pages` 三个测试文件。`npm --prefix frontend run verify`：16 个测试文件、152 个用例通过，`check:no-mock` PASS。
 >
-> **前端仍缺**：P1-D 页面（学生看板、公告列表、教师统计页）尚未实现；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
+> **P1-D 前端 UI（`f4a1e1a`，2026-10-16）**：已实现学生首页 `/student/home`、学习记录 `/student/progress[/:offeringId]`、课程公告列表与详情、教师工作台四张统计卡片、`targetRoute` 消息目标跳转，作业列表与详情补"已归档/已逾期"标签与 `submissionBlockedReason` 文案；学生默认入口改为 `/student/home`。`npm --prefix frontend run verify`：17 个测试文件、170 个用例通过，`check:no-mock` PASS。实现中确认两处设计稿与契约不符并已更正：`getMyLearningRecords` 无分页参数（前端对 `feedbackPage.items` 本地切片，每页 10 条）；`dueAt` 为必填（"无截止时间"仅为防御显示）。教师作业统计页、教师查看学生学习记录页按设计不做。`src/mocks/dashboard.ts` 未补场景数据。
+
+**前端仍缺**：浏览器级走查（P1-D 页面从未在真实浏览器里打开过）；`p1b` 测试夹具仍用小写 `not_started`/`pending`，契约是大写；路由约定已定（2026-10-16）：沿用 `/student/...`、`/teacher/...`，FRONTEND.md §4 已同步；`getSubmission` 的 oneOf 没有 discriminator，前端靠 `'student' in data` 判断教师视图；尚未做前后端真实联调，所有操作仍不能标 `verified`。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
 >
-> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调（HTTP 级已完成，浏览器级待做）；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI；③ 按验收场景走通后标 `verified`；④ 进入 P2-A。
+> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。执行顺序已改为先完成 P1 闭环再做 P2-A（DEVELOPMENT 第 11、14 节）：① P1-B/C 主链路跨端联调（HTTP 级已完成，浏览器级待做）；② 按 [p1d-frontend-ui.md](features/p1d-frontend-ui.md) 实现 P1-D 最小 UI（已完成，`f4a1e1a`）；③ 浏览器级走查，按验收场景走通后标 `verified`；④ 进入 P2-A。
 
 截至 2026-10-15 的提交自述如下（仅作历史记录）：
 
@@ -47,7 +49,7 @@
 - **P1-C**（master `68eb7d3`）：7 个提交评价与通知操作为 implemented，Flyway V7 建表。包含教师评价草稿-发布流程、学生查看评价、通知中心；前端包含教师评价编辑器与学生通知中心。
 - **P1-D**（master `9e594a6`）：9 个多班聚合操作为 implemented，Flyway V8 建表。包含学生仪表盘、学习记录、批量标记消息已读、公告系统（教师创建与学生查看）、教师统计（班级概览、作业统计、学生学习记录）；前端包含 API 客户端层（dashboard.ts、notices.ts、stats.ts），UI 组件待补充。
 
-契约 83 个业务操作与 2 个健康检查中，57 个已实现（5 认证 + 2 健康 + 27 课程 + 12 作业 + 7 评价 + 9 聚合），23 个为 planned，5 个为 verified。P1 阶段后端全部完成，前端 P1-D UI 组件（仪表盘页面、公告列表、教师统计页面）待补充。P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
+契约 83 个业务操作与 2 个健康检查中，57 个已实现（5 认证 + 2 健康 + 27 课程 + 12 作业 + 7 评价 + 9 聚合），23 个为 planned，5 个为 verified。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），待浏览器级走查。P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
 
 <a id="handoff"></a>
 
