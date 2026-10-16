@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import com.learningplatform.common.exception.BusinessException;
+import com.learningplatform.modules.courses.dto.AssignmentDTOs;
+import com.learningplatform.modules.courses.model.AssignmentRows.SubmissionRubricSnapshot;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.FileDTO;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.RubricCriterion;
 import org.springframework.http.HttpStatus;
@@ -155,13 +157,98 @@ public final class AssignmentInput {
         if(revision<1) throw invalid();
         text(body,"reflection",8000);
     }
-    public static void validateFeedbackWrite(Map<String,Object> body) {
-        requireKeys(body,"overallComment","finalScore","rubricScores");
-        text(body,"overallComment",8000);
-        if(body.get("finalScore")!=null) optionalDecimal(body,"finalScore");
-        Object rubricScores=body.get("rubricScores");
-        if(rubricScores!=null&&!(rubricScores instanceof List<?>)) throw invalid();
-        if(body.containsKey("baseVersion")) integer(body,"baseVersion");
+    private static final Set<String> FEEDBACK_FIELDS=Set.of("baseVersion","score","rubricResults","comment","knowledgeEvaluations","issueTags");
+    private static final Set<String> RUBRIC_RESULT_FIELDS=Set.of("criterionId","score","comment");
+    /** 通过校验的评价写入内容（契约 FeedbackWrite）；knowledgeEvaluations/issueTags 当前仅接受空数组（无存储列）。 */
+    public record FeedbackDraft(int baseVersion,BigDecimal score,List<AssignmentDTOs.RubricResultDTO> rubricResults,String comment) {}
+    /** VALIDATION_ERROR，details.fields 按契约至少一项。 */
+    public static BusinessException invalidField(String field,String message) {
+        return new BusinessException(HttpStatus.UNPROCESSABLE_CONTENT,"VALIDATION_ERROR","请求参数不符合要求。",
+                Map.of("fields",List.of(Map.of("field",field,"message",message))));
+    }
+    /** 评价/发布请求中的 baseVersion：必填整数 0..2147483647。 */
+    public static int baseVersion(Map<String,Object> body) {
+        if(!(body.get("baseVersion") instanceof Number n)||n.doubleValue()!=n.longValue()||n.longValue()<0
+                ||n.longValue()>Integer.MAX_VALUE) throw invalidField("baseVersion","必须是 0 到 2147483647 的整数。");
+        return n.intValue();
+    }
+    /** publishFeedback 请求体：仅 baseVersion；未知字段 400，缺失或类型错误 422。 */
+    public static int parsePublishBody(Map<String,Object> body) {
+        if(body==null) throw invalid();
+        for(String key:body.keySet()) { if(!"baseVersion".equals(key)) throw invalidRequest(); }
+        return baseVersion(body);
+    }
+    /** 评价分值：0..9999.99、最多两位小数（契约 Score，允许 0）。 */
+    private static BigDecimal feedbackScore(Object value,String field) {
+        if(!(value instanceof Number number)) throw invalidField(field,"必须是数值。");
+        BigDecimal bd;
+        try { bd=new BigDecimal(number.toString()); } catch(NumberFormatException exception) { throw invalidField(field,"必须是数值。"); }
+        if(bd.signum()<0||bd.compareTo(MAX_SCORE)>0||bd.stripTrailingZeros().scale()>2) {
+            throw invalidField(field,"必须在 0 到 9999.99 之间且最多两位小数。");
+        }
+        return bd.setScale(2);
+    }
+    /**
+     * saveFeedback 请求体（契约 FeedbackWrite）。未知字段 400 INVALID_REQUEST；缺字段或取值非法 422 VALIDATION_ERROR。
+     * knowledgeEvaluations / issueTags 目前没有存储列：只接受空数组（issueTags 亦可省略），非空返回 422，不静默丢弃。
+     */
+    public static FeedbackDraft parseFeedbackWrite(Map<String,Object> body) {
+        if(body==null) throw invalid();
+        for(String key:body.keySet()) { if(!FEEDBACK_FIELDS.contains(key)) throw invalidRequest(); }
+        for(String key:List.of("baseVersion","score","rubricResults","comment","knowledgeEvaluations")) {
+            if(!body.containsKey(key)) throw invalidField(key,"必填。");
+        }
+        int baseVersion=baseVersion(body);
+        BigDecimal score=feedbackScore(body.get("score"),"score");
+        if(!(body.get("comment") instanceof String comment)||cp(comment)>8000) {
+            throw invalidField("comment","必须是不超过 8000 字符的文本。");
+        }
+        if(!(body.get("knowledgeEvaluations") instanceof List<?> knowledge)) {
+            throw invalidField("knowledgeEvaluations","必须是数组。");
+        }
+        if(!knowledge.isEmpty()) throw invalidField("knowledgeEvaluations","当前版本暂不支持保存知识评价，请提交空数组。");
+        if(body.containsKey("issueTags")) {
+            if(!(body.get("issueTags") instanceof List<?> tags)) throw invalidField("issueTags","必须是数组。");
+            if(!tags.isEmpty()) throw invalidField("issueTags","P1 阶段问题标签只能省略或为空数组。");
+        }
+        if(!(body.get("rubricResults") instanceof List<?> list)||list.isEmpty()) {
+            throw invalidField("rubricResults","至少包含一项评分。");
+        }
+        List<AssignmentDTOs.RubricResultDTO> results=new ArrayList<>();
+        Set<String> ids=new HashSet<>();
+        for(Object item:list) {
+            if(!(item instanceof Map<?,?> raw)) throw invalidField("rubricResults","每项必须是对象。");
+            for(Object key:raw.keySet()) { if(!RUBRIC_RESULT_FIELDS.contains(key)) throw invalidRequest(); }
+            if(!(raw.get("criterionId") instanceof String id)||id.isEmpty()||id.length()>64||!CRITERION_ID.matcher(id).matches()) {
+                throw invalidField("rubricResults.criterionId","评分项 ID 不合法。");
+            }
+            // 数据库 feedback_rubric_scores.comment 为 VARCHAR(2000)，比契约 8000 更严（见汇报遗留事项）。
+            if(!(raw.get("comment") instanceof String itemComment)||cp(itemComment)>2000) {
+                throw invalidField("rubricResults.comment","必须是不超过 2000 字符的文本。");
+            }
+            BigDecimal itemScore=feedbackScore(raw.get("score"),"rubricResults.score");
+            if(!ids.add(id)) throw invalidField("rubricResults.criterionId","评分项 ID 不能重复。");
+            results.add(new AssignmentDTOs.RubricResultDTO(id,itemScore,itemComment));
+        }
+        return new FeedbackDraft(baseVersion,score,results,comment);
+    }
+    /** 与提交时冻结的量规快照核对：覆盖全部评分项、单项不超上限、总分等于各项之和且不超满分。 */
+    public static void checkFeedbackAgainstSnapshot(BigDecimal score,List<AssignmentDTOs.RubricResultDTO> results,
+            List<SubmissionRubricSnapshot> snapshot,BigDecimal maxScore) {
+        if(score.compareTo(maxScore)>0) throw invalidField("score","不能超过作业满分。");
+        Map<String,BigDecimal> limits=new java.util.HashMap<>();
+        for(SubmissionRubricSnapshot item:snapshot) limits.put(item.criterionId(),item.maxScore());
+        Set<String> given=new HashSet<>();
+        BigDecimal sum=BigDecimal.ZERO;
+        for(AssignmentDTOs.RubricResultDTO result:results) {
+            BigDecimal limit=limits.get(result.criterionId());
+            if(limit==null) throw invalidField("rubricResults","包含作业量规之外的评分项。");
+            if(result.score().compareTo(limit)>0) throw invalidField("rubricResults.score","单项得分不能超过该项满分。");
+            given.add(result.criterionId());
+            sum=sum.add(result.score());
+        }
+        if(!given.equals(limits.keySet())) throw invalidField("rubricResults","必须覆盖作业量规的全部评分项。");
+        if(sum.compareTo(score)!=0) throw invalidField("score","必须等于各评分项得分之和。");
     }
     private static final Set<String> WRITE_FIELDS=Set.of("chapterId","title","type","isRequired","description","requirements",
             "estimatedMinutes","knowledgePointIds","dueAt","lateUntil","allowResubmit","maxAttempts","maxScore","rubric","initialFiles");

@@ -341,23 +341,43 @@ SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,b
 FROM feedback WHERE submission_id=#{submissionId}
 </select>
 
-<select id="getFeedbackRubricScores" resultMap="feedbackRubricScore">
-SELECT feedback_id,criterion_id,score,comment FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId}
+<!-- 锁当前提交行：保存/发布评价与提交替换串行化（BACKEND 核心事务“唯一保留的行锁”）。 -->
+<select id="findSubmissionForUpdate" resultMap="submission">
+SELECT id,offering_id,assignment_id,workspace_id,student_id,attempt_no,workspace_revision,reflection,content_version,assignment_title_snapshot,max_score_snapshot,ai_policy_id,due_at_snapshot,submitted_at,is_current,is_late,created_at
+FROM submissions WHERE id=#{id} FOR UPDATE
 </select>
 
+<select id="findFeedbackBySubmissionForUpdate" resultMap="feedback">
+SELECT id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at
+FROM feedback WHERE submission_id=#{submissionId} FOR UPDATE
+</select>
+
+<select id="findFeedbackMessageId" resultType="string">
+SELECT id FROM notifications WHERE recipient_id=#{recipientId} AND type='feedback_published' AND related_feedback_id=#{feedbackId} ORDER BY created_at,id LIMIT 1
+</select>
+
+<select id="findUserDisplayName" resultType="string">
+SELECT display_name FROM users WHERE id=#{id}
+</select>
+
+<select id="getFeedbackRubricScores" resultMap="feedbackRubricScore">
+SELECT feedback_id,criterion_id,score,comment FROM feedback_rubric_scores WHERE feedback_id=#{feedbackId} ORDER BY criterion_id
+</select>
+
+<!-- 契约 version 从 1 起；列 base_version 即评价版本号。 -->
 <insert id="insertFeedback">
 INSERT INTO feedback (id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at)
-VALUES (#{id},#{submissionId},#{assignmentId},#{offeringId},#{studentId},#{teacherId},'draft',0,#{overallComment},#{finalScore},NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+VALUES (#{id},#{submissionId},#{assignmentId},#{offeringId},#{studentId},#{teacherId},'draft',1,#{overallComment},#{finalScore},NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
 </insert>
 
 <update id="updateFeedbackDraft">
-UPDATE feedback SET base_version=base_version+1,overall_comment=#{overallComment},final_score=#{finalScore},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+UPDATE feedback SET base_version=base_version+1,teacher_id=#{teacherId},overall_comment=#{overallComment},final_score=#{finalScore},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
 WHERE id=#{id} AND status='draft' AND base_version=#{baseVersion}
 </update>
 
 <update id="publishFeedback">
-UPDATE feedback SET status='published',published_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
-WHERE id=#{id} AND status='draft'
+UPDATE feedback SET status='published',base_version=base_version+1,teacher_id=#{teacherId},published_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+WHERE id=#{id} AND status='draft' AND base_version=#{baseVersion}
 </update>
 
 <delete id="deleteFeedbackRubricScores">

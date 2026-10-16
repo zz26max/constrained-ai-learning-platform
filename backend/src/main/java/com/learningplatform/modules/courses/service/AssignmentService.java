@@ -12,6 +12,7 @@ import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.modules.auth.dto.UserDTO;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.*;
+import com.learningplatform.modules.courses.dto.CourseDTOs;
 import com.learningplatform.modules.courses.mapper.AssignmentMapper;
 import com.learningplatform.modules.courses.mapper.AssignmentMapper.AssignmentCounts;
 import com.learningplatform.modules.courses.model.AssignmentRows;
@@ -364,94 +365,107 @@ public class AssignmentService {
         int total=mapper.countAssignmentSubmissions(assignment.id());
         return new SubmissionListResponse(items,page,pageSize,total);
     }
+    /** saveFeedback 的结果：created=true 对应 201，否则 200。 */
+    public record FeedbackSaveResult(TeacherFeedbackDTO feedback,boolean created) {}
+    /**
+     * 保存评价草稿（契约 saveFeedback）。锁顺序：submission 行 → feedback 行。
+     * 版本从 1 起；baseVersion 为客户端所见版本（尚无评价时为 0），每次成功保存 +1。
+     */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
-    public FeedbackDTO saveFeedbackDraft(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
-        Submission submission=submissionOr404(submissionId);
+    public FeedbackSaveResult saveFeedback(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
+        Submission probe=submissionOr404(submissionId);
+        access.requireTeacher(user,probe.offeringId(),true);
+        Submission submission=mapper.findSubmissionForUpdate(probe.id());
+        if(submission==null) throw CourseAccess.notFound();
         Assignment assignment=assignmentOr404(submission.assignmentId());
-        access.requireTeacher(user,submission.offeringId(),true);
-        if("archived".equals(assignment.status())) {
-            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
+        if("archived".equals(assignment.status())) throw assignmentArchived();
+        AssignmentInput.FeedbackDraft draft=AssignmentInput.parseFeedbackWrite(body);
+        if(!submission.isCurrent()) throw submissionSuperseded();
+        Feedback existing=mapper.findFeedbackBySubmissionForUpdate(submission.id());
+        if(existing!=null&&"published".equals(existing.status())) {
+            throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","已发布的评价不能覆盖为草稿。");
         }
-        AssignmentInput.validateFeedbackWrite(body);
-        String overallComment=AssignmentInput.text(body,"overallComment",8000);
-        BigDecimal finalScore=AssignmentInput.optionalDecimal(body,"finalScore");
-        @SuppressWarnings("unchecked")
-        List<Map<String,Object>> rubricList=(List<Map<String,Object>>)body.get("rubricScores");
+        int currentVersion=existing==null?0:existing.baseVersion();
+        if(draft.baseVersion()!=currentVersion) throw feedbackVersionConflict(currentVersion);
+        AssignmentInput.checkFeedbackAgainstSnapshot(draft.score(),draft.rubricResults(),
+                mapper.getSubmissionRubric(submission.id()),submission.maxScoreSnapshot());
         Instant now=now();
-        Feedback existing=mapper.findFeedbackBySubmission(submission.id());
-        if(existing==null) {
-            String feedbackId=UUID.randomUUID().toString();
+        String feedbackId;
+        boolean created=existing==null;
+        if(created) {
+            feedbackId=UUID.randomUUID().toString();
             mapper.insertFeedback(feedbackId,submission.id(),submission.assignmentId(),submission.offeringId(),
-                    submission.studentId(),user.id(),overallComment,finalScore,now);
-            if(rubricList!=null) {
-                for(Map<String,Object> r:rubricList) {
-                    mapper.insertFeedbackRubricScore(feedbackId,AssignmentInput.text(r,"criterionId",64),
-                            AssignmentInput.decimal(r,"score"),AssignmentInput.text(r,"comment",2000));
-                }
-            }
-            audit.record(user.id(),"FEEDBACK_CREATED","feedback",feedbackId,Map.of(),requestId);
-            return feedbackView(mapper.findFeedback(feedbackId));
+                    submission.studentId(),user.id(),draft.comment(),draft.score(),now);
         } else {
-            if("published".equals(existing.status())) {
-                throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","已发布的反馈不可修改。");
-            }
-            int baseVersion=AssignmentInput.integer(body,"baseVersion");
-            if(baseVersion!=existing.baseVersion()) throw feedbackVersionConflict(existing.baseVersion());
-            int updated=mapper.updateFeedbackDraft(existing.id(),baseVersion,overallComment,finalScore,now);
-            if(updated==0) throw feedbackVersionConflict(existing.baseVersion());
-            mapper.deleteFeedbackRubricScores(existing.id());
-            if(rubricList!=null) {
-                for(Map<String,Object> r:rubricList) {
-                    mapper.insertFeedbackRubricScore(existing.id(),AssignmentInput.text(r,"criterionId",64),
-                            AssignmentInput.decimal(r,"score"),AssignmentInput.text(r,"comment",2000));
-                }
-            }
-            audit.record(user.id(),"FEEDBACK_UPDATED","feedback",existing.id(),Map.of(),requestId);
-            return feedbackView(mapper.findFeedback(existing.id()));
+            feedbackId=existing.id();
+            int updated=mapper.updateFeedbackDraft(feedbackId,draft.baseVersion(),user.id(),draft.comment(),draft.score(),now);
+            if(updated==0) throw feedbackVersionConflict(latestVersion(submission.id()));
+            mapper.deleteFeedbackRubricScores(feedbackId);
         }
+        for(RubricResultDTO r:draft.rubricResults()) {
+            mapper.insertFeedbackRubricScore(feedbackId,r.criterionId(),r.score(),r.comment());
+        }
+        audit.record(user.id(),created?"FEEDBACK_CREATED":"FEEDBACK_UPDATED","feedback",feedbackId,Map.of(),requestId);
+        return new FeedbackSaveResult(teacherFeedbackView(mapper.findFeedback(feedbackId),submission),created);
     }
+    /**
+     * 发布评价（契约 publishFeedback）。同事务：锁 submission → 确认仍为当前提交 → 锁 feedback →
+     * baseVersion 乐观校验 → 重验分值 → 发布并 version+1 → 写 feedback_published 通知（按评价去重）→ 审计。
+     * 已发布的重复请求：baseVersion 等于发布前版本或当前版本时原样返回，不再增加版本或通知（BACKEND 核心事务）。
+     */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
-    public FeedbackDTO publishFeedback(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
-        int baseVersion=AssignmentInput.integer(body,"baseVersion");
-        Submission submission=submissionOr404(submissionId);
-        Feedback feedback=mapper.findFeedbackBySubmission(submission.id());
+    public TeacherFeedbackDTO publishFeedback(UserDTO user,String submissionId,Map<String,Object> body,String requestId) {
+        Submission probe=submissionOr404(submissionId);
+        access.requireTeacher(user,probe.offeringId(),true);
+        Submission submission=mapper.findSubmissionForUpdate(probe.id());
+        if(submission==null) throw CourseAccess.notFound();
+        Assignment assignment=assignmentOr404(submission.assignmentId());
+        if("archived".equals(assignment.status())) throw assignmentArchived();
+        int baseVersion=AssignmentInput.parsePublishBody(body);
+        if(!submission.isCurrent()) throw submissionSuperseded();
+        Feedback feedback=mapper.findFeedbackBySubmissionForUpdate(submission.id());
         if(feedback==null) throw CourseAccess.notFound();
-        Assignment assignment=assignmentOr404(feedback.assignmentId());
-        access.requireTeacher(user,feedback.offeringId(),true);
-        if("archived".equals(assignment.status())) {
-            throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_ARCHIVED","归档作业拒绝继续教学写入。");
-        }
         if("published".equals(feedback.status())) {
-            throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","反馈已发布，不可重复发布。");
+            if(baseVersion==feedback.baseVersion()||baseVersion==feedback.baseVersion()-1) {
+                return teacherFeedbackView(feedback,submission);
+            }
+            throw feedbackVersionConflict(feedback.baseVersion());
         }
-        if(feedback.baseVersion()!=baseVersion) {
-            throw new BusinessException(HttpStatus.CONFLICT,"VERSION_CONFLICT","反馈版本冲突，请刷新后重试。");
-        }
+        if(baseVersion!=feedback.baseVersion()) throw feedbackVersionConflict(feedback.baseVersion());
+        if(feedback.finalScore()==null) throw AssignmentInput.invalidField("score","发布前必须填写总分。");
+        List<RubricResultDTO> results=rubricResults(feedback);
+        if(results.isEmpty()) throw AssignmentInput.invalidField("rubricResults","发布前必须填写量规评分。");
+        AssignmentInput.checkFeedbackAgainstSnapshot(feedback.finalScore(),results,
+                mapper.getSubmissionRubric(submission.id()),submission.maxScoreSnapshot());
         Instant now=now();
-        int updated=mapper.publishFeedback(feedback.id(),now);
-        if(updated==0) {
-            throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","反馈已发布，不可重复发布。");
+        int updated=mapper.publishFeedback(feedback.id(),baseVersion,user.id(),now);
+        if(updated==0) throw feedbackVersionConflict(latestVersion(submission.id()));
+        // 通知按评价去重：持有 feedback 行锁，已有本评价的 feedback_published 通知则不再插入。
+        String messageId=mapper.findFeedbackMessageId(feedback.studentId(),feedback.id());
+        if(messageId==null) {
+            messageId=UUID.randomUUID().toString();
+            mapper.insertNotification(messageId,feedback.studentId(),"feedback_published",
+                    "作业《"+submission.assignmentTitleSnapshot()+"》已获批阅","教师已发布对您提交的评价，请查看反馈详情。",
+                    feedback.offeringId(),feedback.assignmentId(),feedback.id(),now);
         }
-        String notificationId=UUID.randomUUID().toString();
-        String title="作业 "+assignment.title()+" 已获批阅";
-        String content="教师已对您的提交进行批阅，请查看反馈详情。";
-        mapper.insertNotification(notificationId,feedback.studentId(),"feedback",title,content,
-                feedback.offeringId(),feedback.assignmentId(),feedback.id(),now);
-        audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("notificationId",notificationId),requestId);
-        return feedbackView(mapper.findFeedback(feedback.id()));
+        audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("messageId",messageId),requestId);
+        return teacherFeedbackView(mapper.findFeedback(feedback.id()),submission);
     }
-    public FeedbackDTO getFeedback(UserDTO user,String feedbackId) {
+    /** 学生读取本人已发布评价；草稿、他人评价、不存在统一 404，教师角色 403。 */
+    public StudentFeedbackViewDTO getFeedback(UserDTO user,String feedbackId) {
+        CourseAccess.role(user,"student");
         Feedback feedback=feedbackOr404(feedbackId);
+        if(!feedback.studentId().equals(user.id())||!"published".equals(feedback.status())) throw CourseAccess.notFound();
+        access.requireStudent(user,feedback.offeringId(),false);
         Submission submission=submissionOr404(feedback.submissionId());
-        try {
-            access.requireTeacher(user,submission.offeringId(),false);
-            return feedbackView(feedback);
-        } catch(BusinessException e) {
-            access.requireStudent(user,submission.offeringId(),false);
-            if(!submission.studentId().equals(user.id())) throw CourseAccess.notFound();
-            if("draft".equals(feedback.status())) throw CourseAccess.notFound();
-            return feedbackView(feedback);
-        }
+        return studentFeedbackView(feedback,submission);
+    }
+    private int latestVersion(String submissionId) {
+        Feedback latest=mapper.findFeedbackBySubmission(submissionId);
+        return latest==null?0:latest.baseVersion();
+    }
+    private BusinessException submissionSuperseded() {
+        return new BusinessException(HttpStatus.CONFLICT,"SUBMISSION_SUPERSEDED","该提交已被新提交替代，不能再批阅。");
     }
     public NotificationListResponse listMyNotifications(UserDTO user,int page,int pageSize) {
         CourseAccess.role(user,"student");
@@ -493,11 +507,26 @@ public class AssignmentService {
         if(n==null) throw CourseAccess.notFound();
         return n;
     }
-    private FeedbackDTO feedbackView(Feedback f) {
-        List<FeedbackRubricScore> scores=mapper.getFeedbackRubricScores(f.id());
-        return new FeedbackDTO(f.id(),f.submissionId(),f.status(),f.baseVersion(),f.overallComment(),
-                f.finalScore(),scores.stream().map(s->new RubricScore(s.criterionId(),s.score(),s.comment())).toList(),
-                f.publishedAt(),f.updatedAt());
+    private List<RubricResultDTO> rubricResults(Feedback f) {
+        return mapper.getFeedbackRubricScores(f.id()).stream()
+                .map(s->new RubricResultDTO(s.criterionId(),s.score(),s.comment())).toList();
+    }
+    private CourseDTOs.TeacherBrief teacherBrief(Feedback f) {
+        String name=mapper.findUserDisplayName(f.teacherId());
+        return new CourseDTOs.TeacherBrief(f.teacherId(),name==null||name.isEmpty()?"教师":name);
+    }
+    /** 教师视图：草稿或已发布；messageId 恒为 null（个人通知属于学生收件人）。 */
+    private TeacherFeedbackDTO teacherFeedbackView(Feedback f,Submission s) {
+        return new TeacherFeedbackDTO(f.id(),f.submissionId(),f.offeringId(),f.assignmentId(),s.assignmentTitleSnapshot(),
+                f.baseVersion(),f.status(),f.finalScore(),s.maxScoreSnapshot(),rubricResults(f),f.overallComment(),
+                List.of(),List.of(),null,teacherBrief(f),f.publishedAt(),null);
+    }
+    /** 学生视图：只用于已发布评价；messageId 取本人 feedback_published 消息。 */
+    private StudentFeedbackViewDTO studentFeedbackView(Feedback f,Submission s) {
+        return new StudentFeedbackViewDTO(f.id(),f.submissionId(),f.offeringId(),f.assignmentId(),s.assignmentTitleSnapshot(),
+                f.baseVersion(),f.status(),f.finalScore(),s.maxScoreSnapshot(),rubricResults(f),f.overallComment(),
+                List.of(),List.of(),null,teacherBrief(f),f.publishedAt(),
+                mapper.findFeedbackMessageId(f.studentId(),f.id()));
     }
     private boolean canSave(Assignment assignment,CourseAccess.Context context) {
         return saveBlockedReason(assignment,context)==null;

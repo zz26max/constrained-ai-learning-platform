@@ -122,22 +122,21 @@ public class AssignmentController {
                 "total",result.total()),req);
     }
     @PostMapping("/teacher/submissions/{submissionId}/feedback")
-    public ResponseEntity<ApiResponse<FeedbackDTO>> saveFeedbackDraft(Authentication auth,HttpServletRequest req,
+    public ResponseEntity<ApiResponse<TeacherFeedbackDTO>> saveFeedback(Authentication auth,HttpServletRequest req,
             @PathVariable String submissionId,@RequestBody Map<String,Object> body) {
         AssignmentInput.uuid(submissionId);
-        FeedbackDTO result=service.saveFeedbackDraft(user(auth),submissionId,body,id(req));
-        boolean created="draft".equals(result.status())&&result.baseVersion()==1;
-        return ResponseEntity.status(created?HttpStatus.CREATED:HttpStatus.OK)
-                .body(response(result,req));
+        FeedbackSaveResult result=service.saveFeedback(user(auth),submissionId,body,id(req));
+        return ResponseEntity.status(result.created()?HttpStatus.CREATED:HttpStatus.OK)
+                .body(response(result.feedback(),req));
     }
     @PostMapping("/teacher/submissions/{submissionId}/feedback/publish")
-    public ApiResponse<FeedbackDTO> publishFeedback(Authentication auth,HttpServletRequest req,
+    public ApiResponse<TeacherFeedbackDTO> publishFeedback(Authentication auth,HttpServletRequest req,
             @PathVariable String submissionId,@RequestBody Map<String,Object> body) {
         AssignmentInput.uuid(submissionId);
         return response(service.publishFeedback(user(auth),submissionId,body,id(req)),req);
     }
     @GetMapping("/me/feedback/{feedbackId}")
-    public ApiResponse<FeedbackDTO> getFeedback(Authentication auth,HttpServletRequest req,
+    public ApiResponse<StudentFeedbackViewDTO> getFeedback(Authentication auth,HttpServletRequest req,
             @PathVariable String feedbackId) {
         AssignmentInput.uuid(feedbackId);
         return response(service.getFeedback(user(auth),feedbackId),req);

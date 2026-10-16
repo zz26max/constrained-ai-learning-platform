@@ -59,6 +59,8 @@ class AssignmentHttpContractTest {
     private static final String REQUEST_ID = "req-p1b-assignment-test";
     private static final Instant FUTURE = Instant.parse("2099-01-01T00:00:00Z");
     private static final JsonMapper JSON = JsonMapper.builder().findAndAddModules().build();
+    private static final String FEEDBACK_BODY = "{\"baseVersion\":0,\"score\":85,\"rubricResults\":[{\"criterionId\":\"layout\",\"score\":85,\"comment\":\"ok\"}],"
+            + "\"comment\":\"整体不错\",\"knowledgeEvaluations\":[]}";
 
     @Autowired private MockMvc mvc;
     @Autowired private CsrfTokenService csrf;
@@ -89,7 +91,10 @@ class AssignmentHttpContractTest {
                 new Operation("patchAssignment", "PATCH", "/api/v1/teacher/assignments/" + ID, true, "{\"description\":\"更新说明\"}", 200, false),
                 new Operation("publishAssignment", "POST", "/api/v1/teacher/assignments/" + ID + "/publish", true, "{}", 200, false),
                 new Operation("archiveAssignment", "POST", "/api/v1/teacher/assignments/" + ID + "/archive", true, "{}", 200, false),
-                new Operation("listTeacherSubmissions", "GET", "/api/v1/teacher/assignments/" + ID + "/submissions", true, null, 200, true));
+                new Operation("listTeacherSubmissions", "GET", "/api/v1/teacher/assignments/" + ID + "/submissions", true, null, 200, true),
+                new Operation("saveFeedback", "POST", "/api/v1/teacher/submissions/" + ID + "/feedback", true, FEEDBACK_BODY, 201, false),
+                new Operation("publishFeedback", "POST", "/api/v1/teacher/submissions/" + ID + "/feedback/publish", true, "{\"baseVersion\":1}", 200, false),
+                new Operation("getFeedback", "GET", "/api/v1/me/feedback/" + ID, false, null, 200, false));
     }
 
     static Stream<Operation> writes() { return operations().filter(Operation::writes); }
@@ -147,6 +152,27 @@ class AssignmentHttpContractTest {
         when(service.archiveAssignment(any(), anyString(), anyString())).thenReturn(teacherAssignment);
         when(service.listTeacherSubmissions(any(), anyString(), anyInt(), anyInt()))
                 .thenReturn(new SubmissionListResponse(List.of(), 1, 20, 0));
+        when(service.saveFeedback(any(), anyString(), anyMap(), anyString()))
+                .thenReturn(new FeedbackSaveResult(teacherFeedback(1, "draft"), true));
+        when(service.publishFeedback(any(), anyString(), anyMap(), anyString())).thenReturn(teacherFeedback(2, "published"));
+        when(service.getFeedback(any(), anyString())).thenReturn(studentFeedback());
+    }
+
+    private static final String MESSAGE_ID = "00000000-0000-4000-8000-000000000095";
+    private static final String TEACHER_ID = "00000000-0000-4000-8000-000000000096";
+
+    private static TeacherFeedbackDTO teacherFeedback(int version, String status) {
+        return new TeacherFeedbackDTO(ID, ID, OFFERING, ID, "作业一", version, status, new BigDecimal("85.00"), new BigDecimal("100.00"),
+                List.of(new RubricResultDTO("layout", new BigDecimal("85.00"), "ok")), "整体不错", List.of(), List.of(), null,
+                new com.learningplatform.modules.courses.dto.CourseDTOs.TeacherBrief(TEACHER_ID, "教师"),
+                "published".equals(status) ? Instant.parse("2026-10-14T00:00:00Z") : null, null);
+    }
+
+    private static StudentFeedbackViewDTO studentFeedback() {
+        return new StudentFeedbackViewDTO(ID, ID, OFFERING, ID, "作业一", 2, "published", new BigDecimal("85.00"), new BigDecimal("100.00"),
+                List.of(new RubricResultDTO("layout", new BigDecimal("85.00"), "ok")), "整体不错", List.of(), List.of(), null,
+                new com.learningplatform.modules.courses.dto.CourseDTOs.TeacherBrief(TEACHER_ID, "教师"),
+                Instant.parse("2026-10-14T00:00:00Z"), MESSAGE_ID);
     }
 
     @ParameterizedTest(name = "{0}") @MethodSource("operations")
@@ -541,6 +567,136 @@ class AssignmentHttpContractTest {
             mvc.perform(authenticated(op, TEACHER_TOKEN, true)).andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         }
+    }
+
+    // ---- P1-C 反馈三操作：契约形状、状态码与错误码 ----
+
+    private Operation op(String id) { return operations().filter(o -> id.equals(o.id())).findFirst().orElseThrow(); }
+
+    private void assertTeacherFeedbackShape(org.springframework.test.web.servlet.ResultActions r, int version, String status) throws Exception {
+        r.andExpect(jsonPath("$.data.id").value(ID))
+                .andExpect(jsonPath("$.data.submissionId").value(ID))
+                .andExpect(jsonPath("$.data.offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.assignmentId").value(ID))
+                .andExpect(jsonPath("$.data.assignmentTitle").value("作业一"))
+                .andExpect(jsonPath("$.data.version").value(version))
+                .andExpect(jsonPath("$.data.status").value(status))
+                .andExpect(jsonPath("$.data.score").value(85.0))
+                .andExpect(jsonPath("$.data.maxScore").value(100.0))
+                .andExpect(jsonPath("$.data.rubricResults[0].criterionId").value("layout"))
+                .andExpect(jsonPath("$.data.rubricResults[0].score").value(85.0))
+                .andExpect(jsonPath("$.data.rubricResults[0].comment").value("ok"))
+                .andExpect(jsonPath("$.data.comment").value("整体不错"))
+                .andExpect(jsonPath("$.data.knowledgeEvaluations").isArray())
+                .andExpect(jsonPath("$.data.issueTags").isArray())
+                .andExpect(jsonPath("$.data.issueTagVersion").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.teacher.id").value(TEACHER_ID))
+                .andExpect(jsonPath("$.data.teacher.displayName").value("教师"))
+                .andExpect(jsonPath("$.data.messageId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasKey("messageId")))
+                .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasKey("issueTagVersion")))
+                .andExpect(jsonPath("$.data.baseVersion").doesNotExist())
+                .andExpect(jsonPath("$.data.overallComment").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist());
+        if ("published".equals(status)) r.andExpect(jsonPath("$.data.publishedAt").value("2026-10-14T00:00:00Z"));
+        else r.andExpect(jsonPath("$.data.publishedAt").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void saveFeedbackCreatedReturns201AndUpdatedReturns200WithTeacherShape() throws Exception {
+        assertTeacherFeedbackShape(mvc.perform(authenticated(op("saveFeedback"), TEACHER_TOKEN, true))
+                .andExpect(status().isCreated()), 1, "draft");
+        when(service.saveFeedback(any(), anyString(), anyMap(), anyString()))
+                .thenReturn(new FeedbackSaveResult(teacherFeedback(2, "draft"), false));
+        assertTeacherFeedbackShape(mvc.perform(authenticated(op("saveFeedback"), TEACHER_TOKEN, true))
+                .andExpect(status().isOk()), 2, "draft");
+    }
+
+    @Test
+    void publishFeedbackReturns200WithPublishedTeacherShape() throws Exception {
+        assertTeacherFeedbackShape(mvc.perform(authenticated(op("publishFeedback"), TEACHER_TOKEN, true))
+                .andExpect(status().isOk()), 2, "published");
+    }
+
+    @Test
+    void getFeedbackReturnsStudentShapeWithMessageId() throws Exception {
+        mvc.perform(authenticated(op("getFeedback"), STUDENT_TOKEN, true)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(ID))
+                .andExpect(jsonPath("$.data.submissionId").value(ID))
+                .andExpect(jsonPath("$.data.offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.assignmentId").value(ID))
+                .andExpect(jsonPath("$.data.assignmentTitle").value("作业一"))
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.status").value("published"))
+                .andExpect(jsonPath("$.data.score").value(85.0))
+                .andExpect(jsonPath("$.data.maxScore").value(100.0))
+                .andExpect(jsonPath("$.data.rubricResults[0].criterionId").value("layout"))
+                .andExpect(jsonPath("$.data.comment").value("整体不错"))
+                .andExpect(jsonPath("$.data.knowledgeEvaluations").isArray())
+                .andExpect(jsonPath("$.data.issueTags").isArray())
+                .andExpect(jsonPath("$.data.teacher.displayName").value("教师"))
+                .andExpect(jsonPath("$.data.publishedAt").value("2026-10-14T00:00:00Z"))
+                .andExpect(jsonPath("$.data.messageId").value(MESSAGE_ID))
+                .andExpect(jsonPath("$.data.feedbackId").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist());
+    }
+
+    @Test
+    void getFeedbackHidesDraftOtherAndMissingAs404AndRejectsMalformedId() throws Exception {
+        when(service.getFeedback(any(), anyString()))
+                .thenThrow(new BusinessException(HttpStatus.NOT_FOUND, "NOT_FOUND", "请求的资源不存在。"));
+        mvc.perform(authenticated(op("getFeedback"), STUDENT_TOKEN, true)).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+        Operation bad = new Operation("getFeedback", "GET", "/api/v1/me/feedback/not-a-uuid", false, null, 200, false);
+        mvc.perform(authenticated(bad, STUDENT_TOKEN, true)).andExpect(status().is(422))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void feedbackVersionConflictCarriesCurrentVersion() throws Exception {
+        BusinessException conflict = new BusinessException(HttpStatus.CONFLICT, "FEEDBACK_VERSION_CONFLICT",
+                "评价版本已过期，请刷新后重试。", Map.of("currentVersion", 7));
+        when(service.saveFeedback(any(), anyString(), anyMap(), anyString())).thenThrow(conflict);
+        when(service.publishFeedback(any(), anyString(), anyMap(), anyString())).thenThrow(conflict);
+        for (String id : List.of("saveFeedback", "publishFeedback")) {
+            mvc.perform(authenticated(op(id), TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("FEEDBACK_VERSION_CONFLICT"))
+                    .andExpect(jsonPath("$.error.details.currentVersion").value(7));
+        }
+    }
+
+    @Test
+    void feedbackWriteConflictCodesUseRegisteredNamesAndStatus409() throws Exception {
+        for (String code : List.of("SUBMISSION_SUPERSEDED", "ASSIGNMENT_ARCHIVED", "OFFERING_ARCHIVED", "FEEDBACK_ALREADY_PUBLISHED")) {
+            org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.CONFLICT, code, "冲突。"))
+                    .when(service).saveFeedback(any(), anyString(), anyMap(), anyString());
+            mvc.perform(authenticated(op("saveFeedback"), TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value(code));
+        }
+        for (String code : List.of("SUBMISSION_SUPERSEDED", "ASSIGNMENT_ARCHIVED", "OFFERING_ARCHIVED")) {
+            org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.CONFLICT, code, "冲突。"))
+                    .when(service).publishFeedback(any(), anyString(), anyMap(), anyString());
+            mvc.perform(authenticated(op("publishFeedback"), TEACHER_TOKEN, true)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value(code));
+        }
+    }
+
+    @Test
+    void feedbackValidationAndUnknownFieldAndHiddenSubmission() throws Exception {
+        when(service.saveFeedback(any(), anyString(), anyMap(), anyString())).thenThrow(new BusinessException(
+                HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_ERROR", "请求参数不符合要求。",
+                Map.of("fields", List.of(Map.of("field", "score", "message", "不能超过作业满分。")))));
+        mvc.perform(authenticated(op("saveFeedback"), TEACHER_TOKEN, true)).andExpect(status().is(422))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details.fields[0].field").value("score"));
+        org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "请求体包含未知字段。"))
+                .when(service).publishFeedback(any(), anyString(), anyMap(), anyString());
+        mvc.perform(authenticated(op("publishFeedback"), TEACHER_TOKEN, true)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.NOT_FOUND, "NOT_FOUND", "请求的资源不存在。"))
+                .when(service).publishFeedback(any(), anyString(), anyMap(), anyString());
+        mvc.perform(authenticated(op("publishFeedback"), TEACHER_TOKEN, true)).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 
     private MockHttpServletRequestBuilder authenticated(Operation op, String token, boolean validCsrf) {

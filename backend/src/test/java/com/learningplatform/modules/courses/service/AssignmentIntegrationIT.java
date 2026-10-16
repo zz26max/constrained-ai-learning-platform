@@ -49,6 +49,7 @@ class AssignmentIntegrationIT {
     private static final UserDTO TEACHER = user("a3", "assignment.teacher", "teacher");
     private static final UserDTO STUDENT = user("a4", "assignment.student", "student");
     private static final UserDTO OTHER_STUDENT = user("a5", "assignment.other", "student");
+    private static final UserDTO OTHER_TEACHER = user("a6", "assignment.otherteacher", "teacher");
     private static final JsonMapper JSON = JsonMapper.builder().findAndAddModules().build();
 
     @Container
@@ -100,7 +101,7 @@ class AssignmentIntegrationIT {
         jdbc.update("DELETE FROM audit_logs");
         jdbc.update("DELETE FROM auth_sessions");
         jdbc.update("DELETE FROM users");
-        for (UserDTO u : List.of(TEACHER, STUDENT, OTHER_STUDENT)) {
+        for (UserDTO u : List.of(TEACHER, STUDENT, OTHER_STUDENT, OTHER_TEACHER)) {
             jdbc.update("INSERT INTO users(id,username,display_name,password_hash,roles,status,created_at,updated_at) VALUES(?,?,?,?,CAST(? AS JSON),'active',?,?)",
                     u.id(), u.username(), u.displayName(), "TEST_ONLY_NOT_A_REAL_HASH", JSON.writeValueAsString(u.roles()), ts(NOW), ts(NOW));
         }
@@ -515,10 +516,9 @@ class AssignmentIntegrationIT {
                 .satisfies(t -> assertCode(t, 409, "ARCHIVE_PENDING_REVIEWS"));
         assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).pendingReviewCount()).isEqualTo(1);
 
-        // 直接写入已发布评价行：P1-C publishFeedback 的通知类型与 ck_notifications_type 不一致（见汇报），此处不依赖它。
-        jdbc.update("INSERT INTO feedback(id,submission_id,assignment_id,offering_id,student_id,teacher_id,status,base_version,overall_comment,final_score,published_at,created_at,updated_at) VALUES(?,?,?,?,?,?,'published',1,'不错',90,?,?,?)",
-                UUID.randomUUID().toString(), created.submission().id(), assignment.id(), offering.id(), STUDENT.id(),
-                TEACHER.id(), ts(NOW), ts(NOW), ts(NOW));
+        // 走真实的 saveFeedback -> publishFeedback，不再绕过服务直接写已发布评价行。
+        assignmentService.saveFeedback(TEACHER, created.submission().id(), feedbackBody(0, "55", "35"), "fb-save");
+        assignmentService.publishFeedback(TEACHER, created.submission().id(), Map.of("baseVersion", 1), "fb-publish");
 
         assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).pendingReviewCount()).isZero();
         assertThat(assignmentService.archiveAssignment(TEACHER, assignment.id(), "archive").publicationState()).isEqualTo("archived");
@@ -677,6 +677,229 @@ class AssignmentIntegrationIT {
         // 学生角色 -> 403；
         assertThatThrownBy(() -> assignmentService.getTeacherAssignment(STUDENT, draft.id()))
                 .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+    }
+
+    /** 契约 FeedbackWrite：量规 layout 上限 60、quality 上限 40；总分为两项之和。 */
+    private Map<String, Object> feedbackBody(int baseVersion, String layout, String quality) {
+        BigDecimal l = new BigDecimal(layout), q = new BigDecimal(quality);
+        Map<String, Object> body = new HashMap<>();
+        body.put("baseVersion", baseVersion);
+        body.put("score", l.add(q));
+        body.put("rubricResults", List.of(
+                Map.of("criterionId", "layout", "score", l, "comment", "布局"),
+                Map.of("criterionId", "quality", "score", q, "comment", "质量")));
+        body.put("comment", "整体不错");
+        body.put("knowledgeEvaluations", List.of());
+        return body;
+    }
+
+    private record Ctx(OfferingDTO offering, TeacherAssignmentDTO assignment, String submissionId) {}
+
+    /** 创建班级、发布作业、学生保存并提交一次；返回第一次提交。 */
+    private Ctx submittedAssignment() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 0);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V1")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), save, "save");
+        Map<String, Object> submit = new HashMap<>();
+        submit.put("workspaceRevision", 1);
+        submit.put("reflection", "完成");
+        var created = assignmentService.submitAssignment(STUDENT, assignment.id(), submit, "submit");
+        return new Ctx(offering, assignment, created.submission().id());
+    }
+
+    private String feedbackIdOf(String submissionId) {
+        return jdbc.queryForObject("SELECT id FROM feedback WHERE submission_id=?", String.class, submissionId);
+    }
+
+    @Test
+    void saveFeedbackCreatesThenUpdatesWithVersionIncrementAndContractShape() {
+        Ctx c = submittedAssignment();
+        var first = assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        assertThat(first.created()).isTrue();
+        TeacherFeedbackDTO dto = first.feedback();
+        assertThat(dto.version()).isEqualTo(1);
+        assertThat(dto.status()).isEqualTo("draft");
+        assertThat(dto.score()).isEqualByComparingTo("80");
+        assertThat(dto.maxScore()).isEqualByComparingTo("100");
+        assertThat(dto.rubricResults()).hasSize(2);
+        assertThat(dto.publishedAt()).isNull();
+        assertThat(dto.messageId()).isNull();
+        assertThat(dto.teacher().id()).isEqualTo(TEACHER.id());
+        assertThat(dto.assignmentId()).isEqualTo(c.assignment().id());
+        assertThat(dto.offeringId()).isEqualTo(c.offering().id());
+
+        var second = assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(1, "60", "40"), "s2");
+        assertThat(second.created()).isFalse();
+        assertThat(second.feedback().version()).isEqualTo(2);
+        assertThat(second.feedback().id()).isEqualTo(dto.id());
+        assertThat(second.feedback().score()).isEqualByComparingTo("100");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM feedback_rubric_scores", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void staleBaseVersionReturnsConflictWithLatestCurrentVersion() {
+        Ctx c = submittedAssignment();
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(1, "51", "30"), "s2");
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(2, "52", "30"), "s3");
+
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(1, "53", "30"), "stale"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getStatus().value()).isEqualTo(409);
+                    assertThat(e.getCode()).isEqualTo("FEEDBACK_VERSION_CONFLICT");
+                    assertThat(e.getDetails()).containsEntry("currentVersion", 3);
+                });
+        assertThatThrownBy(() -> assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "stale-pub"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("FEEDBACK_VERSION_CONFLICT");
+                    assertThat(e.getDetails()).containsEntry("currentVersion", 3);
+                });
+        // 首次创建时 baseVersion 必须为 0
+        Ctx fresh = submittedAssignment();
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, fresh.submissionId(), feedbackBody(5, "50", "30"), "bad"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("FEEDBACK_VERSION_CONFLICT");
+                    assertThat(e.getDetails()).containsEntry("currentVersion", 0);
+                });
+    }
+
+    @Test
+    void publishFeedbackWritesFeedbackPublishedNotificationOnceAndStudentReadsIt() {
+        Ctx c = submittedAssignment();
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        String feedbackId = feedbackIdOf(c.submissionId());
+
+        TeacherFeedbackDTO published = assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p1");
+        assertThat(published.status()).isEqualTo("published");
+        assertThat(published.version()).isEqualTo(2);
+        assertThat(published.publishedAt()).isNotNull();
+        assertThat(published.messageId()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE type='feedback_published' AND recipient_id=? AND related_feedback_id=?",
+                Integer.class, STUDENT.id(), feedbackId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE type='feedback'", Integer.class)).isZero();
+
+        // 重复发布（旧版本号或当前版本号）原样返回，不增加版本和通知
+        TeacherFeedbackDTO again = assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p2");
+        TeacherFeedbackDTO again2 = assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 2), "p3");
+        assertThat(again.version()).isEqualTo(2);
+        assertThat(again2.version()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE related_feedback_id=?", Integer.class, feedbackId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT base_version FROM feedback WHERE id=?", Integer.class, feedbackId)).isEqualTo(2);
+
+        // 已发布后不能再保存草稿
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(2, "50", "30"), "s2"))
+                .satisfies(t -> assertCode(t, 409, "FEEDBACK_ALREADY_PUBLISHED"));
+
+        StudentFeedbackViewDTO view = assignmentService.getFeedback(STUDENT, feedbackId);
+        assertThat(view.id()).isEqualTo(feedbackId);
+        assertThat(view.status()).isEqualTo("published");
+        assertThat(view.version()).isEqualTo(2);
+        assertThat(view.score()).isEqualByComparingTo("80");
+        assertThat(view.maxScore()).isEqualByComparingTo("100");
+        assertThat(view.rubricResults()).hasSize(2);
+        assertThat(view.assignmentTitle()).isEqualTo("作业一");
+        assertThat(view.publishedAt()).isNotNull();
+        String messageId = jdbc.queryForObject("SELECT id FROM notifications WHERE related_feedback_id=?", String.class, feedbackId);
+        assertThat(view.messageId()).isEqualTo(messageId);
+        assertThat(view.teacher().displayName()).isNotBlank();
+    }
+
+    @Test
+    void publishAfterNewerSubmissionReturnsSubmissionSuperseded() {
+        Ctx c = submittedAssignment();
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+
+        Map<String, Object> save = new HashMap<>();
+        save.put("baseRevision", 1);
+        save.put("files", List.of(Map.of("path", "index.html", "content", "V2")));
+        save.put("activeFile", "index.html");
+        assignmentService.saveWorkspace(STUDENT, c.assignment().id(), save, "save2");
+        Map<String, Object> submit = new HashMap<>();
+        submit.put("workspaceRevision", 2);
+        submit.put("reflection", "再次提交");
+        assignmentService.submitAssignment(STUDENT, c.assignment().id(), submit, "submit2");
+
+        assertThatThrownBy(() -> assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p"))
+                .satisfies(t -> assertCode(t, 409, "SUBMISSION_SUPERSEDED"));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(1, "50", "30"), "s"))
+                .satisfies(t -> assertCode(t, 409, "SUBMISSION_SUPERSEDED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE type='feedback_published'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM feedback WHERE submission_id=?", String.class, c.submissionId())).isEqualTo("draft");
+    }
+
+    @Test
+    void studentCannotReadDraftOrOthersFeedbackAndWrongRolesAreRejected() {
+        Ctx c = submittedAssignment();
+        enrollStudent(c.offering().id(), OTHER_STUDENT);
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
+        String feedbackId = feedbackIdOf(c.submissionId());
+
+        // 草稿对本人也是 404
+        assertThatThrownBy(() -> assignmentService.getFeedback(STUDENT, feedbackId))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p");
+        assertThat(assignmentService.getFeedback(STUDENT, feedbackId).status()).isEqualTo("published");
+
+        // 同班他人、教师本人（含授课教师）均不能经 /me/feedback 读取
+        assertThatThrownBy(() -> assignmentService.getFeedback(OTHER_STUDENT, feedbackId))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.getFeedback(TEACHER, feedbackId))
+                .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+        assertThatThrownBy(() -> assignmentService.getFeedback(STUDENT, UUID.randomUUID().toString()))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+    }
+
+    @Test
+    void otherOfferingTeacherAndStudentCannotWriteFeedback() {
+        Ctx c = submittedAssignment();
+        assertThatThrownBy(() -> assignmentService.saveFeedback(OTHER_TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.publishFeedback(OTHER_TEACHER, c.submissionId(), Map.of("baseVersion", 0), "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(STUDENT, c.submissionId(), feedbackBody(0, "50", "30"), "x"))
+                .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM feedback", Integer.class)).isZero();
+    }
+
+    @Test
+    void feedbackScoresAreValidatedAgainstRubricSnapshotAndArchiveBlocksWrites() {
+        Ctx c = submittedAssignment();
+        // 单项超过量规上限 -> 422
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "61", "10"), "x"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // 总分与各项之和不一致 -> 422
+        Map<String, Object> mismatch = feedbackBody(0, "50", "30");
+        mismatch.put("score", new BigDecimal("99"));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), mismatch, "x"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // 缺少量规项 -> 422
+        Map<String, Object> missing = feedbackBody(0, "50", "30");
+        missing.put("rubricResults", List.of(Map.of("criterionId", "layout", "score", new BigDecimal("50"), "comment", "c")));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), missing, "x"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        // 未知字段 -> 400 INVALID_REQUEST（旧字段名不再被接受）
+        Map<String, Object> legacy = new HashMap<>();
+        legacy.put("overallComment", "旧字段");
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), legacy, "x"))
+                .satisfies(t -> assertCode(t, 400, "INVALID_REQUEST"));
+        // 无评价时发布 -> 404
+        assertThatThrownBy(() -> assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 0), "x"))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+
+        // 归档作业：先发布另一份评价让归档通过，再验证写入被拒
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s");
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "p");
+        assignmentService.archiveAssignment(TEACHER, c.assignment().id(), "archive");
+        assertThatThrownBy(() -> assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 2), "x"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(2, "50", "30"), "x"))
+                .satisfies(t -> assertCode(t, 409, "ASSIGNMENT_ARCHIVED"));
     }
 
     private OfferingDTO createOffering() {

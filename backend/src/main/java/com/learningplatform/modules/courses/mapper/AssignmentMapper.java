@@ -100,9 +100,15 @@ public interface AssignmentMapper {
     int insertFeedback(@Param("id") String id,@Param("submissionId") String submissionId,@Param("assignmentId") String assignmentId,
             @Param("offeringId") String offeringId,@Param("studentId") String studentId,@Param("teacherId") String teacherId,
             @Param("overallComment") String overallComment,@Param("finalScore") BigDecimal finalScore,@Param("now") Instant now);
-    int updateFeedbackDraft(@Param("id") String id,@Param("baseVersion") int baseVersion,@Param("overallComment") String overallComment,
-            @Param("finalScore") BigDecimal finalScore,@Param("now") Instant now);
-    int publishFeedback(@Param("id") String id,@Param("now") Instant now);
+    int updateFeedbackDraft(@Param("id") String id,@Param("baseVersion") int baseVersion,@Param("teacherId") String teacherId,
+            @Param("overallComment") String overallComment,@Param("finalScore") BigDecimal finalScore,@Param("now") Instant now);
+    int publishFeedback(@Param("id") String id,@Param("baseVersion") int baseVersion,@Param("teacherId") String teacherId,@Param("now") Instant now);
+    /** 行锁读：保存/发布评价前锁 submission 行与 feedback 行（FOR UPDATE）。 */
+    Submission findSubmissionForUpdate(String id);
+    Feedback findFeedbackBySubmissionForUpdate(String submissionId);
+    /** 学生本人该评价的 feedback_published 站内消息 ID；不存在返回 null。 */
+    String findFeedbackMessageId(@Param("recipientId") String recipientId,@Param("feedbackId") String feedbackId);
+    String findUserDisplayName(String id);
     int deleteFeedbackRubricScores(String feedbackId);
     int insertFeedbackRubricScore(@Param("feedbackId") String feedbackId,@Param("criterionId") String criterionId,
             @Param("score") BigDecimal score,@Param("comment") String comment);

@@ -41,9 +41,17 @@ public final class AssignmentDTOs {
             boolean allowResubmit,int maxAttempts,BigDecimal maxScore,List<RubricCriterion> rubric,List<FileDTO> initialFiles,
             Integer aiPolicyVersion,String id,String offeringId,String publicationState,Instant publishedAt,
             int submittedStudentCount,int pendingReviewCount) {}
-    public record RubricScore(String criterionId,BigDecimal score,String comment) {}
-    public record FeedbackDTO(String id,String submissionId,String status,int baseVersion,String overallComment,
-            BigDecimal finalScore,List<RubricScore> rubricScores,Instant publishedAt,Instant updatedAt) {}
+    // P1-C 契约 RubricResult / TeacherFeedbackDTO / StudentFeedbackDTO。契约的 StudentFeedbackDTO 与下方 P1-D 同名旧记录
+    // 结构不同（P1-D 本批不动），故学生视图在 Java 中命名为 StudentFeedbackViewDTO，JSON 形状以契约为准。
+    public record RubricResultDTO(String criterionId,BigDecimal score,String comment) {}
+    public record TeacherFeedbackDTO(String id,String submissionId,String offeringId,String assignmentId,String assignmentTitle,
+            int version,String status,BigDecimal score,BigDecimal maxScore,List<RubricResultDTO> rubricResults,String comment,
+            List<Object> knowledgeEvaluations,List<String> issueTags,Integer issueTagVersion,
+            CourseDTOs.TeacherBrief teacher,Instant publishedAt,String messageId) {}
+    public record StudentFeedbackViewDTO(String id,String submissionId,String offeringId,String assignmentId,String assignmentTitle,
+            int version,String status,BigDecimal score,BigDecimal maxScore,List<RubricResultDTO> rubricResults,String comment,
+            List<Object> knowledgeEvaluations,List<String> issueTags,Integer issueTagVersion,
+            CourseDTOs.TeacherBrief teacher,Instant publishedAt,String messageId) {}
     public record NotificationDTO(String id,String type,String title,String content,String relatedOfferingId,
             String relatedAssignmentId,String relatedFeedbackId,boolean isRead,Instant readAt,Instant createdAt) {}
     public record PaginationInfo(int page,int pageSize,int totalItems,int totalPages) {}
