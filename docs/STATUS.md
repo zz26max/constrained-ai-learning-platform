@@ -4,7 +4,19 @@
 
 ## 1. 当前真实状态
 
-契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。截至 2026-10-15，**P0-A、P1-A、P1-B、P1-C、P1-D 已完成**：
+契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
+
+> **2026-10-16 全量核对结论（以 openapi.yaml 1.1.0 为准逐项比对代码）**：下列"已完成"描述为提交时的自述，**P1-B / P1-C / P1-D 后端与契约不符，不能视为完成**。可信度：P0-A 高（有真实联调）；P1-A 基本符合（18 个抽样操作中 11 个 MATCH，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异）；P1-B 10 个核对操作中 9 个不符；P1-C 9 个全部不符；P1-D 9 个全部不符。
+>
+> 已确认会在运行时出错的问题：`publishFeedback` 插入通知 `type="feedback"` 违反 `ck_notifications_type`（`AssignmentService.java:426`）；`listMyAssignments` 的 `#{now}` 无对应参数；`createNotice` 的 12 参 `insertNotification` 重载无 XML 语句；看板 SQL 引用不存在的 `base_courses`、`cp.student_id`、`a.type='lab'`；`findCurrentLearningChapter` JOIN 位置语法错误；`listTeacherAssignments` 默认 `all` 被当作 `status='all'`。
+>
+> 其他共性问题：错误码使用契约未登记的值；响应字段与契约不一致（`DashboardDTO`、`LearningRecordSummary`、`AssignmentStatsDTO`、`NoticeDTO` 按 `docs/features/p1d-aggregation.md` 自造）；学生/教师视图缺失（`getAssignment`、`getSubmission` 教师 403）；`publishedFeedbackId`、`feedbackStatus`、`pendingReviewCount` 等硬编码；无行锁；个人公告对全班可见；`getMyLearningRecords`/`markMessagesAsRead` 的 200 响应引用了 `getCsrfToken_200` 占位（契约缺陷）。
+>
+> 前端：`main.ts` 未注册 `AssignmentsApi`（作业页与通知中心运行时抛错，vitest 测不出）；`NotificationCenter.vue`、`TeacherFeedbackEditor.vue` 未接入路由；`dashboard.ts`/`notices.ts`/`stats.ts` 路径、方法、分页字段均与契约不符，未注册、无 mock、无测试；P1-C/P1-D 无前端测试。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段，因此 `implemented` 标记不能证明符合契约。
+>
+> 处置原则：以契约为准修后端，修复前不开发 P1-D 前端 UI；`p1d-aggregation.md` 与契约冲突部分作废。
+
+截至 2026-10-15 的提交自述如下（仅作历史记录）：
 
 - **P0-A**（master `b3c4f0e`）：5 个认证操作为 verified，2 个健康检查为 implemented。已有账户初始化、数据库会话、认证 HTTP 链、原子登录限流、审计和 Flyway V1～V4；前端包含登录、会话联调页、身份恢复、退出、同源代理与 mock。
 - **P1-A**（master `4d62379`）：27 个课程操作为 implemented（11 个教学班 + 16 个内容），Flyway V5 建表。教师开班→发布章节→邀请码→学生加入→阅读完成→跨班被拒的验收链路已实现；前端包含教师工作台与学生课程页，mock 与测试覆盖写路径。
@@ -20,10 +32,11 @@
 
 - **接手方式**：先读本节，再按任务阅读本端手册及契约切片。前端只实现 frontend/，后端只实现 backend/。
 - **代码基点**：master `4b76e1a`（文档结构重整；P1-D 功能代码基点仍为 `9e594a6`）。P1-D 多班聚合模块后端已完成，前端 API 客户端已就绪，UI 组件待补充。
-- **下一包**：
-  - 补充前端 P1-D UI 组件（学生仪表盘、公告列表、教师统计页面）及路由配置
-  - 或直接进入 P2-A（受限式 AI 辅导）、P2-B（学习行为分析）
-  - 不重新创建已有工程或重复实现认证、课程、作业接口。
+- **下一包**（2026-10-16 核对后修订）：
+  - 先把 P1-B / P1-C / P1-D 后端按契约对齐（顺序：P1-B → P1-C → P1-D；每个操作用 `scripts/contract_slice.py` 取切片，补响应字段断言测试）
+  - 接通前端：`main.ts` 注册 `AssignmentsApi`，通知中心与教师评价编辑器接入路由，P1-D 客户端改用生成类型
+  - 之后才做 P1-D 前端 UI 或进入 P2
+  - 不重新创建已有工程或重复实现认证、课程接口。
 
 2026-10-13 定向检查发现的 5 个认证问题均已修复，各有先失败后通过的回归测试：
 

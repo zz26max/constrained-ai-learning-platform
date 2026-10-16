@@ -552,7 +552,7 @@ paths:
         required: false
         schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
       responses:
-        '200': {$ref: '#/components/responses/getCsrfToken_200'}
+        '200': {$ref: '#/components/responses/getMyLearningRecords_200'}
         '400': {$ref: '#/components/responses/getCsrfToken_400'}
         '401': {$ref: '#/components/responses/logout_401'}
         '403': {$ref: '#/components/responses/getMe_403'}
@@ -597,7 +597,7 @@ paths:
         required: true
         schema: {type: string, format: uri}
       responses:
-        '200': {$ref: '#/components/responses/getCsrfToken_200'}
+        '200': {$ref: '#/components/responses/markMessagesAsRead_200'}
         '400': {$ref: '#/components/responses/getCsrfToken_400'}
         '401': {$ref: '#/components/responses/logout_401'}
         '403': {$ref: '#/components/responses/logout_403'}
@@ -5251,6 +5251,13 @@ components:
         updatedCount: {type: integer, minimum: 0, maximum: 2147483647}
       required:
       - updatedCount
+    MarkedReadDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        markedAt: {$ref: '#/components/schemas/Timestamp'}
+      required:
+      - markedAt
     BaseCourseDTO:
       type: object
       additionalProperties: false
@@ -8511,6 +8518,24 @@ components:
       required:
       - data
       - requestId
+    Response_markMessagesAsRead:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/MarkedReadDTO'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - data
+      - requestId
+    Response_getMyLearningRecords:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/LearningRecordsDTO'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - data
+      - requestId
     Response_listNotices:
       type: object
       additionalProperties: false
@@ -9464,6 +9489,22 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Response_readAllMessages'}
+    markMessagesAsRead_200:
+      description: 200 `{markedAt}`；只更新本人在该教学班内、可选 `type` 范围内的未读消息
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_markMessagesAsRead'}
+    getMyLearningRecords_200:
+      description: 200 `LearningRecordsDTO`；当前学生在该教学班的学习记录与统计
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_getMyLearningRecords'}
     listNotices_200:
       description: 200 通知分页，字段同教师创建公告响应；按 `createdAt` 降序
       headers:
