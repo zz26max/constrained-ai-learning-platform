@@ -160,25 +160,24 @@ public interface AssignmentMapper {
             @Param("termId") String termId);
     int countCompletedLabs(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
 
-    // 教师端学生学习记录（下一批对齐，暂保留旧形状）
-    LegacyLearningRecordSummary getLearningRecordSummary(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
-    List<LegacyStudentFeedbackDTO> listStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
-            @Param("offset") int offset,@Param("limit") int limit);
-    int countStudentFeedback(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
+    /** 教师查看指定学生：已发布评价 ID 分页，顺序 published_at DESC, id DESC；termId 传 null。 */
+    List<String> listPublishedFeedbackIdsPage(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
+            @Param("termId") String termId,@Param("offset") long offset,@Param("size") int size);
 
     // P1-D 批量标记消息已读
     int markMessagesRead(@Param("recipientId") String recipientId,@Param("offeringId") String offeringId,
             @Param("type") String type,@Param("readAt") Instant readAt);
 
-    // P1-D 公告系统
+    // P1-D 公告系统；studentId 非 null 时只返回全班公告与定向给该学生的公告，null（教师）返回全部。
     int insertNotice(@Param("notice") NoticeRow notice);
-    NoticeDTO findNoticeById(@Param("id") String id);
-    List<NoticeDTO> listNotices(@Param("offeringId") String offeringId,@Param("offset") int offset,@Param("limit") int limit);
-    int countNotices(@Param("offeringId") String offeringId);
+    NoticeView findNoticeView(@Param("id") String id);
+    List<NoticeView> listNotices(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
+            @Param("offset") long offset,@Param("limit") int limit);
+    int countNotices(@Param("offeringId") String offeringId,@Param("studentId") String studentId);
 
     // P1-D 教师统计
     OfferingStatsDTO getOfferingStats(@Param("offeringId") String offeringId);
-    AssignmentStatsDTO getAssignmentStats(@Param("assignmentId") String assignmentId);
+    AssignmentStatsRow getAssignmentStats(@Param("assignmentId") String assignmentId);
 
     // 辅助记录
     record AssignmentCounts(int allCount,int todoCount,int doneCount,int archivedIncompleteCount) {}

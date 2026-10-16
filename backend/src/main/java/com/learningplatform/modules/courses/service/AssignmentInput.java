@@ -393,6 +393,15 @@ public final class AssignmentInput {
         if(total>262144) throw invalid();
         return result;
     }
+    private static final Set<String> NOTICE_FIELDS=Set.of("title","content","target");
+    /** createNotice 请求体：未知字段 400 INVALID_REQUEST；缺少 title/content 为 422 并指明字段。 */
+    public static void checkNoticeKeys(Map<String,Object> body) {
+        if(body==null) throw invalid();
+        for(String key:body.keySet()) { if(!NOTICE_FIELDS.contains(key)) throw invalidRequest(); }
+        for(String key:List.of("title","content")) {
+            if(!body.containsKey(key)) throw invalidField(key,"必填字段缺失。");
+        }
+    }
     public static void empty(Map<String,Object> body) {
         if(body==null||!body.isEmpty()) throw new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_REQUEST","请求体必须为空对象。");
     }

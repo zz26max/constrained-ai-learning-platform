@@ -586,6 +586,11 @@ public class AssignmentService {
                 f.baseVersion(),f.status(),f.finalScore(),s.maxScoreSnapshot(),rubricResults(f),f.overallComment(),
                 List.of(),List.of(),null,teacherBrief(f),f.publishedAt(),null);
     }
+    /** 教师读取学生学习记录用：按评价 ID 生成教师视图（调用方已校验班级与学生归属）。 */
+    TeacherFeedbackDTO teacherFeedbackById(String feedbackId) {
+        Feedback f=feedbackOr404(feedbackId);
+        return teacherFeedbackView(f,submissionOr404(f.submissionId()));
+    }
     /** 学生视图：只用于已发布评价；messageId 取本人 feedback_published 消息。 */
     private StudentFeedbackViewDTO studentFeedbackView(Feedback f,Submission s) {
         return new StudentFeedbackViewDTO(f.id(),f.submissionId(),f.offeringId(),f.assignmentId(),s.assignmentTitleSnapshot(),

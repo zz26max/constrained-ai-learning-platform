@@ -3,39 +3,57 @@ import java.util.List;
 import com.learningplatform.modules.auth.dto.UserDTO;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.*;
 import com.learningplatform.modules.courses.mapper.AssignmentMapper;
+import com.learningplatform.modules.courses.mapper.CourseMapper;
 import com.learningplatform.modules.courses.model.AssignmentRows.Assignment;
+import com.learningplatform.modules.courses.model.AssignmentRows.AssignmentStatsRow;
+import com.learningplatform.modules.courses.model.CourseRows;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-/** P1-D 教师统计服务 */
+/** P1-D 教师统计与学生学习记录；字段与错误码以 openapi 1.1.0 为准。 */
 @Service
 public class TeacherStatsService {
     private final AssignmentMapper mapper;
+    private final CourseMapper courseMapper;
     private final CourseAccess access;
-    public TeacherStatsService(AssignmentMapper mapper,CourseAccess access) {
-        this.mapper=mapper;this.access=access;
+    private final AssignmentService assignments;
+    public TeacherStatsService(AssignmentMapper mapper,CourseMapper courseMapper,CourseAccess access,AssignmentService assignments) {
+        this.mapper=mapper;this.courseMapper=courseMapper;this.access=access;this.assignments=assignments;
     }
     @Transactional(readOnly=true)
     public OfferingStatsDTO getOfferingStats(String offeringId,UserDTO user) {
-        access.requireTeacher(user,offeringId,false);
+        access.requireTeacher(user,AssignmentInput.uuid(offeringId),false);
         return mapper.getOfferingStats(offeringId);
     }
+    /** 作业不存在或不属于本人任教班级统一 404。 */
     @Transactional(readOnly=true)
     public AssignmentStatsDTO getAssignmentStats(String assignmentId,UserDTO user) {
-        Assignment assignment=mapper.findAssignment(assignmentId);
-        if(assignment==null) throw new com.learningplatform.common.exception.BusinessException(
-                org.springframework.http.HttpStatus.NOT_FOUND,"NOT_FOUND","Assignment not found");
+        CourseAccess.role(user,"teacher");
+        Assignment assignment=mapper.findAssignment(AssignmentInput.uuid(assignmentId));
+        if(assignment==null) throw CourseAccess.notFound();
         access.requireTeacher(user,assignment.offeringId(),false);
-        return mapper.getAssignmentStats(assignmentId);
+        AssignmentStatsRow row=mapper.getAssignmentStats(assignmentId);
+        // commonIssues：P1 没有求助/检查数据来源，契约允许空数组。
+        return new AssignmentStatsDTO(row.studentCount(),row.submittedStudentCount(),row.pendingReviewCount(),
+                row.reviewedStudentCount(),List.of());
     }
+    /** 目标必须是本班 active 学生，否则 404；评价为已发布评价的教师视图，分页，其余字段与学生端同一份数据。 */
     @Transactional(readOnly=true)
-    public LegacyLearningRecordsDTO getStudentLearningRecords(String offeringId,String studentId,UserDTO teacher,int page,int pageSize) {
-        access.requireTeacher(teacher,offeringId,false);
-        LegacyLearningRecordSummary summary=mapper.getLearningRecordSummary(offeringId,studentId);
-        int offset=(page-1)*pageSize;
-        List<LegacyStudentFeedbackDTO> feedback=mapper.listStudentFeedback(offeringId,studentId,offset,pageSize);
-        int totalFeedback=mapper.countStudentFeedback(offeringId,studentId);
-        int totalPages=(totalFeedback+pageSize-1)/pageSize;
-        PaginationInfo pageInfo=new PaginationInfo(page,pageSize,totalFeedback,totalPages);
-        return new LegacyLearningRecordsDTO(offeringId,summary,feedback,pageInfo,null,null);
+    public TeacherLearningRecordsDTO getStudentLearningRecords(String offeringId,String studentId,UserDTO teacher,int page,int pageSize) {
+        access.requireTeacher(teacher,AssignmentInput.uuid(offeringId),false);
+        AssignmentInput.uuid(studentId);AssignmentInput.page(page,pageSize);
+        CourseRows.Member member=courseMapper.findMember(offeringId,studentId);
+        if(member==null||!"student".equals(member.role())||!"active".equals(member.status())) throw CourseAccess.notFound();
+        StudentBrief student=mapper.findStudentBrief(studentId);
+        if(student==null) throw CourseAccess.notFound();
+        long offset=(long)(page-1)*pageSize;
+        List<TeacherFeedbackDTO> items=mapper.listPublishedFeedbackIdsPage(studentId,offeringId,null,offset,pageSize)
+                .stream().map(assignments::teacherFeedbackById).toList();
+        int total=mapper.countPublishedFeedback(studentId,offeringId,null);
+        TeacherFeedbackDTO recent=page==1?(items.isEmpty()?null:items.get(0))
+                :mapper.listPublishedFeedbackIdsPage(studentId,offeringId,null,0,1).stream()
+                        .map(assignments::teacherFeedbackById).findFirst().orElse(null);
+        LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,null);
+        return new TeacherLearningRecordsDTO(offeringId,summary,recent,new TeacherFeedbackPage(items,page,pageSize,total),
+                List.of(),null,student);
     }
 }

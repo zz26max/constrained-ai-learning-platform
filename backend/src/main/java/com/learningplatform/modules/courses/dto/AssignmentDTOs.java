@@ -65,7 +65,6 @@ public final class AssignmentDTOs {
             CourseDTOs.TeacherBrief sender,Instant createdAt,Instant readAt,TargetDTO target) {}
     /** 契约 MessageReadDTO：readAt 为首次阅读时间。 */
     public record MessageReadDTO(String id,Instant readAt) {}
-    public record PaginationInfo(int page,int pageSize,int totalItems,int totalPages) {}
     // P1-D 契约 DashboardDTO；courses 复用 CourseDTOs.CourseSummaryDTO（与 listMyCourses 同一结构）。
     // currentLearning 为 CurrentAssignment、CurrentLearningChapter 或 null。
     public record DashboardDTO(String termId,String termLabel,Instant serverTime,int courseCount,
@@ -82,19 +81,19 @@ public final class AssignmentDTOs {
     public record LearningSummary(int completedLabCount,int publishedFeedbackCount,Integer needsPracticeCount) {}
     public record FeedbackPage(List<StudentFeedbackViewDTO> items,int page,int pageSize,int total) {}
     public record MarkedReadDTO(Instant markedAt) {}
-    // 教师端学生学习记录（getStudentLearningRecords）属下一批对齐，暂保留旧形状。
-    public record LegacyLearningRecordsDTO(String offeringId,LegacyLearningRecordSummary summary,
-            List<LegacyStudentFeedbackDTO> recentFeedback,PaginationInfo feedbackPage,
-            Object knowledgeEvidence,Object nextRecommendation) {}
-    public record LegacyLearningRecordSummary(int completedChapterCount,int totalChapterCount,
-            int completedLabCount,int totalLabCount,int feedbackCount) {}
-    public record LegacyStudentFeedbackDTO(String feedbackId,String assignmentId,String assignmentTitle,
-            String overallComment,BigDecimal finalScore,Instant publishedAt) {}
+    // P1-D 契约 TeacherLearningRecordsDTO / TeacherFeedbackPage：与学生 LearningRecordsDTO 同一结构，
+    // 评价用教师视图并另含 student。
+    public record TeacherFeedbackPage(List<TeacherFeedbackDTO> items,int page,int pageSize,int total) {}
+    public record TeacherLearningRecordsDTO(String offeringId,LearningSummary summary,TeacherFeedbackDTO recentFeedback,
+            TeacherFeedbackPage feedbackPage,List<Object> knowledgeEvidence,Object nextRecommendation,StudentBrief student) {}
     public record OfferingStatsDTO(int studentCount,int activeAssignmentCount,
             int pendingReviewCount,int pendingHelpCount) {}
-    public record AssignmentStatsDTO(int submittedStudentCount,int pendingReviewCount,BigDecimal avgScore) {}
-    public record NoticeDTO(String id,String offeringId,String authorId,String authorName,
-            String targetStudentId,String targetStudentName,String title,String content,Instant createdAt) {}
-    public record NoticeWrite(String targetStudentId,String title,String content) {}
-    public record PagedResult<T>(List<T> items,int page,int pageSize,int total,int totalPages,Object metadata) {}
+    /** 契约 AssignmentStatsDTO：P1 没有 commonIssues 数据来源，恒为空数组。 */
+    public record AssignmentStatsDTO(int studentCount,int submittedStudentCount,int pendingReviewCount,
+            int reviewedStudentCount,List<Object> commonIssues) {}
+    /** 契约 NoticeDTO：target 是可选跳转对象（TargetDTO），不是收件人；现有 notices 表无对应列，P1 恒为 null。 */
+    public record NoticeDTO(String id,String offeringId,String title,String content,TargetDTO target,
+            Instant createdAt,int recipientCount) {}
+    /** 契约 NoticePage。 */
+    public record NoticePage(List<NoticeDTO> items,int page,int pageSize,int total) {}
 }

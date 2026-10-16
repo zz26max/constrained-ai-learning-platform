@@ -567,32 +567,9 @@ SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.type=
 AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1)
 </select>
 
-<!-- 教师端学生学习记录（下一批对齐，暂保留旧形状；仅修正不存在的列与作业类型枚举）。 -->
-<select id="getLearningRecordSummary" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LegacyLearningRecordSummary">
-SELECT
-(SELECT COUNT(*) FROM chapters c
- JOIN offering_members om ON om.offering_id=c.offering_id AND om.user_id=#{studentId}
- JOIN chapter_progress cp ON cp.chapter_id=c.id AND cp.member_id=om.id
- WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1 AND cp.status='completed') AS completed_chapter_count,
-(SELECT COUNT(*) FROM chapters c WHERE c.offering_id=#{offeringId} AND c.status='published' AND c.is_required=1) AS total_chapter_count,
-(SELECT COUNT(DISTINCT a.id) FROM assignments a
- JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
- WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='web_lab') AS completed_lab_count,
-(SELECT COUNT(*) FROM assignments a WHERE a.offering_id=#{offeringId} AND a.status='published' AND a.is_required=1 AND a.type='web_lab') AS total_lab_count,
-(SELECT COUNT(*) FROM feedback f WHERE f.offering_id=#{offeringId} AND f.student_id=#{studentId} AND f.status='published') AS feedback_count
-</select>
-
-<select id="listStudentFeedback" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$LegacyStudentFeedbackDTO">
-SELECT f.id AS feedback_id,a.id AS assignment_id,a.title AS assignment_title,
-f.overall_comment,f.final_score,f.published_at
-FROM feedback f
-JOIN assignments a ON a.id=f.assignment_id
-WHERE f.offering_id=#{offeringId} AND f.student_id=#{studentId} AND f.status='published'
-ORDER BY f.published_at DESC LIMIT #{limit} OFFSET #{offset}
-</select>
-
-<select id="countStudentFeedback" resultType="int">
-SELECT COUNT(*) FROM feedback WHERE offering_id=#{offeringId} AND student_id=#{studentId} AND status='published'
+<!-- 教师查看指定学生的已发布评价分页（与学生端同一 publishedFeedbackScope）。 -->
+<select id="listPublishedFeedbackIdsPage" resultType="string">
+SELECT f.id <include refid="publishedFeedbackScope"/> ORDER BY f.published_at DESC,f.id DESC LIMIT #{size} OFFSET #{offset}
 </select>
 
 <!-- P1-D 批量标记消息已读 -->
@@ -604,14 +581,14 @@ WHERE recipient_id=#{recipientId} AND is_read=0
 </update>
 
 <!-- P1-D 公告系统 -->
-<resultMap id="noticeRow" type="com.learningplatform.modules.courses.model.AssignmentRows$NoticeRow"><constructor>
+<resultMap id="noticeView" type="com.learningplatform.modules.courses.model.AssignmentRows$NoticeView"><constructor>
 <arg name="id" column="id" javaType="java.lang.String"/>
 <arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
-<arg name="authorId" column="author_id" javaType="java.lang.String"/>
 <arg name="targetStudentId" column="target_student_id" javaType="java.lang.String"/>
 <arg name="title" column="title" javaType="java.lang.String"/>
 <arg name="content" column="content" javaType="java.lang.String"/>
 <arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="recipientCount" column="recipient_count" javaType="_int"/>
 </constructor></resultMap>
 
 <insert id="insertNotice">
@@ -619,26 +596,32 @@ INSERT INTO notices (id,offering_id,author_id,target_student_id,title,content,cr
 VALUES (#{notice.id},#{notice.offeringId},#{notice.authorId},#{notice.targetStudentId},#{notice.title},#{notice.content},#{notice.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
 </insert>
 
-<select id="findNoticeById" resultMap="noticeRow">
-SELECT id,offering_id,author_id,target_student_id,title,content,created_at FROM notices WHERE id=#{id}
+<!-- notifications 没有公告 ID 列：同一次发布写入的通知与公告共用 created_at、title、offering，据此计数。个人公告恒为 1。 -->
+<sql id="noticeColumns">
+n.id,n.offering_id,n.target_student_id,n.title,n.content,n.created_at,
+CASE WHEN n.target_student_id IS NOT NULL THEN 1 ELSE
+(SELECT COUNT(*) FROM notifications x WHERE x.type='notice_published' AND x.related_offering_id=n.offering_id
+ AND x.created_at=n.created_at AND x.title=n.title) END AS recipient_count
+</sql>
+<sql id="noticeVisible">
+n.offering_id=#{offeringId}
+<if test="studentId != null">AND (n.target_student_id IS NULL OR n.target_student_id=#{studentId})</if>
+</sql>
+
+<select id="findNoticeView" resultMap="noticeView">
+SELECT <include refid="noticeColumns"/> FROM notices n WHERE n.id=#{id}
 </select>
 
-<select id="listNotices" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$NoticeDTO">
-SELECT n.id,n.offering_id,n.author_id,u1.display_name AS author_name,
-n.target_student_id,u2.display_name AS target_student_name,
-n.title,n.content,n.created_at
-FROM notices n
-JOIN users u1 ON u1.id=n.author_id
-LEFT JOIN users u2 ON u2.id=n.target_student_id
-WHERE n.offering_id=#{offeringId}
+<select id="listNotices" resultMap="noticeView">
+SELECT <include refid="noticeColumns"/> FROM notices n WHERE <include refid="noticeVisible"/>
 ORDER BY n.created_at DESC,n.id DESC LIMIT #{limit} OFFSET #{offset}
 </select>
 
 <select id="countNotices" resultType="int">
-SELECT COUNT(*) FROM notices WHERE offering_id=#{offeringId}
+SELECT COUNT(*) FROM notices n WHERE <include refid="noticeVisible"/>
 </select>
 
-<!-- P1-D 教师统计查询 -->
+<!-- P1-D 教师统计查询：待批阅与提交数沿用教师作业视图同一定义（当前有效提交）。 -->
 <select id="getOfferingStats" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$OfferingStatsDTO">
 SELECT
 (SELECT COUNT(*) FROM offering_members WHERE offering_id=#{offeringId} AND role='student' AND status='active') AS student_count,
@@ -649,12 +632,16 @@ SELECT
 0 AS pending_help_count
 </select>
 
-<select id="getAssignmentStats" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentStatsDTO">
+<select id="getAssignmentStats" resultType="com.learningplatform.modules.courses.model.AssignmentRows$AssignmentStatsRow">
 SELECT
+(SELECT COUNT(*) FROM offering_members m JOIN assignments a ON a.offering_id=m.offering_id
+ WHERE a.id=#{assignmentId} AND m.role='student' AND m.status='active') AS student_count,
 (SELECT COUNT(DISTINCT student_id) FROM submissions WHERE assignment_id=#{assignmentId} AND is_current=1) AS submitted_student_count,
 (SELECT COUNT(*) FROM submissions s
  WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')) AS pending_review_count,
-(SELECT AVG(final_score) FROM feedback WHERE assignment_id=#{assignmentId} AND status='published') AS avg_score
+(SELECT COUNT(DISTINCT s.student_id) FROM submissions s
+ WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+ AND EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')) AS reviewed_student_count
 </select>
 </mapper>

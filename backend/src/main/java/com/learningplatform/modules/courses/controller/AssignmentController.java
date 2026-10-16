@@ -180,19 +180,17 @@ public class AssignmentController {
     // P1-D 公告系统
     @PostMapping("/teacher/offerings/{offeringId}/notices")
     public ResponseEntity<ApiResponse<NoticeDTO>> createNotice(Authentication auth,HttpServletRequest req,
-            @PathVariable String offeringId,@RequestBody NoticeWrite input) {
+            @PathVariable String offeringId,@RequestBody Map<String,Object> body) {
         AssignmentInput.uuid(offeringId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(response(noticeService.createNotice(offeringId,user(auth),input),req));
+                .body(response(noticeService.createNotice(offeringId,user(auth),body,id(req)),req));
     }
     @GetMapping("/offerings/{offeringId}/notices")
-    public ApiResponse<?> listNotices(Authentication auth,HttpServletRequest req,
+    public ApiResponse<NoticePage> listNotices(Authentication auth,HttpServletRequest req,
             @PathVariable String offeringId,@RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(offeringId);AssignmentInput.page(page,pageSize);
-        PagedResult<NoticeDTO> result=noticeService.listNotices(offeringId,user(auth),page,pageSize);
-        return response(Map.of("items",result.items(),"page",result.page(),"pageSize",result.pageSize(),
-                "total",result.total(),"totalPages",result.totalPages()),req);
+        return response(noticeService.listNotices(offeringId,user(auth),page,pageSize),req);
     }
     @GetMapping("/notices/{noticeId}")
     public ApiResponse<NoticeDTO> getNotice(Authentication auth,HttpServletRequest req,
@@ -214,7 +212,7 @@ public class AssignmentController {
         return response(statsService.getAssignmentStats(assignmentId,user(auth)),req);
     }
     @GetMapping("/teacher/offerings/{offeringId}/students/{studentId}/learning-records")
-    public ApiResponse<LegacyLearningRecordsDTO> getStudentLearningRecords(Authentication auth,HttpServletRequest req,
+    public ApiResponse<TeacherLearningRecordsDTO> getStudentLearningRecords(Authentication auth,HttpServletRequest req,
             @PathVariable String offeringId,@PathVariable String studentId,
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(offeringId);AssignmentInput.uuid(studentId);AssignmentInput.page(page,pageSize);
