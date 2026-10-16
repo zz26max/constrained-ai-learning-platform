@@ -91,7 +91,7 @@ public final class AssignmentDTOs {
     /** 契约 AssignmentStatsDTO：P1 没有 commonIssues 数据来源，恒为空数组。 */
     public record AssignmentStatsDTO(int studentCount,int submittedStudentCount,int pendingReviewCount,
             int reviewedStudentCount,List<Object> commonIssues) {}
-    /** 契约 NoticeDTO：target 是可选跳转对象（TargetDTO），不是收件人；现有 notices 表无对应列，P1 恒为 null。 */
+    /** 契约 NoticeDTO：target 是可选跳转对象（TargetDTO），不是收件人；存于 notices.target_type/target_id，为空时为 null。 */
     public record NoticeDTO(String id,String offeringId,String title,String content,TargetDTO target,
             Instant createdAt,int recipientCount) {}
     /** 契约 NoticePage。 */

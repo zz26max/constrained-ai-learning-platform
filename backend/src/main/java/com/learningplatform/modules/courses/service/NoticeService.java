@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import com.learningplatform.common.audit.AuditService;
 import com.learningplatform.modules.auth.dto.UserDTO;
@@ -39,13 +40,10 @@ public class NoticeService {
         AssignmentInput.checkNoticeKeys(body);
         String title=noticeText(body,"title",1,TITLE_MAX);
         String content=noticeText(body,"content",0,CONTENT_MAX);
-        if(body.get("target")!=null) {
-            // notices 表没有 target 列且不允许自行加迁移：P1 无法保存跳转目标，明确拒绝而不是静默丢弃。
-            throw AssignmentInput.invalidField("target","当前版本不支持公告跳转目标，请省略或传 null。");
-        }
+        TargetDTO target=parseTarget(offeringId,body.get("target"));
         String noticeId=UUID.randomUUID().toString();
         Instant now=now();
-        mapper.insertNotice(new NoticeRow(noticeId,offeringId,author.id(),null,title,content,now));
+        mapper.insertNotice(new NoticeRow(noticeId,offeringId,author.id(),null,target==null?null:target.type(),target==null?null:target.id(),title,content,now));
         String notificationContent=truncate(content,NOTIFICATION_CONTENT_MAX);
         int notified=0;
         for(String studentId:mapper.listActiveStudentIds(offeringId)) {
@@ -75,8 +73,43 @@ public class NoticeService {
                 &&!notice.targetStudentId().equals(user.id())) throw CourseAccess.notFound();
         return toDto(notice);
     }
+    private static final Set<String> TARGET_TYPES=Set.of("offering","chapter","resource","assignment","feedback","help_request");
+    private static final Set<String> TARGET_KEYS=Set.of("type","id","offeringId");
+    private static final String UUID_PATTERN="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+    /**
+     * 校验公告跳转目标：键恰为 type/id/offeringId，offeringId 等于路径班级，目标存在且属于本班；
+     * 任何失败均为 422（不用 404，避免暴露他班资源是否存在）。target 为 null 时返回 null。
+     */
+    private TargetDTO parseTarget(String offeringId,Object raw) {
+        if(raw==null) return null;
+        if(!(raw instanceof Map<?,?> map)) throw AssignmentInput.invalidField("target","必须是对象或 null。");
+        if(!map.keySet().equals(TARGET_KEYS)) throw AssignmentInput.invalidField("target","必须且只能包含 type、id、offeringId。");
+        if(!(map.get("type") instanceof String type)||!TARGET_TYPES.contains(type)) {
+            throw AssignmentInput.invalidField("target.type","不在允许的目标类型内。");
+        }
+        if(!(map.get("id") instanceof String id)||!id.matches(UUID_PATTERN)) {
+            throw AssignmentInput.invalidField("target.id","必须是合法 UUID。");
+        }
+        if(!(map.get("offeringId") instanceof String targetOffering)||!targetOffering.matches(UUID_PATTERN)) {
+            throw AssignmentInput.invalidField("target.offeringId","必须是合法 UUID。");
+        }
+        if(!targetOffering.equals(offeringId)) {
+            throw AssignmentInput.invalidField("target.offeringId","必须等于公告所属教学班。");
+        }
+        boolean belongs=switch(type) {
+            case "offering" -> id.equals(offeringId);
+            case "chapter" -> mapper.existsChapterInOffering(id,offeringId);
+            case "resource" -> mapper.existsResourceInOffering(id,offeringId);
+            case "assignment" -> mapper.existsAssignmentInOffering(id,offeringId);
+            case "feedback" -> mapper.existsPublishedFeedbackInOffering(id,offeringId);
+            default -> throw AssignmentInput.invalidField("target.type","P1 暂不支持 help_request 类型的跳转目标。");
+        };
+        if(!belongs) throw AssignmentInput.invalidField("target.id","目标不存在或不属于本教学班。");
+        return new TargetDTO(type,id,offeringId);
+    }
     private static NoticeDTO toDto(NoticeView n) {
-        return new NoticeDTO(n.id(),n.offeringId(),n.title(),n.content(),null,n.createdAt(),n.recipientCount());
+        return new NoticeDTO(n.id(),n.offeringId(),n.title(),n.content(),
+                n.targetType()==null?null:new TargetDTO(n.targetType(),n.targetId(),n.offeringId()),n.createdAt(),n.recipientCount());
     }
     /** 字符数（码点）校验，与 VARCHAR 字符长度一致；类型错误、缺失或越界为 422 并指明字段。 */
     private static String noticeText(Map<String,Object> body,String field,int min,int max) {

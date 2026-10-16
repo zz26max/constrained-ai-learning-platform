@@ -240,6 +240,20 @@ ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
 SELECT status FROM chapters WHERE id=#{chapterId} AND offering_id=#{offeringId}
 </select>
 
+<!-- 公告跳转目标存在性：均要求属于本班（offering_id 相等）；feedback 额外要求已发布。 -->
+<select id="existsChapterInOffering" resultType="boolean">
+SELECT EXISTS(SELECT 1 FROM chapters WHERE id=#{id} AND offering_id=#{offeringId})
+</select>
+<select id="existsResourceInOffering" resultType="boolean">
+SELECT EXISTS(SELECT 1 FROM resources WHERE id=#{id} AND offering_id=#{offeringId})
+</select>
+<select id="existsAssignmentInOffering" resultType="boolean">
+SELECT EXISTS(SELECT 1 FROM assignments WHERE id=#{id} AND offering_id=#{offeringId})
+</select>
+<select id="existsPublishedFeedbackInOffering" resultType="boolean">
+SELECT EXISTS(SELECT 1 FROM feedback WHERE id=#{id} AND offering_id=#{offeringId} AND status='published')
+</select>
+
 <select id="listKnowledgePointRefs" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$KnowledgePointRef">
 SELECT id,chapter_id FROM knowledge_points WHERE offering_id=#{offeringId} AND id IN
 <foreach collection="ids" item="kid" open="(" separator="," close=")">#{kid}</foreach>
@@ -585,6 +599,8 @@ WHERE recipient_id=#{recipientId} AND is_read=0
 <arg name="id" column="id" javaType="java.lang.String"/>
 <arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
 <arg name="targetStudentId" column="target_student_id" javaType="java.lang.String"/>
+<arg name="targetType" column="target_type" javaType="java.lang.String"/>
+<arg name="targetId" column="target_id" javaType="java.lang.String"/>
 <arg name="title" column="title" javaType="java.lang.String"/>
 <arg name="content" column="content" javaType="java.lang.String"/>
 <arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
@@ -592,13 +608,13 @@ WHERE recipient_id=#{recipientId} AND is_read=0
 </constructor></resultMap>
 
 <insert id="insertNotice">
-INSERT INTO notices (id,offering_id,author_id,target_student_id,title,content,created_at)
-VALUES (#{notice.id},#{notice.offeringId},#{notice.authorId},#{notice.targetStudentId},#{notice.title},#{notice.content},#{notice.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+INSERT INTO notices (id,offering_id,author_id,target_student_id,target_type,target_id,title,content,created_at)
+VALUES (#{notice.id},#{notice.offeringId},#{notice.authorId},#{notice.targetStudentId},#{notice.targetType},#{notice.targetId},#{notice.title},#{notice.content},#{notice.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
 </insert>
 
 <!-- notifications 没有公告 ID 列：同一次发布写入的通知与公告共用 created_at、title、offering，据此计数。个人公告恒为 1。 -->
 <sql id="noticeColumns">
-n.id,n.offering_id,n.target_student_id,n.title,n.content,n.created_at,
+n.id,n.offering_id,n.target_student_id,n.target_type,n.target_id,n.title,n.content,n.created_at,
 CASE WHEN n.target_student_id IS NOT NULL THEN 1 ELSE
 (SELECT COUNT(*) FROM notifications x WHERE x.type='notice_published' AND x.related_offering_id=n.offering_id
  AND x.created_at=n.created_at AND x.title=n.title) END AS recipient_count

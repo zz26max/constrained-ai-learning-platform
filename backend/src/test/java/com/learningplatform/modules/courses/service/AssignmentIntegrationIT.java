@@ -868,6 +868,33 @@ class AssignmentIntegrationIT {
     }
 
     @Test
+    void rubricCommentAcceptsUpTo8000CharsAndRejectsLonger() {
+        Ctx c = submittedAssignment();
+        String long5000 = "评".repeat(5000);
+        Map<String, Object> body = feedbackBody(0, "50", "30");
+        body.put("rubricResults", List.of(
+                Map.of("criterionId", "layout", "score", new BigDecimal("50"), "comment", long5000),
+                Map.of("criterionId", "quality", "score", new BigDecimal("30"), "comment", "质量")));
+        var saved = assignmentService.saveFeedback(TEACHER, c.submissionId(), body, "long-ok");
+        assertThat(saved.feedback().rubricResults()).filteredOn(r -> "layout".equals(r.criterionId()))
+                .singleElement().satisfies(r -> assertThat(r.comment()).isEqualTo(long5000));
+        assertThat(jdbc.queryForObject("SELECT s.comment FROM feedback_rubric_scores s JOIN feedback f ON f.id=s.feedback_id WHERE f.submission_id=? AND s.criterion_id='layout'",
+                String.class, c.submissionId())).isEqualTo(long5000);
+        // 恰好 8000 通过，8001 为 422
+        Map<String, Object> max = feedbackBody(1, "50", "30");
+        max.put("rubricResults", List.of(
+                Map.of("criterionId", "layout", "score", new BigDecimal("50"), "comment", "a".repeat(8000)),
+                Map.of("criterionId", "quality", "score", new BigDecimal("30"), "comment", "质量")));
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), max, "max-ok");
+        Map<String, Object> over = feedbackBody(2, "50", "30");
+        over.put("rubricResults", List.of(
+                Map.of("criterionId", "layout", "score", new BigDecimal("50"), "comment", "a".repeat(8001)),
+                Map.of("criterionId", "quality", "score", new BigDecimal("30"), "comment", "质量")));
+        assertThatThrownBy(() -> assignmentService.saveFeedback(TEACHER, c.submissionId(), over, "over"))
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+    }
+
+    @Test
     void feedbackScoresAreValidatedAgainstRubricSnapshotAndArchiveBlocksWrites() {
         Ctx c = submittedAssignment();
         // 单项超过量规上限 -> 422

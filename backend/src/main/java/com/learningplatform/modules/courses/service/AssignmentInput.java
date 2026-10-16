@@ -222,9 +222,9 @@ public final class AssignmentInput {
             if(!(raw.get("criterionId") instanceof String id)||id.isEmpty()||id.length()>64||!CRITERION_ID.matcher(id).matches()) {
                 throw invalidField("rubricResults.criterionId","评分项 ID 不合法。");
             }
-            // 数据库 feedback_rubric_scores.comment 为 VARCHAR(2000)，比契约 8000 更严（见汇报遗留事项）。
-            if(!(raw.get("comment") instanceof String itemComment)||cp(itemComment)>2000) {
-                throw invalidField("rubricResults.comment","必须是不超过 2000 字符的文本。");
+            // feedback_rubric_scores.comment 自 V9 起为 VARCHAR(8000)，与契约一致。
+            if(!(raw.get("comment") instanceof String itemComment)||cp(itemComment)>8000) {
+                throw invalidField("rubricResults.comment","必须是不超过 8000 字符的文本。");
             }
             BigDecimal itemScore=feedbackScore(raw.get("score"),"rubricResults.score");
             if(!ids.add(id)) throw invalidField("rubricResults.criterionId","评分项 ID 不能重复。");

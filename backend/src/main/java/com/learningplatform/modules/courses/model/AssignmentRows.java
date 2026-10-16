@@ -41,10 +41,10 @@ public final class AssignmentRows {
             String termId,String termLabel,String status,String progressUnit,String memberId,
             Instant lastStudiedAt,String lastChapterId) {}
     public record NoticeRow(String id,String offeringId,String authorId,String targetStudentId,
-            String title,String content,Instant createdAt) {}
+            String targetType,String targetId,String title,String content,Instant createdAt) {}
     /** 公告读取行：recipientCount 在查询时由同次发布生成的通知条数得出（notices 表无存储列）；个人公告恒为 1。 */
-    public record NoticeView(String id,String offeringId,String targetStudentId,String title,String content,
-            Instant createdAt,int recipientCount) {}
+    public record NoticeView(String id,String offeringId,String targetStudentId,String targetType,String targetId,
+            String title,String content,Instant createdAt,int recipientCount) {}
     /** 作业统计行；commonIssues 在 P1 无数据来源，由 Service 补空数组。 */
     public record AssignmentStatsRow(int studentCount,int submittedStudentCount,int pendingReviewCount,
             int reviewedStudentCount) {}

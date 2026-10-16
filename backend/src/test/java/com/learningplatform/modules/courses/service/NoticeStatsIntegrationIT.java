@@ -216,7 +216,8 @@ class NoticeStatsIntegrationIT {
         assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, unknown, "v6")).satisfies(t -> assertCode(t, 400, "INVALID_REQUEST"));
         Map<String, Object> withTarget = body("t", "c");
         withTarget.put("target", Map.of("type", "assignment", "id", UUID.randomUUID().toString(), "offeringId", offering.id()));
-        assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, withTarget, "v7")).satisfies(t -> assertField(t, "target"));
+        // 非 null target 不再无条件拒绝：不存在的目标 id 为 422 target.id（成功路径见 createNoticeWithTarget*）
+        assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, withTarget, "v7")).satisfies(t -> assertField(t, "target.id"));
         assertThatThrownBy(() -> notices.createNotice("not-a-uuid", TEACHER, body("t", "c"), "v8")).satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
         // 校验失败不产生任何公告与通知
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notices", Integer.class)).isZero();
@@ -228,6 +229,154 @@ class NoticeStatsIntegrationIT {
         Map<String, Object> nullTarget = body("t", "");
         nullTarget.put("target", null);
         assertThat(notices.createNotice(offering.id(), TEACHER, nullTarget, "ok").content()).isEmpty();
+    }
+
+    // ---------- 公告跳转目标（V9 target_type/target_id） ----------
+
+    private static Map<String, Object> targetBody(String type, String id, String offeringId) {
+        Map<String, Object> m = body("带目标公告", "内容");
+        Map<String, Object> target = new HashMap<>();
+        target.put("type", type);
+        target.put("id", id);
+        target.put("offeringId", offeringId);
+        m.put("target", target);
+        return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> targetOf(Map<String, Object> bodyWithTarget) {
+        return (Map<String, Object>) bodyWithTarget.get("target");
+    }
+
+    private String insertChapter(String offeringId) {
+        String id = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO chapters(id,offering_id,position,title,summary,status,is_required,content_version,published_at,created_at,updated_at) VALUES(?,?,1,'章','','draft',1,1,NULL,?,?)",
+                id, offeringId, ts(NOW), ts(NOW));
+        return id;
+    }
+
+    private String insertResource(String offeringId, String chapterId) {
+        String id = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO resources(id,offering_id,chapter_id,title,content_markdown,position,created_at,updated_at) VALUES(?,?,?,'资料','原文',1,?,?)",
+                id, offeringId, chapterId, ts(NOW), ts(NOW));
+        return id;
+    }
+
+    private static void assertTarget(NoticeDTO dto, String type, String id, String offeringId) {
+        assertThat(dto.target()).isNotNull();
+        assertThat(dto.target().type()).isEqualTo(type);
+        assertThat(dto.target().id()).isEqualTo(id);
+        assertThat(dto.target().offeringId()).isEqualTo(offeringId);
+    }
+
+    @Test
+    void createNoticeWithTargetPersistsAndReadsBackIdenticallyInDetailAndList() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String assignmentId = publishAssignment(offering.id(), "目标作业").id();
+        String chapterId = insertChapter(offering.id());
+        String resourceId = insertResource(offering.id(), chapterId);
+        String feedbackSubmission = saveAndSubmit(STUDENT, publishAssignment(offering.id(), "评价作业").id());
+        publishReview(feedbackSubmission);
+        String feedbackId = jdbc.queryForObject("SELECT id FROM feedback WHERE submission_id=?", String.class, feedbackSubmission);
+        List<String[]> targets = List.of(
+                new String[]{"assignment", assignmentId}, new String[]{"chapter", chapterId},
+                new String[]{"resource", resourceId}, new String[]{"feedback", feedbackId},
+                new String[]{"offering", offering.id()});
+        int i = 0;
+        for (String[] t : targets) {
+            NoticeDTO created = notices.createNotice(offering.id(), TEACHER, targetBody(t[0], t[1], offering.id()), "tg-" + (i++));
+            assertTarget(created, t[0], t[1], offering.id());
+            assertThat(jdbc.queryForMap("SELECT target_type, target_id FROM notices WHERE id=?", created.id()))
+                    .containsEntry("target_type", t[0]).containsEntry("target_id", t[1]);
+            for (UserDTO viewer : List.of(STUDENT, TEACHER)) {
+                assertThat(notices.getNotice(created.id(), viewer).target()).isEqualTo(created.target());
+                NoticeDTO listed = notices.listNotices(offering.id(), viewer, 1, 50).items().stream()
+                        .filter(n -> n.id().equals(created.id())).findFirst().orElseThrow();
+                assertThat(listed.target()).isEqualTo(created.target());
+            }
+        }
+        NoticeDTO plain = notices.createNotice(offering.id(), TEACHER, body("无目标", "c"), "tg-plain");
+        assertThat(plain.target()).isNull();
+        assertThat(notices.getNotice(plain.id(), STUDENT).target()).isNull();
+    }
+
+    @Test
+    void noticesTargetColumnsAreCheckedByDatabase() {
+        OfferingDTO offering = createOffering();
+        String id = UUID.randomUUID().toString();
+        String sql = "INSERT INTO notices(id,offering_id,author_id,target_type,target_id,title,content,created_at) VALUES(?,?,?,?,?,'t','c',?)";
+        // MySQL 8 的 CHECK 违反（错误码 3819）被 Spring 归为 UncategorizedSQLException，按约束名断言。
+        // 只写一列
+        assertThatThrownBy(() -> jdbc.update(sql, id, offering.id(), TEACHER.id(), "chapter", null, ts(NOW)))
+                .hasMessageContaining("ck_notices_target_pair");
+        assertThatThrownBy(() -> jdbc.update(sql, id, offering.id(), TEACHER.id(), null, UUID.randomUUID().toString(), ts(NOW)))
+                .hasMessageContaining("ck_notices_target_pair");
+        // 类型不在枚举内（含大小写不同）
+        assertThatThrownBy(() -> jdbc.update(sql, id, offering.id(), TEACHER.id(), "bogus", UUID.randomUUID().toString(), ts(NOW)))
+                .hasMessageContaining("ck_notices_target_type");
+        assertThatThrownBy(() -> jdbc.update(sql, id, offering.id(), TEACHER.id(), "Chapter", UUID.randomUUID().toString(), ts(NOW)))
+                .hasMessageContaining("ck_notices_target_type");
+        // 两列同为 NULL 与同非 NULL 合法
+        assertThat(jdbc.update(sql, id, offering.id(), TEACHER.id(), null, null, ts(NOW))).isEqualTo(1);
+        assertThat(jdbc.update(sql, UUID.randomUUID().toString(), offering.id(), TEACHER.id(), "help_request", UUID.randomUUID().toString(), ts(NOW))).isEqualTo(1);
+    }
+
+    @Test
+    void createNoticeRejectsInvalidTargetsWith422AndWritesNothing() {
+        OfferingDTO offering = createOffering();
+        OfferingDTO other = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String otherChapter = insertChapter(other.id());
+        String otherResource = insertResource(other.id(), otherChapter);
+        String otherAssignment = publishAssignment(other.id(), "他班作业").id();
+        String draftSubmission = saveAndSubmit(STUDENT, publishAssignment(offering.id(), "草稿评价作业").id());
+        assignmentService.saveFeedback(TEACHER, draftSubmission, feedbackBody(0), "draft-only");
+        String draftFeedbackId = jdbc.queryForObject("SELECT id FROM feedback WHERE submission_id=?", String.class, draftSubmission);
+        String uuid = UUID.randomUUID().toString();
+        String mine = offering.id();
+
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("assignment", otherAssignment, other.id()), "r1"))
+                .satisfies(t -> assertField(t, "target.offeringId"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("chapter", otherChapter, mine), "r2"))
+                .satisfies(t -> assertField(t, "target.id"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("assignment", otherAssignment, mine), "r3"))
+                .satisfies(t -> assertField(t, "target.id"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("resource", otherResource, mine), "r4"))
+                .satisfies(t -> assertField(t, "target.id"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("offering", other.id(), mine), "r5"))
+                .satisfies(t -> assertField(t, "target.id"));
+        for (String type : List.of("chapter", "resource", "assignment", "feedback", "offering")) {
+            assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody(type, uuid, mine), "r6-" + type))
+                    .satisfies(t -> assertField(t, "target.id"));
+        }
+        // 草稿评价不可作为目标
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("feedback", draftFeedbackId, mine), "r7"))
+                .satisfies(t -> assertField(t, "target.id"));
+        // help_request：P1 不支持
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("help_request", uuid, mine), "r8"))
+                .satisfies(t -> assertField(t, "target.type"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("bogus", uuid, mine), "r9"))
+                .satisfies(t -> assertField(t, "target.type"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("chapter", "not-a-uuid", mine), "r10"))
+                .satisfies(t -> assertField(t, "target.id"));
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("chapter", uuid, "not-a-uuid"), "r11"))
+                .satisfies(t -> assertField(t, "target.offeringId"));
+        Map<String, Object> notObject = body("t", "c");
+        notObject.put("target", "assignment");
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, notObject, "r12")).satisfies(t -> assertField(t, "target"));
+        // 键不完整或多余
+        for (String missing : List.of("type", "id", "offeringId")) {
+            Map<String, Object> partial = targetBody("chapter", uuid, mine);
+            targetOf(partial).remove(missing);
+            assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, partial, "r13-" + missing)).satisfies(t -> assertField(t, "target"));
+        }
+        Map<String, Object> extra = targetBody("chapter", uuid, mine);
+        targetOf(extra).put("extra", "x");
+        assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, extra, "r14")).satisfies(t -> assertField(t, "target"));
+        // 校验失败不产生公告与公告通知
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notices", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE type='notice_published'", Integer.class)).isZero();
     }
 
     @Test
