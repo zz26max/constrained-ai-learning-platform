@@ -150,4 +150,59 @@ describe('工作区自动保存逻辑', () => {
     expect(saveOperation).not.toHaveBeenCalled()
     expect(state.value.pendingSave).toBe(false)
   })
+
+  it('flush：防抖期内立即发出最新内容，确认后返回 true（B1）', async () => {
+    const saveOperation = vi.fn(async (data: WorkspaceWrite, token: string): Promise<ApiResult<WorkspaceDTO>> => {
+      return { data: { assignmentId: 'test', revision: data.baseRevision + 1, files: data.files, activeFile: data.activeFile, savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null }, requestId: 'req-test' }
+    })
+    const { scheduleSave, flush, state } = useDebouncedSave(saveOperation, async () => 'csrf-test', 1500)
+
+    scheduleSave({ files: [{ path: 'script.js', content: '// 最新' }], activeFile: 'script.js', baseRevision: 2 })
+    vi.advanceTimersByTime(100)
+    expect(saveOperation).not.toHaveBeenCalled()
+    expect(state.value.pendingSave).toBe(true)
+
+    const saved = await flush()
+
+    expect(saved).toBe(true)
+    expect(saveOperation).toHaveBeenCalledTimes(1)
+    expect(saveOperation).toHaveBeenCalledWith(expect.objectContaining({ baseRevision: 2, files: [{ path: 'script.js', content: '// 最新' }] }), 'csrf-test')
+    expect(state.value.lastSavedRevision).toBe(3)
+    expect(state.value.pendingSave).toBe(false)
+  })
+
+  it('flush：在途保存期间又有新编辑，等两次都确认后才返回 true', async () => {
+    let resolveFirst!: (value: ApiResult<WorkspaceDTO>) => void
+    let calls = 0
+    const saveOperation = vi.fn(async (data: WorkspaceWrite, token: string): Promise<ApiResult<WorkspaceDTO>> => {
+      calls += 1
+      if (calls === 1) return new Promise<ApiResult<WorkspaceDTO>>(resolve => { resolveFirst = resolve })
+      return { data: { assignmentId: 'test', revision: data.baseRevision + 1, files: data.files, activeFile: data.activeFile, savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null }, requestId: 'req-test' }
+    })
+    const { scheduleSave, flush, state } = useDebouncedSave(saveOperation, async () => 'csrf-test', 1500)
+
+    scheduleSave({ files: [{ path: 'script.js', content: '// 第一次' }], activeFile: 'script.js', baseRevision: 0 })
+    await vi.advanceTimersByTimeAsync(1500)
+    scheduleSave({ files: [{ path: 'script.js', content: '// 第二次' }], activeFile: 'script.js', baseRevision: 0 })
+
+    const flushing = flush()
+    resolveFirst({ data: { assignmentId: 'test', revision: 1, files: [], activeFile: 'script.js', savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null }, requestId: 'req-test' })
+
+    expect(await flushing).toBe(true)
+    expect(saveOperation).toHaveBeenCalledTimes(2)
+    expect(saveOperation).toHaveBeenLastCalledWith(expect.objectContaining({ baseRevision: 1, files: [{ path: 'script.js', content: '// 第二次' }] }), 'csrf-test')
+    expect(state.value.lastSavedRevision).toBe(2)
+  })
+
+  it('flush：保存失败返回 false，不视为已确认', async () => {
+    const saveOperation = vi.fn(async () => {
+      throw new ApiError({ status: 409, code: 'WORKSPACE_CONFLICT', message: '工作区版本冲突', requestId: 'req-conflict' })
+    })
+    const { scheduleSave, flush, state } = useDebouncedSave(saveOperation, async () => 'csrf-test', 1500)
+
+    scheduleSave({ files: [{ path: 'script.js', content: '// 冲突' }], activeFile: 'script.js', baseRevision: 0 })
+
+    expect(await flush()).toBe(false)
+    expect(state.value.error).not.toBeNull()
+  })
 })

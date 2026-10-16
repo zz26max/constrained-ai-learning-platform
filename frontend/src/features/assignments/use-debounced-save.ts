@@ -69,10 +69,11 @@ export function useDebouncedSave(
       state.value.pendingSave = false
       state.value.inflightBaseRevision = 0
       inflightRequest = null
+      pendingData = null
 
       if (error && typeof error === 'object' && 'code' in error) {
         const apiError = error as { code: string; message: string }
-        if (apiError.code === 'VERSION_CONFLICT') {
+        if (apiError.code === 'WORKSPACE_CONFLICT') {
           state.value.error = '工作区已被修改，请刷新后重试'
         } else {
           state.value.error = apiError.message || '保存失败'
@@ -91,18 +92,31 @@ export function useDebouncedSave(
       timer = null
     }
 
-    if (inflightRequest !== null) {
-      pendingData = data
-      state.value.pendingSave = true
-      return
-    }
+    pendingData = data
+    state.value.pendingSave = true
+    if (inflightRequest !== null) return
 
     timer = window.setTimeout(() => {
       if (!alive) return
       timer = null
-      state.value.pendingSave = true
-      inflightRequest = executeSave(data)
+      const next = pendingData
+      pendingData = null
+      if (next !== null) inflightRequest = executeSave(next)
     }, debounceMs)
+  }
+
+  // 立即发出防抖中的最新内容并等待在途保存结束；返回 true 表示服务端已确认全部本地编辑。
+  async function flush(): Promise<boolean> {
+    if (!alive) return false
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+      const next = pendingData
+      pendingData = null
+      if (next !== null) inflightRequest = executeSave(next)
+    }
+    while (inflightRequest !== null && alive) await inflightRequest
+    return alive && state.value.error === null && !state.value.pendingSave
   }
 
   function cancelPending(): void {
@@ -118,5 +132,6 @@ export function useDebouncedSave(
     state,
     scheduleSave,
     cancelPending,
+    flush,
   }
 }
