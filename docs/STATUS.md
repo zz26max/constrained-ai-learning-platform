@@ -146,7 +146,7 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 | P1-D 页面 | 首页两班、课程进度与待办；学习记录从空态变为 1 个实验、1 份公开评价，P2 掌握分析明确未开放；公告列表空态/详情及 assignment target 跳转；教师卡片反映学生 1、进行中作业 4、待批阅 2。SQL/Text 不计入“实验已完成”符合既定口径 |
 | 归档/期限/文本安全 | 既有归档 Text 作业详情可读，工作区 textarea 与提交禁用；过期作业可练习保存，正式提交被服务端拒绝（B6）。标题/公告中的 img/script 探针未生成标题图片或设置 DOM 标记，反馈 Markdown 未执行探针；Web 沙箱因尚无实现而无法验收 |
 
-浏览器复现与代码定位（**以下均未修复**）：
+浏览器复现与代码定位（B1、B2、B6 已在 `0292150` 修复代码，待浏览器复验；其余**均未修复**）：
 
 | 编号 | 影响与可复现结果 | 定位/证据 |
 | --- | --- | --- |
@@ -157,7 +157,9 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 | B5 · 一致性 | 学生刷新成功看到正式评价，或从新反馈消息“查看”进入评价后，回消息页仍为“未读”（14 条）；点击手动“标为已读”后才变 13 条，首页随后也显示 13 | `AssignmentDetail.vue`/`StudentFeedbackView.vue` 不按 `messageId` 显式标读；证据 `09`。代码另见消息只保留 assignmentId、丢指定 feedbackId，未制造旧评价场景复现 |
 | B6 · 一致性 | 过期作业详情正确提示“提交窗口已关闭”，但进入工作区并练习保存后“提交作业”可点；确认后才显示同一拒绝原因（requestId `f60977bb-0ba9-4512-8923-b94cdf9a4bd0`） | `WorkspaceEditor.vue` 以 `canSave` 代替正式 `canSubmit`；证据 `06`；后端拒绝有效 |
 | B7 · 未实现 | Web 工作区仅三个文本文件，没有“预览效果”、iframe、sandbox 或消息桥 | 无法执行 DEVELOPMENT §6/FRONTEND §8 的恶意预览隔离验收；不能标为通过 |
-| B8 · 错误未呈现 | Web 尚有待评提交时点“归档”，仍留原列表，无原因或 requestId 提示 | `AssignmentManagement.vue` 没有渲染 `actions.error/message`；`use-debounced-save.ts` 冲突分支另外写成不存在的 `VERSION_CONFLICT`，未实现暂停/比较/恢复流程 |
+| B8 · 错误未呈现 | Web 尚有待评提交时点“归档”，仍留原列表，无原因或 requestId 提示 | `AssignmentManagement.vue` 没有渲染 `actions.error/message`；`use-debounced-save.ts` 冲突分支另外写成不存在的 `VERSION_CONFLICT`（`0292150` 已改为 `WORKSPACE_CONFLICT`），未实现暂停/比较/恢复流程 |
+
+**B1/B2/B6 代码修复（`0292150`，2026-10-16，未经浏览器复验）**：`use-debounced-save.ts` 新增 `flush()`，调用 `scheduleSave` 即标记待保存；`WorkspaceEditor.vue` 提交前先 `flush()` 并等待服务端确认，保存失败或冲突则停止提交并在对话框提示；路由离开与切换到另一作业的工作区前先保存，失败时 `window.confirm` 让用户选择留下或放弃；退出登录或会话失效时丢弃待发送内容，不再用失效会话写入；保存目标固定为已加载的作业 id；正式提交资格改用 `getAssignment.canSubmit`，显示 `submissionBlockedReason`，`getAssignment` 失败时显示错误与 requestId。新增 `tests/workspace-editor.test.ts`（11 个组件用例）和 3 个 `flush` 单元用例；把两个源文件回退到修复前运行，新组件测试 9 个中 6 个失败（立即提交、保存失败不提交、离开先保存、失败后留下、`canSubmit=false`、`getAssignment` 失败），恢复后全过。`npm --prefix frontend run verify`：18 个测试文件、184 个用例通过，`check:no-mock` PASS。仍未做：离开确认是 `window.confirm`，不是 FRONTEND §124 的“等待保存/留在页面/放弃”三选一对话框；保存失败后没有重试入口，要再编辑一次才会重新保存；409 提示“请刷新后重试”会误导（刷新会丢本地修改），留给 B8 冲突流程；提交对话框显示的版本号是 `flush` 之前的值。
 
 额外代码审查发现（**未构造 21 份评价做浏览器复现**）：`DashboardService` 固定返回最近 20 份评价，`LearningRecordsPage.vue` 按 `items.length` 本地切页，忽略更大的 `total`；超过 20 份的历史不可访问且无截断说明。契约没有分页请求参数，后续若扩分页须按 AGENTS 先确认契约/产品规则，不能自行加兼容字段。
 
