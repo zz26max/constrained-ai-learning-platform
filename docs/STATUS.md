@@ -69,6 +69,8 @@
 
 ### 接手记录（2026-10-16）
 
+- **P1 收尾基线复验（代码 `ccfc1d5`）**：真实学生页面 Web 编辑后 750ms 内完成提交，HTTP 读回提交 `af68db35-7105-40eb-b346-c1947380603d` 的 revision 1 文件为 `P1_B1_LATEST_CONFIRMED`；Text 编辑后立即切页，服务端 revision 2 保留 `P1_B2_LEAVE_PRESERVED`；过期作业工作区提交按钮禁用且仍可练习保存。B1/B2/B6 原正常网络场景通过，慢网络、失败恢复及会话恢复仍待补验。前端目录运行 `npm exec -- vitest run tests/workspace-autosave.test.ts tests/workspace-editor.test.ts`：2 文件、19 项通过。证据 `D:/tmp/lp/browser-p1/baseline-retest.json`（本机，不入库）。新建独立 Web 夹具 `795db0ac-f56e-4ab8-930b-fcfe0d433050`，保留原测试数据；HTTP 创建夹具不算教师表单通过。
+
 - 按用户要求保存当前版本并接手项目，代码基点为 `master` 的 `8314f36`；将已有 [交接说明](HANDOFF.md) 纳入版本控制，未改其原文。
 - 已核对 AGENTS、交接说明和 STATUS：B1/B2/B6 的代码修复为 `0292150`，18 个前端测试文件、184 个用例通过是上一包记录，本次尚未重跑或浏览器复验；其余 B3/B4/B5/B7/B8 仍待处理，P1 不标为 `verified`，暂不进入 P2。
 - 下一步先按 3.4 原场景浏览器复验 B1/B2/B6。交接说明中两处引用按实际文件使用：作业编辑 operationId 为 `patchAssignment`，工作区编辑与自动保存规则在 FRONTEND 第 5 节。
