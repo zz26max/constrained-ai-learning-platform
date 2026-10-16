@@ -6,15 +6,25 @@
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
-> **2026-10-16 全量核对结论（以 openapi.yaml 1.1.0 为准逐项比对代码）**：下列"已完成"描述为提交时的自述，**P1-B / P1-C / P1-D 后端与契约不符，不能视为完成**。可信度：P0-A 高（有真实联调）；P1-A 基本符合（18 个抽样操作中 11 个 MATCH，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异）；P1-B 10 个核对操作中 9 个不符；P1-C 9 个全部不符；P1-D 9 个全部不符。
+> **2026-10-16 全量核对与后端对齐（以 openapi.yaml 1.1.0 为准）**：核对发现下列"已完成"自述不实，P1-B 核对的 10 个操作中 9 个与契约不符，P1-C 的 9 个、P1-D 的 9 个全部不符。同日已按契约逐项修复后端并分批提交：`3008f19`、`5f5fa22`（P1-B）、`e716dde`、`443a5f9`（P1-C）、`2dac32e`、`b4fcf42`（P1-D）；契约占位响应修复见 `82977c9`。最近一次 `./mvnw.cmd --batch-mode verify`（`b4fcf42` 工作区）结果：379 个单测/契约测试、198 个 IT（Testcontainers + MySQL）全部通过，BUILD SUCCESS。
 >
-> 已确认会在运行时出错的问题：`publishFeedback` 插入通知 `type="feedback"` 违反 `ck_notifications_type`（`AssignmentService.java:426`）；`listMyAssignments` 的 `#{now}` 无对应参数；`createNotice` 的 12 参 `insertNotification` 重载无 XML 语句；看板 SQL 引用不存在的 `base_courses`、`cp.student_id`、`a.type='lab'`；`findCurrentLearningChapter` JOIN 位置语法错误；`listTeacherAssignments` 默认 `all` 被当作 `status='all'`。
+> 可信度：P0-A 高（有真实联调）；P1-A 基本符合（抽样 18 个操作中 11 个一致，其余为 `assignmentCount` 恒为 0、空 `summary`/`content` 被 422 拒绝、`createOffering` 学期不存在返回 404 等小差异，未修）；P1-B/C/D 后端已对齐并有逐字段断言与真实数据库用例，但 `x-implementation-status` 仍为 `implemented`，未做跨端联调，不得标为 `verified`。
 >
-> 其他共性问题：错误码使用契约未登记的值；响应字段与契约不一致（`DashboardDTO`、`LearningRecordSummary`、`AssignmentStatsDTO`、`NoticeDTO` 按 `docs/features/p1d-aggregation.md` 自造）；学生/教师视图缺失（`getAssignment`、`getSubmission` 教师 403）；`publishedFeedbackId`、`feedbackStatus`、`pendingReviewCount` 等硬编码；无行锁；个人公告对全班可见；`getMyLearningRecords`/`markMessagesAsRead` 的 200 响应引用了 `getCsrfToken_200` 占位（契约缺陷）。
+> 已修复的运行时错误：`publishFeedback` 通知类型违反 `ck_notifications_type`（现为 `feedback_published`，并有真实库用例）；`listMyAssignments` 的 `#{now}` 缺参；`createNotice` 的 12 参 `insertNotification` 死重载；看板 SQL 引用不存在的 `base_courses`、`cp.student_id`、`a.type='lab'`；`findCurrentLearningChapter` JOIN 位置；`listTeacherAssignments` 默认 `all` 被当作 `status='all'`。
 >
-> 前端：`main.ts` 未注册 `AssignmentsApi`（作业页与通知中心运行时抛错，vitest 测不出）；`NotificationCenter.vue`、`TeacherFeedbackEditor.vue` 未接入路由；`dashboard.ts`/`notices.ts`/`stats.ts` 路径、方法、分页字段均与契约不符，未注册、无 mock、无测试；P1-C/P1-D 无前端测试。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段，因此 `implemented` 标记不能证明符合契约。
+> 其他已修复：错误码改为契约登记值；`DashboardDTO`、`LearningRecordsDTO`、`AssignmentStatsDTO`、`NoticeDTO` 等按契约重写；`getAssignment`、`getSubmission` 增加教师视图；`publishedFeedbackId`、`feedbackStatus`、`pendingReviewCount` 改为真实值；评价保存/发布、提交增加行锁与幂等；个人公告不再对全班可见；`getMyLearningRecords`/`markMessagesAsRead` 的 200 响应占位已替换。
 >
-> 处置原则：以契约为准修后端，修复前不开发 P1-D 前端 UI；`p1d-aggregation.md` 与契约冲突部分作废。
+> **后端遗留（未改，部分需要迁移，属红线，须你决定）**：
+> - `createNotice` 部分对齐：`notices` 表没有 target 列，`target` 只接受 null，非 null 返回 422，定向公告目前无法通过 API 创建；`recipientCount` 靠通知记录推算；通知内容截断到 2000 字（`notifications.content` 为 VARCHAR(2000)）。
+> - `saveFeedback`：`knowledgeEvaluations`、`issueTags` 无存储列，只接受空数组；量规项 comment 按 2000 校验（契约 8000）；`issueTagVersion` 恒为 null。
+> - 恒为空或 null：`needsPracticeCount`、`aiPolicyVersion`、`commonIssues`、`pendingHelpCount`；`course_notice`、`help_reply` 类消息 P1 无数据来源。
+> - 快照里的 `knowledgePoints` 读的是作业当前关联，未真正冻结。
+> - 行锁只按设计加上，没有并发压测用例。
+> - P1-A 的上述小差异与章节序号并发重复会变成 500 的隐患未处理。
+>
+> **前端仍未处理**：`main.ts` 未注册 `AssignmentsApi`（作业页与通知中心运行时抛错，vitest 测不出）；`NotificationCenter.vue`、`TeacherFeedbackEditor.vue` 未接入路由；`dashboard.ts`/`notices.ts`/`stats.ts` 路径、方法、分页字段均与契约不符，未注册、无 mock、无测试；P1-C/P1-D 无前端测试。契约在 `82977c9` 有改动，`frontend/src/api/generated` 的生成类型尚未重新生成（`npm --prefix frontend run contract:types`），前端后端响应字段也已变化，前端 API 层与 mock 需要按新契约同步。`ImplementationStatusContractTest` 只校验路由存在，不校验响应字段。
+>
+> 处置原则：以契约为准；`docs/features/p1d-aggregation.md` 已标注作废。后端已对齐后，下一步是重新生成类型、修正前端 API 层与 mock、接通路由，之后才做 P1-D 前端 UI。
 
 截至 2026-10-15 的提交自述如下（仅作历史记录）：
 
