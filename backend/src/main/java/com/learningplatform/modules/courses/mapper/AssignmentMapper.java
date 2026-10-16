@@ -14,9 +14,11 @@ public interface AssignmentMapper {
     // 作业查询
     Assignment findAssignment(String id);
     List<AssignmentSummaryDTO> listStudentAssignments(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
-            @Param("termId") String termId,@Param("filter") String filter,@Param("offset") long offset,@Param("size") int size);
-    int countStudentAssignments(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
-            @Param("termId") String termId,@Param("filter") String filter);
+            @Param("termId") String termId,@Param("filter") String filter,@Param("now") Instant now,
+            @Param("offset") long offset,@Param("size") int size);
+    /** 单个作业的学生个人视图（与列表同一派生状态）；draft 或非本班学生返回 null。offeringId/termId 传 null。 */
+    AssignmentSummaryDTO findStudentAssignmentSummary(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
+            @Param("termId") String termId,@Param("assignmentId") String assignmentId,@Param("now") Instant now);
     AssignmentCounts getAssignmentCounts(@Param("studentId") String studentId,@Param("offeringId") String offeringId,@Param("termId") String termId);
     List<AssignmentRequirement> getRequirements(String assignmentId);
     List<AssignmentRows.RubricCriterion> getRubric(String assignmentId);
@@ -55,9 +57,14 @@ public interface AssignmentMapper {
             @Param("title") String title,@Param("description") String description,@Param("maxScore") BigDecimal maxScore);
 
     // 教师端作业管理
-    List<TeacherAssignmentDTO> listTeacherAssignments(@Param("offeringId") String offeringId,
+    List<Assignment> listTeacherAssignments(@Param("offeringId") String offeringId,
             @Param("publicationState") String publicationState,@Param("offset") long offset,@Param("size") int size);
     int countTeacherAssignments(@Param("offeringId") String offeringId,@Param("publicationState") String publicationState);
+    /** 章节在本班内的状态；章节不存在或不属于本班返回 null。 */
+    String findChapterStatus(@Param("chapterId") String chapterId,@Param("offeringId") String offeringId);
+    /** 本班内存在的知识点及其关联章节（可为 null）。 */
+    List<KnowledgePointRef> listKnowledgePointRefs(@Param("offeringId") String offeringId,@Param("ids") List<String> ids);
+    List<String> listActiveStudentIds(String offeringId);
     int insertAssignment(@Param("id") String id,@Param("offeringId") String offeringId,@Param("chapterId") String chapterId,
             @Param("title") String title,@Param("description") String description,@Param("estimatedMinutes") int estimatedMinutes,
             @Param("type") String type,@Param("status") String status,@Param("isRequired") boolean isRequired,@Param("dueAt") Instant dueAt,
@@ -137,11 +144,6 @@ public interface AssignmentMapper {
     NoticeDTO findNoticeById(@Param("id") String id);
     List<NoticeDTO> listNotices(@Param("offeringId") String offeringId,@Param("offset") int offset,@Param("limit") int limit);
     int countNotices(@Param("offeringId") String offeringId);
-    int insertNotification(@Param("id") String id,@Param("recipientId") String recipientId,@Param("type") String type,
-            @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
-            @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,
-            @Param("noticeId") String noticeId,@Param("isRead") boolean isRead,@Param("readAt") java.time.Instant readAt,
-            @Param("createdAt") java.time.Instant createdAt);
 
     // P1-D 教师统计
     OfferingStatsDTO getOfferingStats(@Param("offeringId") String offeringId);
@@ -149,4 +151,5 @@ public interface AssignmentMapper {
 
     // 辅助记录
     record AssignmentCounts(int allCount,int todoCount,int doneCount,int archivedIncompleteCount) {}
+    record KnowledgePointRef(String id,String chapterId) {}
 }

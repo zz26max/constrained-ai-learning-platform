@@ -110,9 +110,9 @@ class AssignmentHttpContractTest {
         when(sessions.resolve(STUDENT_TOKEN)).thenReturn(identity(STUDENT_TOKEN, "student"));
 
         AssignmentSummaryDTO assignmentSummary = new AssignmentSummaryDTO(ID, OFFERING, "active", CHAPTER, "作业一",
-                "web_lab", true, "published", "说明", FUTURE, "not_started", false, null, null, false);
+                "web_lab", true, "published", "说明", FUTURE, "NOT_STARTED", false, null, null, false);
         AssignmentDetailDTO assignmentDetail = new AssignmentDetailDTO(ID, OFFERING, "active", CHAPTER, "作业一",
-                "web_lab", true, "published", "说明", FUTURE, "not_started", false, null, null, false,
+                "web_lab", true, "published", "说明", FUTURE, "NOT_STARTED", false, null, null, false,
                 List.of("完成功能"), 30, new BigDecimal("100.00"), List.of(), List.of(), null, true, 3, 0, true, null, null);
         WorkspaceDTO workspace = new WorkspaceDTO(ID, 1,
                 List.of(new FileDTO("index.html", "<h1>Test</h1>")), "index.html",
@@ -138,7 +138,7 @@ class AssignmentHttpContractTest {
         when(service.listMySubmissions(any(), anyString(), anyInt(), anyInt()))
                 .thenReturn(new SubmissionListResponse(List.of(submissionSummary), 1, 20, 1));
         when(service.getSubmission(any(), anyString())).thenReturn(submissionDetail);
-        when(service.listTeacherAssignments(any(), anyString(), anyString(), anyInt(), anyInt()))
+        when(service.listTeacherAssignments(any(), anyString(), nullable(String.class), anyInt(), anyInt()))
                 .thenReturn(new AssignmentListResponse(List.of(teacherAssignment), 1, 20, 1, null));
         when(service.createAssignment(any(), anyString(), anyMap(), anyString())).thenReturn(teacherAssignment);
         when(service.getTeacherAssignment(any(), anyString())).thenReturn(teacherAssignment);
@@ -226,21 +226,181 @@ class AssignmentHttpContractTest {
     }
 
     @Test
-    void versionConflictReturns409() throws Exception {
-        BusinessException conflict = new BusinessException(HttpStatus.CONFLICT, "VERSION_CONFLICT", "工作区版本冲突，请刷新后重试。");
+    void workspaceConflictReturns409WithCurrentRevision() throws Exception {
+        BusinessException conflict = new BusinessException(HttpStatus.CONFLICT, "WORKSPACE_CONFLICT",
+                "工作区版本冲突，请刷新后重试。", Map.of("currentRevision", 5));
         when(service.saveWorkspace(any(), anyString(), anyMap(), anyString())).thenThrow(conflict);
         Operation save = operations().filter(o -> "saveWorkspace".equals(o.id())).findFirst().orElseThrow();
         mvc.perform(authenticated(save, STUDENT_TOKEN, true)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("VERSION_CONFLICT"));
+                .andExpect(jsonPath("$.error.code").value("WORKSPACE_CONFLICT"))
+                .andExpect(jsonPath("$.error.details.currentRevision").value(5));
     }
 
     @Test
-    void duplicateSubmissionReturns409() throws Exception {
-        BusinessException duplicate = new BusinessException(HttpStatus.CONFLICT, "SUBMISSION_BLOCKED", "已达到最大提交次数。");
+    void saveBlockedByArchiveReturns409WithRegisteredCode() throws Exception {
+        for (String code : List.of("OFFERING_ARCHIVED", "ASSIGNMENT_ARCHIVED")) {
+            org.mockito.Mockito.doThrow(new BusinessException(HttpStatus.CONFLICT, code, "已归档。"))
+                    .when(service).saveWorkspace(any(), anyString(), anyMap(), anyString());
+            Operation save = operations().filter(o -> "saveWorkspace".equals(o.id())).findFirst().orElseThrow();
+            mvc.perform(authenticated(save, STUDENT_TOKEN, true)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value(code));
+        }
+    }
+
+    @Test
+    void saveWithUnsupportedFilePathReturns400() throws Exception {
+        when(service.saveWorkspace(any(), anyString(), anyMap(), anyString()))
+                .thenThrow(new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_FILE_PATH", "文件名不在该作业类型允许的范围内。"));
+        Operation save = operations().filter(o -> "saveWorkspace".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(save, STUDENT_TOKEN, true)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_FILE_PATH"));
+    }
+
+    @Test
+    void attemptLimitReturns409() throws Exception {
+        BusinessException duplicate = new BusinessException(HttpStatus.CONFLICT, "ATTEMPT_LIMIT_REACHED", "已达到最大提交次数。");
         when(service.submitAssignment(any(), anyString(), anyMap(), anyString())).thenThrow(duplicate);
         Operation submit = operations().filter(o -> "submitAssignment".equals(o.id())).findFirst().orElseThrow();
         mvc.perform(authenticated(submit, STUDENT_TOKEN, true)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("SUBMISSION_BLOCKED"));
+                .andExpect(jsonPath("$.error.code").value("ATTEMPT_LIMIT_REACHED"));
+    }
+
+    // ---- 五个阶段1操作的强形状断言 ----
+
+    @Test
+    void listMyAssignmentsHasContractShape() throws Exception {
+        Operation op = operations().filter(o -> "listMyAssignments".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.pageSize").value(20))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.summary.allCount").value(1))
+                .andExpect(jsonPath("$.data.summary.todoCount").value(1))
+                .andExpect(jsonPath("$.data.summary.doneCount").value(0))
+                .andExpect(jsonPath("$.data.summary.archivedIncompleteCount").value(0))
+                .andExpect(jsonPath("$.data.items[0].id").value(ID))
+                .andExpect(jsonPath("$.data.items[0].offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.items[0].offeringStatus").value("active"))
+                .andExpect(jsonPath("$.data.items[0].publicationState").value("published"))
+                .andExpect(jsonPath("$.data.items[0].assignmentState").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.items[0].overdue").value(false))
+                .andExpect(jsonPath("$.data.items[0].isRequired").value(true))
+                .andExpect(jsonPath("$.data.items[0].latestSubmissionId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.items[0].publishedFeedbackId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.items[0].unreadFeedback").value(false))
+                .andExpect(jsonPath("$.data.items[0].dueAt").value("2099-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void listMyAssignmentsPassesFilterParameters() throws Exception {
+        Operation op = operations().filter(o -> "listMyAssignments".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true).queryParam("filter", "done")
+                        .queryParam("offeringId", OFFERING))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verify(service).listMyAssignments(any(), org.mockito.ArgumentMatchers.eq(OFFERING),
+                nullable(String.class), org.mockito.ArgumentMatchers.eq("done"), anyInt(), anyInt());
+    }
+
+    @Test
+    void listTeacherAssignmentsHasContractShapeAndNoDefaultStatusFilter() throws Exception {
+        Operation op = operations().filter(o -> "listTeacherAssignments".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.pageSize").value(20))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(ID))
+                .andExpect(jsonPath("$.data.items[0].offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.items[0].publicationState").value("draft"))
+                .andExpect(jsonPath("$.data.items[0].submittedStudentCount").value(0))
+                .andExpect(jsonPath("$.data.items[0].pendingReviewCount").value(0))
+                .andExpect(jsonPath("$.data.items[0].maxScore").value(100.0))
+                .andExpect(jsonPath("$.data.items[0].isRequired").value(true));
+        // 未传 publicationState 时控制器必须原样传 null（不得替换为默认状态）。
+        org.mockito.Mockito.verify(service).listTeacherAssignments(any(), org.mockito.ArgumentMatchers.eq(OFFERING),
+                org.mockito.ArgumentMatchers.isNull(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getAssignmentStudentViewHasContractShape() throws Exception {
+        Operation op = operations().filter(o -> "getAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assignmentState").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.offeringStatus").value("active"))
+                .andExpect(jsonPath("$.data.attemptsUsed").value(0))
+                .andExpect(jsonPath("$.data.canSubmit").value(true))
+                .andExpect(jsonPath("$.data.submissionBlockedReason").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.maxAttempts").value(3))
+                .andExpect(jsonPath("$.data.allowResubmit").value(true))
+                .andExpect(jsonPath("$.data.requirements[0]").value("完成功能"))
+                .andExpect(jsonPath("$.data.estimatedMinutes").value(30));
+    }
+
+    @Test
+    void getAssignmentTeacherViewHasNullStudentFields() throws Exception {
+        TeacherAssignmentViewDTO view = new TeacherAssignmentViewDTO(ID, OFFERING, "active", CHAPTER, "作业一",
+                "web_lab", true, "published", "说明", FUTURE, null, null, null, null, null,
+                List.of("完成功能"), 30, new BigDecimal("100.00"), List.of(), List.of(), null, true, 3,
+                null, null, null, null);
+        when(service.getAssignment(any(), anyString())).thenReturn(view);
+        Operation op = operations().filter(o -> "getAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, TEACHER_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.publicationState").value("published"))
+                .andExpect(jsonPath("$.data.offeringStatus").value("active"))
+                .andExpect(jsonPath("$.data.assignmentState").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.overdue").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.unreadFeedback").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.attemptsUsed").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.canSubmit").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.submissionBlockedReason").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void getAssignmentForbiddenWhenUserHasNoRole() throws Exception {
+        when(service.getAssignment(any(), anyString()))
+                .thenThrow(new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "无权访问。"));
+        Operation op = operations().filter(o -> "getAssignment".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true)).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void getWorkspaceHasContractShape() throws Exception {
+        Operation op = operations().filter(o -> "getWorkspace".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assignmentId").value(ID))
+                .andExpect(jsonPath("$.data.revision").value(1))
+                .andExpect(jsonPath("$.data.files[0].path").value("index.html"))
+                .andExpect(jsonPath("$.data.files[0].content").value("<h1>Test</h1>"))
+                .andExpect(jsonPath("$.data.activeFile").value("index.html"))
+                .andExpect(jsonPath("$.data.savedAt").value("2026-10-14T00:00:00Z"))
+                .andExpect(jsonPath("$.data.canSave").value(true))
+                .andExpect(jsonPath("$.data.saveBlockedReason").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void getWorkspaceReportsSaveBlockedReasonEnum() throws Exception {
+        when(service.getWorkspace(any(), anyString())).thenReturn(new WorkspaceDTO(ID, 2,
+                List.of(new FileDTO("index.html", "x")), "index.html",
+                Instant.parse("2026-10-14T00:00:00Z"), false, "OFFERING_ARCHIVED"));
+        Operation op = operations().filter(o -> "getWorkspace".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.canSave").value(false))
+                .andExpect(jsonPath("$.data.saveBlockedReason").value("OFFERING_ARCHIVED"));
+    }
+
+    @Test
+    void saveWorkspaceSuccessReturnsWorkspaceShape() throws Exception {
+        Operation op = operations().filter(o -> "saveWorkspace".equals(o.id())).findFirst().orElseThrow();
+        mvc.perform(authenticated(op, STUDENT_TOKEN, true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.revision").value(1))
+                .andExpect(jsonPath("$.data.assignmentId").value(ID))
+                .andExpect(jsonPath("$.data.canSave").value(true));
     }
 
     @Test

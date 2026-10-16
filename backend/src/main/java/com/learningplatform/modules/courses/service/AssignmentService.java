@@ -33,29 +33,26 @@ public class AssignmentService {
     public AssignmentListResponse listMyAssignments(UserDTO user,String offeringId,String termId,String filter,int page,int pageSize) {
         CourseAccess.role(user,"student");AssignmentInput.page(page,pageSize);
         if(!List.of("all","todo","done").contains(filter)) throw AssignmentInput.invalid();
-        // offeringId/termId 二选一过滤；学生必须是成员。
-        if(offeringId!=null) {
-            access.requireStudent(user,AssignmentInput.uuid(offeringId),false);
-            AssignmentCounts counts=mapper.getAssignmentCounts(user.id(),offeringId,null);
-            List<AssignmentSummaryDTO> items=mapper.listStudentAssignments(user.id(),offeringId,null,filter,offset(page,pageSize),pageSize);
-            return new AssignmentListResponse(items,page,pageSize,count(counts,filter),summary(counts));
-        } else {
-            // termId 过滤或当前学期。
-            String term=termId!=null?AssignmentInput.uuid(termId):null;
-            AssignmentCounts counts=mapper.getAssignmentCounts(user.id(),null,term);
-            List<AssignmentSummaryDTO> items=mapper.listStudentAssignments(user.id(),null,term,filter,offset(page,pageSize),pageSize);
-            return new AssignmentListResponse(items,page,pageSize,count(counts,filter),summary(counts));
-        }
+        // offeringId/termId 可选过滤；指定 offeringId 时学生必须是该班成员。summary 与 items 基于同一派生视图。
+        String offering=offeringId!=null?AssignmentInput.uuid(offeringId):null;
+        String term=termId!=null?AssignmentInput.uuid(termId):null;
+        if(offering!=null) access.requireStudent(user,offering,false);
+        AssignmentCounts counts=mapper.getAssignmentCounts(user.id(),offering,term);
+        List<AssignmentSummaryDTO> items=mapper.listStudentAssignments(user.id(),offering,term,filter,now(),offset(page,pageSize),pageSize);
+        return new AssignmentListResponse(items,page,pageSize,count(counts,filter),summary(counts));
     }
-    public AssignmentDetailDTO getAssignment(UserDTO user,String assignmentId) {
-        CourseAccess.role(user,"student");
+    /** 本班学生返回 AssignmentDetailDTO；本班授课教师返回 TeacherAssignmentViewDTO（学生字段为 null）。 */
+    public Object getAssignment(UserDTO user,String assignmentId) {
         Assignment assignment=assignmentOr404(assignmentId);
-        CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),false);
+        CourseAccess.Context context=access.requireReader(user,assignment.offeringId());
+        if("teacher".equals(context.member().role())) return teacherDetailView(assignment,context);
         if("draft".equals(assignment.status())) throw CourseAccess.notFound();
+        Instant now=now();
+        AssignmentSummaryDTO summary=mapper.findStudentAssignmentSummary(user.id(),null,null,assignment.id(),now);
+        if(summary==null) throw CourseAccess.notFound();
         int attemptsUsed=mapper.countSubmissions(assignment.id(),user.id());
-        boolean canSubmit=canSubmit(assignment,context,attemptsUsed);
-        String blockedReason=canSubmit?null:submitBlockedReason(assignment,context,attemptsUsed);
-        return studentView(assignment,user.id(),attemptsUsed,canSubmit,blockedReason);
+        String blockedReason=submitBlockedReason(assignment,context,attemptsUsed,"REVIEWED".equals(summary.assignmentState()),now);
+        return studentView(assignment,summary,attemptsUsed,blockedReason);
     }
     public WorkspaceDTO getWorkspace(UserDTO user,String assignmentId) {
         Assignment assignment=assignmentOr404(assignmentId);
@@ -79,18 +76,20 @@ public class AssignmentService {
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public WorkspaceDTO saveWorkspace(UserDTO user,String assignmentId,Map<String,Object> body,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
-        CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),true);
+        CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),false);
         if("draft".equals(assignment.status())) throw CourseAccess.notFound();
-        if(!canSave(assignment,context)) throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_LOCKED",saveBlockedReason(assignment,context));
-        AssignmentInput.validateWorkspaceWrite(body);
+        // 业务阻断（归档）优先于输入校验；错误码即契约枚举 OFFERING_ARCHIVED / ASSIGNMENT_ARCHIVED。
+        String blocked=saveBlockedReason(assignment,context);
+        if(blocked!=null) throw blockedException(blocked);
+        AssignmentInput.validateWorkspaceWrite(body,allowedPaths(assignment.type()));
         int baseRevision=AssignmentInput.integer(body,"baseRevision");
-        List<FileDTO> files=AssignmentInput.files(body,"files");
-        String activeFile=AssignmentInput.activeFile(body,"activeFile");
+        List<FileDTO> files=AssignmentInput.workspaceFiles(body);
+        String activeFile=(String)body.get("activeFile");
         Instant now=now();
         Workspace workspace=mapper.findWorkspace(assignment.id(),user.id());
         if(workspace==null) {
             // 首次保存：创建工作区。并发场景下可能重复 INSERT，需捕获并重试查询。
-            if(baseRevision!=0) throw versionConflict();
+            if(baseRevision!=0) throw versionConflict(0);
             String id=UUID.randomUUID().toString();
             try {
                 mapper.insertWorkspace(id,assignment.offeringId(),assignment.id(),user.id(),activeFile,now);
@@ -100,18 +99,18 @@ public class AssignmentService {
                 // 并发线程已创建，重新查询并按乐观锁更新。
                 workspace=mapper.findWorkspace(assignment.id(),user.id());
                 if(workspace==null) throw e;
-                if(baseRevision!=workspace.revision()) throw versionConflict();
+                if(baseRevision!=workspace.revision()) throw versionConflict(workspace.revision());
                 int updated=mapper.updateWorkspace(workspace.id(),baseRevision,activeFile,now);
-                if(updated==0) throw versionConflict();
+                if(updated==0) throw versionConflict(currentRevision(assignment,user));
                 mapper.deleteWorkspaceFiles(workspace.id());
                 for(FileDTO f:files) mapper.insertWorkspaceFile(workspace.id(),f.path(),f.content());
                 workspace=mapper.findWorkspace(assignment.id(),user.id());
             }
         } else {
             // 乐观锁：检查 baseRevision 是否匹配当前 revision。
-            if(baseRevision!=workspace.revision()) throw versionConflict();
+            if(baseRevision!=workspace.revision()) throw versionConflict(workspace.revision());
             int updated=mapper.updateWorkspace(workspace.id(),baseRevision,activeFile,now);
-            if(updated==0) throw versionConflict();
+            if(updated==0) throw versionConflict(currentRevision(assignment,user));
             mapper.deleteWorkspaceFiles(workspace.id());
             for(FileDTO f:files) mapper.insertWorkspaceFile(workspace.id(),f.path(),f.content());
             workspace=mapper.findWorkspace(assignment.id(),user.id());
@@ -128,11 +127,12 @@ public class AssignmentService {
         Assignment assignment=assignmentOr404(assignmentId);
         CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),true);
         if("draft".equals(assignment.status())) throw CourseAccess.notFound();
-        // 业务检查优先于输入校验，避免归档状态返回 VALIDATION_ERROR。
+        // 业务检查优先于输入校验，避免归档状态返回 VALIDATION_ERROR；错误码即契约的 SubmissionBlockedReason 枚举。
         int attemptsUsed=mapper.countSubmissions(assignment.id(),user.id());
-        if(!canSubmit(assignment,context,attemptsUsed)) {
-            throw new BusinessException(HttpStatus.CONFLICT,"SUBMISSION_BLOCKED",submitBlockedReason(assignment,context,attemptsUsed));
-        }
+        AssignmentSummaryDTO mine=mapper.findStudentAssignmentSummary(user.id(),null,null,assignment.id(),now());
+        if(mine==null) throw CourseAccess.notFound();
+        String blocked=submitBlockedReason(assignment,context,attemptsUsed,"REVIEWED".equals(mine.assignmentState()),now());
+        if(blocked!=null) throw blockedException(blocked);
         AssignmentInput.validateSubmissionWrite(body);
         int workspaceRevision=AssignmentInput.integer(body,"workspaceRevision");
         String reflection=AssignmentInput.text(body,"reflection",8000);
@@ -189,9 +189,15 @@ public class AssignmentService {
     public AssignmentListResponse listTeacherAssignments(UserDTO user,String offeringId,String publicationState,int page,int pageSize) {
         access.requireTeacher(user,AssignmentInput.uuid(offeringId),false);
         AssignmentInput.page(page,pageSize);
-        if(!List.of("draft","published","archived","all").contains(publicationState)) throw AssignmentInput.invalid();
-        List<TeacherAssignmentDTO> items=mapper.listTeacherAssignments(offeringId,publicationState,offset(page,pageSize),pageSize);
-        int total=mapper.countTeacherAssignments(offeringId,publicationState);
+        // 未传（null）或 all 不加状态条件，返回 draft/published/archived 全部。
+        String state=null;
+        if(publicationState!=null&&!"all".equals(publicationState)) {
+            if(!List.of("draft","published","archived").contains(publicationState)) throw AssignmentInput.invalid();
+            state=publicationState;
+        }
+        List<TeacherAssignmentDTO> items=mapper.listTeacherAssignments(offeringId,state,offset(page,pageSize),pageSize)
+                .stream().map(this::teacherAssignmentView).toList();
+        int total=mapper.countTeacherAssignments(offeringId,state);
         return new AssignmentListResponse(items,page,pageSize,total,null);
     }
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
@@ -384,9 +390,9 @@ public class AssignmentService {
                 throw new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_ALREADY_PUBLISHED","已发布的反馈不可修改。");
             }
             int baseVersion=AssignmentInput.integer(body,"baseVersion");
-            if(baseVersion!=existing.baseVersion()) throw versionConflict();
+            if(baseVersion!=existing.baseVersion()) throw feedbackVersionConflict(existing.baseVersion());
             int updated=mapper.updateFeedbackDraft(existing.id(),baseVersion,overallComment,finalScore,now);
-            if(updated==0) throw versionConflict();
+            if(updated==0) throw feedbackVersionConflict(existing.baseVersion());
             mapper.deleteFeedbackRubricScores(existing.id());
             if(rubricList!=null) {
                 for(Map<String,Object> r:rubricList) {
@@ -488,71 +494,72 @@ public class AssignmentService {
                 f.publishedAt(),f.updatedAt());
     }
     private boolean canSave(Assignment assignment,CourseAccess.Context context) {
-        if(!"active".equals(context.offering().status())) return false;
-        if("archived".equals(assignment.status())) return false;
-        Instant now=now();
-        if(assignment.lateUntil()!=null) return now.isBefore(assignment.lateUntil());
-        return true;
+        return saveBlockedReason(assignment,context)==null;
     }
+    /** SaveBlockedReason：教学班归档优先于作业归档；截止、已评价、提交次数不阻止练习保存。 */
     private String saveBlockedReason(Assignment assignment,CourseAccess.Context context) {
-        if(!"active".equals(context.offering().status())) return "教学班已归档。";
-        if("archived".equals(assignment.status())) return "作业已归档。";
-        Instant now=now();
-        if(assignment.lateUntil()!=null&&!now.isBefore(assignment.lateUntil())) return "作业已截止。";
-        return "保存已锁定。";
+        if(!"active".equals(context.offering().status())) return "OFFERING_ARCHIVED";
+        if("archived".equals(assignment.status())) return "ASSIGNMENT_ARCHIVED";
+        return null;
     }
-    private boolean canSubmit(Assignment assignment,CourseAccess.Context context,int attemptsUsed) {
-        if(!"active".equals(context.offering().status())) return false;
-        if("archived".equals(assignment.status())) return false;
-        Instant now=now();
-        if(assignment.lateUntil()!=null&&!now.isBefore(assignment.lateUntil())) return false;
-        if(!assignment.allowResubmit()&&attemptsUsed>=1) return false;
-        if(attemptsUsed>=assignment.maxAttempts()) return false;
-        return true;
+    /** SubmissionBlockedReason，按契约枚举顺序取首项；null 表示允许提交。 */
+    private String submitBlockedReason(Assignment assignment,CourseAccess.Context context,int attemptsUsed,boolean reviewed,Instant now) {
+        if(!"active".equals(context.offering().status())) return "OFFERING_ARCHIVED";
+        if("archived".equals(assignment.status())) return "ASSIGNMENT_ARCHIVED";
+        if(reviewed) return "RESUBMIT_AFTER_REVIEW";
+        if(!assignment.allowResubmit()&&attemptsUsed>=1) return "RESUBMIT_NOT_ALLOWED";
+        if(attemptsUsed>=assignment.maxAttempts()) return "ATTEMPT_LIMIT_REACHED";
+        // lateUntil=null 表示禁止补交：提交窗口在 dueAt 关闭。
+        Instant deadline=assignment.lateUntil()!=null?assignment.lateUntil():assignment.dueAt();
+        if(now.isAfter(deadline)) return "SUBMISSION_CLOSED";
+        return null;
     }
-    private String submitBlockedReason(Assignment assignment,CourseAccess.Context context,int attemptsUsed) {
-        if(!"active".equals(context.offering().status())) return "教学班已归档。";
-        if("archived".equals(assignment.status())) return "作业已归档。";
-        Instant now=now();
-        if(assignment.lateUntil()!=null&&!now.isBefore(assignment.lateUntil())) return "作业已截止。";
-        if(!assignment.allowResubmit()&&attemptsUsed>=1) return "不允许重新提交。";
-        if(attemptsUsed>=assignment.maxAttempts()) return "已达到最大提交次数。";
-        return "提交已锁定。";
+    private BusinessException blockedException(String reason) {
+        String message=switch(reason) {
+            case "OFFERING_ARCHIVED"->"教学班已归档。";
+            case "ASSIGNMENT_ARCHIVED"->"作业已归档。";
+            case "RESUBMIT_AFTER_REVIEW"->"当前提交已有发布评价，不能重新提交。";
+            case "RESUBMIT_NOT_ALLOWED"->"该作业不允许重新提交。";
+            case "ATTEMPT_LIMIT_REACHED"->"已达到最大提交次数。";
+            default->"提交窗口已关闭。";
+        };
+        return new BusinessException(HttpStatus.CONFLICT,reason,message);
     }
-    private AssignmentDetailDTO studentView(Assignment a,String studentId,int attemptsUsed,boolean canSubmit,String blockedReason) {
+    private static java.util.Set<String> allowedPaths(String assignmentType) {
+        return switch(assignmentType) {
+            case "web_lab"->java.util.Set.of("index.html","style.css","script.js");
+            case "sql_text"->java.util.Set.of("answer.sql");
+            default->java.util.Set.of("answer.md");
+        };
+    }
+    private int currentRevision(Assignment assignment,UserDTO user) {
+        Workspace current=mapper.findWorkspace(assignment.id(),user.id());
+        return current==null?0:current.revision();
+    }
+    private AssignmentDetailDTO studentView(Assignment a,AssignmentSummaryDTO s,int attemptsUsed,String blockedReason) {
         List<AssignmentRequirement> requirements=mapper.getRequirements(a.id());
         List<AssignmentRows.RubricCriterion> rubric=mapper.getRubric(a.id());
         List<String> knowledgePointIds=mapper.getKnowledgePointIds(a.id());
-        Submission latest=mapper.findSubmissionByRevision(a.id(),studentId,Integer.MAX_VALUE);
-        String latestSubmissionId=latest!=null?latest.id():null;
-        Instant now=now();boolean overdue=a.dueAt().isBefore(now)&&(a.lateUntil()==null||a.lateUntil().isBefore(now));
-        return new AssignmentDetailDTO(a.id(),a.offeringId(),a.status(),a.chapterId(),a.title(),a.type(),
-                a.isRequired(),"published",a.description(),a.dueAt(),determineAssignmentState(a,attemptsUsed,now),
-                overdue,latestSubmissionId,null,false,
+        return new AssignmentDetailDTO(a.id(),a.offeringId(),s.offeringStatus(),a.chapterId(),a.title(),a.type(),
+                a.isRequired(),s.publicationState(),a.description(),a.dueAt(),s.assignmentState(),
+                s.overdue(),s.latestSubmissionId(),s.publishedFeedbackId(),s.unreadFeedback(),
                 requirements.stream().map(AssignmentRequirement::requirementText).toList(),
                 a.estimatedMinutes(),a.maxScore(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
                 knowledgePointIds,a.lateUntil(),a.allowResubmit(),a.maxAttempts(),attemptsUsed,
-                canSubmit,blockedReason,a.currentAiPolicyId()!=null?1:null);
+                blockedReason==null,blockedReason,a.currentAiPolicyId()!=null?1:null);
     }
-    private AssignmentDetailDTO teacherStudentView(Assignment a) {
+    private TeacherAssignmentViewDTO teacherDetailView(Assignment a,CourseAccess.Context context) {
         List<AssignmentRequirement> requirements=mapper.getRequirements(a.id());
         List<AssignmentRows.RubricCriterion> rubric=mapper.getRubric(a.id());
         List<String> knowledgePointIds=mapper.getKnowledgePointIds(a.id());
-        return new AssignmentDetailDTO(a.id(),a.offeringId(),a.status(),a.chapterId(),a.title(),a.type(),
-                a.isRequired(),"published",a.description(),a.dueAt(),null,false,null,null,false,
+        return new TeacherAssignmentViewDTO(a.id(),a.offeringId(),context.offering().status(),a.chapterId(),a.title(),a.type(),
+                a.isRequired(),a.status(),a.description(),a.dueAt(),null,null,null,null,null,
                 requirements.stream().map(AssignmentRequirement::requirementText).toList(),
                 a.estimatedMinutes(),a.maxScore(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
-                knowledgePointIds,a.lateUntil(),a.allowResubmit(),a.maxAttempts(),0,false,null,
+                knowledgePointIds,a.lateUntil(),a.allowResubmit(),a.maxAttempts(),null,null,null,
                 a.currentAiPolicyId()!=null?1:null);
-    }
-    private String determineAssignmentState(Assignment a,int attemptsUsed,Instant now) {
-        if(attemptsUsed==0) return "not_started";
-        if("archived".equals(a.status())) return "archived";
-        boolean overdue=a.dueAt().isBefore(now)&&(a.lateUntil()==null||a.lateUntil().isBefore(now));
-        if(overdue) return "overdue";
-        return "in_progress";
     }
     private TeacherAssignmentDTO teacherAssignmentView(Assignment a) {
         List<AssignmentRequirement> requirements=mapper.getRequirements(a.id());
@@ -598,8 +605,13 @@ public class AssignmentService {
         return Map.of("allCount",counts.allCount(),"todoCount",counts.todoCount(),
                 "doneCount",counts.doneCount(),"archivedIncompleteCount",counts.archivedIncompleteCount());
     }
-    private BusinessException versionConflict() {
-        return new BusinessException(HttpStatus.CONFLICT,"VERSION_CONFLICT","工作区版本冲突，请刷新后重试。");
+    private BusinessException feedbackVersionConflict(int currentVersion) {
+        return new BusinessException(HttpStatus.CONFLICT,"FEEDBACK_VERSION_CONFLICT","评价版本已过期，请刷新后重试。",
+                Map.of("currentVersion",currentVersion));
+    }
+    private BusinessException versionConflict(int currentRevision) {
+        return new BusinessException(HttpStatus.CONFLICT,"WORKSPACE_CONFLICT","工作区版本冲突，请刷新后重试。",
+                Map.of("currentRevision",currentRevision));
     }
     private long offset(int page,int size) { return (long)(page-1)*size; }
     private Instant now() { return clock.instant().truncatedTo(ChronoUnit.MICROS); }

@@ -34,7 +34,7 @@ public class NoticeService {
             for(String studentId:studentIds) {
                 String msgId=UUID.randomUUID().toString();
                 mapper.insertNotification(msgId,studentId,"notice_published",
-                        input.title(),input.content(),offeringId,null,null,noticeId,false,null,now);
+                        input.title(),input.content(),offeringId,null,null,now);
             }
         }
         return mapper.findNoticeById(noticeId);

@@ -126,9 +126,22 @@ class AssignmentIntegrationIT {
         assertThat(published.publishedAt()).isNotNull();
 
         // 学生可以看到并获取工作区
-        AssignmentDetailDTO studentView = assignmentService.getAssignment(STUDENT, published.id());
+        AssignmentDetailDTO studentView = (AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, published.id());
         assertThat(studentView.publicationState()).isEqualTo("published");
+        assertThat(studentView.assignmentState()).isEqualTo("NOT_STARTED");
+        assertThat(studentView.offeringStatus()).isEqualTo("active");
         assertThat(studentView.canSubmit()).isTrue();
+        assertThat(studentView.submissionBlockedReason()).isNull();
+
+        // 教师（本班教师）得到 TeacherAssignmentViewDTO：学生个人字段为 null
+        Object teacherObj = assignmentService.getAssignment(TEACHER, published.id());
+        assertThat(teacherObj).isInstanceOf(TeacherAssignmentViewDTO.class);
+        TeacherAssignmentViewDTO teacherView = (TeacherAssignmentViewDTO) teacherObj;
+        assertThat(teacherView.publicationState()).isEqualTo("published");
+        assertThat(teacherView.assignmentState()).isNull();
+        assertThat(teacherView.canSubmit()).isNull();
+        assertThat(teacherView.attemptsUsed()).isNull();
+        assertThat(teacherView.submissionBlockedReason()).isNull();
 
         WorkspaceDTO workspace = assignmentService.getWorkspace(STUDENT, published.id());
         assertThat(workspace.revision()).isEqualTo(0);
@@ -205,8 +218,9 @@ class AssignmentIntegrationIT {
         bodyConflict.put("activeFile", "index.html");
         assertThatThrownBy(() -> assignmentService.saveWorkspace(STUDENT, assignment.id(), bodyConflict, "conflict"))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("VERSION_CONFLICT");
+                    assertThat(e.getCode()).isEqualTo("WORKSPACE_CONFLICT");
                     assertThat(e.getStatus().value()).isEqualTo(409);
+                    assertThat(e.getDetails()).containsEntry("currentRevision", 2);
                 });
 
         // 数据库版本未变
@@ -300,7 +314,7 @@ class AssignmentIntegrationIT {
             String result2 = task2.get(20, TimeUnit.SECONDS);
 
             // 一个成功，一个冲突
-            assertThat(List.of(result1, result2)).containsExactlyInAnyOrder("success", "VERSION_CONFLICT");
+            assertThat(List.of(result1, result2)).containsExactlyInAnyOrder("success", "WORKSPACE_CONFLICT");
         } finally {
             start.countDown();
             pool.shutdownNow();
@@ -328,9 +342,15 @@ class AssignmentIntegrationIT {
         saveBody.put("activeFile", "index.html");
         assertThatThrownBy(() -> assignmentService.saveWorkspace(STUDENT, assignment.id(), saveBody, "save"))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("ASSIGNMENT_LOCKED");
+                    assertThat(e.getCode()).isEqualTo("ASSIGNMENT_ARCHIVED");
                     assertThat(e.getStatus().value()).isEqualTo(409);
                 });
+
+        // 工作区与详情的阻断原因同样是契约枚举
+        assertThat(assignmentService.getWorkspace(STUDENT, assignment.id()).saveBlockedReason()).isEqualTo("ASSIGNMENT_ARCHIVED");
+        AssignmentDetailDTO archivedView = (AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, assignment.id());
+        assertThat(archivedView.canSubmit()).isFalse();
+        assertThat(archivedView.submissionBlockedReason()).isEqualTo("ASSIGNMENT_ARCHIVED");
 
         // 提交被阻止
         Map<String, Object> submitBody = new HashMap<>();
@@ -338,7 +358,7 @@ class AssignmentIntegrationIT {
         submitBody.put("reflection", "Test");
         assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, assignment.id(), submitBody, "submit"))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("SUBMISSION_BLOCKED");
+                    assertThat(e.getCode()).isEqualTo("ASSIGNMENT_ARCHIVED");
                     assertThat(e.getStatus().value()).isEqualTo(409);
                 });
     }
@@ -385,7 +405,7 @@ class AssignmentIntegrationIT {
         submitBody3.put("reflection", "第三次");
         assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, assignment.id(), submitBody3, "submit3"))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("SUBMISSION_BLOCKED");
+                    assertThat(e.getCode()).isEqualTo("ATTEMPT_LIMIT_REACHED");
                     assertThat(e.getMessage()).contains("最大提交次数");
                 });
     }
@@ -434,11 +454,8 @@ class AssignmentIntegrationIT {
         TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
         assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
 
-        assertThatThrownBy(() -> assignmentService.getAssignment(TEACHER, assignment.id()))
-                .isInstanceOfSatisfying(BusinessException.class, e -> {
-                    assertThat(e.getCode()).isEqualTo("FORBIDDEN");
-                    assertThat(e.getStatus().value()).isEqualTo(403);
-                });
+        // 本班教师可通过公共详情端点读取，但得到的是教师通用视图而非学生视图
+        assertThat(assignmentService.getAssignment(TEACHER, assignment.id())).isInstanceOf(TeacherAssignmentViewDTO.class);
 
         assertThatThrownBy(() -> assignmentService.getWorkspace(TEACHER, assignment.id()))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {

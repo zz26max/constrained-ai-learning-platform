@@ -16,6 +16,13 @@ public final class AssignmentDTOs {
             List<String> requirements,int estimatedMinutes,BigDecimal maxScore,List<RubricCriterion> rubric,
             List<String> knowledgePointIds,Instant lateUntil,boolean allowResubmit,int maxAttempts,int attemptsUsed,
             boolean canSubmit,String submissionBlockedReason,Integer aiPolicyVersion) {}
+    /** 公共作业详情端点的教师视图：学生个人字段全部显式为 null（契约 TeacherAssignmentViewDTO）。 */
+    public record TeacherAssignmentViewDTO(String id,String offeringId,String offeringStatus,String chapterId,String title,
+            String type,boolean isRequired,String publicationState,String description,Instant dueAt,String assignmentState,
+            Boolean overdue,String latestSubmissionId,String publishedFeedbackId,Boolean unreadFeedback,
+            List<String> requirements,int estimatedMinutes,BigDecimal maxScore,List<RubricCriterion> rubric,
+            List<String> knowledgePointIds,Instant lateUntil,boolean allowResubmit,int maxAttempts,Integer attemptsUsed,
+            Boolean canSubmit,String submissionBlockedReason,Integer aiPolicyVersion) {}
     public record WorkspaceDTO(String assignmentId,int revision,List<FileDTO> files,String activeFile,
             Instant savedAt,boolean canSave,String saveBlockedReason) {}
     public record SubmissionSummaryDTO(String id,String assignmentId,String offeringId,int attemptNumber,

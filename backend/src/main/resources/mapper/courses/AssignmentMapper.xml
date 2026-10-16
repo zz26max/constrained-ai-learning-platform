@@ -58,57 +58,58 @@
 SELECT id,offering_id,chapter_id,title,description,estimated_minutes,type,status,is_required,due_at,late_until,allow_resubmit,max_attempts,max_score,content_version,current_ai_policy_id,published_at,created_by,created_at,updated_at FROM assignments WHERE id=#{id}
 </select>
 
-<select id="listStudentAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+<!-- 学生作业基础视图：列表与汇总共用同一派生状态，保证 allCount=todo+done+archivedIncomplete。 -->
+<sql id="studentAssignmentBase">
 SELECT a.id,a.offering_id,o.status AS offering_status,a.chapter_id,a.title,a.type,a.is_required,a.status AS publication_state,a.description,a.due_at,
-CASE WHEN s.id IS NULL THEN 'NOT_STARTED' WHEN s.id IS NOT NULL THEN 'IN_PROGRESS' END AS assignment_state,
-CASE WHEN a.due_at &lt; #{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} THEN 1 ELSE 0 END AS overdue,
-s.id AS latest_submission_id,NULL AS published_feedback_id,0 AS unread_feedback
+CASE WHEN f.id IS NOT NULL THEN 'REVIEWED' WHEN s.id IS NOT NULL THEN 'SUBMITTED' WHEN w.id IS NOT NULL THEN 'IN_PROGRESS' ELSE 'NOT_STARTED' END AS assignment_state,
+s.id AS latest_submission_id,f.id AS published_feedback_id,
+CASE WHEN f.id IS NOT NULL AND EXISTS (SELECT 1 FROM notifications n WHERE n.recipient_id=#{studentId} AND n.related_feedback_id=f.id AND n.is_read=0) THEN 1 ELSE 0 END AS unread_feedback
 FROM assignments a
 JOIN course_offerings o ON o.id=a.offering_id
 JOIN offering_members m ON m.offering_id=a.offering_id
 LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
+LEFT JOIN feedback f ON f.submission_id=s.id AND f.status='published'
+LEFT JOIN workspaces w ON w.assignment_id=a.id AND w.student_id=#{studentId}
 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
 <if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
 <if test="termId != null">AND o.term_id=#{termId}</if>
-<if test='filter == "todo"'>AND s.id IS NULL</if>
-<if test='filter == "done"'>AND s.id IS NOT NULL</if>
-ORDER BY a.due_at,a.id LIMIT #{size} OFFSET #{offset}
+</sql>
+
+<sql id="studentSummaryColumns">
+t.id,t.offering_id,t.offering_status,t.chapter_id,t.title,t.type,t.is_required,t.publication_state,t.description,t.due_at,t.assignment_state,
+CASE WHEN t.assignment_state IN ('NOT_STARTED','IN_PROGRESS') AND t.due_at &lt; #{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} THEN 1 ELSE 0 END AS overdue,
+t.latest_submission_id,t.published_feedback_id,t.unread_feedback
+</sql>
+
+<select id="findStudentAssignmentSummary" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT <include refid="studentSummaryColumns"/>
+FROM (<include refid="studentAssignmentBase"/>) t WHERE t.id=#{assignmentId}
 </select>
 
-<select id="countStudentAssignments" resultType="int">
-SELECT COUNT(*) FROM assignments a
-JOIN course_offerings o ON o.id=a.offering_id
-JOIN offering_members m ON m.offering_id=a.offering_id
-LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1
-WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
-<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>
-<if test='filter == "todo"'>AND s.id IS NULL</if>
-<if test='filter == "done"'>AND s.id IS NOT NULL</if>
+<select id="listStudentAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT <include refid="studentSummaryColumns"/>
+FROM (<include refid="studentAssignmentBase"/>) t
+<where>
+<if test='filter == "todo"'>t.offering_status='active' AND t.publication_state='published' AND t.assignment_state IN ('NOT_STARTED','IN_PROGRESS')</if>
+<if test='filter == "done"'>t.assignment_state IN ('SUBMITTED','REVIEWED')</if>
+</where>
+ORDER BY t.due_at,t.id LIMIT #{size} OFFSET #{offset}
 </select>
 
 <select id="getAssignmentCounts" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$AssignmentCounts">
-SELECT
-(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived')
-<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>) AS all_count,
-(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived') AND s.id IS NULL
-<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>) AS todo_count,
-(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status IN ('published','archived') AND s.id IS NOT NULL
-<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>) AS done_count,
-(SELECT COUNT(*) FROM assignments a JOIN course_offerings o ON o.id=a.offering_id JOIN offering_members m ON m.offering_id=a.offering_id LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=#{studentId} AND s.is_current=1 WHERE m.user_id=#{studentId} AND m.role='student' AND m.status='active' AND a.status='archived' AND s.id IS NULL
-<if test="offeringId != null">AND a.offering_id=#{offeringId}</if>
-<if test="termId != null">AND o.term_id=#{termId}</if>) AS archived_incomplete_count
+SELECT COUNT(*) AS all_count,
+CAST(COALESCE(SUM(CASE WHEN t.offering_status='active' AND t.publication_state='published' AND t.assignment_state IN ('NOT_STARTED','IN_PROGRESS') THEN 1 ELSE 0 END),0) AS SIGNED) AS todo_count,
+CAST(COALESCE(SUM(CASE WHEN t.assignment_state IN ('SUBMITTED','REVIEWED') THEN 1 ELSE 0 END),0) AS SIGNED) AS done_count,
+CAST(COALESCE(SUM(CASE WHEN t.assignment_state IN ('NOT_STARTED','IN_PROGRESS') AND NOT (t.offering_status='active' AND t.publication_state='published') THEN 1 ELSE 0 END),0) AS SIGNED) AS archived_incomplete_count
+FROM (<include refid="studentAssignmentBase"/>) t
 </select>
 
 <select id="getRequirements" resultType="com.learningplatform.modules.courses.model.AssignmentRows$AssignmentRequirement">
 SELECT assignment_id,requirement_index,requirement_text FROM assignment_requirements WHERE assignment_id=#{assignmentId} ORDER BY requirement_index
 </select>
 
-<select id="getRubric" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$RubricCriterion">
-SELECT criterion_id,title,description,max_score FROM assignment_rubric_criteria WHERE assignment_id=#{assignmentId} ORDER BY criterion_id
+<select id="getRubric" resultType="com.learningplatform.modules.courses.model.AssignmentRows$RubricCriterion">
+SELECT assignment_id,criterion_id,title,description,max_score FROM assignment_rubric_criteria WHERE assignment_id=#{assignmentId} ORDER BY criterion_id
 </select>
 
 <select id="getKnowledgePointIds" resultType="string">
@@ -203,13 +204,24 @@ INSERT INTO submission_rubric_snapshot (submission_id,criterion_id,title,descrip
 </insert>
 
 <!-- 教师端作业管理 -->
-<select id="listTeacherAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$TeacherAssignmentDTO">
-SELECT a.chapter_id,a.title,a.type,a.is_required,a.description,a.estimated_minutes,a.due_at,a.late_until,a.allow_resubmit,a.max_attempts,a.max_score,a.current_ai_policy_id AS ai_policy_version,a.id,a.offering_id,a.status AS publication_state,a.published_at,
-(SELECT COUNT(DISTINCT s.student_id) FROM submissions s WHERE s.assignment_id=a.id) AS submitted_student_count,
-0 AS pending_review_count
-FROM assignments a WHERE a.offering_id=#{offeringId}
-<if test="publicationState != null">AND a.status=#{publicationState}</if>
-ORDER BY a.created_at DESC,a.id DESC LIMIT #{size} OFFSET #{offset}
+<select id="listTeacherAssignments" resultMap="assignment">
+SELECT id,offering_id,chapter_id,title,description,estimated_minutes,type,status,is_required,due_at,late_until,allow_resubmit,max_attempts,max_score,content_version,current_ai_policy_id,published_at,created_by,created_at,updated_at
+FROM assignments WHERE offering_id=#{offeringId}
+<if test="publicationState != null">AND status=#{publicationState}</if>
+ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+</select>
+
+<select id="findChapterStatus" resultType="string">
+SELECT status FROM chapters WHERE id=#{chapterId} AND offering_id=#{offeringId}
+</select>
+
+<select id="listKnowledgePointRefs" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$KnowledgePointRef">
+SELECT id,chapter_id FROM knowledge_points WHERE offering_id=#{offeringId} AND id IN
+<foreach collection="ids" item="kid" open="(" separator="," close=")">#{kid}</foreach>
+</select>
+
+<select id="listActiveStudentIds" resultType="string">
+SELECT user_id FROM offering_members WHERE offering_id=#{offeringId} AND role='student' AND status='active' ORDER BY user_id
 </select>
 
 <select id="countTeacherAssignments" resultType="int">
@@ -265,6 +277,7 @@ WHERE id=#{id} AND status='published'
 
 <select id="countPendingReviews" resultType="int">
 SELECT COUNT(*) FROM submissions s WHERE s.assignment_id=#{assignmentId} AND s.is_current=1
+AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')
 </select>
 
 <select id="listAssignmentSubmissions" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$TeacherSubmissionSummaryDTO">

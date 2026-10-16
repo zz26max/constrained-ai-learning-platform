@@ -39,7 +39,7 @@ public class AssignmentController {
                 "total",result.total(),"summary",result.summary()),req);
     }
     @GetMapping("/assignments/{assignmentId}")
-    public ApiResponse<AssignmentDetailDTO> getAssignment(Authentication auth,HttpServletRequest req,
+    public ApiResponse<Object> getAssignment(Authentication auth,HttpServletRequest req,
             @PathVariable String assignmentId) {
         AssignmentInput.uuid(assignmentId);return response(service.getAssignment(user(auth),assignmentId),req);
     }
@@ -76,7 +76,7 @@ public class AssignmentController {
     }
     @GetMapping("/teacher/offerings/{offeringId}/assignments")
     public ApiResponse<?> listTeacherAssignments(Authentication auth,HttpServletRequest req,
-            @PathVariable String offeringId,@RequestParam(defaultValue="all") String publicationState,
+            @PathVariable String offeringId,@RequestParam(required=false) String publicationState,
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(offeringId);AssignmentInput.page(page,pageSize);
         AssignmentListResponse result=service.listTeacherAssignments(user(auth),offeringId,publicationState,page,pageSize);

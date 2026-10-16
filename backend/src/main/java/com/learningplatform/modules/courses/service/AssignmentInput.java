@@ -101,11 +101,51 @@ public final class AssignmentInput {
         if(!VALID_FILE_PATHS.contains(path)) throw invalid();
         return path;
     }
-    public static void validateWorkspaceWrite(Map<String,Object> body) {
+    /**
+     * 工作区保存请求校验：未知字段 400 INVALID_REQUEST；文件名不在作业类型允许集合 400 INVALID_FILE_PATH；
+     * 其余缺失、类型、数量、体积、重复路径等问题 422 VALIDATION_ERROR。content 允许为空串。
+     */
+    public static void validateWorkspaceWrite(Map<String,Object> body,Set<String> allowedPaths) {
+        if(body==null) throw invalid();
+        for(String key:body.keySet()) {
+            if(!Set.of("baseRevision","files","activeFile").contains(key)) throw invalidRequest();
+        }
         requireKeys(body,"baseRevision","files","activeFile");
         integer(body,"baseRevision");
-        files(body,"files");
-        activeFile(body,"activeFile");
+        if(!(body.get("files") instanceof List<?> list)||list.isEmpty()||list.size()>3) throw invalid();
+        Set<String> seen=new java.util.HashSet<>();
+        long total=0;
+        for(Object item:list) {
+            if(!(item instanceof Map<?,?> file)) throw invalid();
+            for(Object key:file.keySet()) {
+                if(!"path".equals(key)&&!"content".equals(key)) throw invalidRequest();
+            }
+            if(!(file.get("path") instanceof String path)||!(file.get("content") instanceof String content)) throw invalid();
+            if(!allowedPaths.contains(path)) throw invalidFilePath();
+            if(!seen.add(path)) throw invalid();
+            int bytes=content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if(bytes>102400) throw invalid();
+            total+=bytes;
+        }
+        if(total>262144) throw invalid();
+        if(!(body.get("activeFile") instanceof String active)) throw invalid();
+        if(!allowedPaths.contains(active)) throw invalidFilePath();
+        if(!seen.contains(active)) throw invalid();
+    }
+    /** 已通过 validateWorkspaceWrite 校验的文件列表。 */
+    public static List<FileDTO> workspaceFiles(Map<String,Object> body) {
+        List<FileDTO> result=new ArrayList<>();
+        for(Object item:(List<?>)body.get("files")) {
+            Map<?,?> file=(Map<?,?>)item;
+            result.add(new FileDTO((String)file.get("path"),(String)file.get("content")));
+        }
+        return result;
+    }
+    public static BusinessException invalidRequest() {
+        return new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_REQUEST","请求体包含未知字段。");
+    }
+    public static BusinessException invalidFilePath() {
+        return new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_FILE_PATH","文件名不在该作业类型允许的范围内。");
     }
     public static void validateSubmissionWrite(Map<String,Object> body) {
         requireKeys(body,"workspaceRevision","reflection");
