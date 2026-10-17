@@ -5,6 +5,7 @@ import { authApi } from '../api'
 import type { AuthApi } from '../api/auth'
 import type { components } from '../api/generated/schema'
 import { createCsrfRefreshCoordinator } from './csrf-refresh'
+import { clearWorkspaceRecovery } from '../features/assignments/workspace-recovery'
 
 type UserDTO = components['schemas']['UserDTO']
 type ConfigDTO = components['schemas']['ConfigDTO']
@@ -164,6 +165,7 @@ export const useAuthStore = defineStore('auth', () => {
       identity.value = me.data
       identityRequestId.value = me.requestId
       config.value = null
+      clearWorkspaceRecovery(me.data.id)
       phase.value = 'authenticated'
       await loadConfig()
       loginStatus.value = 'success'
@@ -263,6 +265,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     if (identity.value?.id !== userId) return false
     clearAuthenticatedState()
+    clearWorkspaceRecovery()
     loginStatus.value = 'idle'
     loginFailure.value = null
     logoutFailure.value = null

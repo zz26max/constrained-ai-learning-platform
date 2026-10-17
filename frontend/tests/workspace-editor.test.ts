@@ -10,6 +10,7 @@ import { ApiClient } from '../src/api/client'
 import { AssignmentsApi } from '../src/api/assignments'
 import { CoursesApi } from '../src/api/courses'
 import { useAuthStore } from '../src/stores/auth'
+import { clearWorkspaceRecovery } from '../src/features/assignments/workspace-recovery'
 import { createScriptedTransport, DEMO_CONFIG, DEMO_USER, failEnvelope, okEnvelope, type ScriptedResponse, type ScriptedTransport, type ScriptHandler } from './helpers'
 
 const ASSIGNMENT = '00000000-0000-4000-8000-000000000701'
@@ -72,6 +73,7 @@ async function editAndConfirmSubmit(page: VueWrapper, content: string): Promise<
 }
 
 beforeEach(() => {
+  clearWorkspaceRecovery()
   assignmentOverride = {}
   saveFails = false
   if (typeof window.confirm !== 'function') window.confirm = () => false
@@ -137,29 +139,30 @@ describe('离开工作区保护（B2）', () => {
 
   it('保存失败且用户选择留下：停留在工作区并保留本地文字', async () => {
     saveFails = true
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('KEEP_ME')
-    await router!.push('/student/assignments')
+    const navigation = router!.push('/student/assignments')
     await flushPromises()
-
-    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(page.find('#leave-title').text()).toBe('还有未保存的内容')
+    await page.findAll('button').find(button => button.text() === '留在页面')!.trigger('click')
+    await navigation
     expect(router!.currentRoute.value.fullPath).toBe(`/student/workspaces/${ASSIGNMENT}`)
     expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('KEEP_ME')
   })
 
   it('保存失败且用户确认放弃：允许离开', async () => {
     saveFails = true
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('DISCARD_ME')
-    await router!.push('/student/assignments')
+    const navigation = router!.push('/student/assignments')
     await flushPromises()
+    await page.findAll('button').find(button => button.text() === '放弃修改并离开')!.trigger('click')
+    await navigation
 
     expect(router!.currentRoute.value.fullPath).toBe('/student/assignments')
   })
 
-  it('退出登录或会话失效：丢弃待保存内容，不再发保存请求', async () => {
+  it('会话失效暂停写入；同账号重新登录后保留文字并要求比较恢复', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('AFTER_LOGOUT')
@@ -172,6 +175,12 @@ describe('离开工作区保护（B2）', () => {
     expect(requestsOf('saveWorkspace')).toHaveLength(0)
     expect(confirm).not.toHaveBeenCalled()
     expect(router!.currentRoute.value.name).toBe('login')
+    useAuthStore().$patch({ phase: 'authenticated', identity: { ...DEMO_USER, roles: ['student'] }, csrfToken: 'renewed' })
+    await router!.push(`/student/workspaces/${ASSIGNMENT}`)
+    await flushPromises()
+    expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('AFTER_LOGOUT')
+    expect(page.text()).toContain('已恢复本账号的本地编辑')
+    expect(requestsOf('saveWorkspace')).toHaveLength(0)
   })
 
   it('从作业 A 的工作区直接切到作业 B：A 的修改保存到 A，不写入 B', async () => {

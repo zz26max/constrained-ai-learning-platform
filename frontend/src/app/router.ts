@@ -115,7 +115,8 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresRole && !auth.identity?.roles.includes(to.meta.requiresRole)) return { name: 'access-denied' }
   return true
 })
-router.afterEach((to) => {
+router.afterEach((to, _from, failure) => {
+  if (failure) return
   const title = to.meta.title
   if (typeof title === 'string') {
     document.title = title
