@@ -86,7 +86,7 @@ function excerpt(text: string, max = 80): string {
         <h2 id="dash-feedback">最近反馈</h2>
         <template v-if="query.data.value.recentFeedback">
           <p>
-            <RouterLink :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
+            <RouterLink :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId }, query: { feedbackId: query.data.value.recentFeedback.id } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
             <span class="muted"> · {{ formatTime(query.data.value.recentFeedback.publishedAt) }} · {{ query.data.value.recentFeedback.score }}/{{ query.data.value.recentFeedback.maxScore }}</span>
           </p>
           <p class="dash-text">{{ excerpt(query.data.value.recentFeedback.comment) }}</p>

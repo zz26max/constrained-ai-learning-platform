@@ -21,7 +21,7 @@ export function useOpenTarget() {
     try {
       if (route === 'needs-feedback-lookup') {
         const feedback = await assignmentsApi().getFeedback(target.id)
-        await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId } })
+        await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId }, query: { feedbackId: target.id } })
       } else {
         await router.push(route)
       }

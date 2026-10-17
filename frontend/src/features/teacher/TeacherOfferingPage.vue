@@ -54,6 +54,7 @@ onBeforeUnmount(closeArchive)
       <button type="button" class="button secondary" :disabled="readOnly" @click="openArchive">归档教学班</button>
     </header>
     <section class="stat-cards" aria-label="班级统计">
+      <RouterLink class="button" :to="{ name: 'teacher-assignments', params: { offeringId: id } }">作业管理与批阅</RouterLink>
       <ApiState :status="stats.status.value" :error="stats.error.value" @retry="stats.load" />
       <ul v-if="stats.data.value && stats.status.value !== 'error'" class="stat-card-list">
         <li class="stat-card"><span class="muted">学生</span><strong>{{ stats.data.value.studentCount }}</strong></li>

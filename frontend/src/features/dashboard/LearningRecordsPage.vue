@@ -110,7 +110,7 @@ function goToPage(next: number): void {
           <h2 id="lr-recent">最近反馈</h2>
           <template v-if="recordsQuery.data.value.recentFeedback">
             <p>
-              <RouterLink :to="{ name: 'student-assignment', params: { id: recordsQuery.data.value.recentFeedback.assignmentId } }">{{ recordsQuery.data.value.recentFeedback.assignmentTitle }}</RouterLink>
+              <RouterLink :to="{ name: 'student-assignment', params: { id: recordsQuery.data.value.recentFeedback.assignmentId }, query: { feedbackId: recordsQuery.data.value.recentFeedback.id } }">{{ recordsQuery.data.value.recentFeedback.assignmentTitle }}</RouterLink>
               <span class="muted"> · {{ formatTime(recordsQuery.data.value.recentFeedback.publishedAt) }} · {{ recordsQuery.data.value.recentFeedback.score }}/{{ recordsQuery.data.value.recentFeedback.maxScore }}</span>
             </p>
             <p class="dash-text">{{ recordsQuery.data.value.recentFeedback.comment }}</p>
@@ -124,7 +124,7 @@ function goToPage(next: number): void {
           <template v-else>
             <ul class="dash-list">
               <li v-for="item in pagedItems" :key="item.id">
-                <RouterLink :to="{ name: 'student-assignment', params: { id: item.assignmentId } }">{{ item.assignmentTitle }}</RouterLink>
+                <RouterLink :to="{ name: 'student-assignment', params: { id: item.assignmentId }, query: { feedbackId: item.id } }">{{ item.assignmentTitle }}</RouterLink>
                 <span class="muted">{{ formatTime(item.publishedAt) }} · {{ item.score }}/{{ item.maxScore }}</span>
               </li>
             </ul>

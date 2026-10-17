@@ -81,7 +81,12 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
     }
     case 'getAssignment': return okEnvelope(assignmentDetail(FEEDBACK))
     case 'getFeedback': return okEnvelope(studentFeedback)
-    case 'getSubmission': return okEnvelope(teacherSubmission)
+    case 'listMySubmissions': return okEnvelope({ items: [], page: 1, pageSize: 10, total: 0 })
+    case 'getSubmission': {
+      if (useAuthStore().identity?.roles.includes('teacher')) return okEnvelope(teacherSubmission)
+      const { student: _student, draftFeedback: _draft, ...submission } = teacherSubmission
+      return okEnvelope({ ...submission, publishedFeedback: studentFeedback })
+    }
     case 'saveFeedback': return { status: 201, body: { data: draftResponse, requestId: 'req-save' } }
     default: throw new Error(`未脚本化操作：${request.operationId}`)
   }
@@ -250,7 +255,14 @@ describe('作业详情展示已发布反馈（getFeedback）', () => {
   })
 
   it('没有 publishedFeedbackId 时不请求反馈', async () => {
-    scripted.setHandler(request => request.operationId === 'getAssignment' ? okEnvelope(assignmentDetail(null)) : normalResponse(request))
+    scripted.setHandler(request => {
+      if (request.operationId === 'getAssignment') return okEnvelope(assignmentDetail(null))
+      if (request.operationId === 'getSubmission') {
+        const { student: _student, draftFeedback: _draft, ...submission } = teacherSubmission
+        return okEnvelope({ ...submission, publishedFeedback: null })
+      }
+      return normalResponse(request)
+    })
     const page = await open(path, 'student')
     expect(requestsOf('getFeedback')).toHaveLength(0)
     expect(page.text()).not.toContain('教师反馈')

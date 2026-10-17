@@ -34,6 +34,7 @@ export type AssignmentOperationId = keyof Pick<operations,
   | 'listMySubmissions'
   | 'getSubmission'
   | 'listTeacherAssignments'
+  | 'listTeacherSubmissions'
   | 'createAssignment'
   | 'getTeacherAssignment'
   | 'patchAssignment'
@@ -59,6 +60,7 @@ export const ASSIGNMENT_SPECS = {
   listMySubmissions: { id: 'listMySubmissions', method: 'GET', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: false },
   getSubmission: { id: 'getSubmission', method: 'GET', path: '/api/v1/submissions/{submissionId}', csrf: false },
   listTeacherAssignments: { id: 'listTeacherAssignments', method: 'GET', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: false },
+  listTeacherSubmissions: { id: 'listTeacherSubmissions', method: 'GET', path: '/api/v1/teacher/assignments/{assignmentId}/submissions', csrf: false },
   createAssignment: { id: 'createAssignment', method: 'POST', path: '/api/v1/teacher/offerings/{offeringId}/assignments', csrf: true },
   getTeacherAssignment: { id: 'getTeacherAssignment', method: 'GET', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: false },
   patchAssignment: { id: 'patchAssignment', method: 'PATCH', path: '/api/v1/teacher/assignments/{assignmentId}', csrf: true },
@@ -125,6 +127,9 @@ export class AssignmentsApi {
 
   getSubmission(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getSubmission']>> {
     return this.request('getSubmission', options, id)
+  }
+  listTeacherSubmissions(id: string, query: NonNullable<operations['listTeacherSubmissions']['parameters']['query']> = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listTeacherSubmissions']>> {
+    return this.request('listTeacherSubmissions', options, id, undefined, query)
   }
 
   listTeacherAssignments(offeringId: string, query: TeacherAssignmentsQuery = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listTeacherAssignments']>> {

@@ -9,6 +9,7 @@ import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { isUuid } from './format'
 import { assignmentBody, localDateTime, templateFiles } from './assignment-form'
+import TeacherSubmissionList from './TeacherSubmissionList.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -268,5 +269,6 @@ function addCriterion(): void {
       <label v-for="file in form.initialFiles" :key="file.path">{{ file.path }}<textarea v-model="file.content" rows="8" spellcheck="false" /></label>
       </fieldset>
     </fieldset>
+    <TeacherSubmissionList v-if="assignmentId && query.status.value === 'success' && query.data.value?.publicationState !== 'draft'" :assignment-id="assignmentId" />
   </div>
 </template>

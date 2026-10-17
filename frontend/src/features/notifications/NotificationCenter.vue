@@ -62,7 +62,7 @@ async function open(notification: NotificationDTO): Promise<void> {
   try {
     if (route === 'needs-feedback-lookup') {
       const feedback = await api.getFeedback(target.id)
-      await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId } })
+      await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId }, query: { feedbackId: target.id } })
     } else {
       await router.push(route)
     }

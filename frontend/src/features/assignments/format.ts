@@ -37,7 +37,7 @@ export function formatScore(score: number | null, maxScore: number): string {
   return `${score}/${maxScore}`
 }
 
-export function isUuid(value: string | string[] | undefined): value is string {
+export function isUuid(value: unknown): value is string {
   if (typeof value !== 'string') return false
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }

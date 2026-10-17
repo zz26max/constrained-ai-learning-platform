@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
+import ActionNotice from '../../components/ActionNotice.vue'
+import { useAssignmentActions } from './use-assignment-actions'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import StudentFeedbackView from './StudentFeedbackView.vue'
 import { usePageQuery } from '../courses/use-page-query'
@@ -10,6 +12,11 @@ import { assignmentStateLabel, dueText, isUuid } from './format'
 
 const route = useRoute()
 const api = assignmentsApi()
+const router = useRouter()
+const readActions = useAssignmentActions()
+const page = ref(1)
+const historyQuery = usePageQuery(async signal => (await api.listMySubmissions(assignmentId.value, { page: page.value, pageSize: 10 }, { signal })).data)
+watch(page, () => { void historyQuery.load() })
 
 const assignmentId = computed(() => {
   const id = route.params.id
@@ -24,14 +31,34 @@ const query = usePageQuery(async signal => {
 })
 
 const feedbackQuery = usePageQuery(async signal => {
-  const feedbackId = query.data.value?.publishedFeedbackId
-  if (!feedbackId) return null
-  return (await api.getFeedback(feedbackId, { signal })).data
+  const feedbackId = route.query.feedbackId ?? (route.query.submissionId ? undefined : query.data.value?.publishedFeedbackId ?? undefined)
+  const submissionId = route.query.submissionId
+  if (feedbackId !== undefined && !isUuid(feedbackId)) throw new Error('评价链接无效')
+  if (submissionId !== undefined && !isUuid(submissionId)) throw new Error('提交链接无效')
+  const feedback = feedbackId ? (await api.getFeedback(feedbackId, { signal })).data : null
+  if (feedback && feedback.assignmentId !== assignmentId.value) throw new Error('评价不属于当前作业')
+  const id = feedback?.submissionId ?? submissionId ?? query.data.value?.latestSubmissionId
+  if (!id) return null
+  const submission = (await api.getSubmission(id, { signal })).data
+  if ('student' in submission || submission.assignmentId !== assignmentId.value) throw new Error('提交不属于当前作业')
+  return { submission, feedback: feedback ?? submission.publishedFeedback }
 })
+
+async function markFeedbackRead(): Promise<void> {
+  const feedback = feedbackQuery.data.value?.feedback
+  if (!feedback || feedbackQuery.status.value !== 'success') return
+  await readActions.run(token => api.readMessage(feedback.messageId, { csrfToken: token }), '相关反馈消息已读')
+}
+watch(() => feedbackQuery.status.value, async status => {
+  if (status === 'success') { await nextTick(); await markFeedbackRead() }
+})
+function selectSubmission(id: string): void {
+  void router.push({ query: { submissionId: id } })
+}
 
 watch(() => route.fullPath, async () => {
   await query.load()
-  if (query.status.value === 'success') await feedbackQuery.load()
+  if (query.status.value === 'success') await Promise.all([feedbackQuery.load(), historyQuery.load()])
 }, { immediate: true })
 
 // 文案只翻译后端 submissionBlockedReason，不自行推断是否可提交。
@@ -122,14 +149,31 @@ const canStartWork = computed(() => {
         </section>
       </section>
 
-      <template v-if="query.data.value.publishedFeedbackId">
+      <section class="surface" aria-label="我的提交记录">
+        <h2>我的提交记录</h2>
+        <ApiState :status="historyQuery.status.value" :error="historyQuery.error.value" @retry="historyQuery.load" />
+        <template v-if="historyQuery.status.value === 'success' && historyQuery.data.value">
+          <p v-if="!historyQuery.data.value.items.length">尚未提交作品。</p>
+          <ul><li v-for="item in historyQuery.data.value.items" :key="item.id"><button type="button" class="button secondary" @click="selectSubmission(item.id)">查看第 {{ item.attemptNumber }} 次提交 · 版本 {{ item.workspaceRevision }}</button><span v-if="item.superseded">已被新提交替代</span></li></ul>
+          <nav v-if="historyQuery.data.value.total > 10" aria-label="提交记录分页"><button :disabled="page <= 1" @click="page--">上一页</button><span>第 {{ page }} 页</span><button :disabled="page * 10 >= historyQuery.data.value.total" @click="page++">下一页</button></nav>
+        </template>
+      </section>
+      <div>
         <ApiState :status="feedbackQuery.status.value" :error="feedbackQuery.error.value" @retry="feedbackQuery.load" />
+        <section v-if="feedbackQuery.status.value === 'success' && feedbackQuery.data.value" class="surface" aria-label="提交作品快照">
+          <h2>第 {{ feedbackQuery.data.value.submission.attemptNumber }} 次提交 · 版本 {{ feedbackQuery.data.value.submission.workspaceRevision }}</h2>
+          <p>这是提交时的不可变作品，工作区后续练习不会改变它。</p>
+          <div v-for="file in feedbackQuery.data.value.submission.files" :key="file.path"><h3>{{ file.path }}</h3><pre>{{ file.content }}</pre></div>
+          <h3>完成反思</h3><SafeMarkdown :content="feedbackQuery.data.value.submission.reflection" />
+        </section>
         <StudentFeedbackView
-          v-if="feedbackQuery.status.value === 'success' && feedbackQuery.data.value"
-          :feedback="feedbackQuery.data.value"
-          :rubric="query.data.value.rubric"
+          v-if="feedbackQuery.status.value === 'success' && feedbackQuery.data.value?.feedback"
+          :feedback="feedbackQuery.data.value.feedback"
+          :rubric="feedbackQuery.data.value.submission.assignmentSnapshot.rubric"
         />
-      </template>
+        <ActionNotice :error="readActions.error.value" :message="readActions.message.value" />
+        <button v-if="readActions.error.value" type="button" class="button secondary" :disabled="readActions.pending.value" @click="markFeedbackRead">重试标记已读</button>
+      </div>
     </template>
   </div>
 </template>
