@@ -69,6 +69,8 @@
 
 ### 接手记录（2026-10-16）
 
+- **2026-10-17 教师表单修复包**：B3 日期在本地控件与 UTC 间转换；PATCH 排除 `aiPolicyVersion`，published 仅提交允许字段；补 Web/SQL/文字类型、章节知识点、模板、量规、延期与提交次数，切换类型前提示模板替换；归档/加载失败禁用写入。作业管理补操作结果与错误呈现（B8）。日期回归先失败，修复后前端 `npm run verify` 20 文件/192 项通过，类型、构建、无 mock 检查通过。真实教师页面创建 SQL 草稿 `256567e8-86c9-41da-823f-8215ce7e09ec`，填写本地截止 2026-10-24 22:00、模板 `SELECT 1017 AS acceptance;`，再次改描述保存成功，整页刷新恢复类型/章节/截止/模板/量规。证据 `D:/tmp/lp/browser-p1/teacher-sql-reopened-dom.txt`。尚待三类全链路发布提交、批阅入口和其余 P1 包；未将接口提升 verified。
+
 - **2026-10-17 工作区恢复包**：保存队列区分本地编辑序号与服务端 revision，错误暂停且保留最新待保存内容；409 显式读取/比较/恢复或合并，断线结果不确定先读回核对；提交期间冻结编辑与反思；离开失败使用等待保存/留在页面/放弃三项操作；会话失效在内存保留，同账号恢复前比较，换号或主动退出清除。取消导航不再错误更新页面标题。新增恢复用例先运行 3 项均失败，再修复；最终前端 `npm run verify`：类型、构建、无 mock 检查通过，19 文件/188 项通过。真实双标签从 revision 1 编辑，第二页 409 保留本地并显示离开对话框；选择留在页面→读取服务端 revision 2→编辑合并→明确保存，HTTP 读回 revision 3 为合并内容。证据 `D:/tmp/lp/browser-p1/conflict-merged-dom.txt` 与 `conflict-merged-readback.json`；截图工具本轮失败，未声称取得截图。尚待：真实慢网络/会话失效专项及 P1 其余包；不提升整体 verified。
 
 - **P1 收尾基线复验（代码 `ccfc1d5`）**：真实学生页面 Web 编辑后 750ms 内完成提交，HTTP 读回提交 `af68db35-7105-40eb-b346-c1947380603d` 的 revision 1 文件为 `P1_B1_LATEST_CONFIRMED`；Text 编辑后立即切页，服务端 revision 2 保留 `P1_B2_LEAVE_PRESERVED`；过期作业工作区提交按钮禁用且仍可练习保存。B1/B2/B6 原正常网络场景通过，慢网络、失败恢复及会话恢复仍待补验。前端目录运行 `npm exec -- vitest run tests/workspace-autosave.test.ts tests/workspace-editor.test.ts`：2 文件、19 项通过。证据 `D:/tmp/lp/browser-p1/baseline-retest.json`（本机，不入库）。新建独立 Web 夹具 `795db0ac-f56e-4ab8-930b-fcfe0d433050`，保留原测试数据；HTTP 创建夹具不算教师表单通过。

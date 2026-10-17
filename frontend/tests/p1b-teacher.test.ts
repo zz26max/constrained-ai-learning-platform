@@ -24,6 +24,9 @@ const createdId = '00000000-0000-4000-8000-000000000706'
 function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
   const id = request.path.split('/').filter(Boolean).at(-1) ?? ''
   switch (request.operationId) {
+    case 'getOffering': return okEnvelope({ id: P1A_IDS.offeringWeb, status: 'active' })
+    case 'listTeacherChapters':
+    case 'listKnowledgePoints': return okEnvelope({ items: [] })
     case 'listTeacherAssignments':
       return okEnvelope({ items: [
         { id: P1B_IDS.assignmentWeb, offeringId: P1A_IDS.offeringWeb, chapterId: P1A_IDS.chapterWeb, title: 'HTML 表单实现', type: 'web_lab', isRequired: true, description: '完成编程任务', requirements: ['实现功能'], estimatedMinutes: 120, knowledgePointIds: [], dueAt: '2026-11-01T16:00:00Z', lateUntil: '2026-11-03T16:00:00Z', allowResubmit: true, maxAttempts: 3, maxScore: 80, rubric: [{ criterionId: 'c1', title: '代码正确性', description: '实现符合需求', maxScore: 50 }], initialFiles: [{ path: 'main.js', content: '// 代码\n' }], aiPolicyVersion: 1, publicationState: 'published', publishedAt: '2026-10-14T02:00:00Z', submittedStudentCount: 0, pendingReviewCount: 0 },
@@ -108,10 +111,12 @@ describe('P1-B 教师作业路径', () => {
 
     await rendered.find('#title').setValue('新作业')
     await rendered.find('#description').setValue('新作业描述')
+    await rendered.find('#dueAt').setValue('2026-11-10T16:00')
     await buttonNamed(rendered, '保存').trigger('click')
     await flushPromises()
 
     expect(postRequests('createAssignment')).toHaveLength(1)
+    expect(JSON.parse(postRequests('createAssignment')[0]!.body!).dueAt).toBe(new Date('2026-11-10T16:00').toISOString())
 
     await router?.push(`/teacher/offerings/${P1A_IDS.offeringWeb}/assignments`)
     await router?.isReady()
@@ -193,6 +198,7 @@ describe('P1-B 教师作业路径', () => {
     await router?.isReady()
 
     await rendered.find('#title').setValue('重试作业')
+    await rendered.find('#dueAt').setValue('2026-11-10T16:00')
     await buttonNamed(rendered, '保存').trigger('click')
     await flushPromises()
 

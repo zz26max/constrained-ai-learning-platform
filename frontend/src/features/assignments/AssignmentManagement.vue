@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
+import ActionNotice from '../../components/ActionNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { formatDueTime, isUuid } from './format'
@@ -70,6 +71,7 @@ async function archiveAssignment(id: string): Promise<void> {
     </header>
 
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
+    <ActionNotice :error="actions.error.value" :message="actions.message.value" />
 
     <template v-if="query.status.value === 'success'">
       <section v-if="publishedAssignments.length > 0" class="surface">
