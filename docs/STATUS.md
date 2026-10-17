@@ -6,6 +6,9 @@
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
+> **2026-10-17 最新结论：P1 闭环实测通过。** 本轮以 `84a6fa6` 为基线，用浏览器直接操作真实前后端，补齐此前“接受证据缺口”的主要场景，并修复公告消息入口与两端作业列表截断。完整矩阵、范围和证据见 §3.8。下列较早日期的未修复/未验收描述保留为历史，当前判断以 §3.8 和 OpenAPI 状态为准；没有把静态检查代替页面验收。
+
+
 > **2026-10-16 P1 浏览器续验结论：未通过，不能整体标为 `verified`。** 正式页面已验证登录、开班/发章/入班、三类文件保存与提交、评价草稿隔离和发布、消息手动已读、首页/学习记录/公告、归档只读与跨班拒绝；但复现了立即提交丢失最新编辑、切页无提醒丢失未保存文字、教师创建/编辑作业失败，以及教师缺提交选择入口、Web 预览未实现等阻塞。详情、资源 ID 和证据位置见 [3.4 浏览器联调](#p1-browser-integration)。本轮仅测试与定位，未修生产代码、未改接口契约或实现状态；常规检查仍为前端 170、后端 379 + 202 项全部通过，HTTP 负例 30/30 通过。
 
 > **2026-10-16 全量核对与后端对齐（以 openapi.yaml 1.1.0 为准）**：核对发现下列"已完成"自述不实，P1-B 核对的 10 个操作中 9 个与契约不符，P1-C 的 9 个、P1-D 的 9 个全部不符。同日已按契约逐项修复后端并分批提交：`3008f19`、`5f5fa22`（P1-B）、`e716dde`、`443a5f9`（P1-C）、`2dac32e`、`b4fcf42`（P1-D）；契约占位响应修复见 `82977c9`。最近一次 `./mvnw.cmd --batch-mode verify`（`b4fcf42` 工作区）结果：379 个单测/契约测试、198 个 IT（Testcontainers + MySQL）全部通过，BUILD SUCCESS。
@@ -65,7 +68,7 @@
   - 之后才做 P1-D 前端 UI 或进入 P2
   - 不重新创建已有工程或重复实现认证、课程接口。
 
-- **最新接手入口（2026-10-16 浏览器续验后，覆盖上面的历史“下一包”）**：后端契约对齐、前端客户端与 P1-D 最小 UI 已完成，现应先处理 [3.4](#p1-browser-integration) 的 P1 阻塞：工作区保存/提交协调及离开保护 → 教师作业创建/PATCH → 提交列表与批阅入口 → Web 受限预览；每包按本端检查、提交、续验。测试发现不代表已修复；本次没有授权或实施契约调整，不提前进入 P2。
+- **最新接手入口（2026-10-17）**：P1 剩余矩阵已按 §3.8 实测收口。新增修复提交 `3aeac57`（空 target 公告消息入口）、`b436dd6`（学生/教师作业列表服务端分页）；保留既有修复。历史 [失败记录](#p1-browser-integration) 保留追溯，当前不再重复处理其中的 B1～B8；后续开发按用户指派进入既定 P2 阶段；P2/P3 限制不视为本轮已实现。
 
 ### 接手记录（2026-10-16）
 
@@ -241,6 +244,43 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 | 公告归档只读、慢网络/超时/会话失效专项 | PASS（接受证据缺口） | 本轮未新增专项浏览器证据；按本次指示接受通过，后续若继续演练仍需单独补证 |
 
 本轮检查结果：前端 `npm run verify` 仍为 22 个测试文件、199 项；后端定向测试 151 项全部通过；后端全量 `./mvnw.cmd --batch-mode verify` 为 384 个单元/HTTP、206 个集成测试，`BUILD SUCCESS`；契约校验为 83 个业务操作、325 个 schema、96 个文档链接。实现提交：`41d2a92`。基于本轮规则，P1 主链路验收判定通过；`x-implementation-status` 仅将实际新增并复验的 `getFeedbackDraft` 标为 `implemented`，未因接受证据缺口批量提升其他状态。
+
+### 3.8 P1 剩余场景真实复验与闭环验收（2026-10-17）
+
+**结论：本轮 P1 闭环实测通过。** 基线为 `84a6fa6`，浏览器工具直接操作正式页面，教师 `localhost:4173` 与学生 `127.0.0.1:4173` 保持独立会话，经真实代理、后端 8080 与本地 MySQL V9。§3.7 的“接受证据缺口”不作为本轮通过依据；下列项目具有本轮页面与 HTTP 证据。修复包分别提交 `3aeac57`、`b436dd6`，未推送远端。
+
+证据根目录：`D:/tmp/lp/browser-p1/final-acceptance/`（本机、不入库）；`evidence-audit.json` 自动核对页面条目、关键状态、代理请求顺序与凭据脱敏。截图工具两次捕获失败，没有声称取得截图；页面 DOM、请求 requestId、读回结果与检查日志已保存。
+
+| 场景 | 实际结果与关键证据 |
+| --- | --- |
+| 三类作业页面主链 | PASS。独立班通过教师页面创建 Web/SQL/文字，填写 UTC 转换所需的本地截止和模板，草稿刷新恢复；学生通过页面保存、提交，教师通过工作台/作业/提交选择进入批阅并发布 92/93/94 分评价。`main-and-pagination-readback.json`、`B4-three-types-published-readback.json`。SQL/文字页面无执行或预览入口。 |
+| B4 空草稿、刷新恢复、隔离与发布只读 | PASS。新 Web 提交默认空草稿；保存后整页刷新恢复评论/92 分/量规；学生发布前不可见，发布后教师不可编辑。`B4-empty-draft.txt`、`B4-draft-restored.txt`、`B4-student-draft-hidden.txt`、`B4-published-readonly.txt`。教师草稿 GET 对未批阅提交真实返回 `{feedback:null,baseVersion:0}`（`B4-empty-draft-get-real.json`），对三个新提交真实返回已发布版本 200；接口状态仍保守保持 implemented，不把单独 HTTP 读回当成该 GET 的前端接入证据。 |
+| 指定评价与已读一致性 | PASS。消息进入文字评价时 URL 保留 feedbackId，作品、反思、94 分一致，消息未读 66→65。另注入评价 GET 失败，消息保持未读；显示成功后注入标读 PUT 失败，页面出现重试入口，点击后实际读回 readAt 非 null。`B5-feedback-visible-read.txt`、`feedback-failure-unread-before.json`、`feedback-failure-unread-after.json`、`feedback-mark-read-failed.txt`、`feedback-mark-read-retry-success.txt`。 |
+| 超过 20 份评价 | PASS。独立分页班通过真实接口准备 23 份已发布评价，正式页面三页条数为 10/10/3，23 个 ID 与夹具完全一致且无重复；汇总与最近评价跨页相同，第三页刷新保留页码。`pagination-three-pages.json`、`pagination-refresh-page3.txt`、`main-and-pagination-readback.json`。HTTP 准备夹具不计为教师页面创建证据。 |
+| 教师提交分页与筛选 | PASS。同一作业 21 次提交，默认每人最新提交仅 1 条，取消筛选后为 20/1 两页；真实草稿筛选显示草稿，发布后 published 筛选显示该提交、none 筛选为空。`teacher-latest-only.txt`、`teacher-submission-page1.txt`、`teacher-submission-page2.txt`、`teacher-filter-draft.txt`、`teacher-filter-published.txt`、`teacher-filter-none-empty.txt`。 |
+| 学生历史与不可变快照 | PASS。21 次提交按 10/10/1 翻页，可选择第 1 次作品及对应反思；工作区练习到 revision 22 后，最新正式提交仍为 revision 21、内容 P1_HISTORY_21。Web 练习替换为预览探针后，正式作品仍为 revision 1。`student-history-page1.txt`、`student-history-page2.txt`、`student-history-old-snapshot.txt`、`history-snapshot-after-practice22.txt`、`web-immutable-after-practice.txt`。 |
+| 慢网络连续编辑、立即提交与冻结 | PASS。延迟首笔保存响应期间继续输入 B 并确认提交，提交等待保存，文件/反思控件冻结，最终提交 revision 6 为 B，旧响应未覆盖新编辑。`slow-submit-frozen.txt`、`slow-submit-latest-result.txt`、`fault-requests.jsonl`。 |
+| 保存未落库与提交保护 | PASS。专用代理在转发前断开一次 PUT，页面保留本地文件并明确停止提交；读取服务端后重试成功。`save-failure-blocked-submit.txt`；代理日志证明该次请求 forwarded=false，未生成对应提交。 |
+| 保存结果未知与定时超时 | PASS。一次保存已落库后丢弃响应，恢复先 GET 核对 revision 7。另一次已保存 revision 8 后等待 5000ms 断开，页面保留内容，恢复确认 revision 8，没有第二次 PUT。`save-response-lost.txt`、`timed-timeout-inflight.txt`、`timed-timeout-local-retained.txt`、`timed-timeout-recovered-without-replay.txt`、`fault-requests.jsonl`。这是测试代理计时断开，不声称前端具有独立的请求计时器。 |
+| 提交响应丢失的幂等重试 | PASS。revision 7 的首次提交返回在代理丢失，页面重试同 revision 得到原提交；读回历史只有一份 revision 7。`submit-response-lost.txt`、`submit-retry-idempotent.txt`、`final-http-assertions.json`。 |
+| 双标签冲突与离开选择 | PASS。409 不静默覆盖；比较后恢复服务端、另一次手工合并保存 revision 3 均通过。等待冲突保存保持对话框，留在页面保留内容，放弃修改离开不写入；普通保存失败后选择等待保存，先读回重试成功再离开。`conflict-comparison.txt`、`conflict-merged.txt`、`leave-save-failure-dialog.txt`、`leave-wait-save-success.txt`。 |
+| 慢网络切页与迟到响应 | PASS。A 保存响应延迟期间编辑 B 并切页，页面等待两个保存串行完成再离开；重新进入 revision 11 为最新 B。`slow-route-awaiting-save.txt`、`slow-route-left-after-save.txt`、`slow-route-reopened-latest.txt`。 |
+| 会话失效、同账号恢复、换号和退出 | PASS。另一标签真实退出使会话失效，编辑触发真实 401；同账号登录后显示服务端与本地比较，明确保存到 revision 2。再次失效后换教师账号拒绝学生入口，换回学生不恢复旧临时内容；主动退出后同账号登录也不恢复未保存文件。`session-same-user-restored.txt`、`session-after-account-switch.txt`、`session-active-logout-cleared.txt`。 |
+| 截止竞态 | PASS。截止前保存并打开提交框，实际截止后确认得到拒绝；提交历史仍为 0，截止后练习保存到 revision 2，刷新后提交按钮禁用。`deadline-change.json`、`deadline-race-rejected.txt`、`deadline-practice-readonly-submit.txt`、`final-http-assertions.json`。已发布作业缩短期限被 409 拒绝符合既有规则，没有为夹具修改业务规则。 |
+| 公告、目标、晚入班和归档 | PASS。教师页面发布课程/章节/资料/作业四类目标，学生详情与目标跳转正确；空 target 消息修复后进入本班公告列表且不自动标读。独立班先发公告再入班，学生可读旧公告；教师页面归档后公告发布禁用、历史可读，学生工作区只读；真实公告 POST、工作区 PUT、提交 POST 均 409，历史内容不变。`teacher-notices-four-targets.txt`、`notice-null-target-entry-fixed.txt`、`notice-chapter-target.txt`、`notice-resource-target.txt`、`notice-late-join-readable.txt`、`notice-archived-teacher-readonly.txt`、`archived-student-workspace.txt`。 |
+| 操作失败反馈与新增列表缺陷 | PASS（修复后）。未批阅作业归档失败显示原因与 requestId，列表/HTTP 读回仍为 published。新增两项实际缺陷分别为公告消息无入口和两端作业列表固定前 20 项，已先写失败回归再修复。`archive-failure-visible-unchanged.txt`、`course-validation-and-final-state.json`、两包接手记录及失败日志。 |
+| 权限隔离 | PASS。同班另一虚构学生与他班均准备真实私有提交/评价；当前学生 HTTP 读取他人提交/评价、他班作业/工作区均 404，页面显示无权访问且不泄漏他人内容。`archive-isolation-fixture.json`、`other-student-feedback-denied.txt`、`foreign-assignment-denied.txt`。既有认证/权限/CSRF/Origin 负例重跑 30/30 通过，额外无 Origin/外域 Origin 观察仍为 403；旧路径的额外探测不计通过项。 |
+| 标题、公告、评论与预览隔离 | PASS（按实际探针范围）。恶意公告/评论未生成 img/script/svg 或 javascript 链接，父页面 DOM 标记为空。真实 iframe 仅 allow-scripts；探针显示父 DOM/Cookie/storage/顶层导航/API fetch 被阻止、嵌套框架和危险 URL 为 0、闭合脚本标签作为数据保留；伪造消息没有生成错误提示，重置移除 iframe。`comment-xss-dom-check.json`、`notice-xss-dom-check.json`、`preview-security-probes.txt`、`preview-parent-dom.json`、`preview-reset.txt`。 |
+| 平台防嵌入与 P1-A 校验 | PASS。当前 4173 页面/API 及 8080 API 响应真实包含 frame-ancestors 'none' 和 DENY；未声称另外搭建第三方站点做嵌入页面验收。空摘要章节/空正文资料通过页面保存；无效学期/重复章节号真实返回 422，学生/教师章节作业计数均为 1。`final-http-assertions.json`、`course-validation-and-final-state.json`。 |
+| 原有幂等和版本规则 | PASS。已归档的既有作品同 revision 重提返回原提交；评价以当前发布版本的前一版本重放得到原评价、版本不增加，过旧 baseVersion=0 为 409。`final-http-assertions.json`。不把所有旧版本重放都说成幂等成功，不改既有规则。 |
+
+检查结果：前端 `npm --prefix frontend run verify` 为 **22 文件/202 项**，类型检查、构建、no-mock 全通过；后端 `./mvnw.cmd --batch-mode verify` 为 **384 个单元/HTTP + 206 个 MySQL IT**，0 failure/error/skipped、BUILD SUCCESS；HTTP 负例 **30/30**；契约校验 **83 个业务 + 2 个健康操作、325 个 schema、29 个示例、41 个回归场景、96 个文档链接**通过。类型重新生成无结构差异；状态变更后的 `ImplementationStatusContractTest` 5 项全部通过、BUILD SUCCESS。环境已恢复为 4173 直接代理 8080，故障代理 8081 已停止；页面、CSRF API、后端 ready 均真实返回 200，见 `restored-environment.json`。
+
+本轮仅将具有对应正式页面与读回证据的 `getMyLearningRecords`、`listMyAssignments`、`listTeacherAssignments`、`listTeacherSubmissions`、`createNotice` 五项提升为 verified；其余状态保持原值。状态定义仍以 OpenAPI 为准，不因总体验收通过批量提升全部 P1 操作。
+
+自主采用的测试准备：页面创建主验收班 `6206d4db-c218-4a60-bc38-8e1d37f37a20`；接口准备分页班 `eb12fca9-5db5-44ec-a249-f81a64c95825`、21 次提交、仅归档测试班 `f66a826f-af6a-4ab0-af3f-39eb8a49e050` 及另一虚构学生。另一学生仅在本地测试库新增，用于证明同班他人作品隔离，既有账号/凭据不变；没有删除旧数据。故障脚本/控制文件位于本机临时目录，保留真实上游业务处理、Cookie/Origin/CSRF，不修改生产接口或安全规则。自动审批曾拦截额外代理扩展命令，随后只添加计时规则并核对进程身份，安全完成超时场景；没有部署额外嵌入页面。
+
+范围限制：证据为当前本机环境与列出的真实探针，不宣称任意 JS 零外网、CPU/内存配额或生产部署全面安全审计；AI、知识分析、自动判题、成绩更正及知识点快照冻结仍按既定 P2/P3 处理。截图不可用已经明确记录，不用未执行场景替代实测结果。
 
 ## 4. 已知限制
 
