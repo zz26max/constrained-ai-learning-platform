@@ -1,20 +1,31 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { assignmentStateLabel, dueText } from './format'
 
 const route = useRoute()
+const router = useRouter()
+const PAGE_SIZE = 20
+const page = computed(() => {
+  const raw = Number(route.query.page)
+  return Number.isInteger(raw) && raw >= 1 && raw <= 2147483647 ? raw : 1
+})
 const api = assignmentsApi()
 
 const query = usePageQuery(async signal => {
-  const result = await api.listMyAssignments({}, { signal })
+  const result = await api.listMyAssignments({ page: page.value, pageSize: PAGE_SIZE }, { signal })
   return result.data
 })
 
 watch(() => route.fullPath, () => { void query.load() }, { immediate: true })
+const totalPages = computed(() => Math.max(1, Math.ceil((query.data.value?.total ?? 0) / PAGE_SIZE)))
+function goToPage(next: number): void {
+  if (next >= 1 && next <= totalPages.value) void router.push({ query: { ...route.query, page: String(next) } })
+}
+
 
 const sortedAssignments = computed(() => {
   if (!query.data.value?.items) return []
@@ -63,6 +74,11 @@ const sortedAssignments = computed(() => {
           </li>
         </ul>
       </section>
+      <nav v-if="totalPages > 1" class="pagination" aria-label="作业列表分页">
+        <button type="button" class="button secondary" :disabled="page <= 1" @click="goToPage(page - 1)">上一页</button>
+        <span>第 {{ page }} / {{ totalPages }} 页 · 共 {{ query.data.value?.total }} 项</span>
+        <button type="button" class="button secondary" :disabled="page >= totalPages" @click="goToPage(page + 1)">下一页</button>
+      </nav>
     </template>
   </div>
 </template>

@@ -292,6 +292,27 @@ describe('P1-D 公告', () => {
 })
 
 describe('P1-D 消息目标映射', () => {
+  it.each([
+    { role: 'student' as const, path: '/student/assignments', operation: 'listMyAssignments' },
+    { role: 'teacher' as const, path: `/teacher/offerings/${OFFERING}/assignments`, operation: 'listTeacherAssignments' },
+  ])('$role 超过 20 项作业可请求第二页并保留 URL 页码', async ({ role, path, operation }) => {
+    const items = Array.from({ length: 23 }, (_, i) => summary(`00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, { title: `分页作业${i + 1}` }))
+    scripted.setHandler(request => {
+      if (request.operationId !== operation) return normalResponse(request)
+      const params = new URL(request.path, 'http://localhost').searchParams
+      const page = Number(params.get('page') ?? 1)
+      return okEnvelope({ items: items.slice((page - 1) * 20, page * 20), page, pageSize: 20, total: 23, summary: { allCount: 23 } })
+    })
+    const page = await open(path, role)
+    const next = page.findAll('button').find(button => button.text() === '下一页')
+    expect(next).toBeDefined()
+    await next!.trigger('click')
+    await flushPromises()
+    expect(router?.currentRoute.value.query.page).toBe('2')
+    expect(requestsOf(operation).at(-1)?.path).toContain('page=2&pageSize=20')
+    expect(page.text()).toContain('分页作业23')
+    expect(page.text()).not.toContain('分页作业20')
+  })
   it('空 target 的课程公告进入本班公告列表，打开不标读', async () => {
     scripted.setHandler(request => request.operationId === 'listMessages'
       ? okEnvelope({ items: [{ id: NOTICE, offeringId: OFFERING, type: 'course_notice', title: '历史公告',

@@ -69,6 +69,9 @@
 
 ### 接手记录（2026-10-16）
 
+- **2026-10-17 两端作业列表分页补修**：23 份真实评价夹具暴露学生“我的作业”与教师“作业管理”都固定读取默认前 20 项且没有翻页入口，后续作业无法从列表访问。沿用现有 `listMyAssignments` / `listTeacherAssignments` 的 `page/pageSize`，每页 20 项、按服务端 total 翻页、页码保存在 URL，未新增契约字段。两条回归先失败（学生/教师均无下一页），修复后前端 `verify` 22 文件/202 项全通过。正式页面已翻到教师 23 项列表第 2 页和学生列表第 3 页；证据在 `D:/tmp/lp/browser-p1/final-acceptance/` 的 `assignment-list-truncated-before.txt`、`teacher-assignment-list-truncated-before.txt`、`teacher-assignment-list-page2-fixed.txt`、`student-assignment-list-page3-fixed.txt`、`assignment-pagination-before.log`。P1 其余专项仍在收口。
+
+
 - **2026-10-17 剩余场景实测发现并修复公告消息入口**：以 `84a6fa6` 为基线，正式页面发布公告后，真实 `course_notice` 消息 `target=null` 只有标读按钮，不能进入公告。补按 `offeringId` 进入本班公告列表的入口，仅适用于课程公告且 UUID 合法，打开不标读，不改变服务端消息字段。回归先失败（找不到查看按钮），修复后前端 `verify` 22 文件/200 项、类型/构建/no-mock 全通过。真实学生消息点击已进入对应班公告列表。证据 `D:/tmp/lp/browser-p1/final-acceptance/notice-null-target-missing-entry.txt`、`notice-null-target-entry-fixed.txt` 和 `notice-entry-before.log`。其余专项仍在验收，本条不代表 P1 全量收口。
 
 
