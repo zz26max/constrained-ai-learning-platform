@@ -205,6 +205,22 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 
 2026-10-17 继续验收基础检查：`npm --prefix frontend run verify` 通过（22 个测试文件、199 项测试，类型检查、构建及 no-mock 检查均通过）；`.contract-venv\\Scripts\\python.exe scripts/validate_contract.py` 通过（83 个业务操作、325 个 schema、29 个示例、41 个回归场景）。当前仓库没有 Playwright/Puppeteer 验收入口，Edge 进程未开放调试端口，因此本轮未新增真实浏览器动作证据，B3/B4/B5/B8 及并发、超时、跨账号场景仍不能标记为 `verified`。
 
+### 3.6 P1 浏览器闭环验收记录（2026-10-17）
+
+本轮采用用户手动操作 Edge、脚本即时 HTTP 读回的方式，证据保存在 `D:/tmp/lp/browser-p1/`，不入库。结果如下：
+
+| 场景 | 结果 | 证据/说明 |
+| --- | --- | --- |
+| B3 教师创建与草稿恢复 | PASS | `B3-create-edit.json`；Web/SQL/文字模板、UTC 时间、量规总分和草稿状态读回一致 |
+| B4 提交列表与批阅入口 | FAIL | `B4-submission-review.json`；提交列表、快照和入口可用，但 `getFeedbackDraft` GET 返回 405，requestId `req-2b9162d8-6776-4f50-b1fc-62b9fdaf28c9`，响应 `Allow: POST` |
+| B5 反馈跳转与标读 | PASS | `B5-feedback-message-final.json`；4 个 feedbackId 可读，最新 messageId 已标读，未读数 18→14 |
+| B8 冲突/恢复最终状态 | PASS（页面结果由用户确认） | `B8-conflict-recovery-final.json`；三个工作区读回 200，revision 为 3/2/1，提交历史可读 |
+| 学习记录超过 20 条分页 | BLOCKED | `pagination.json`；当前夹具只有 3 条和 1 条评价，未达到超过 20 条的前置条件 |
+| 公告列表与 target | PASS | `pagination.json`；教师和学生列表均 200，target 属于当前教学班 |
+| 标题/公告/预览隔离 | PASS（页面结果由用户确认） | 用户确认恶意探针未执行，预览不能读父页面、Cookie、存储或 API，重置成功 |
+
+最终自动化检查：前端 `verify` 通过（22 个测试文件、199 项）；后端 Maven `verify` 通过（380 个单元/HTTP、205 个集成测试）；契约校验通过（83 个业务操作、325 个 schema）。由于 B4 为 FAIL、历史分页为 BLOCKED，P1 仍不能整体标记 `verified`。
+
 ## 4. 已知限制
 
 以下竞态在课程演示规模下发生概率极低，按设计不加防护；如果出现，在此记录现象再决定是否补强。
