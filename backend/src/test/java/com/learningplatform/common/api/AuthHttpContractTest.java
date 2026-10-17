@@ -135,6 +135,8 @@ class AuthHttpContractTest {
     void anonymousCsrfTokenSetsPreAuthCookie() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/auth/csrf-token"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", "frame-ancestors 'none'"))
+                .andExpect(header().string("X-Frame-Options", "DENY"))
                 .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
                 .andExpect(jsonPath("$.requestId").isNotEmpty())
                 .andExpect(header().string("Cache-Control", "no-store"))

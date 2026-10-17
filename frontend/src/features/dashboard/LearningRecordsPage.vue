@@ -18,7 +18,7 @@ const selecting = computed(() => rawId.value === undefined)
 const invalidLink = computed(() => !selecting.value && !isUuid(rawId.value))
 const page = computed(() => {
   const value = Number(route.query['page'])
-  return Number.isInteger(value) && value >= 1 ? value : 1
+  return Number.isInteger(value) && value >= 1 && value <= 2147483647 ? value : 1
 })
 
 const offeringsQuery = usePageQuery(async signal =>
@@ -27,10 +27,10 @@ const offeringsQuery = usePageQuery(async signal =>
 const recordsQuery = usePageQuery(async signal => {
   const id = rawId.value
   if (!isUuid(id)) throw new Error('链接无效')
-  return (await dashApi.getMyLearningRecords(id, { signal })).data
+  return (await dashApi.getMyLearningRecords(id, { page: page.value, pageSize: PAGE_SIZE }, { signal })).data
 })
 
-watch(() => route.path, async () => {
+watch(() => route.fullPath, async () => {
   if (selecting.value) {
     await offeringsQuery.load()
     const items = offeringsQuery.data.value?.items ?? []
@@ -47,10 +47,8 @@ const restricted = computed(() => {
   return recordsQuery.status.value === 'error' && (kind === 'forbidden' || kind === 'not-found')
 })
 
-// 契约中 getMyLearningRecords 无分页参数：翻页在已返回的评价条目上本地切片，页码保存在 query。
-const allItems = computed(() => recordsQuery.data.value?.feedbackPage.items ?? [])
-const totalPages = computed(() => Math.max(1, Math.ceil(allItems.value.length / PAGE_SIZE)))
-const pagedItems = computed(() => allItems.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
+const pagedItems = computed(() => recordsQuery.data.value?.feedbackPage.items ?? [])
+const totalPages = computed(() => Math.max(1, Math.ceil((recordsQuery.data.value?.feedbackPage.total ?? 0) / PAGE_SIZE)))
 
 function goToPage(next: number): void {
   if (next < 1 || next > totalPages.value) return

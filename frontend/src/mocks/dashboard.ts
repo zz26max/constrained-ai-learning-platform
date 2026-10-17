@@ -77,10 +77,12 @@ function handleMyLearningRecords(context: MockRequestContext): MockResult {
   if (denied !== null) return denied
   const offeringId = segment(context, 4)
   if (!isUuid(offeringId) || !knownOffering(offeringId)) return missing(context)
+  const window = pageWindow(searchParams(context))
+  if (window === null) return invalid(context, '分页参数不合法。', 'query')
   const feedback = byPublishedDesc(feedbackOf(offeringId)).map(studentFeedbackView)
   const data: LearningRecordsDTO = {
     offeringId, summary: learningSummary(offeringId), recentFeedback: feedback[0] ?? null,
-    feedbackPage: paginate(feedback, { page: 1, pageSize: 20 }), knowledgeEvidence: [], nextRecommendation: null,
+    feedbackPage: paginate(feedback, window), knowledgeEvidence: [], nextRecommendation: null,
   }
   return ok(context, data)
 }

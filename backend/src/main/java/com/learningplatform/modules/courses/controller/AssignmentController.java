@@ -166,9 +166,10 @@ public class AssignmentController {
     }
     @GetMapping("/me/offerings/{offeringId}/learning-records")
     public ApiResponse<LearningRecordsDTO> getLearningRecords(Authentication auth,HttpServletRequest req,
-            @PathVariable String offeringId) {
+            @PathVariable String offeringId,@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         AssignmentInput.uuid(offeringId);
-        return response(dashboardService.getLearningRecords(user(auth),offeringId),req);
+        AssignmentInput.page(page,pageSize);
+        return response(dashboardService.getLearningRecords(user(auth),offeringId,page,pageSize),req);
     }
     @PutMapping("/me/offerings/{offeringId}/messages/mark-read")
     public ApiResponse<MarkedReadDTO> markMessagesRead(Authentication auth,HttpServletRequest req,

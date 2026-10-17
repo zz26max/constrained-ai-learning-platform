@@ -110,15 +110,22 @@ public class DashboardService {
     }
     @Transactional(readOnly=true)
     public LearningRecordsDTO getLearningRecords(UserDTO user,String offeringId) {
+        return getLearningRecords(user,offeringId,1,FEEDBACK_PAGE_SIZE);
+    }
+    @Transactional(readOnly=true)
+    public LearningRecordsDTO getLearningRecords(UserDTO user,String offeringId,int page,int pageSize) {
         CourseAccess.role(user,"student");
         access.requireStudent(user,offeringId,false);
+        AssignmentInput.page(page,pageSize);
         String studentId=user.id();
-        List<String> ids=mapper.listPublishedFeedbackIds(studentId,offeringId,null,FEEDBACK_PAGE_SIZE);
+        List<String> ids=mapper.listPublishedFeedbackIdsPage(studentId,offeringId,null,(long)(page-1)*pageSize,pageSize);
         List<StudentFeedbackViewDTO> items=ids.stream().map(id->assignments.getFeedback(user,id)).toList();
+        List<String> recentIds=mapper.listPublishedFeedbackIds(studentId,offeringId,null,1);
+        StudentFeedbackViewDTO recent=recentIds.isEmpty()?null:assignments.getFeedback(user,recentIds.get(0));
         int total=mapper.countPublishedFeedback(studentId,offeringId,null);
         LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,null);
-        return new LearningRecordsDTO(offeringId,summary,items.isEmpty()?null:items.get(0),
-                new FeedbackPage(items,1,FEEDBACK_PAGE_SIZE,total),List.of(),null);
+        return new LearningRecordsDTO(offeringId,summary,recent,
+                new FeedbackPage(items,page,pageSize,total),List.of(),null);
     }
     /** 只更新本人、该班、可选 type 范围内的未读消息；重复调用幂等（已读行不再改写 readAt）。 */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)

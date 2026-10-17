@@ -461,6 +461,35 @@ class DashboardIntegrationIT {
     }
 
     @Test
+    void learningRecordsPagesBeyondTwentyWithoutDuplicatesAndKeepsGlobalSummary() {
+        OfferingDTO offering = createOffering(TERM, "分页记录班", "chapter");
+        enrollStudent(offering.id(), STUDENT);
+        for (int i = 0; i < 23; i++) {
+            TeacherAssignmentDTO assignment = publishAssignment(offering.id(), "分页作业" + i, 5, "web_lab", true);
+            String submission = saveAndSubmit(STUDENT, assignment.id());
+            assignmentService.saveFeedback(TEACHER, submission, feedbackBody(0), "draft");
+            assignmentService.publishFeedback(TEACHER, submission, new HashMap<>(Map.of("baseVersion", 1)), "publish");
+        }
+        LearningRecordsDTO first = dashboard.getLearningRecords(STUDENT, offering.id(), 1, 10);
+        List<String> ids = new java.util.ArrayList<>();
+        for (int page = 1; page <= 3; page++) {
+            LearningRecordsDTO result = dashboard.getLearningRecords(STUDENT, offering.id(), page, 10);
+            assertThat(result.feedbackPage().page()).isEqualTo(page);
+            assertThat(result.feedbackPage().pageSize()).isEqualTo(10);
+            assertThat(result.feedbackPage().total()).isEqualTo(23);
+            assertThat(result.feedbackPage().items()).hasSize(page == 3 ? 3 : 10);
+            assertThat(result.summary()).isEqualTo(first.summary());
+            assertThat(result.recentFeedback()).isEqualTo(first.recentFeedback());
+            ids.addAll(result.feedbackPage().items().stream().map(StudentFeedbackViewDTO::id).toList());
+        }
+        assertThat(first.summary().publishedFeedbackCount()).isEqualTo(23);
+        assertThat(ids).doesNotHaveDuplicates().isSortedAccordingTo(java.util.Comparator.reverseOrder());
+        assertThat(first.recentFeedback().id()).isEqualTo(ids.get(0));
+        assertThat(dashboard.getLearningRecords(STUDENT, offering.id(), 4, 10).feedbackPage().items()).isEmpty();
+        assertThat(dashboard.getLearningRecords(STUDENT, offering.id()).feedbackPage().items()).hasSize(20);
+    }
+
+    @Test
     void learningRecordsAreScopedToOfferingAndStudent() {
         Fixture f = submitted();
         assignmentService.saveFeedback(TEACHER, f.submissionId(), feedbackBody(0), "draft");

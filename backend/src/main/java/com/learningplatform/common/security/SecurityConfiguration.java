@@ -30,6 +30,7 @@ public class SecurityConfiguration {
         CsrfOriginFilter csrfOrigin = new CsrfOriginFilter(properties, csrfTokens);
 
         http.securityMatcher("/api/v1/**")
+                .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'none'")))
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

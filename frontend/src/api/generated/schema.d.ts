@@ -293,7 +293,7 @@ export interface paths {
         };
         /**
          * getMyLearningRecords
-         * @description 权限：本班学生。请求约定：无。结果约定：200 `LearningRecordsDTO`；返回当前学生在该班级的学习记录与统计。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生。请求约定：可选 page/pageSize（默认 1/20）。结果约定：200 `LearningRecordsDTO`；feedbackPage 按 publishedAt、id 倒序分页，summary 与 recentFeedback 始终覆盖本班全部公开评价，不随页码变化。业务规则以 DEVELOPMENT.md 为准。
          */
         get: operations["getMyLearningRecords"];
         put?: never;
@@ -6044,7 +6044,10 @@ export interface operations {
     };
     getMyLearningRecords: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
             header?: {
                 "X-Request-ID"?: string;
             };

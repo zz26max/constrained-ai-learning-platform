@@ -35,7 +35,7 @@ let router: Router | undefined
 let dashboardOverride: Record<string, unknown> = {}
 let noticeItems: unknown[] = []
 let noticeDetail: Record<string, unknown> = {}
-let learningRecords: Record<string, unknown> | null = null
+let learningRecords: ReturnType<typeof recordsFor> | null = null
 let statsFails = false
 
 const progress = { unit: 'assignment', completed: 3, total: 5, percent: 60, notConfigured: false, asOf: '2026-10-14T02:00:00Z' }
@@ -85,7 +85,13 @@ function recordsFor(count: number) {
 function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
   switch (request.operationId) {
     case 'getDashboard': return okEnvelope(dashboard())
-    case 'getMyLearningRecords': return okEnvelope(learningRecords ?? recordsFor(0))
+    case 'getMyLearningRecords': {
+      const records = learningRecords ?? recordsFor(0)
+      const query = new URL(request.path, 'http://localhost').searchParams
+      const page = Number(query.get('page') ?? 1), pageSize = Number(query.get('pageSize') ?? 20)
+      return okEnvelope({ ...records, feedbackPage: { ...records.feedbackPage, page, pageSize,
+        items: records.feedbackPage.items.slice((page - 1) * pageSize, page * pageSize) } })
+    }
     case 'listMyCourses': return okEnvelope({ items: [course(), course({ offeringId: OFFERING_2, title: '数据库' })], page: 1, pageSize: 50, total: 2 })
     case 'listNotices': return okEnvelope({ items: noticeItems, page: 1, pageSize: 20, total: noticeItems.length })
     case 'getNotice': return okEnvelope({ id: NOTICE, offeringId: OFFERING, title: '公告', content: '', target: null, createdAt: '2026-10-14T02:00:00Z', recipientCount: 1, ...noticeDetail })
@@ -218,16 +224,22 @@ describe('P1-D 学习记录', () => {
     expect(page.text()).toContain('评价作业 1')
   })
 
-  it('5b. 翻页更新 query 页码', async () => {
-    learningRecords = recordsFor(12)
+  it('5b. 超过 20 份评价向服务端请求第三页，汇总和最近评价保持不变', async () => {
+    learningRecords = recordsFor(23)
     const page = await open(`/student/progress/${OFFERING}`)
-    expect(page.text()).toContain('第 1 / 2 页')
+    expect(page.text()).toContain('第 1 / 3 页')
     const next = page.findAll('button').find(item => item.text() === '下一页')
     await next?.trigger('click')
     await flushPromises()
     expect(router?.currentRoute.value.query['page']).toBe('2')
-    expect(page.text()).toContain('第 2 / 2 页')
+    expect(page.text()).toContain('第 2 / 3 页')
     expect(page.text()).toContain('评价作业 11')
+    await page.findAll('button').find(item => item.text() === '下一页')?.trigger('click')
+    await flushPromises()
+    expect(page.text()).toContain('评价作业 23')
+    expect(page.text()).toContain('第 3 / 3 页')
+    expect(requestsOf('getMyLearningRecords').at(-1)?.path).toContain('page=3&pageSize=10')
+    expect(page.text()).toContain('23 份评价已发布')
   })
 
   it('5c. 非法 offeringId 不发请求并显示链接无效', async () => {

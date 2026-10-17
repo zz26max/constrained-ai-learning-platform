@@ -8,6 +8,7 @@ export type LearningRecordsDTO = Schemas['LearningRecordsDTO']
 export type MarkedReadDTO = Schemas['MarkedReadDTO']
 
 export type DashboardQuery = NonNullable<operations['getDashboard']['parameters']['query']>
+export type LearningRecordsQuery = NonNullable<operations['getMyLearningRecords']['parameters']['query']>
 export type MarkMessagesQuery = NonNullable<operations['markMessagesAsRead']['parameters']['query']>
 export type DashboardRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToken'>
 
@@ -57,8 +58,8 @@ export class DashboardApi {
     return this.request('getDashboard', options, undefined, undefined, query)
   }
 
-  getMyLearningRecords(offeringId: string, options: DashboardRequestOptions = {}): Promise<ApiResult<DashboardPayloads['getMyLearningRecords']>> {
-    return this.request('getMyLearningRecords', options, offeringId)
+  getMyLearningRecords(offeringId: string, query: LearningRecordsQuery = {}, options: DashboardRequestOptions = {}): Promise<ApiResult<DashboardPayloads['getMyLearningRecords']>> {
+    return this.request('getMyLearningRecords', options, offeringId, undefined, query)
   }
 
   markMessagesAsRead(offeringId: string, query: MarkMessagesQuery = {}, options: DashboardRequestOptions = {}): Promise<ApiResult<DashboardPayloads['markMessagesAsRead']>> {

@@ -82,7 +82,7 @@ frontend/
 | `/student/assignments` | 个人作业，P1 | `/me/assignments` 的班级、状态筛选和分页 |
 | `/student/assignments/{assignmentId}` | 作业详情，P1 | 作业要求、提交限制、最近提交与公开评价（提交详情与评价在此页展示，不另设路由） |
 | `/student/workspaces/{assignmentId}` | 作业编辑，P1 | 工作区读取/保存/提交；按 `type` 选择编辑模式 |
-| `/student/progress` / `/student/progress/{offeringId}` | 学习记录，P1/P2 | `/me/learning-records?offeringId=...`；P2 再显示知识分析 |
+| `/student/progress` / `/student/progress/{offeringId}` | 学习记录，P1/P2 | `/me/offerings/{offeringId}/learning-records?page=1&pageSize=10`；P2 再显示知识分析 |
 | `/student/messages` | 消息中心，P1/P2 | `/me/messages`、标记已读及全部已读 |
 | `/student/offerings/{offeringId}/notices` / `/student/notices/{noticeId}` | 课程公告，P1 | 课程公告列表与详情，支持晚加入成员读取 |
 | `/student/help-requests/{id}` | 本人求助详情，P2 | `/me/help-requests/{id}`、教师回复 |

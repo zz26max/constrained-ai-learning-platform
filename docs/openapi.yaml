@@ -533,7 +533,7 @@ paths:
     get:
       operationId: getMyLearningRecords
       summary: getMyLearningRecords
-      description: 权限：本班学生。请求约定：无。结果约定：200 `LearningRecordsDTO`；返回当前学生在该班级的学习记录与统计。业务规则以 DEVELOPMENT.md 为准。
+      description: 权限：本班学生。请求约定：可选 page/pageSize（默认 1/20）。结果约定：200 `LearningRecordsDTO`；feedbackPage 按 publishedAt、id 倒序分页，summary 与 recentFeedback 始终覆盖本班全部公开评价，不随页码变化。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - student
       x-phase: P1
@@ -543,6 +543,14 @@ paths:
       x-csrf-required: false
       x-idempotency: none
       parameters:
+      - name: page
+        in: query
+        required: false
+        schema: {type: integer, minimum: 1, maximum: 2147483647, default: 1}
+      - name: pageSize
+        in: query
+        required: false
+        schema: {type: integer, minimum: 1, maximum: 100, default: 20}
       - name: offeringId
         in: path
         required: true
@@ -9505,6 +9513,19 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Response_getMyLearningRecords'}
+          examples:
+            emptyRequestedPage:
+              summary: 请求第 3 页，每页 10 条（空班）
+              value:
+                requestId: req-learning-records-page3
+                data:
+                  offeringId: 00000000-0000-4000-8000-000000000092
+                  summary: {completedLabCount: 0, publishedFeedbackCount: 0, needsPracticeCount: null}
+                  recentFeedback: null
+                  feedbackPage: {items: [], page: 3, pageSize: 10, total: 0}
+                  knowledgeEvidence: []
+                  nextRecommendation: null
+
     listNotices_200:
       description: 200 通知分页，字段同教师创建公告响应；按 `createdAt` 降序
       headers:

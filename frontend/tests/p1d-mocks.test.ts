@@ -130,7 +130,7 @@ describe('P1-D mock：学生侧', () => {
     expect(result.status).toBe(422)
   })
 
-  it('getMyLearningRecords：无分页参数，结构含 feedbackPage 与 knowledgeEvidence', async () => {
+  it('getMyLearningRecords：默认分页，结构含 feedbackPage 与 knowledgeEvidence', async () => {
     const { status, body } = await call('getMyLearningRecords', 'GET', `/api/v1/me/offerings/${P1A_IDS.offeringWeb}/learning-records`)
     expect(status).toBe(200)
     expect(body.data).toMatchObject({

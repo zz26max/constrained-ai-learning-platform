@@ -73,7 +73,7 @@ class DashboardHttpContractTest {
         when(sessions.resolve(STUDENT_TOKEN)).thenReturn(identity("student"));
         when(sessions.resolve(TEACHER_TOKEN)).thenReturn(identity("teacher"));
         when(service.getDashboard(any(), nullable(String.class))).thenReturn(dashboard());
-        when(service.getLearningRecords(any(), anyString())).thenReturn(records());
+        when(service.getLearningRecords(any(), anyString(), anyInt(), anyInt())).thenReturn(records());
         when(service.markMessagesRead(any(), anyString(), nullable(String.class))).thenReturn(new MarkedReadDTO(T));
     }
 
@@ -220,8 +220,23 @@ class DashboardHttpContractTest {
     }
 
     @Test
+    void getMyLearningRecordsPassesRequestedPageAndSize() throws Exception {
+        when(service.getLearningRecords(any(), eq(OFFERING), eq(3), eq(10))).thenReturn(new LearningRecordsDTO(
+                OFFERING, new LearningSummary(23, 23, null), feedback(),
+                new FeedbackPage(List.of(feedback()), 3, 10, 23), List.of(), null));
+        mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", STUDENT_TOKEN)
+                .queryParam("page", "3").queryParam("pageSize", "10"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.feedbackPage.page").value(3))
+                .andExpect(jsonPath("$.data.feedbackPage.pageSize").value(10))
+                .andExpect(jsonPath("$.data.feedbackPage.total").value(23));
+        verify(service).getLearningRecords(any(), eq(OFFERING), eq(3), eq(10));
+        mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", STUDENT_TOKEN)
+                .queryParam("pageSize", "101")).andExpect(status().is(422));
+    }
+
+    @Test
     void getMyLearningRecordsRecentFeedbackIsNullWhenNone() throws Exception {
-        when(service.getLearningRecords(any(), anyString())).thenReturn(new LearningRecordsDTO(OFFERING,
+        when(service.getLearningRecords(any(), anyString(), anyInt(), anyInt())).thenReturn(new LearningRecordsDTO(OFFERING,
                 new LearningSummary(0, 0, null), null, new FeedbackPage(List.of(), 1, 20, 0), List.of(), null));
         mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", STUDENT_TOKEN)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recentFeedback").value(nullValue()))
@@ -231,11 +246,11 @@ class DashboardHttpContractTest {
     @Test
     void getMyLearningRecordsRejectsNonMemberAndMalformedId() throws Exception {
         doThrow(new BusinessException(HttpStatus.NOT_FOUND, "NOT_FOUND", "请求的资源不存在。"))
-                .when(service).getLearningRecords(any(), anyString());
+                .when(service).getLearningRecords(any(), anyString(), anyInt(), anyInt());
         mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", STUDENT_TOKEN))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
         doThrow(new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "权限不足。"))
-                .when(service).getLearningRecords(any(), anyString());
+                .when(service).getLearningRecords(any(), anyString(), anyInt(), anyInt());
         mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", TEACHER_TOKEN))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
         mvc.perform(get("/api/v1/me/offerings/not-a-uuid/learning-records", STUDENT_TOKEN))
@@ -243,10 +258,10 @@ class DashboardHttpContractTest {
     }
 
     @Test
-    void getMyLearningRecordsIgnoresPagingParameters() throws Exception {
-        // 契约无 page/pageSize 参数；多余的查询参数不影响响应形状。
+    void getMyLearningRecordsValidatesPagingParameters() throws Exception {
+        // 分页边界在控制器校验，不能被 service mock 绕过。
         mvc.perform(get("/api/v1/me/offerings/" + OFFERING + "/learning-records", STUDENT_TOKEN).queryParam("page", "0"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.feedbackPage.page").value(1));
+                .andExpect(status().is(422)).andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test

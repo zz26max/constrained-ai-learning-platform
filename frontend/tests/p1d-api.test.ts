@@ -49,9 +49,9 @@ describe('DashboardApi 契约请求', () => {
     expect(last().path).toBe('/api/v1/me/dashboard')
   })
 
-  it('getMyLearningRecords：路径含 offeringId，无分页参数，无 CSRF', async () => {
-    await dashboard.getMyLearningRecords(OFFERING)
-    expect(last()).toMatchObject({ operationId: 'getMyLearningRecords', method: 'GET', path: `/api/v1/me/offerings/${OFFERING}/learning-records` })
+  it('getMyLearningRecords：路径含 offeringId，发送分页参数，无 CSRF', async () => {
+    await dashboard.getMyLearningRecords(OFFERING, { page: 3, pageSize: 10 })
+    expect(last()).toMatchObject({ operationId: 'getMyLearningRecords', method: 'GET', path: `/api/v1/me/offerings/${OFFERING}/learning-records?page=3&pageSize=10` })
     expect(last().headers['X-CSRF-Token']).toBeUndefined()
   })
 
