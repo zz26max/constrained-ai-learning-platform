@@ -234,7 +234,7 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 | 隔离与预览探针 | PASS（复用既有证据） | 复用 `preview-isolation-dom.txt` 与用户已确认的页面结果；本轮未重复执行恶意探针，仅确认重置结果 |
 | 公告归档只读、慢网络/超时/会话失效专项 | PASS（接受证据缺口） | 本轮未新增专项浏览器证据；按本次指示接受通过，后续若继续演练仍需单独补证 |
 
-本轮检查结果：前端 `npm run verify` 仍为 22 个测试文件、199 项；后端定向测试 151 项全部通过；后端全量 `./mvnw.cmd --batch-mode verify` 为 384 个单元/HTTP、206 个集成测试，`BUILD SUCCESS`；契约校验为 83 个业务操作、325 个 schema、96 个文档链接。提交：`431bab8`。基于本轮规则，P1 主链路验收判定通过；`x-implementation-status` 仅将实际新增并复验的 `getFeedbackDraft` 标为 `implemented`，未因接受证据缺口批量提升其他状态。
+本轮检查结果：前端 `npm run verify` 仍为 22 个测试文件、199 项；后端定向测试 151 项全部通过；后端全量 `./mvnw.cmd --batch-mode verify` 为 384 个单元/HTTP、206 个集成测试，`BUILD SUCCESS`；契约校验为 83 个业务操作、325 个 schema、96 个文档链接。实现提交：`41d2a92`。基于本轮规则，P1 主链路验收判定通过；`x-implementation-status` 仅将实际新增并复验的 `getFeedbackDraft` 标为 `implemented`，未因接受证据缺口批量提升其他状态。
 
 ## 4. 已知限制
 
