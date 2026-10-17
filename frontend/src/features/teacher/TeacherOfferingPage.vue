@@ -10,11 +10,12 @@ import TeacherChaptersPanel from './TeacherChaptersPanel.vue'
 import TeacherKnowledgePanel from './TeacherKnowledgePanel.vue'
 import TeacherMembersPanel from './TeacherMembersPanel.vue'
 import TeacherInvitesPanel from './TeacherInvitesPanel.vue'
+import TeacherNoticesPanel from './TeacherNoticesPanel.vue'
 
 const route = useRoute()
 const api = coursesApi()
 const id = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
-const tab = ref<'chapters' | 'knowledge' | 'members' | 'invites'>('chapters')
+const tab = ref<'chapters' | 'knowledge' | 'members' | 'invites' | 'notices'>('chapters')
 const archiveDialog = ref<HTMLDialogElement | null>(null)
 const confirmArchive = ref(false)
 const { pending, error: actionError, message, clearNotice, run } = useCourseActions()
@@ -76,10 +77,12 @@ onBeforeUnmount(closeArchive)
         <button type="button" :aria-current="tab === 'knowledge' ? 'page' : undefined" @click="tab = 'knowledge'">知识点</button>
         <button type="button" :aria-current="tab === 'members' ? 'page' : undefined" @click="tab = 'members'">班级成员</button>
         <button type="button" :aria-current="tab === 'invites' ? 'page' : undefined" @click="tab = 'invites'">邀请码</button>
+        <button type="button" :aria-current="tab === 'notices' ? 'page' : undefined" @click="tab = 'notices'">公告</button>
       </nav>
       <TeacherChaptersPanel v-if="tab === 'chapters'" :offering-id="data.id" :read-only="readOnly" />
       <TeacherKnowledgePanel v-else-if="tab === 'knowledge'" :offering-id="data.id" :read-only="readOnly" />
       <TeacherMembersPanel v-else-if="tab === 'members'" :offering-id="data.id" />
+      <TeacherNoticesPanel v-else-if="tab === 'notices'" :offering-id="data.id" :read-only="readOnly" />
       <TeacherInvitesPanel v-else :offering-id="data.id" :read-only="readOnly" />
     </template>
     <dialog ref="archiveDialog" class="teacher-dialog teacher-confirm" aria-labelledby="offering-archive-title" @cancel="cancelArchive" @close="confirmArchive = false">

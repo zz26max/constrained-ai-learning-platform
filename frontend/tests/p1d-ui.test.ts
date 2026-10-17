@@ -321,6 +321,23 @@ describe('P1-D 教师统计卡片', () => {
     expect(page.find('h1').text()).toBe('Web 前端开发技术')
     expect(page.text()).toContain('章节与资料')
   })
+
+  it('8c. 教师公告入口可发布并关联本课程，归档班级保持只读', async () => {
+    const page = await open(`/teacher/offerings/${OFFERING}`, 'teacher')
+    await page.findAll('button').find(item => item.text() === '公告')?.trigger('click')
+    await flushPromises()
+    expect(page.text()).toContain('课程公告')
+    await page.findAll('button').find(item => item.text() === '发布公告')?.trigger('click')
+    await page.find('form input').setValue('本周公告')
+    await page.find('form textarea').setValue('请查看本周课程安排。')
+    await page.find('form select').setValue('offering')
+    await page.find('form').trigger('submit')
+    await flushPromises()
+    const request = requestsOf('createNotice').at(-1)
+    expect(request?.headers['X-CSRF-Token']).toBe('csrf-teacher')
+    expect(JSON.parse(request?.body ?? '{}')).toMatchObject({ title: '本周公告', content: '请查看本周课程安排。', target: { type: 'offering', id: OFFERING, offeringId: OFFERING } })
+    expect(page.text()).toContain('公告已发布')
+  })
 })
 
 describe('P1-D 只读加载', () => {

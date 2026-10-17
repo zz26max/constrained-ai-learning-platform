@@ -15,6 +15,7 @@
 .teacher-empty h2,.teacher-empty h3{font-size:18px;margin:0 0 6px}
 .teacher-empty p{font-size:14px;line-height:1.75;color:var(--muted);margin:0}
 .teacher-offering-list,.teacher-member-list,.teacher-invite-list,.teacher-knowledge-list,.teacher-chapter-list,.teacher-resource-list{list-style:none;margin:0;padding:0}
+.teacher-notice-list{list-style:none;margin:0;padding:0}.teacher-notice-list>li{padding:20px 26px}.teacher-notice-list>li+li{border-top:1px solid var(--line)}.teacher-notice-list h3{font-size:17px;margin:0 0 4px}.teacher-notice-list .teacher-text{margin:12px 0 0}.teacher-notice-composer{padding:22px 26px;margin-bottom:20px}.teacher-notice-composer form{display:grid;gap:16px}.teacher-notice-composer label{display:grid;gap:6px;font-size:13px;color:var(--muted)}.teacher-notice-composer input,.teacher-notice-composer textarea,.teacher-notice-composer select{width:100%;min-height:44px;padding:9px 12px;border:1px solid #8993a0;border-radius:var(--radius-button);background:var(--surface);color:var(--ink);font:inherit;font-size:14px}.teacher-notice-composer textarea{resize:vertical;line-height:1.7}
 .teacher-offering-list>li+li,.teacher-member-list>li+li,.teacher-invite-list>li+li,.teacher-knowledge-list>li+li,.teacher-chapter-list>li+li,.teacher-resource-list>li+li{border-top:1px solid var(--line)}
 .teacher-offering-row{display:grid;grid-template-columns:minmax(0,1fr) 200px 140px;align-items:center;gap:28px;padding:22px 26px}
 .teacher-mark{font:700 11px Consolas,monospace;letter-spacing:.04em;color:var(--muted)}
