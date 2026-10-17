@@ -36,6 +36,7 @@ public interface CourseMapper {
     int revokeInvite(@Param("id") String id,@Param("now") Instant now);
     int chapterTotal(String offeringId);
     int chapterCompleted(@Param("offeringId") String offeringId,@Param("memberId") String memberId);
+    int assignmentCountForChapter(@Param("chapterId") String chapterId,@Param("publicOnly") boolean publicOnly);
     CurrentChapter currentChapter(@Param("offeringId") String offeringId,@Param("memberId") String memberId,@Param("lastChapterId") String lastChapterId);
 
     List<Chapter> chapters(@Param("offeringId") String offeringId,@Param("publicOnly") boolean publicOnly);

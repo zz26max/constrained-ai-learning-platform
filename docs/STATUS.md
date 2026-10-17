@@ -190,6 +190,17 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 
 工具链：Node v24.17.0/npm 11.13.0（低于仓库 24.21.0/11.19.0 基线，不等同 CI）；Java 21.0.11、Docker 29.3.1、Testcontainers MySQL 8.4.11。本轮自主决定：复用现有服务、增加独立虚构验收班、在教师表单阻断后用 HTTP 准备下游数据，并保留证据和数据供修复后复验。
 
+### 3.5 P1-A 课程内容校验修复（2026-10-17）
+
+已修复并补测课程内容与教学班接口的已知差异：章节摘要和资料正文允许空字符串；章节统计返回真实作业数量并按学生/教师可见性过滤；不存在的学期在创建教学班时返回 `422 VALIDATION_ERROR`；章节序号唯一键冲突转换为可理解的 `422 VALIDATION_ERROR`，避免数据库错误泄漏。新增集成回归覆盖空内容和重复序号。
+
+| 检查 | 结果 |
+| --- | --- |
+| `./mvnw.cmd --batch-mode "-Dtest=CourseContentIntegrationIT" test` | PASS，8 项 |
+| `./mvnw.cmd --batch-mode "-Dtest=OfferingIntegrationIT" test` | PASS，10 项（同批次执行） |
+
+本包尚未完成最终全量 `verify` 与正式浏览器复验；预览安全、公告页面浏览器证据及 P1 验收矩阵仍按上文记录，未提升相关接口的 `verified` 状态。
+
 ## 4. 已知限制
 
 以下竞态在课程演示规模下发生概率极低，按设计不加防护；如果出现，在此记录现象再决定是否补强。

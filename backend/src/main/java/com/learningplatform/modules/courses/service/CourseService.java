@@ -49,7 +49,8 @@ public class CourseService {
     public OfferingDTO createOffering(UserDTO user,Map<String,Object> body,String requestId) {
         CourseAccess.role(user,"teacher");validateOffering(body);
         String courseId=CourseInput.uuid(body,"courseId"),termId=CourseInput.uuid(body,"termId");
-        if(mapper.activeCourse(courseId)==null||mapper.termExists(termId)==0) throw CourseAccess.notFound();
+        if(mapper.activeCourse(courseId)==null) throw CourseAccess.notFound();
+        if(mapper.termExists(termId)==0) throw CourseInput.invalid();
         Instant now=now();String id=UUID.randomUUID().toString();
         mapper.insertOffering(id,courseId,termId,CourseInput.text(body,"title",200),
                 CourseInput.text(body,"groupName",200),CourseInput.text(body,"progressUnit",20),user.id(),now);
@@ -268,8 +269,12 @@ public class CourseService {
         ensureChapterPositionFree(oid, no, null);
         Instant n = now();
         String id = UUID.randomUUID().toString();
-        mapper.insertChapter(id, oid, no, string(b, "title", 200), string(b, "summary", 8000),
-                bool(b, "isRequired"), n);
+        try {
+            mapper.insertChapter(id, oid, no, string(b, "title", 200), textAllowEmpty(b, "summary", 8000), bool(b, "isRequired"), n);
+        } catch (DuplicateKeyException exception) {
+            if (!isChapterPositionDuplicate(exception)) throw exception;
+            throw CourseInput.invalid();
+        }
         audit.record(u.id(), "CHAPTER_CREATED", "chapter", id, Map.of(), req);
         return teacherSummary(mapper.chapter(id));
     }
@@ -290,7 +295,7 @@ public class CourseService {
         }
         int no = b.containsKey("number") ? integer(b, "number") : c.position();
         String t = b.containsKey("title") ? string(b, "title", 200) : c.title();
-        String s = b.containsKey("summary") ? string(b, "summary", 8000) : c.summary();
+        String s = b.containsKey("summary") ? textAllowEmpty(b, "summary", 8000) : c.summary();
         boolean ir = b.containsKey("isRequired") ? bool(b, "isRequired") : c.isRequired();
         if ("published".equals(c.status())
                 && ((b.containsKey("number") && no != c.position())
@@ -298,7 +303,12 @@ public class CourseService {
             throw new BusinessException(HttpStatus.CONFLICT, "CHAPTER_ALREADY_PUBLISHED", "已发布章节的位置与必修属性已冻结。");
         }
         ensureChapterPositionFree(c.offeringId(), no, c.id());
-        mapper.updateChapter(c.id(), no, t, s, ir, c.contentVersion() + 1, now());
+        try {
+            mapper.updateChapter(c.id(), no, t, s, ir, c.contentVersion() + 1, now());
+        } catch (DuplicateKeyException exception) {
+            if (!isChapterPositionDuplicate(exception)) throw exception;
+            throw CourseInput.invalid();
+        }
         audit.record(u.id(), "CHAPTER_UPDATED", "chapter", c.id(), Map.of(), req);
         return teacherSummary(mapper.chapter(c.id()));
     }
@@ -368,7 +378,7 @@ public class CourseService {
         validateKnowledgeForChapter(kp, c);
         String rid = UUID.randomUUID().toString();
         mapper.insertResource(rid, c.offeringId(), c.id(), kp, string(b, "title", 200),
-                string(b, "content", 65536), integer(b, "order"), now());
+                markdown(b, "content"), integer(b, "order"), now());
         audit.record(u.id(), "RESOURCE_CREATED", "resource", rid, Map.of(), req);
         return resourceView(mapper.resource(rid));
     }
@@ -408,14 +418,14 @@ public class CourseService {
     }
 
     private CourseRows.Chapter chapterOr404(String id){CourseInput.uuid(id);var c=mapper.chapter(id);if(c==null)throw CourseAccess.notFound();return c;}
-    private ChapterSummaryDTO summary(CourseRows.Chapter c,String mid){return new ChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),progressView(mapper.chapterProgress(mid,c.id())),c.contentVersion(),mapper.resources(c.id(),true).size(),0);}
-    private TeacherChapterSummaryDTO teacherSummary(CourseRows.Chapter c){return new TeacherChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),mapper.resources(c.id(),false).size(),0);}
-    private ChapterDetailDTO detail(CourseRows.Chapter c,UserDTO u){var x=access.requireReader(u,c.offeringId());var p=mapper.chapterProgress(x.member().id(),c.id());var rs=mapper.resources(c.id(),true);return new ChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),p==null?new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress("not_started",null):progressView(p),c.contentVersion(),rs.size(),0,rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
-    private TeacherChapterDetailDTO teacherDetail(CourseRows.Chapter c){var rs=mapper.resources(c.id(),false);return new TeacherChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),rs.size(),0,rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
+    private ChapterSummaryDTO summary(CourseRows.Chapter c,String mid){return new ChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),progressView(mapper.chapterProgress(mid,c.id())),c.contentVersion(),mapper.resources(c.id(),true).size(),mapper.assignmentCountForChapter(c.id(),true));}
+    private TeacherChapterSummaryDTO teacherSummary(CourseRows.Chapter c){return new TeacherChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),mapper.resources(c.id(),false).size(),mapper.assignmentCountForChapter(c.id(),false));}
+    private ChapterDetailDTO detail(CourseRows.Chapter c,UserDTO u){var x=access.requireReader(u,c.offeringId());var p=mapper.chapterProgress(x.member().id(),c.id());var rs=mapper.resources(c.id(),true);return new ChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),p==null?new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress("not_started",null):progressView(p),c.contentVersion(),rs.size(),mapper.assignmentCountForChapter(c.id(),true),rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
+    private TeacherChapterDetailDTO teacherDetail(CourseRows.Chapter c){var rs=mapper.resources(c.id(),false);return new TeacherChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),rs.size(),mapper.assignmentCountForChapter(c.id(),false),rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
     private com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress progressView(CourseRows.ChapterProgress p){return p==null?null:new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress(p.status(),p.completedAt());}
     private ResourceDTO resourceView(CourseRows.Resource r){return new ResourceDTO(r.id(),r.offeringId(),r.chapterId(),r.knowledgePointId(),r.title(),"markdown",r.contentMarkdown(),null,r.position(),"archived".equals(r.status()));}
     private KnowledgePointDTO knowledgeView(CourseRows.KnowledgePoint p){return new KnowledgePointDTO(p.id(),p.offeringId(),p.chapterId(),p.title(),p.description(),p.position());}
-    private void validateChapterWrite(Map<String,Object>b){CourseInput.fields(b,"number","title","summary","isRequired");integer(b,"number");string(b,"title",200);string(b,"summary",8000);bool(b,"isRequired");}
+    private void validateChapterWrite(Map<String,Object>b){CourseInput.fields(b,"number","title","summary","isRequired");integer(b,"number");string(b,"title",200);textAllowEmpty(b,"summary",8000);bool(b,"isRequired");}
     private void validateKnowledgeWrite(Map<String,Object>b){CourseInput.fields(b,"chapterId","title","description","order");string(b,"title",200);string(b,"description",8000);integer(b,"order");}
     private void validateResourceWrite(Map<String,Object>b){CourseInput.fields(b,"knowledgePointId","title","type","content","url","order");requireKeys(b,"title","type","content","url","order");if(!"markdown".equals(string(b,"type",20))||b.get("url")!=null)throw CourseInput.invalid();string(b,"title",200);markdown(b,"content");integer(b,"order");}
     private void validatePatch(Map<String, Object> b, String... fs) {
@@ -430,12 +440,22 @@ public class CourseService {
     private int integer(Map<String,Object>b,String k){Object x=b.get(k);if(!(x instanceof Number n)||n.longValue()<1||n.longValue()>Integer.MAX_VALUE||n.doubleValue()!=n.longValue())throw CourseInput.invalid();return n.intValue();}
     private boolean bool(Map<String,Object>b,String k){Object x=b.get(k);if(!(x instanceof Boolean))throw CourseInput.invalid();return (Boolean)x;}
     private String string(Map<String,Object>b,String k,int max){return CourseInput.text(b,k,max);}
-    private String markdown(Map<String,Object>b,String k){String x=string(b,k,65536);if(x.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>65536)throw CourseInput.invalid();return x;}
+    private String textAllowEmpty(Map<String,Object>b,String k,int max){return CourseInput.textAllowEmpty(b,k,max);}
+    private String markdown(Map<String,Object>b,String k){String x=CourseInput.textAllowEmpty(b,k,65536);if(x.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>65536)throw CourseInput.invalid();return x;}
     private void requireKeys(Map<String,Object>b,String...ks){for(String k:ks)if(!b.containsKey(k))throw CourseInput.invalid();}
     private String optionalUuid(Map<String,Object>b,String k){Object x=b.get(k);if(x==null)return null;if(!(x instanceof String))throw CourseInput.invalid();return CourseInput.uuid((String)x);}
     private void validateChapterAssociation(String oid,String cid){if(cid!=null){var c=mapper.chapter(cid);if(c==null||!oid.equals(c.offeringId()))throw CourseInput.invalid();}}
     private void validateKnowledgeForChapter(String id,CourseRows.Chapter c){if(id!=null){var p=mapper.knowledgePoint(id);if(p==null||!c.offeringId().equals(p.offeringId())||(p.chapterId()!=null&&!c.id().equals(p.chapterId())))throw CourseInput.invalid();}}
     private void ensureChapterPositionFree(String oid,int no,String ex){for(var c:mapper.chapters(oid,false))if(c.position()==no&&!c.id().equals(ex))throw CourseInput.invalid();}
+    private boolean isChapterPositionDuplicate(DuplicateKeyException exception) {
+        Throwable current=exception;
+        while(current!=null) {
+            if(current instanceof java.sql.SQLException sql && sql.getErrorCode()==1062
+                    && sql.getMessage()!=null && sql.getMessage().contains("uq_chapters_offering_position")) return true;
+            current=current.getCause();
+        }
+        return false;
+    }
     private BusinessException invalidInvite() { return new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_INVITE_CODE","邀请码不可用。"); }
 }
 

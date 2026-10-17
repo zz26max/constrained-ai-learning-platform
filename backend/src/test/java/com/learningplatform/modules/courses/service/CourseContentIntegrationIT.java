@@ -135,6 +135,31 @@ class CourseContentIntegrationIT {
     }
 
     @Test
+    void emptyChapterSummaryAndResourceContentAreAccepted() {
+        OfferingDTO offering = offering();
+        Map<String, Object> chapterBody = new HashMap<>();
+        chapterBody.put("number", 1); chapterBody.put("title", "空摘要章节");
+        chapterBody.put("summary", ""); chapterBody.put("isRequired", true);
+        var chapter = service.createChapter(TEACHER, offering.id(), chapterBody, "empty-summary");
+        Map<String, Object> resource = resourceBody(null, "空内容资料");
+        resource.put("content", "");
+        ResourceDTO saved = service.createResource(TEACHER, chapter.id(), resource, "empty-content");
+        assertThat(saved.content()).isEmpty();
+    }
+
+    @Test
+    void duplicateChapterNumberReturnsValidationError() {
+        OfferingDTO offering = offering();
+        service.createChapter(TEACHER, offering.id(), Map.of("number", 1, "title", "第一章", "summary", "", "isRequired", true), "first");
+        assertThatThrownBy(() -> service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 1, "title", "重复章节", "summary", "", "isRequired", true), "duplicate"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(e.getStatus().value()).isEqualTo(422);
+                });
+    }
+
+    @Test
     void knowledgePointCanBeUnlinkedWhenItHasNoResourceReferences() {
         OfferingDTO offering = offering();
         var chapter = service.createChapter(TEACHER, offering.id(),

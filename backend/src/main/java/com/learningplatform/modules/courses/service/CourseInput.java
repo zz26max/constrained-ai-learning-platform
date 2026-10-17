@@ -20,6 +20,11 @@ public final class CourseInput {
         if(!(value instanceof String text)||text.codePointCount(0,text.length())<1||text.codePointCount(0,text.length())>max) throw invalid();
         return text;
     }
+    public static String textAllowEmpty(Map<String,Object> body,String name,int max) {
+        Object value=body.get(name);
+        if(!(value instanceof String text)||text.codePointCount(0,text.length())>max) throw invalid();
+        return text;
+    }
     public static String uuid(String value) { if(value==null||!value.matches(UUID_REGEX)) throw invalid(); return value; }
     public static String uuid(Map<String,Object> body,String name) { return uuid(text(body,name,36)); }
     public static Instant timestamp(Map<String,Object> body,String name) {
