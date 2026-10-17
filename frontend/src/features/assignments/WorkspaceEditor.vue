@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/auth'
 import { isUuid } from './format'
 import { pageError } from '../courses/page-error'
 import { retainWorkspace, takeWorkspace } from './workspace-recovery'
+import WebPreview from './WebPreview.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -327,6 +328,7 @@ onBeforeUnmount(() => {
           @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
         />
       </section>
+      <WebPreview v-if="assignmentQuery.data.value?.type === 'web_lab'" :key="editingAssignmentId" :files="fileContents" />
     </template>
 
     <dialog

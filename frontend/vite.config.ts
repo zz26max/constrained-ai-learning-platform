@@ -68,12 +68,14 @@ export default defineConfig(({ command, mode }) => {
     plugins: [vue()],
     appType: 'spa',
     server: {
+      headers: { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' },
       port: FRONTEND_PORT,
       strictPort: true,
       host: '127.0.0.1',
       proxy: apiProxy(),
     },
     preview: {
+      headers: { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' },
       port: FRONTEND_PORT,
       strictPort: true,
       host: '127.0.0.1',
