@@ -203,6 +203,8 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 
 2026-10-17 重启后端服务并复验真实 HTTP 响应：`GET http://127.0.0.1:8080/api/v1/auth/csrf-token` 返回 200，同时包含 `Content-Security-Policy: frame-ancestors 'none'` 与 `X-Frame-Options: DENY`。前端 4173 同端点响应也包含这两项。该结果证明防嵌入响应头已加载到当前服务进程；不等同于完整浏览器 P1 矩阵通过。
 
+2026-10-17 继续验收基础检查：`npm --prefix frontend run verify` 通过（22 个测试文件、199 项测试，类型检查、构建及 no-mock 检查均通过）；`.contract-venv\\Scripts\\python.exe scripts/validate_contract.py` 通过（83 个业务操作、325 个 schema、29 个示例、41 个回归场景）。当前仓库没有 Playwright/Puppeteer 验收入口，Edge 进程未开放调试端口，因此本轮未新增真实浏览器动作证据，B3/B4/B5/B8 及并发、超时、跨账号场景仍不能标记为 `verified`。
+
 ## 4. 已知限制
 
 以下竞态在课程演示规模下发生概率极低，按设计不加防护；如果出现，在此记录现象再决定是否补强。
