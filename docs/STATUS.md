@@ -221,6 +221,21 @@ Maven 报告位于 `backend/target/surefire-reports/` 与 `backend/target/failsa
 
 最终自动化检查：前端 `verify` 通过（22 个测试文件、199 项）；后端 Maven `verify` 通过（380 个单元/HTTP、205 个集成测试）；契约校验通过（83 个业务操作、325 个 schema）。由于 B4 为 FAIL、历史分页为 BLOCKED，P1 仍不能整体标记 `verified`。
 
+### 3.7 B4 修复后复验与验收收口（2026-10-17）
+
+本轮按用户指示修复明确的 B4 接口缺失；证据不足但没有观察到产品失败的项目按“接受通过”记录，并保留覆盖范围说明。
+
+| 检查 | 结果 | 证据/说明 |
+| --- | --- | --- |
+| B4 教师评价草稿读取 | PASS | 新增 `GET /api/v1/teacher/submissions/{submissionId}/feedback`；原失败提交真实返回 200，`feedback` 与 `baseVersion` 正确。证据 `D:/tmp/lp/browser-p1/B4-get-feedback-draft-retest.json`，requestId `b4-retest-get` |
+| B4 空草稿、草稿恢复、已发布读取、越权 | PASS | `AssignmentIntegrationIT.getFeedbackDraftReturnsEmptyThenCurrentTeacherFeedback` |
+| B4 HTTP 契约与状态同步 | PASS | `AssignmentHttpContractTest` 已纳入 `getFeedbackDraft`；OpenAPI 状态从 `planned` 更新为 `implemented` |
+| 历史分页超过 20 条 | PASS（接受证据缺口） | 当前真实夹具仍为 3/1 条评价；分页 200、页码和汇总稳定。按本次指示接受通过，不宣称已用超过 20 条真实数据完成浏览器翻页 |
+| 隔离与预览探针 | PASS（复用既有证据） | 复用 `preview-isolation-dom.txt` 与用户已确认的页面结果；本轮未重复执行恶意探针，仅确认重置结果 |
+| 公告归档只读、慢网络/超时/会话失效专项 | PASS（接受证据缺口） | 本轮未新增专项浏览器证据；按本次指示接受通过，后续若继续演练仍需单独补证 |
+
+本轮检查结果：前端 `npm run verify` 仍为 22 个测试文件、199 项；后端定向测试 151 项全部通过；后端全量 `./mvnw.cmd --batch-mode verify` 为 384 个单元/HTTP、206 个集成测试，`BUILD SUCCESS`；契约校验为 83 个业务操作、325 个 schema、96 个文档链接。提交：`431bab8`。基于本轮规则，P1 主链路验收判定通过；`x-implementation-status` 仅将实际新增并复验的 `getFeedbackDraft` 标为 `implemented`，未因接受证据缺口批量提升其他状态。
+
 ## 4. 已知限制
 
 以下竞态在课程演示规模下发生概率极低，按设计不加防护；如果出现，在此记录现象再决定是否补强。

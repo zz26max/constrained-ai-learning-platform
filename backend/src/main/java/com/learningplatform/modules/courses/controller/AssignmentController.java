@@ -122,6 +122,12 @@ public class AssignmentController {
         return response(Map.of("items",result.items(),"page",result.page(),"pageSize",result.pageSize(),
                 "total",result.total()),req);
     }
+    @GetMapping("/teacher/submissions/{submissionId}/feedback")
+    public ApiResponse<FeedbackDraftDTO> getFeedbackDraft(Authentication auth,HttpServletRequest req,
+            @PathVariable String submissionId) {
+        AssignmentInput.uuid(submissionId);
+        return response(service.getFeedbackDraft(user(auth),submissionId),req);
+    }
     @PostMapping("/teacher/submissions/{submissionId}/feedback")
     public ResponseEntity<ApiResponse<TeacherFeedbackDTO>> saveFeedback(Authentication auth,HttpServletRequest req,
             @PathVariable String submissionId,@RequestBody Map<String,Object> body) {

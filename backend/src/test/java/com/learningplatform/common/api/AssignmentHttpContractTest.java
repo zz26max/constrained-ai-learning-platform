@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** P1-B 作业与工作区：11 个端点的 HTTP 契约测试，验证认证、CSRF、参数校验与错误码。 */
+/** P1-B/C 作业、工作区与评价：12 个端点的 HTTP 契约测试，验证认证、CSRF、参数校验与错误码。 */
 @SpringBootTest(classes = LearningPlatformApplication.class, properties = {
         "spring.flyway.enabled=false", "spring.sql.init.mode=never",
         "DB_URL=jdbc:mysql://127.0.0.1:1/unused", "DB_USERNAME=unused", "DB_PASSWORD=unused",
@@ -93,6 +93,7 @@ class AssignmentHttpContractTest {
                 new Operation("publishAssignment", "POST", "/api/v1/teacher/assignments/" + ID + "/publish", true, "{}", 200, false),
                 new Operation("archiveAssignment", "POST", "/api/v1/teacher/assignments/" + ID + "/archive", true, "{}", 200, false),
                 new Operation("listTeacherSubmissions", "GET", "/api/v1/teacher/assignments/" + ID + "/submissions", true, null, 200, true),
+                new Operation("getFeedbackDraft", "GET", "/api/v1/teacher/submissions/" + ID + "/feedback", true, null, 200, false),
                 new Operation("saveFeedback", "POST", "/api/v1/teacher/submissions/" + ID + "/feedback", true, FEEDBACK_BODY, 201, false),
                 new Operation("publishFeedback", "POST", "/api/v1/teacher/submissions/" + ID + "/feedback/publish", true, "{\"baseVersion\":1}", 200, false),
                 new Operation("getFeedback", "GET", "/api/v1/me/feedback/" + ID, false, null, 200, false),
@@ -156,6 +157,8 @@ class AssignmentHttpContractTest {
         when(service.archiveAssignment(any(), anyString(), anyString())).thenReturn(teacherAssignment);
         when(service.listTeacherSubmissions(any(), anyString(), nullable(String.class), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new SubmissionListResponse(List.of(), 1, 20, 0));
+        when(service.getFeedbackDraft(any(), anyString()))
+                .thenReturn(new FeedbackDraftDTO(teacherFeedback(1, "draft"), 1));
         when(service.listMessages(any(), nullable(String.class), nullable(String.class), nullable(String.class), anyInt(), anyInt()))
                 .thenReturn(new NotificationListResponse(List.of(notification()), 1, 20, 1, 1));
         when(service.readMessage(any(), anyString(), anyString()))
@@ -630,6 +633,15 @@ class AssignmentHttpContractTest {
     void publishFeedbackReturns200WithPublishedTeacherShape() throws Exception {
         assertTeacherFeedbackShape(mvc.perform(authenticated(op("publishFeedback"), TEACHER_TOKEN, true))
                 .andExpect(status().isOk()), 2, "published");
+    }
+
+    @Test
+    void getFeedbackDraftReturnsTeacherFeedbackAndBaseVersion() throws Exception {
+        mvc.perform(authenticated(op("getFeedbackDraft"), TEACHER_TOKEN, true)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.baseVersion").value(1))
+                .andExpect(jsonPath("$.data.feedback.status").value("draft"))
+                .andExpect(jsonPath("$.data.feedback.version").value(1))
+                .andExpect(jsonPath("$.data.feedback.messageId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

@@ -2379,7 +2379,7 @@ paths:
       tags:
       - teacher
       x-phase: P1
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false

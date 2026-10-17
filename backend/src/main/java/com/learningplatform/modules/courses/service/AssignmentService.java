@@ -381,6 +381,17 @@ public class AssignmentService {
     }
     /** saveFeedback 的结果：created=true 对应 201，否则 200。 */
     public record FeedbackSaveResult(TeacherFeedbackDTO feedback,boolean created) {}
+    /** 教师读取提交当前评价；尚未创建评价时返回空 feedback 与 baseVersion=0。 */
+    public FeedbackDraftDTO getFeedbackDraft(UserDTO user,String submissionId) {
+        Submission submission=submissionOr404(submissionId);
+        access.requireTeacher(user,submission.offeringId(),false);
+        Feedback feedback=mapper.findFeedbackBySubmission(submission.id());
+        return new FeedbackDraftDTO(feedback==null?null:teacherFeedbackView(feedback,submission),
+                feedback==null?0:feedback.baseVersion());
+    }
+
+    public record FeedbackDraftDTO(TeacherFeedbackDTO feedback,int baseVersion) {}
+
     /**
      * 保存评价草稿（契约 saveFeedback）。锁顺序：submission 行 → feedback 行。
      * 版本从 1 起；baseVersion 为客户端所见版本（尚无评价时为 0），每次成功保存 +1。

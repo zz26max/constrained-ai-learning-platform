@@ -743,6 +743,30 @@ class AssignmentIntegrationIT {
     }
 
     @Test
+    void getFeedbackDraftReturnsEmptyThenCurrentTeacherFeedback() {
+        Ctx c = submittedAssignment();
+
+        AssignmentService.FeedbackDraftDTO empty = assignmentService.getFeedbackDraft(TEACHER, c.submissionId());
+        assertThat(empty.feedback()).isNull();
+        assertThat(empty.baseVersion()).isZero();
+
+        assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "draft-read-save");
+        AssignmentService.FeedbackDraftDTO draft = assignmentService.getFeedbackDraft(TEACHER, c.submissionId());
+        assertThat(draft.feedback()).isNotNull();
+        assertThat(draft.feedback().status()).isEqualTo("draft");
+        assertThat(draft.feedback().version()).isEqualTo(1);
+        assertThat(draft.baseVersion()).isEqualTo(1);
+
+        assignmentService.publishFeedback(TEACHER, c.submissionId(), Map.of("baseVersion", 1), "draft-read-publish");
+        AssignmentService.FeedbackDraftDTO published = assignmentService.getFeedbackDraft(TEACHER, c.submissionId());
+        assertThat(published.feedback().status()).isEqualTo("published");
+        assertThat(published.baseVersion()).isEqualTo(2);
+
+        assertThatThrownBy(() -> assignmentService.getFeedbackDraft(OTHER_TEACHER, c.submissionId()))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+    }
+
+    @Test
     void staleBaseVersionReturnsConflictWithLatestCurrentVersion() {
         Ctx c = submittedAssignment();
         assignmentService.saveFeedback(TEACHER, c.submissionId(), feedbackBody(0, "50", "30"), "s1");
