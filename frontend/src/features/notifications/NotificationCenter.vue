@@ -10,6 +10,7 @@ import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
 import { targetRoute } from './target-route'
+import { isUuid } from '../assignments/format'
 
 const router = useRouter()
 const api = assignmentsApi()
@@ -50,12 +51,21 @@ async function markRead(notification: NotificationDTO): Promise<void> {
 }
 
 function canOpen(notification: NotificationDTO): boolean {
-  return notification.target !== null && targetRoute(notification.target) !== null
+  return notification.target !== null ? targetRoute(notification.target) !== null : isCourseNotice(notification)
+}
+
+function isCourseNotice(notification: NotificationDTO): boolean {
+  return notification.type === 'course_notice' && isUuid(notification.offeringId)
 }
 
 async function open(notification: NotificationDTO): Promise<void> {
   const target = notification.target
-  if (target === null) return
+  if (target === null) {
+    if (isCourseNotice(notification)) {
+      await router.push({ name: 'student-notices', params: { offeringId: notification.offeringId } })
+    }
+    return
+  }
   const route = targetRoute(target)
   if (route === null) return
   navigateError.value = null

@@ -292,6 +292,21 @@ describe('P1-D 公告', () => {
 })
 
 describe('P1-D 消息目标映射', () => {
+  it('空 target 的课程公告进入本班公告列表，打开不标读', async () => {
+    scripted.setHandler(request => request.operationId === 'listMessages'
+      ? okEnvelope({ items: [{ id: NOTICE, offeringId: OFFERING, type: 'course_notice', title: '历史公告',
+        content: '公告正文', target: null, sender: null, createdAt: '2026-10-14T02:00:00Z', readAt: null }],
+        page: 1, pageSize: 20, total: 1, summary: { unreadCount: 1 } })
+      : normalResponse(request))
+    const page = await open('/student/messages')
+    const view = page.findAll('button').find(button => button.text() === '查看')
+    expect(view).toBeDefined()
+    await view!.trigger('click')
+    await flushPromises()
+    expect(router?.currentRoute.value.fullPath).toBe(`/student/offerings/${OFFERING}/notices`)
+    expect(requestsOf('listNotices')).toHaveLength(1)
+    expect(requestsOf('readMessage')).toHaveLength(0)
+  })
   it('7. targetRoute 覆盖六种 type 与非法 UUID', () => {
     const t = (type: string, id = RESOURCE, offeringId = OFFERING) => targetRoute({ type, id, offeringId } as never)
     expect(t('offering', OFFERING)).toEqual({ name: 'course', params: { offeringId: OFFERING } })

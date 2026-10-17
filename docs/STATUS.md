@@ -69,6 +69,9 @@
 
 ### 接手记录（2026-10-16）
 
+- **2026-10-17 剩余场景实测发现并修复公告消息入口**：以 `84a6fa6` 为基线，正式页面发布公告后，真实 `course_notice` 消息 `target=null` 只有标读按钮，不能进入公告。补按 `offeringId` 进入本班公告列表的入口，仅适用于课程公告且 UUID 合法，打开不标读，不改变服务端消息字段。回归先失败（找不到查看按钮），修复后前端 `verify` 22 文件/200 项、类型/构建/no-mock 全通过。真实学生消息点击已进入对应班公告列表。证据 `D:/tmp/lp/browser-p1/final-acceptance/notice-null-target-missing-entry.txt`、`notice-null-target-entry-fixed.txt` 和 `notice-entry-before.log`。其余专项仍在验收，本条不代表 P1 全量收口。
+
+
 - **2026-10-17 Web 预览前端包**：Web 工作区增加手动预览/重置，SQL/文字无入口；无同源权限的 `sandbox=allow-scripts`，CSP 默认拒绝网络与框架，惯用本地文件引用由可信引导脚本组合，作品仅作为转义数据，清除 base/meta/嵌套框架/外部资源/导航属性；消息核对窗口、随机标识与白名单。Vite dev/preview 返回防嵌入头。前端 `npm run verify` 22 文件/198 项通过。真实浏览器执行作品探针，DOM 明确显示 `parent DOM:blocked | cookie:blocked | storage:blocked | fetch:blocked`，恶意 iframe/meta 未生成嵌套内容，重置移除预览；证据 `D:/tmp/lp/browser-p1/preview-isolation-dom.txt`。尚待后端 CSP 防嵌入头及最终恶意预览矩阵；不将预览成功视为自动验收通过，不宣称任意 JS 零外网或 CPU 配额。
 
 - **2026-10-17 学习记录分页与 API 防嵌入包**：`getMyLearningRecords` 增加可选 `page/pageSize`（默认 `1/20`），后端使用既有反馈查询按 `published_at、id` 稳定倒序分页；`summary` 与 `recentFeedback` 仍覆盖全班公开评价，前端每页请求 10 条。同步 OpenAPI、示例、生成类型、客户端、mock 与分页 UI；真实 MySQL 用例构造 23 份评价验证三页无重复、空页和汇总稳定。API 安全链增加 `Content-Security-Policy: frame-ancestors 'none'`，并由 Spring Security 保持 `X-Frame-Options: DENY`。前端 `npm run verify`：22 文件、198 项通过；后端 HTTP 契约 22 项通过，`DashboardIntegrationIT` 23 项通过；契约校验 PASS（83 个业务操作、325 个 schema、96 个文档链接）。尚待正式浏览器验证 API 防嵌入响应头及最终 P1 矩阵；不整体标 verified。
