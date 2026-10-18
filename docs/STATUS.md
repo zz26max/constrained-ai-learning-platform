@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；其余章节只追加、不修改。
 
-- **代码基线**：`dc87d38`（2026-10-18，已合并 `origin/master`，本地领先 39 个提交、未推送）。
+- **代码基线**：`dc87d38`（2026-10-18）。该提交合并了 `origin/master`，是最后一次影响代码与契约的提交；之后的提交只改文档。**本地 master 尚未推送**，领先量以 `git status` 为准。
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导）、P3（学习行为分析）尚未开始**，契约中对应操作仍为 `planned`。
 - **契约状态**：83 个业务操作 + 2 个健康检查；截至 2026-10-18 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
 - **门禁现状**（2026-10-18 复跑）：前端 `npm --prefix frontend run verify` 通过，22 个测试文件 / 202 个用例；后端 `backend/target` 既有报告 0 失败（本轮 Docker 未启动，未重跑 Testcontainers 集成测试）；`scripts/validate_contract.py` 通过。
