@@ -90,6 +90,8 @@ async function saveChapter(): Promise<void> {
   selectedId.value = result.id
   await load()
   if (previous === selectedId.value) await details.load()
+  await nextTick()
+  document.getElementById('teacher-chapter-content')?.scrollIntoView?.({block:'nearest'})
 }
 async function openResourceEditor(resource: ResourceDTO | null = null): Promise<void> {
   if (!canWriteChapter.value || (resource?.archived ?? false)) return
@@ -167,13 +169,13 @@ onBeforeUnmount(closeDialogs)
       <div v-if="!data.chapters.items.length" class="surface teacher-empty"><h3>暂无章节</h3><p>创建章节草稿，准备知识点与资料，再明确发布给学生。</p></div>
       <div v-else class="teacher-chapter-workspace">
         <ul class="surface teacher-chapter-list"><li v-for="chapter in data.chapters.items" :key="chapter.id"><button type="button" class="teacher-chapter-choice" :aria-current="selectedId === chapter.id ? 'true' : undefined" @click="selectedId = chapter.id"><span class="teacher-chapter-number">{{ chapter.number }}</span><div><h3>{{ chapter.title }}</h3><p>{{ chapter.isRequired ? '必修' : '选修' }} · {{ chapter.resourceCount }} 份资料</p></div><span class="tag" :class="chapter.publicationState === 'published' ? 'tag-on' : 'tag-off'">{{ publicationLabel(chapter.publicationState) }}</span></button></li></ul>
-        <div class="teacher-chapter-content">
+        <details :key="selectedId" id="teacher-chapter-content" class="teacher-chapter-content" open><summary class="teacher-detail-toggle">当前章节内容</summary>
           <ApiState v-if="selectedId" :status="chapterStatus" :error="chapterError" @retry="details.load" />
           <template v-if="selectedId && chapterData && currentChapterData">
             <section class="surface teacher-chapter-summary"><div class="teacher-section-heading"><div><span class="teacher-muted">第 {{ chapterData.number }} 章 · {{ chapterData.isRequired ? '必修' : '选修' }}</span><h3>{{ chapterData.title }}</h3></div><span class="tag" :class="chapterData.publicationState === 'published' ? 'tag-on' : 'tag-off'">{{ publicationLabel(chapterData.publicationState) }}</span></div><p class="teacher-text">{{ chapterData.summary }}</p><p v-if="chapterData.publicationState === 'published'" class="teacher-field-hint">已发布章节可以澄清标题和摘要；章节号与必修属性保持不变。</p><div class="teacher-inline-actions"><button type="button" class="button secondary" :disabled="!canWriteChapter" @click="openChapterEditor(chapterData)">编辑章节</button><button v-if="chapterData.publicationState === 'draft'" type="button" class="button primary" :disabled="!canWriteChapter" @click="confirmPublish">发布章节</button></div></section>
             <section aria-labelledby="teacher-resources-title"><div class="teacher-section-heading teacher-resource-heading"><h3 id="teacher-resources-title">章节资料</h3><button type="button" class="button secondary" :disabled="!canWriteChapter" @click="openResourceEditor()">创建资料</button></div><div v-if="!chapterData.resources.length" class="surface teacher-empty"><p>本章暂无资料。</p></div><ul v-else class="surface teacher-resource-list"><li v-for="resource in chapterData.resources" :key="resource.id"><div><h4>{{ resource.title }}</h4><p>{{ resourcePointLabel(resource.knowledgePointId) }} · 顺序 {{ resource.order }}</p><span v-if="resource.archived" class="tag tag-off">已删除归档</span><details class="teacher-resource-preview"><summary>查看资料正文</summary><pre>{{ resource.content }}</pre></details></div><div class="teacher-inline-actions"><button type="button" class="button secondary" :disabled="!canWriteChapter || resource.archived" :aria-label="`编辑资料：${resource.title}`" @click="openResourceEditor(resource)">编辑</button><button type="button" class="button secondary" :disabled="!canWriteChapter || resource.archived" :aria-label="`删除归档资料：${resource.title}`" @click="confirmResourceArchive(resource)">删除归档</button></div></li></ul></section>
           </template>
-        </div>
+        </details>
       </div>
     </template>
     <dialog ref="chapterDialog" class="teacher-dialog" aria-labelledby="chapter-editor-title" @cancel="cancelWrite" @close="editingChapter = null">

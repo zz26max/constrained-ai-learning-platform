@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import type { FeedbackWrite, TeacherFeedbackDTO, TeacherSubmissionDetailDTO } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
@@ -11,11 +11,13 @@ import { useAssignmentActions } from './use-assignment-actions'
 import { isUuid } from './format'
 
 const route = useRoute()
+const props=withDefaults(defineProps<{submissionId?:string;embedded?:boolean;queue?:string[];queueTotal?:number;queueBusy?:boolean;queueMessage?:string}>(),{embedded:false,queue:()=>[],queueTotal:0,queueBusy:false,queueMessage:''})
+const emit=defineEmits<{close:[];next:[]}>()
 const api = assignmentsApi()
 const actions = useAssignmentActions()
 
 const submissionId = computed(() => {
-  const id = route.params.submissionId
+  const id = props.submissionId ?? route.params.submissionId
   return isUuid(id) ? id : ''
 })
 
@@ -36,6 +38,16 @@ const knowledgeEvaluations = ref<TeacherFeedbackDTO['knowledgeEvaluations']>([])
 const baseVersion = ref(0)
 const published = ref(false)
 const publishDialog = ref<HTMLDialogElement | null>(null)
+const publishNext=ref(false), baseline=ref('')
+const dirty=computed(()=>!!baseline.value && baseline.value!==JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value}))
+function rememberSaved() {baseline.value=JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value})}
+function canLeave() {return (!actions.pending.value && (!dirty.value || window.confirm('评分与反馈尚未保存，确定放弃并离开？')))}
+function requestClose() {if(canLeave()) emit('close')}
+defineExpose({canLeave,requestClose})
+onBeforeRouteLeave(()=>props.embedded ? true : canLeave())
+onBeforeRouteUpdate(()=>props.embedded ? true : canLeave())
+function beforeUnload(e:BeforeUnloadEvent) {if(dirty.value || actions.pending.value) {e.preventDefault();e.returnValue=''}}
+window.addEventListener('beforeunload',beforeUnload)
 
 const rubric = computed(() => query.data.value?.assignmentSnapshot.rubric ?? [])
 const maxScore = computed(() => query.data.value?.assignmentSnapshot.maxScore ?? 0)
@@ -54,9 +66,11 @@ function hydrate(data: TeacherSubmissionDetailDTO): void {
     inputs[criterion.criterionId] = { score: existing?.score ?? 0, comment: existing?.comment ?? '' }
   }
   rubricInputs.value = inputs
+  rememberSaved()
 }
 
 async function reload(): Promise<void> {
+  if(dirty.value && !window.confirm('重新载入会放弃当前未保存的评分与反馈，是否继续？')) return
   actions.clearNotice()
   await query.load()
   if (query.status.value === 'success' && query.data.value) hydrate(query.data.value)
@@ -90,11 +104,12 @@ async function saveDraft(): Promise<void> {
   if (!canSave.value) return
   const id = submissionId.value
   const saved = await actions.run(token => api.saveFeedback(id, buildWrite(), { csrfToken: token }), '反馈草稿已保存')
-  if (saved !== null && submissionId.value === id) baseVersion.value = saved.version
+  if (saved !== null && submissionId.value === id) {baseVersion.value = saved.version;rememberSaved()}
 }
 
-function openPublishDialog(): void {
+function openPublishDialog(next=false): void {
   if (!canSave.value) return
+  publishNext.value=next
   publishDialog.value?.showModal()
 }
 
@@ -109,6 +124,7 @@ async function confirmPublish(): Promise<void> {
   const saved = await actions.run(token => api.saveFeedback(id, buildWrite(), { csrfToken: token }), '反馈草稿已保存')
   if (saved === null || submissionId.value !== id) return
   baseVersion.value = saved.version
+  rememberSaved()
   const result = await actions.run(
     token => api.publishFeedback(id, { baseVersion: saved.version }, { csrfToken: token }),
     '反馈已发布，学生将收到通知',
@@ -116,29 +132,36 @@ async function confirmPublish(): Promise<void> {
   if (result === null || submissionId.value !== id) return
   baseVersion.value = result.version
   published.value = true
+  rememberSaved()
+  if(publishNext.value) emit('next')
 }
 
-onBeforeUnmount(closePublishDialog)
+onBeforeUnmount(()=>{closePublishDialog();window.removeEventListener('beforeunload',beforeUnload)})
 </script>
 
 <template>
-  <div class="workspace-page">
+  <div class="workspace-page feedback-editor" :class="{'is-embedded':embedded}">
     <header class="workspace-heading">
       <div>
-        <h1 tabindex="-1">批阅作业</h1>
+        <component :is="embedded ? 'h2' : 'h1'" tabindex="-1">批阅作业</component>
         <p v-if="query.data.value" class="muted">
           {{ query.data.value.student.displayName }} · 第 {{ query.data.value.attemptNumber }} 次提交
         </p>
       </div>
-      <RouterLink
+      <button v-if="embedded" type="button" class="button secondary feedback-close" @click="requestClose">关闭</button>
+      <RouterLink v-else
         v-if="query.data.value"
         class="button secondary"
-        :to="{ name: 'teacher-assignments', params: { offeringId: query.data.value.offeringId } }"
+        :to="{ name: 'teacher-assignment', params: { id: query.data.value.assignmentId } }"
       >
-        返回作业管理
+        返回作业
       </RouterLink>
     </header>
 
+    <div class="feedback-content">
+    <p v-if="queueBusy" class="notice notice-info" role="status">正在加载完整批改队列…</p>
+    <p v-if="queueMessage" class="notice notice-warn" role="status">{{ queueMessage }}</p>
+    <p v-if="queue.includes(submissionId)" class="notice notice-info" role="status">批改队列 · 第 {{ queueTotal - queue.length + 1 }} / {{ queueTotal }} 份 · 本份之外剩余 {{ queue.length - 1 }} 份</p>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="reload" />
     <ActionNotice :error="actions.error.value" :message="actions.message.value" @clear="actions.clearNotice" />
     <p v-if="actions.error.value && query.status.value === 'success'">
@@ -149,7 +172,7 @@ onBeforeUnmount(closePublishDialog)
       <p v-if="query.data.value.superseded" class="notice notice-warning" role="status">该提交已被新提交替代，不能批阅。</p>
       <p v-else-if="published" class="notice notice-info" role="status">反馈已发布，当前为只读。</p>
 
-      <section class="surface">
+      <section class="surface feedback-files">
         <h2>学生提交</h2>
         <p class="muted">提交时间：{{ new Date(query.data.value.submittedAt).toLocaleString('zh-CN') }}{{ query.data.value.late ? ' · 迟交' : '' }}</p>
         <div v-for="file in query.data.value.files" :key="file.path">
@@ -197,12 +220,14 @@ onBeforeUnmount(closePublishDialog)
 
         <p v-if="!scoresValid && !readOnly" class="notice notice-warning" role="status">分数需在 0 到对应满分之间。</p>
 
-        <div class="button-group">
-          <button type="submit" class="button secondary" :disabled="!canSave">保存草稿</button>
-          <button type="button" class="button" :disabled="!canSave" @click="openPublishDialog">发布反馈</button>
-        </div>
       </form>
     </template>
+    </div>
+    <div v-if="query.status.value==='success'" class="feedback-actions">
+      <button type="button" class="button secondary" :disabled="!canSave" @click="saveDraft">保存草稿</button>
+      <button type="button" class="button" :disabled="!canSave" @click="openPublishDialog(false)">发布反馈</button>
+      <button v-if="queue.includes(submissionId) && !published" type="button" class="button" :disabled="!canSave || queueBusy" @click="openPublishDialog(true)">{{queue.length>1 ? '发布并批改下一份' : '发布并完成'}}</button>
+    </div>
 
     <dialog ref="publishDialog" class="teacher-dialog teacher-confirm" aria-labelledby="publish-feedback-title">
       <h2 id="publish-feedback-title">确认发布反馈</h2>

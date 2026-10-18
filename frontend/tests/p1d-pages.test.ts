@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, type Router } from 'vue-router'
 import App from '../src/app/App.vue'
+import TeacherFeedbackEditor from '../src/features/assignments/TeacherFeedbackEditor.vue'
 import { createAppRouter } from '../src/app/router'
 import { registerAuthApi, registerAssignmentsApi, registerCoursesApi } from '../src/api'
 import { AuthApi } from '../src/api/auth'
@@ -96,7 +97,7 @@ function requestsOf(operationId: string) {
   return scripted.requests.filter(request => request.operationId === operationId)
 }
 
-async function open(path: string, role: 'student' | 'teacher'): Promise<VueWrapper> {
+async function open(path: string, role: 'student' | 'teacher', queueMode=false): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().$patch({
@@ -104,6 +105,7 @@ async function open(path: string, role: 'student' | 'teacher'): Promise<VueWrapp
     identity: { ...DEMO_USER, roles: [role] }, config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms] },
   })
   router = createAppRouter(createMemoryHistory())
+  if(queueMode) router.addRoute({name:'teacher-feedback',path:'/teacher/submissions/:submissionId/feedback',component:TeacherFeedbackEditor,props:{queue:[SUBMISSION],queueTotal:1},meta:{requiresAuth:true,requiresRole:'teacher'}})
   await router.push(path)
   await router.isReady()
   wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router] } })
@@ -186,6 +188,20 @@ describe('消息中心 /student/messages', () => {
 
 describe('教师批阅 /teacher/submissions/:submissionId/feedback', () => {
   const path = `/teacher/submissions/${SUBMISSION}/feedback`
+  it.each([false,true])('连续批改仅在保存并发布均成功后切换，发布失败=%s',async fail=>{
+    scripted.setHandler(r=>r.operationId==='publishFeedback' ? (fail?failEnvelope(409,'FEEDBACK_VERSION_CONFLICT',{},'publish-conflict'):okEnvelope({...draftResponse,status:'published',version:2})) : normalResponse(r))
+    const page=await open(path,'teacher',true)
+    const editor=page.findComponent(TeacherFeedbackEditor)
+    await page.find('#feedback-score').setValue(70)
+    await page.find('#feedback-comment').setValue('连续批改真实流程测试')
+    await page.findAll('button').find(b=>b.text()==='发布并完成')?.trigger('click')
+    await page.findAll('button').find(b=>b.text()==='确认发布')?.trigger('click')
+    await flushPromises()
+    expect(requestsOf('saveFeedback')).toHaveLength(1)
+    expect(JSON.parse(requestsOf('publishFeedback')[0]?.body??'{}').baseVersion).toBe(1)
+    expect(!!editor.emitted('next')).toBe(!fail)
+    expect(page.find<HTMLInputElement>('#feedback-score').element.value).toBe('70')
+  })
 
   it('渲染学生提交与量表，保存草稿发出 saveFeedback（baseVersion、CSRF）', async () => {
     const page = await open(path, 'teacher')

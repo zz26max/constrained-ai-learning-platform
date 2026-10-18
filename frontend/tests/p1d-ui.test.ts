@@ -353,11 +353,12 @@ describe('P1-D 消息目标映射', () => {
 })
 
 describe('P1-D 教师统计卡片', () => {
-  it('8a. 成功时显示四张卡片', async () => {
+  it('8a. 成功时只显示已开放的真实统计', async () => {
     const page = await open(`/teacher/offerings/${OFFERING}`, 'teacher')
     const cards = page.find('.stat-cards')
     expect(cards.text()).toContain('30')
-    expect(cards.text()).toContain('P2 开放')
+    expect(cards.text()).not.toContain('P2 开放')
+    expect(cards.findAll('.stat-card')).toHaveLength(3)
     expect(cards.findAll('a').some(item => item.attributes('href') === `/teacher/offerings/${OFFERING}/assignments`)).toBe(true)
   })
 

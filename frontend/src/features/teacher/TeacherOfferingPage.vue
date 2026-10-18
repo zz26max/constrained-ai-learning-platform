@@ -64,7 +64,6 @@ onBeforeUnmount(closeArchive)
           <span class="muted">待批阅</span><strong>{{ stats.data.value.pendingReviewCount }}</strong>
           <RouterLink v-if="stats.data.value.pendingReviewCount > 0" :to="{ name: 'teacher-assignments', params: { offeringId: id } }">去批阅</RouterLink>
         </li>
-        <li class="stat-card"><span class="muted">待处理求助</span><strong>{{ stats.data.value.pendingHelpCount }}</strong><span class="muted">P2 开放</span></li>
       </ul>
     </section>
     <ApiState :status="status" :error="error" @retry="load" />
