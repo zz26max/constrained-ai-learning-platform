@@ -177,7 +177,7 @@ describe('P1-D 路由与首页', () => {
 
   it('2. currentLearning 三种分支渲染正确按钮与链接，逾期显示文字', async () => {
     const assignmentPage = await open('/student/home')
-    const continueLink = assignmentPage.findAll('a').find(item => item.text() === '继续作业')
+    const continueLink = assignmentPage.findAll('a').find(item => item.text() === '开始作答')
     expect(continueLink?.attributes('href')).toBe(`/student/assignments/${ASSIGNMENT}`)
     expect(assignmentPage.text()).not.toContain('已逾期')
     wrapper?.unmount()
@@ -198,6 +198,52 @@ describe('P1-D 路由与首页', () => {
     const emptyPage = await open('/student/home')
     expect(emptyPage.text()).toContain('暂无待完成任务')
     expect(emptyPage.findAll('a').find(item => item.text() === '查看我的课程')?.attributes('href')).toBe('/course')
+  })
+
+  it('2b. 待办按列渲染，操作随提交/归档变化，逾期只标一次并给出截止日期', async () => {
+    const LONG = '超长标题：这是一个用于验证首页待办列表在标题很长时不会挤压课程、截止时间与操作按钮的测试作业标题'
+    dashboardOverride = {
+      otherPendingAssignments: [
+        summary(ASSIGNMENT, { title: '待作答的作业' }),
+        summary(ASSIGNMENT_2, { title: '已提交待批阅', latestSubmissionId: '00000000-0000-4000-8000-000000000901' }),
+        summary('00000000-0000-4000-8000-000000000703', { title: '已评阅作业',
+          latestSubmissionId: '00000000-0000-4000-8000-000000000902', publishedFeedbackId: FEEDBACK }),
+      ],
+    }
+    const page = await open('/student/home')
+    const rows = page.findAll('.dash-todo > li')
+    expect(rows).toHaveLength(3)
+    // 标题 / 课程 / 截止 / 状态 / 操作 各列都有内容
+    const texts = rows.map(row => row.text())
+    const actions = rows.map(row => row.find('.dash-todo__action').text())
+    expect(texts[0]).toContain('待作答的作业')
+    expect(texts[0]).toContain('Web 前端开发技术')
+    expect(texts[0]).toContain('11月12日')
+    expect(actions).toEqual(['继续作答', '查看提交', '查看评价'])
+    wrapper?.unmount()
+
+    dashboardOverride = {
+      otherPendingAssignments: [
+        summary(ASSIGNMENT, { title: '已归档作业', publicationState: 'archived', overdue: true, dueAt: '2026-10-01T15:59:59Z' }),
+      ],
+    }
+    const archived = await open('/student/home')
+    const archivedRow = archived.find('.dash-todo > li')
+    expect(archivedRow.text()).toContain('已归档')
+    expect(archivedRow.find('.dash-todo__action').text()).toBe('查看详情')
+    expect(archivedRow.text().match(/已逾期/g) ?? []).toHaveLength(1)
+    expect(archivedRow.text()).toContain('10月1日')
+    wrapper?.unmount()
+
+    dashboardOverride = { otherPendingAssignments: [summary(ASSIGNMENT, { title: LONG })] }
+    const longPage = await open('/student/home')
+    expect(longPage.find('.dash-todo > li .dash-todo__title').text()).toBe(LONG)
+    wrapper?.unmount()
+
+    dashboardOverride = { otherPendingAssignments: [], recentFeedback: null }
+    const empty = await open('/student/home')
+    expect(empty.text()).toContain('当前没有其他待办')
+    expect(empty.text()).toContain('暂无已发布的评价')
   })
 
   it('3. termId 为 null 显示无学期提示；notConfigured 不显示 0%', async () => {

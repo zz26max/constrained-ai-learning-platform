@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { dashboardApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { formatTime } from '../courses/format'
-import { assignmentStateLabel, dueText } from '../assignments/format'
+import { assignmentStateLabel, dueInfo } from '../assignments/format'
 import { useOpenTarget } from '../notifications/use-open-target'
 
 const route = useRoute()
@@ -18,7 +18,34 @@ watch(() => route.fullPath, () => { void query.load() }, { immediate: true })
 const TYPE_LABELS = { web_lab: '网页实验', sql_text: 'SQL 作业', text: '文本作业' } as const
 
 function excerpt(text: string, max = 80): string {
-  return text.length > max ? `${text.slice(0, max)}…` : text
+  return text.length > max ? text.slice(0, max) + '…' : text
+}
+
+/** 课程名只从本次返回的课程列表取；取不到就留空，不编造。 */
+const courseNames = computed(() => {
+  const map = new Map<string, string>()
+  for (const c of query.data.value?.courses ?? []) map.set(c.offeringId, c.title)
+  return map
+})
+
+type TodoItem = {
+  offeringId: string
+  publicationState: string
+  offeringStatus: string
+  latestSubmissionId: string | null
+  publishedFeedbackId: string | null
+}
+
+/** 归档后只读：不再提供作答入口。 */
+function isReadOnly(item: Pick<TodoItem, 'publicationState' | 'offeringStatus'>): boolean {
+  return item.publicationState === 'archived' || item.offeringStatus === 'archived'
+}
+
+/** 操作文案按真实状态给出，不猜测权限。 */
+function actionLabel(item: TodoItem): string {
+  if (isReadOnly(item)) return '查看详情'
+  if (item.latestSubmissionId !== null) return item.publishedFeedbackId !== null ? '查看评价' : '查看提交'
+  return '继续作答'
 }
 </script>
 
@@ -46,24 +73,30 @@ function excerpt(text: string, max = 80): string {
       <section class="surface dash-section current-task" aria-labelledby="dash-current">
         <h2 id="dash-current">当前学习</h2>
         <template v-if="query.data.value.currentLearning?.type === 'assignment'">
-          <h3>{{ query.data.value.currentLearning.title }}</h3>
-          <p class="muted">
-            {{ TYPE_LABELS[query.data.value.currentLearning.assignmentType] }}
-            · {{ dueText(query.data.value.currentLearning.dueAt, query.data.value.currentLearning.overdue) }}
-            · {{ assignmentStateLabel(query.data.value.currentLearning.assignmentState) }}
-            <span v-if="query.data.value.currentLearning.overdue" class="tag tag-overdue">已逾期</span>
-          </p>
-          <RouterLink class="button primary" :to="{ name: 'student-assignment', params: { id: query.data.value.currentLearning.assignmentId } }">
-            {{ query.data.value.currentLearning.resume === null ? '继续作业' : '继续上次的工作' }}
-          </RouterLink>
+          <template v-for="item in [query.data.value.currentLearning]" :key="item.assignmentId">
+            <h3 class="dash-wrap">{{ item.title }}</h3>
+            <p class="dash-meta">
+              <span>{{ TYPE_LABELS[item.assignmentType] }}</span>
+              <span aria-hidden="true">·</span>
+              <span>{{ assignmentStateLabel(item.assignmentState) }}</span>
+              <template v-if="dueInfo(item.dueAt, item.overdue).hasDue">
+                <span aria-hidden="true">·</span>
+                <span class="dash-due">{{ dueInfo(item.dueAt, item.overdue).absolute }}</span>
+                <span v-if="dueInfo(item.dueAt, item.overdue).overdue" class="tag tag-overdue">已逾期</span>
+              </template>
+            </p>
+            <RouterLink class="button primary" :to="{ name: 'student-assignment', params: { id: item.assignmentId } }">
+              {{ item.resume === null ? '开始作答' : '继续上次的工作' }}
+            </RouterLink>
+          </template>
         </template>
         <template v-else-if="query.data.value.currentLearning?.type === 'chapter'">
-          <h3>{{ query.data.value.currentLearning.title }}</h3>
-          <p class="muted">{{ query.data.value.currentLearning.description }}</p>
+          <h3 class="dash-wrap">{{ query.data.value.currentLearning.title }}</h3>
+          <p class="dash-meta dash-wrap">{{ query.data.value.currentLearning.description }}</p>
           <RouterLink class="button primary" :to="{ name: 'chapter', params: { offeringId: query.data.value.currentLearning.offeringId, chapterId: query.data.value.currentLearning.chapterId } }">继续学习</RouterLink>
         </template>
         <template v-else>
-          <p class="muted">暂无待完成任务</p>
+          <p class="dash-meta">暂无待完成任务</p>
           <RouterLink class="button secondary" to="/course">查看我的课程</RouterLink>
         </template>
       </section>
@@ -73,15 +106,30 @@ function excerpt(text: string, max = 80): string {
           <h2 id="dash-others">其他待办</h2>
           <RouterLink to="/student/assignments">全部作业</RouterLink>
         </header>
-        <ul v-if="query.data.value.otherPendingAssignments.length > 0" class="dash-list">
-          <li v-for="item in query.data.value.otherPendingAssignments" :key="item.id">
-            <RouterLink :to="{ name: 'student-assignment', params: { id: item.id } }">{{ item.title }}</RouterLink>
-            <span class="muted">{{ dueText(item.dueAt, item.overdue) }}</span>
-            <span v-if="item.overdue" class="tag tag-overdue">已逾期</span>
-            <span v-if="item.publicationState === 'archived'" class="tag">已归档</span>
-          </li>
-        </ul>
-        <p v-else class="muted">当前没有其他待办，按自己的节奏继续学习。</p>
+        <template v-if="query.data.value.otherPendingAssignments.length > 0">
+          <div class="dash-todo__head" aria-hidden="true">
+            <span>任务</span><span>课程</span><span>截止</span><span>状态</span><span>操作</span>
+          </div>
+          <ul class="dash-todo">
+            <li v-for="item in query.data.value.otherPendingAssignments" :key="item.id">
+              <RouterLink class="dash-todo__title" :to="{ name: 'student-assignment', params: { id: item.id } }">{{ item.title }}</RouterLink>
+              <span class="dash-todo__course">{{ courseNames.get(item.offeringId) ?? '—' }}</span>
+              <span class="dash-todo__due">
+                <template v-if="dueInfo(item.dueAt, item.overdue).hasDue">
+                  {{ dueInfo(item.dueAt, item.overdue).absolute }}
+                  <small v-if="dueInfo(item.dueAt, item.overdue).relative">{{ dueInfo(item.dueAt, item.overdue).relative }}</small>
+                </template>
+                <template v-else>无截止时间</template>
+              </span>
+              <span class="dash-todo__state">
+                <span v-if="dueInfo(item.dueAt, item.overdue).overdue" class="tag tag-overdue">已逾期</span>
+                <span v-if="item.publicationState === 'archived'" class="tag">已归档</span>
+              </span>
+              <RouterLink class="dash-todo__action" :to="{ name: 'student-assignment', params: { id: item.id } }">{{ actionLabel(item) }}</RouterLink>
+            </li>
+          </ul>
+        </template>
+        <p v-else class="dash-meta">当前没有其他待办，按自己的节奏继续学习。</p>
       </section>
 
       <section class="surface dash-section" aria-labelledby="dash-courses">
@@ -89,12 +137,12 @@ function excerpt(text: string, max = 80): string {
           <h2 id="dash-courses">课程总览</h2>
           <RouterLink v-if="query.data.value.courseCount > 6" to="/course">查看全部课程</RouterLink>
         </header>
-        <p v-if="query.data.value.courses.length === 0" class="muted">本学期暂无课程</p>
+        <p v-if="query.data.value.courses.length === 0" class="dash-meta">本学期暂无课程</p>
         <ul v-else class="dash-courses">
           <li v-for="course in query.data.value.courses" :key="course.offeringId" class="dash-course">
-            <h3><RouterLink :to="{ name: 'course', params: { offeringId: course.offeringId } }">{{ course.title }}</RouterLink></h3>
-            <p class="muted">{{ course.groupName }} · {{ course.teachers.map(t => t.displayName).join('、') }}</p>
-            <p v-if="course.progress.notConfigured" class="muted">未配置学习内容</p>
+            <h3 class="dash-wrap"><RouterLink :to="{ name: 'course', params: { offeringId: course.offeringId } }">{{ course.title }}</RouterLink></h3>
+            <p class="dash-meta dash-wrap">{{ course.groupName }} · {{ course.teachers.map(t => t.displayName).join('、') }}</p>
+            <p v-if="course.progress.notConfigured" class="dash-meta">未配置学习内容</p>
             <div v-else class="course-progress">
               <div class="progress-track" role="progressbar" :aria-label="course.title + '进度'" :aria-valuenow="course.progress.percent" aria-valuemin="0" aria-valuemax="100"><span :style="{ width: course.progress.percent + '%' }" /></div>
               <span>{{ course.progress.completed }}/{{ course.progress.total }} <strong>{{ course.progress.percent }}%</strong></span>
@@ -114,29 +162,29 @@ function excerpt(text: string, max = 80): string {
       </div><aside class="dashboard-secondary"><section class="surface dash-section" aria-labelledby="dash-feedback">
         <h2 id="dash-feedback">最近反馈</h2>
         <template v-if="query.data.value.recentFeedback">
-          <p>
-            <RouterLink :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId }, query: { feedbackId: query.data.value.recentFeedback.id } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
-            <span class="muted"> · {{ formatTime(query.data.value.recentFeedback.publishedAt) }} · {{ query.data.value.recentFeedback.score }}/{{ query.data.value.recentFeedback.maxScore }}</span>
+          <p class="dash-feedback-head">
+            <RouterLink class="dash-wrap" :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId }, query: { feedbackId: query.data.value.recentFeedback.id } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
+            <span class="dash-meta">{{ formatTime(query.data.value.recentFeedback.publishedAt) }} · {{ query.data.value.recentFeedback.score }}/{{ query.data.value.recentFeedback.maxScore }}</span>
           </p>
           <p class="dash-text">{{ excerpt(query.data.value.recentFeedback.comment) }}</p>
         </template>
-        <p v-else class="muted">暂无已发布的评价</p>
+        <p v-else class="dash-meta">暂无已发布的评价</p>
       </section>
 
       <section class="surface dash-section" aria-labelledby="dash-notice">
         <h2 id="dash-notice">最新公告</h2>
         <ActionNotice :error="target.error.value" :message="null" />
         <template v-if="query.data.value.recentNotice">
-          <p>
+          <p class="dash-wrap">
             <button v-if="target.canOpen(query.data.value.recentNotice.target)" type="button" class="button secondary" @click="target.open(query.data.value.recentNotice.target)">{{ query.data.value.recentNotice.title }}</button>
             <RouterLink v-else to="/student/messages">{{ query.data.value.recentNotice.title }}</RouterLink>
             <span v-if="query.data.value.recentNotice.readAt === null" class="tag">未读</span>
           </p>
-          <p class="muted">
+          <p class="dash-meta">
             {{ query.data.value.recentNotice.sender?.displayName ?? '系统' }} · {{ formatTime(query.data.value.recentNotice.createdAt) }}
           </p>
         </template>
-        <p v-else class="muted">暂无公告</p>
+        <p v-else class="dash-meta">暂无公告</p>
       </section></aside></div>
     </template>
   </div>

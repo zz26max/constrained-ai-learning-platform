@@ -32,6 +32,39 @@ export function dueText(dueAt: string | null | undefined, overdue: boolean): str
   return formatDueTime(dueAt, overdue)
 }
 
+/**
+ * 截止信息：同时给出绝对时间与相对状态，逾期只由调用方渲染一次标签。
+ * 与 dueText 分开，避免改动已验收页面的文案。
+ */
+export interface DueInfo {
+  absolute: string
+  relative: string
+  overdue: boolean
+  hasDue: boolean
+}
+
+export function dueInfo(dueAt: string | null | undefined, overdue: boolean): DueInfo {
+  if (dueAt === null || dueAt === undefined || dueAt === '') {
+    return { absolute: '无截止时间', relative: '', overdue: false, hasDue: false }
+  }
+  const date = new Date(dueAt)
+  const absolute = date.toLocaleString('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const diffMs = date.getTime() - Date.now()
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  let relative = ''
+  if (overdue || diffMs < 0) relative = '已超过截止时间'
+  else if (days === 0) relative = '今天截止'
+  else if (days === 1) relative = '明天截止'
+  else if (days <= 7) relative = days + ' 天后截止'
+  return { absolute, relative, overdue: overdue || diffMs < 0, hasDue: true }
+}
+
 export function formatScore(score: number | null, maxScore: number): string {
   if (score === null) return '未评分'
   return `${score}/${maxScore}`

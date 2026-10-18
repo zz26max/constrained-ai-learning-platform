@@ -11,6 +11,34 @@
 .dash-list>li+li{border-top:1px solid var(--line)}
 .dash-list a{display:inline-flex;align-items:center;min-height:var(--min-touch)}
 .dash-text{font-size:14px;line-height:1.7;margin:4px 0 0;overflow-wrap:anywhere;white-space:pre-wrap}
+/* 长标题换行，不挤压同行其它信息 */
+.dash-wrap{overflow-wrap:anywhere;word-break:break-word;min-width:0}
+.dash-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:4px 0 12px;color:var(--muted);font-size:13px;line-height:1.6}
+.dash-due{font-variant-numeric:tabular-nums}
+.dash-feedback-head{display:flex;flex-direction:column;gap:2px;margin:0}
+.dash-feedback-head a{overflow-wrap:anywhere}
+.dash-feedback-head .dash-meta{margin:0}
+/* 待办：桌面按 任务/课程/截止/状态/操作 对齐，窄屏纵向堆叠 */
+.dash-todo__head,
+.dash-todo>li{display:grid;grid-template-columns:minmax(0,1fr) 132px 148px 84px 92px;gap:14px;align-items:center}
+.dash-todo__head{font-size:12px;color:var(--muted);padding:0 0 8px;border-bottom:1px solid var(--line)}
+.dash-todo{list-style:none;margin:0;padding:0}
+.dash-todo>li{padding:12px 0;min-height:var(--min-touch)}
+.dash-todo>li+li{border-top:1px solid var(--line)}
+.dash-todo__title{min-width:0;overflow-wrap:anywhere;word-break:break-word;line-height:1.5;text-decoration:none}
+.dash-todo__course{min-width:0;overflow-wrap:anywhere;color:var(--muted);font-size:13px;line-height:1.5}
+.dash-todo__due{white-space:nowrap;font-variant-numeric:tabular-nums;font-size:13px;line-height:1.5}
+.dash-todo__due small{display:block;color:var(--muted);font-size:12px}
+.dash-todo__state{white-space:nowrap;display:flex;gap:6px;flex-wrap:wrap}
+.dash-todo__action{justify-self:end;white-space:nowrap;font-size:13px}
+.dashboard-page a{text-decoration:none}
+.dashboard-page a:hover,.dashboard-page a:focus-visible{text-decoration:underline}
+@media (max-width:880px){
+  .dash-todo__head{display:none}
+  .dash-todo>li{grid-template-columns:1fr;gap:4px;padding:14px 0}
+  .dash-todo__action{justify-self:start}
+  .dash-todo__due{white-space:normal}
+}
 .dash-courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;list-style:none;margin:0;padding:0}
 .dash-course{border:1px solid var(--line);border-radius:var(--radius-panel);padding:16px;min-width:0}
 .dash-course p{margin:6px 0}
