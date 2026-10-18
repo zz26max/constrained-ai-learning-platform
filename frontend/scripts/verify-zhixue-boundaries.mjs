@@ -10,7 +10,7 @@ const browser=await chromium.launch({channel:'msedge',headless:true})
 const ctx=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'})
 const page=await ctx.newPage();page.setDefaultTimeout(30000)
 const base='http://127.0.0.1:4173/#'
-const api=async(p,path,method='GET')=>p.evaluate(async({path,method})=>{let h={};if(method!=='GET'){const r=await fetch('/api/v1/auth/csrf-token');h['X-CSRF-Token']=(await r.json()).data.csrfToken}const r=await fetch('/api/v1'+path,{method,headers:h});const data=await r.json();return {status:r.status,data:data.data}},{path,method})
+const api=async(p,path,method='GET')=>p.evaluate(async({path,method})=>{const h={Accept:'application/json'};if(method!=='GET'){const r=await fetch('/api/v1/auth/csrf-token');h['X-CSRF-Token']=(await r.json()).data.csrfToken}const write=method==='POST';if(write)h['Content-Type']='application/json';const r=await fetch('/api/v1'+path,{method,headers:h,...(write?{body:'{}'}:{})});const data=await r.json();return {status:r.status,data:data.data}},{path,method})
 async function login(p,role){await p.goto(base+'/login');await p.locator('#login-username').fill(role+'.demo');await p.locator('#login-password').fill(env['LOCAL_'+role.toUpperCase()+'_PASSWORD']);await p.getByRole('button',{name:'登录',exact:true}).click();await p.waitForURL(u=>!u.hash.startsWith('#/login'),{waitUntil:'domcontentloaded'})}
 async function nav(p,path){await p.goto(base+path);await p.locator('main h1').waitFor();await p.waitForFunction(()=>!Array.from(document.querySelectorAll('[role=status]')).some(n=>n.textContent?.trim()==='正在加载…'))}
 const saved=async(p)=>p.getByText(/已保存 · 版本/).first().waitFor()
