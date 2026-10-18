@@ -10,3 +10,4 @@ dist/
 # 根 .gitignore 的 .env.* 防密钥规则之外定点再纳入
 !.env.mock
 vitest-results/
+.cache/

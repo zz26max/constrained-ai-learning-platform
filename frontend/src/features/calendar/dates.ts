@@ -1,0 +1,6 @@
+export function beijingDay(value: string | Date = new Date()) {return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value))}
+export function validDay(day:unknown):day is string {return typeof day==='string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(Date.parse(day+'T00:00:00Z')) && new Date(day+'T00:00:00Z').toISOString().slice(0,10)===day}
+export function addDays(day:string,n:number){const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
+export function weekDays(day:string){const n=new Date(day+'T00:00:00Z').getUTCDay();const start=addDays(day,-((n+6)%7));return Array.from({length:7},(_,i)=>addDays(start,i))}
+export function monthDays(day:string){const first=day.slice(0,7)+'-01';const d=new Date(day+'T00:00:00Z');const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).toISOString().slice(0,10);const start=weekDays(first)[0]!;const end=weekDays(last)[6]!;return Array.from({length:Math.round((Date.parse(end)-Date.parse(start))/86400000)+1},(_,i)=>addDays(start,i))}
+export function shiftMonth(day:string,n:number){const d=new Date(day+'T00:00:00Z');return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,10)}

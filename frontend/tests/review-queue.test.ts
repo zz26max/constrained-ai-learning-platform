@@ -6,6 +6,12 @@ import { reviewQueue } from '../src/features/assignments/review-queue'
 import { createScriptedTransport, okEnvelope } from './helpers'
 
 describe('完整分页与批阅队列',()=>{
+  it('缺失total的旧响应立即失败，不持续翻页',async()=>{
+    const scripted=createScriptedTransport(),api=new AssignmentsApi(new ApiClient(scripted.transport))
+    scripted.setHandler(()=>okEnvelope({items:[{id:'one',feedbackStatus:'none',superseded:false}]}))
+    await expect(reviewQueue(api,'assignment','',true,'one',new AbortController().signal)).rejects.toThrow('total')
+    expect(scripted.requests).toHaveLength(1)
+  })
   it('跨页聚合，不截断到第一百项',async()=>{
     const rows=Array.from({length:205},(_,i)=>i)
     const pages:number[]=[]

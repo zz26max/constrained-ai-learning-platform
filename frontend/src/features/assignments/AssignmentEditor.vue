@@ -147,7 +147,7 @@ function addCriterion(): void {
 </script>
 
 <template>
-  <div class="workspace-page teacher-page">
+  <div class="workspace-page teacher-page assignment-editor-page">
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">{{ isNew ? '创建作业' : '编辑作业' }}</h1>

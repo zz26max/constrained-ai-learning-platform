@@ -81,6 +81,7 @@ function excerpt(text: string, max = 80): string {
             <span v-if="item.publicationState === 'archived'" class="tag">已归档</span>
           </li>
         </ul>
+        <p v-else class="muted">当前没有其他待办，按自己的节奏继续学习。</p>
       </section>
 
       <section class="surface dash-section" aria-labelledby="dash-courses">

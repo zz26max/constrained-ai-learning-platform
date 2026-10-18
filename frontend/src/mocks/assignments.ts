@@ -7,6 +7,7 @@ import { MOCK_TERM, mockSession, requireMockSession, validateMockCsrf } from './
 import { P1A_IDS } from './courses'
 import { randomUUID } from './random'
 import type { MockHandler, MockRequestContext, MockResult } from './types'
+import { pageWindow, paginate } from './envelope'
 
 type FileDTO = components['schemas']['FileDTO']
 type RubricCriterion = components['schemas']['RubricCriterion']
@@ -184,15 +185,20 @@ function handleAssignment(context: MockRequestContext): MockResult {
   const query = new URL(context.path, 'http://mock.local').searchParams
 
   if (operation === 'listMyAssignments') {
+    const window=pageWindow(query)
+    if(!window) return invalid(context,'分页参数不合法。')
     const chapterId = query.get('chapterId')
     if (chapterId && !identifier(chapterId)) return invalid(context, '章节标识不合法。')
 
     const items = [...assignments.values()]
-      .filter(a => a.dto.publicationState === 'published' && (!chapterId || a.dto.chapterId === chapterId))
+      .filter(a => a.dto.publicationState !== 'draft' && (!chapterId || a.dto.chapterId === chapterId) && (!query.get('offeringId') || a.dto.offeringId === query.get('offeringId')))
       .map(a => toSummary(a.dto, userId))
       .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
 
-    return ok(context, { items })
+    const done=(a:AssignmentSummaryDTO)=>a.assignmentState==='SUBMITTED'||a.assignmentState==='REVIEWED'
+    const summary={allCount:items.length,todoCount:items.filter(a=>!done(a)).length,doneCount:items.filter(done).length,archivedIncompleteCount:items.filter(a=>a.publicationState==='archived'&&!done(a)).length}
+    const filter=query.get('filter')||'all'
+    return ok(context, { ...paginate(items.filter(a=>filter==='all'||(filter==='done'?done(a):!done(a))),window),summary })
   }
 
   if (operation === 'getAssignment') {
@@ -277,12 +283,14 @@ function handleAssignment(context: MockRequestContext): MockResult {
   }
 
   if (operation === 'listTeacherAssignments') {
+    const window=pageWindow(query)
+    if(!window) return invalid(context,'分页参数不合法。')
     const offeringId = new URL(context.path, 'http://mock.local').pathname.split('/').filter(Boolean)[4] || ''
     const items = [...assignments.values()]
-      .filter(a => a.dto.offeringId === offeringId)
+      .filter(a => a.dto.offeringId === offeringId && (!query.get('publicationState') || a.dto.publicationState===query.get('publicationState')))
       .map(a => a.dto)
       .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
-    return ok(context, { items })
+    return ok(context, paginate(items,window))
   }
 
   if (operation === 'createAssignment') {

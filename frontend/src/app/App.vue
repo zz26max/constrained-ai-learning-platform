@@ -10,6 +10,7 @@ const auth = useAuthStore(), router = useRouter(), route = useRoute()
 const loggingOut = ref(false), menuOpen = ref(false), menuTrigger = ref<HTMLButtonElement | null>(null)
 const dualRole = computed(() => auth.identity?.roles.includes('student') && auth.identity.roles.includes('teacher'))
 const role = computed(() => route.path.startsWith('/teacher') ? 'teacher' : auth.identity?.roles.includes('student') ? 'student' : auth.identity?.roles.includes('teacher') ? 'teacher' : 'account')
+const roleLabel = computed(()=>role.value==='teacher'?'教师':role.value==='student'?'学生':'账号')
 const studentNav = [
   {to:'/student/home', label:'学习首页', icon:'home', active: () => route.path === '/student/home'},
   {to:'/course', label:'我的课程', icon:'book', active: () => route.path.startsWith('/course') || route.path.startsWith('/resource') || route.path.startsWith('/student/notices') || route.path.includes('/notices')},
@@ -52,12 +53,12 @@ function skipToMain() { document.getElementById('main-content')?.focus() }
       <aside v-if="auth.phase === 'authenticated'" class="workspace-sidebar" :class="{'is-open':menuOpen}" aria-label="知学导航">
         <RouterLink class="workspace-brand" :to="defaultEntry(auth.identity)"><span>知</span><div><strong>知学</strong><small>让每一步学习有迹可循</small></div></RouterLink>
         <label v-if="dualRole" class="role-select">工作空间<select :value="role" @change="router.push(($event.target as HTMLSelectElement).value === 'teacher' ? '/teacher' : '/student/home')"><option value="student">学生工作空间</option><option value="teacher">教师工作空间</option></select></label>
-        <p v-else class="sidebar-role">{{ role === 'teacher' ? '教师工作空间' : '学生工作空间' }}</p>
+        <p v-else class="sidebar-role">{{roleLabel}}工作空间</p>
         <nav aria-label="主导航"><span class="nav-caption">工作空间</span><RouterLink v-for="item in nav" :key="item.label" :to="item.to" custom v-slot="{href,navigate}"><a :href="href" class="nav-item" :class="{'is-active':item.active()}" :aria-current="item.active() ? 'page' : undefined" @click="navigate"><AppIcon :name="item.icon" />{{ item.label }}</a></RouterLink></nav>
-        <div class="workspace-user"><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span><div><strong>{{ auth.identity?.displayName }}</strong><small>{{ role === 'teacher' ? '教师' : '学生' }}</small></div><button class="button secondary" :disabled="loggingOut" @click="logout">退出</button><p v-if="auth.logoutFailure" role="alert">{{ auth.logoutFailure }}</p></div>
+        <div class="workspace-user"><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span><div><strong>{{ auth.identity?.displayName }}</strong><small>{{roleLabel}}</small></div><button class="button secondary" :disabled="loggingOut" @click="logout">退出</button><p v-if="auth.logoutFailure" role="alert">{{ auth.logoutFailure }}</p></div>
       </aside>
       <div class="workspace-body">
-        <header v-if="auth.phase === 'authenticated'" class="workspace-topbar"><button ref="menuTrigger" class="menu-toggle" :aria-expanded="menuOpen" aria-label="打开导航" @click="menuOpen = !menuOpen"><AppIcon name="menu" /></button><span>{{ role === 'teacher' ? '教师' : '学生' }}工作空间 <span class="crumb-divider">/</span> {{ location }}</span><div class="topbar-account"><span class="muted">{{ auth.config?.terms.find(t=>t.id === auth.config?.currentTermId)?.label }}</span><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span></div></header>
+        <header v-if="auth.phase === 'authenticated'" class="workspace-topbar"><button ref="menuTrigger" class="menu-toggle" :aria-expanded="menuOpen" aria-label="打开导航" @click="menuOpen = !menuOpen"><AppIcon name="menu" /></button><span>{{roleLabel}}工作空间 <span class="crumb-divider">/</span> {{ location }}</span><div class="topbar-account"><span class="muted">{{ auth.config?.terms.find(t=>t.id === auth.config?.currentTermId)?.label }}</span><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span></div></header>
         <main id="main-content" class="app-main" :class="{'business-main':auth.phase === 'authenticated'}" tabindex="-1"><RouterView /></main>
         <footer v-if="auth.phase === 'authenticated'" class="workspace-footer"><span>知学 · 专注学习，从容成长</span><span>课程、实践与反馈</span></footer>
       </div>

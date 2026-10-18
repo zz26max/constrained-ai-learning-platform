@@ -16,6 +16,8 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:browser:real": "node scripts/verify-zhixue.mjs",
+    "test:browser:boundaries": "node scripts/verify-zhixue-boundaries.mjs",
     "contract:types": "openapi-typescript ../docs/openapi.yaml -o src/api/generated/schema.d.ts",
     "check:no-mock": "node scripts/check-no-mock.mjs",
     "verify": "npm run typecheck && npm run build && npm run check:no-mock && npm run test"
@@ -32,6 +34,7 @@
     "@vue/test-utils": "^2.5.1",
     "happy-dom": "^21.0.1",
     "openapi-typescript": "^7.13.0",
+    "playwright-core": "^1.64.1",
     "typescript": "~5.9.0",
     "vite": "^8.3.4",
     "vitest": "^5.0.3",

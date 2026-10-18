@@ -22,12 +22,13 @@ watch(page, () => { void query.load() })
 const grading=ref(''), queue=ref<string[]>([]), queueTotal=ref(0), queueBusy=ref(false), queueMessage=ref('')
 const dialog=ref<HTMLDialogElement|null>(null), editor=ref<InstanceType<typeof TeacherFeedbackEditor>|null>(null)
 let controller:AbortController|null=null, trigger:HTMLElement|null=null, generation=0
+let bodyOverflow=''
 async function open(id:string) {
   trigger=document.activeElement as HTMLElement
   grading.value=id; queue.value=[]; queueMessage.value=''; queueBusy.value=true
   const current=++generation, userId=auth.identity?.id
   controller?.abort(); controller=new AbortController()
-  await nextTick(); dialog.value?.showModal()
+  await nextTick(); bodyOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.value?.showModal()
   try {
     const ids=await reviewQueue(api,props.assignmentId,feedbackStatus.value,latestOnly.value,id,controller.signal)
     if(current===generation && auth.identity?.id===userId) {queue.value=ids;queueTotal.value=ids.length}
@@ -36,7 +37,7 @@ async function open(id:string) {
   } finally { if(current===generation) queueBusy.value=false }
 }
 async function close() {
-  generation++; controller?.abort(); dialog.value?.close(); grading.value=''; queue.value=[]
+  generation++; controller?.abort(); dialog.value?.close(); document.body.style.overflow=bodyOverflow; grading.value=''; queue.value=[]
   await query.load(); trigger?.focus()
 }
 async function next() {
@@ -70,9 +71,9 @@ function trap(e:KeyboardEvent) {
   if(e.shiftKey && document.activeElement===controls[0]) {e.preventDefault();controls.at(-1)?.focus()}
   else if(!e.shiftKey && document.activeElement===controls.at(-1)) {e.preventDefault();controls[0]?.focus()}
 }
-watch(()=>auth.identity?.id,()=>{generation++;controller?.abort();dialog.value?.close();grading.value='';queue.value=[]})
+watch(()=>auth.identity?.id,()=>{generation++;controller?.abort();dialog.value?.close();document.body.style.overflow=bodyOverflow;grading.value='';queue.value=[]})
 onBeforeRouteLeave(()=> !grading.value || editor.value?.canLeave() !== false)
-onBeforeUnmount(()=>{generation++;controller?.abort();dialog.value?.close()})
+onBeforeUnmount(()=>{generation++;controller?.abort();dialog.value?.close();document.body.style.overflow=bodyOverflow})
 </script>
 <template>
   <section aria-label="学生提交列表">

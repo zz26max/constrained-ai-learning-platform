@@ -23,6 +23,7 @@ import StudentHomePage from '../features/dashboard/StudentHomePage.vue'
 import LearningRecordsPage from '../features/dashboard/LearningRecordsPage.vue'
 import NoticeListPage from '../features/notices/NoticeListPage.vue'
 import NoticeDetailPage from '../features/notices/NoticeDetailPage.vue'
+import AssignmentCalendar from '../features/calendar/AssignmentCalendar.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -45,6 +46,8 @@ export function defaultEntry(user: components['schemas']['UserDTO'] | null): str
 }
 
 const routes: RouteRecordRaw[] = [
+  {name:'student-calendar',path:'/student/calendar',component:AssignmentCalendar,meta:{requiresAuth:true,requiresRole:'student',title:'学习日历 · 知学'}},
+  {name:'teacher-calendar',path:'/teacher/calendar',component:AssignmentCalendar,meta:{requiresAuth:true,requiresRole:'teacher',title:'教学日历 · 知学'}},
   {
     name: 'login',
     path: '/login',
