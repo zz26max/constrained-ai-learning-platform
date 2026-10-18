@@ -1,3 +1,5 @@
+> **适用范围**：本文件只对 Claude Code 会话有效，写的是该工具的三步法工作流。其他 agent（Codex、Cursor、DeepSeek Harness 等）请只读 [AGENTS.md](AGENTS.md) 与 [docs/STATUS.md](docs/STATUS.md)，忽略本文件的命令与模型选项；两者冲突时以 AGENTS.md 为准。
+
 项目规范以 AGENTS.md 为准；本文件只补充 Claude Code 会话规则。
 
 ## 工作流：设计 → 并行实现 → 审查（标准三步法）

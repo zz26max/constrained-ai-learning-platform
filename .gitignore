@@ -15,3 +15,5 @@ scripts/__pycache__/
 # AI 工具的本机会话配置与文档预览缓存。
 .claude/
 .preview/
+.workbuddy/
+.slidep/
