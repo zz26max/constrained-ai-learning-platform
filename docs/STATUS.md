@@ -2,7 +2,33 @@
 
 本文件记录会随交付变化的进度、交接与验证结果。**实现任务可以直接更新本文件**，无需另行授权；架构、业务规则与契约仍按 [AGENTS.md](../AGENTS.md) 的规则修改。设计基线见 [DEVELOPMENT](DEVELOPMENT.md)。
 
-## 1. 当前真实状态
+**读法**：§0 是判断"项目当前处在哪"的唯一出处；§1 及之后是按时间追加的历史记录，只用于追溯，不能据此判断现状。
+
+## 0. 现在是什么状态（唯一权威）
+
+> 改本节必须显式说明改了什么、依据是什么；其余章节只追加、不修改。
+
+- **代码基线**：`dc87d38`（2026-10-18，已合并 `origin/master`，本地领先 39 个提交、未推送）。
+- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导）、P3（学习行为分析）尚未开始**，契约中对应操作仍为 `planned`。
+- **契约状态**：83 个业务操作 + 2 个健康检查；截至 2026-10-18 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
+- **门禁现状**（2026-10-18 复跑）：前端 `npm --prefix frontend run verify` 通过，22 个测试文件 / 202 个用例；后端 `backend/target` 既有报告 0 失败（本轮 Docker 未启动，未重跑 Testcontainers 集成测试）；`scripts/validate_contract.py` 通过。
+- **未决事项**（不阻塞 P1，进入 P2 前需定）：
+  1. §1 记录的联调观察 ①～④：归档作业重发旧 revision 返回 200、公告生成的消息 `target` 为 null、陈旧 `baseVersion` 重发 `publishFeedback` 返回 200、全班公告可指向某学生的 feedback。
+  2. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
+  3. §3.7 中三项"接受证据缺口"（慢网络、会话失效、公告归档只读）的浏览器专项证据。
+- **下一包**：由用户指派进入 P2；建议先补上条第 3 项缺口。
+
+### 0.1 接手前必读
+
+- 端口：MySQL 3307（Docker，Flyway V9）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
+- 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
+- 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
+- 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
+- `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
+
+## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **本节是日志，不是现状。** 以下按日期自上而下追加，早期条目里的"未通过""待修复"描述在当时成立、现在可能已不成立；判断现状只看 §0，判断某条缺陷是否已修看 §3。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
@@ -92,7 +118,7 @@
 
 - **P1 收尾基线复验（代码 `ccfc1d5`）**：真实学生页面 Web 编辑后 750ms 内完成提交，HTTP 读回提交 `af68db35-7105-40eb-b346-c1947380603d` 的 revision 1 文件为 `P1_B1_LATEST_CONFIRMED`；Text 编辑后立即切页，服务端 revision 2 保留 `P1_B2_LEAVE_PRESERVED`；过期作业工作区提交按钮禁用且仍可练习保存。B1/B2/B6 原正常网络场景通过，慢网络、失败恢复及会话恢复仍待补验。前端目录运行 `npm exec -- vitest run tests/workspace-autosave.test.ts tests/workspace-editor.test.ts`：2 文件、19 项通过。证据 `D:/tmp/lp/browser-p1/baseline-retest.json`（本机，不入库）。新建独立 Web 夹具 `795db0ac-f56e-4ab8-930b-fcfe0d433050`，保留原测试数据；HTTP 创建夹具不算教师表单通过。
 
-- 按用户要求保存当前版本并接手项目，代码基点为 `master` 的 `8314f36`；将已有 [交接说明](HANDOFF.md) 纳入版本控制，未改其原文。
+- 按用户要求保存当前版本并接手项目，代码基点为 `master` 的 `8314f36`；将已有 [交接说明](archive/HANDOFF-2026-10-16.md) 纳入版本控制，未改其原文。（2026-10-18 该文件已归档并标注作废，见 §0.1。）
 - 已核对 AGENTS、交接说明和 STATUS：B1/B2/B6 的代码修复为 `0292150`，18 个前端测试文件、184 个用例通过是上一包记录，本次尚未重跑或浏览器复验；其余 B3/B4/B5/B7/B8 仍待处理，P1 不标为 `verified`，暂不进入 P2。
 - 下一步先按 3.4 原场景浏览器复验 B1/B2/B6。交接说明中两处引用按实际文件使用：作业编辑 operationId 为 `patchAssignment`，工作区编辑与自动保存规则在 FRONTEND 第 5 节。
 - 本次仅保存交接文档与接手记录，不改业务代码或接口契约，不提交根目录 `node_modules/` 测试缓存，不推送远端。
