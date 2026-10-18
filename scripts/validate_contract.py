@@ -4,6 +4,7 @@ from collections import Counter
 from copy import deepcopy
 from urllib.parse import unquote
 import re
+import subprocess
 import sys
 
 import yaml
@@ -111,6 +112,59 @@ def check_windows_scripts():
         checked += 1
     check(checked > 0, '未发现任何 Windows PowerShell 脚本，该检查可能已失效')
     return checked
+
+
+def check_document_index():
+    """docs/ 顶层文档必须登记在 docs/README.md 的索引表里。
+
+    HANDOFF.md 曾经既不在索引表、也不在任何权限表里，于是无人维护，长期与 STATUS 冲突。
+    索引表就是文档的准入清单：没登记的文件不构成权威，也不该被其他文档引用。
+    """
+    index = (DOCS / 'README.md').read_text(encoding='utf-8')
+    listed = {Path(target).name for target in re.findall(r'\[[^\]\n]+\]\(([^)\n#]+)', index)}
+    registered = 0
+    for path in sorted(DOCS.glob('*.md')):
+        if path.name == 'README.md':
+            continue
+        check(path.name in listed,
+              f'docs/{path.name}: 未在 docs/README.md 索引表登记；新增文档必须同时登记用途与责任人')
+        registered += 1
+    check(registered > 0, '未发现 docs 顶层文档，该检查可能已失效')
+    return registered
+
+
+def check_single_handoff():
+    """交接说明只能归档保留，不能有第二份活跃版本。
+
+    同一项目的两份交接文档必然漂移：docs/HANDOFF.md 停在 2026-10-16 的"P1 不能验收"，
+    而 STATUS §3.8 已经闭环，按前者安排工作就是重做已完成的事。
+    """
+    allowed = DOCS / 'archive'
+    strays = sorted(p.relative_to(ROOT).as_posix() for p in DOCS.rglob('HANDOFF*.md') if p.parent != allowed)
+    check(not strays, f'交接文档必须归档到 docs/archive/，docs/ 下不得有活跃版本: {", ".join(strays)}')
+    return len(list(allowed.glob('HANDOFF*.md')))
+
+
+def check_status_baseline():
+    """STATUS §0 引用的 commit 必须真实存在，否则"当前基线"是编的。"""
+    text = (DOCS / 'STATUS.md').read_text(encoding='utf-8')
+    section = re.search(r'^## 0\..*?(?=^## )', text, re.M | re.S)
+    check(section, 'STATUS.md: 缺少 §0「现在是什么状态」，该文件必须有一个唯一的现状出处')
+    hashes = re.findall(r'`([0-9a-f]{7,40})`', section.group(0))
+    check(hashes, 'STATUS.md §0: 未找到代码基线 commit（形如 `1a2b3c4`）')
+    if not (ROOT / '.git').exists():
+        print('SKIP: STATUS §0 基线 commit 校验需要 git 检出（此处不是仓库）')
+        return 0
+    shallow = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--is-shallow-repository'],
+                             capture_output=True, text=True).stdout.strip()
+    if shallow != 'false':
+        print('SKIP: STATUS §0 基线 commit 校验需要完整历史（checkout 需 fetch-depth: 0）')
+        return 0
+    for value in hashes:
+        result = subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', value + '^{commit}'],
+                                capture_output=True)
+        check(result.returncode == 0, f'STATUS.md §0: 基线 commit {value} 不存在或不是提交')
+    return len(hashes)
 
 
 def main():
@@ -264,10 +318,14 @@ def main():
     check('AssignmentDetailDTO' not in sliced['components']['schemas'], 'Contract slice includes unrelated schemas')
     links = check_links()
     scripts = check_windows_scripts()
+    docs = check_document_index()
+    handoffs = check_single_handoff()
+    baselines = check_status_baseline()
     print(f'PASS: OpenAPI 3.1; {len(business)} business + {len(operations)-len(business)} health operations; {len(examples)} schemas')
     print(f'PASS: baseline coverage, local refs, permissions metadata, error/status mapping; {count_examples} examples; {len(cases)} regression cases; {links} current-document links')
     print('PASS: six detail-response slices retain examples; five count/filter fixture checks (not live queries)')
     print(f'PASS: {scripts} Windows PowerShell script(s) keep their UTF-8 BOM')
+    print(f'PASS: {docs} docs registered in docs/README.md; {handoffs} archived handoff(s); {baselines} STATUS §0 baseline commit(s) resolve')
     print('Implementation states:', dict(Counter(op['x-implementation-status'] for _, _, op in operations)))
     print('Static validation only. No claim of HTTP integration, authorization, database or concurrency correctness.')
 

@@ -12,7 +12,7 @@
 | [STATUS.md](docs/STATUS.md) | 进度、交接、验证记录、已知限制 | **任何实现任务可直接更新** |
 
 - **冲突判定顺序**（前者覆盖后者）：代码与测试 → `openapi.yaml` → `STATUS.md` §0 → DEVELOPMENT / FRONTEND / BACKEND → `docs/features/` → `docs/archive/`。任何一层与上一层矛盾时，先修文档再开发，不要照着文档写代码。
-- **文档准入**：新增 `docs/` 下的文件必须在 [docs/README.md](docs/README.md) 的索引表登记。未登记的文件不构成权威，也不得被其他文档引用。
+- **文档准入**：新增 `docs/` 下的文件必须在 [docs/README.md](docs/README.md) 的索引表登记。未登记的文件不构成权威，也不得被其他文档引用。该规则、以及"`docs/` 下不得有活跃 HANDOFF""STATUS §0 的基线 commit 必须存在"三条，由 `scripts/validate_contract.py` 在 CI 中强制执行。
 - **现状只看 `STATUS.md` §0**；§1 及之后是只追加的历史日志，"未通过""待修复"等描述不代表当前状态。
 - 除 STATUS.md 外，实现任务未经授权不改 `docs/`。需要改字段、契约或业务规则时，先说明改什么、为什么、影响哪一端，等用户确认后统一修改；不要在代码里临时兼容或加前端兜底字段。
 - 字段结构以 OpenAPI 为准，业务含义以 DEVELOPMENT 为准，存储与事务以 BACKEND 为准，界面行为以 FRONTEND 为准；发现冲突先修文档再开发。其他文件只引用，不维护第二份字段表或错误码表。

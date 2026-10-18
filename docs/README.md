@@ -39,6 +39,6 @@
 | 工具 | 用途 |
 | --- | --- |
 | [contract_slice.py](../scripts/contract_slice.py) | 按 operationId 提取只读契约切片 |
-| [validate_contract.py](../scripts/validate_contract.py) | 校验契约结构、示例与文档引用 |
+| [validate_contract.py](../scripts/validate_contract.py) | 校验契约结构、示例、文档引用，以及文档卫生（`docs/*.md` 必须登记在本索引表、`docs/` 下不得有活跃 HANDOFF、STATUS §0 的基线 commit 必须可解析） |
 
 两者依赖 [requirements-contract.txt](../scripts/requirements-contract.txt)，使用独立的 `.contract-venv` 环境，不进入产品依赖。

@@ -9,6 +9,7 @@ on:
       - 'scripts/*.py'
       - 'scripts/requirements-contract.txt'
       - 'README.md'
+      - 'AGENTS.md'
       - '.github/workflows/contract.yml'
   push:
     paths:
@@ -18,6 +19,7 @@ on:
       - 'scripts/*.py'
       - 'scripts/requirements-contract.txt'
       - 'README.md'
+      - 'AGENTS.md'
       - '.github/workflows/contract.yml'
 
 permissions:
@@ -29,6 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # validate_contract.py 校验 STATUS §0 的基线 commit 真实存在，浅克隆会让该检查退化为 SKIP。
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
