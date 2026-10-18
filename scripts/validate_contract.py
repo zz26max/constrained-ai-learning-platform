@@ -73,7 +73,7 @@ def slug(text):
 def check_links():
     count = 0
     # Historical snapshots retain historical coordinates; only current documents are normative.
-    for path in [ROOT / 'README.md', ROOT / 'AGENTS.md', *[DOCS / n for n in ['DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]:
+    for path in [ROOT / 'README.md', ROOT / 'AGENTS.md', *[DOCS / n for n in ['README.md', 'DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]:
         content = path.read_text(encoding='utf-8')
         for target in re.findall(r'\[[^\]\n]+\]\(([^)\n]+)\)', content):
             if re.match(r'^[a-z]+://', target, re.I):
@@ -81,7 +81,9 @@ def check_links():
             target = unquote(target.strip('<>'))
             filename, _, anchor = target.partition('#')
             dest = (path.parent / filename).resolve() if filename else path
-            check(dest.is_file(), f'{path.name}: missing link {target}')
+            # 目录链接必须显式以 / 结尾，避免把笔误的路径当成目录放过。
+            check(dest.is_file() or (filename.endswith('/') and dest.is_dir()),
+                  f'{path.name}: missing link {target}')
             if anchor and dest.suffix == '.md':
                 other = dest.read_text(encoding='utf-8')
                 anchors = {slug(h.strip()) for h in re.findall(r'^#{1,6} (.+)$', other, re.M)}

@@ -11,7 +11,7 @@
 | [FRONTEND.md](FRONTEND.md) / [BACKEND.md](BACKEND.md) | 本端工程、状态、存储、事务 | 用户授权的维护任务 |
 | [DEBUGGING.md](DEBUGGING.md) | 后端断点调试与内部实现逐步指引 | 用户授权的维护任务 |
 | [openapi.yaml](openapi.yaml) | 路径、字段、类型、错误与接口实现状态 | 用户授权的维护任务 |
-| [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景 | 用户授权的维护任务 |
+| [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景；[P1 页面验收清单](features/p1-acceptance-checklist.md) 追踪"契约已实现但未在页面走过"的缺口 | 用户授权的维护任务 |
 | [archive/](archive/ARCHITECTURE_REVIEW.md) | 历史快照，**不是规范**；含已作废的 [2026-10-16 交接说明](archive/HANDOFF-2026-10-16.md) | 不修改 |
 
 **准入规则**：本表是 `docs/` 的准入清单。新增 `docs/` 下的 Markdown 必须同时在本表登记用途与责任人；未登记的文件视为临时草稿，不构成权威，也不得被其他文档引用。历史上 `HANDOFF.md` 正是因为没进本表而长期无人维护、与 STATUS 冲突。
