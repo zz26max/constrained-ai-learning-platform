@@ -54,7 +54,7 @@
 - **P1-C**（master `68eb7d3`）：7 个提交评价与通知操作为 implemented，Flyway V7 建表。包含教师评价草稿-发布流程、学生查看评价、通知中心；前端包含教师评价编辑器与学生通知中心。
 - **P1-D**（master `9e594a6`）：9 个多班聚合操作为 implemented，Flyway V8 建表。包含学生仪表盘、学习记录、批量标记消息已读、公告系统（教师创建与学生查看）、教师统计（班级概览、作业统计、学生学习记录）；前端包含 API 客户端层（dashboard.ts、notices.ts、stats.ts），UI 组件待补充。
 
-契约 83 个业务操作与 2 个健康检查中，57 个已实现（5 认证 + 2 健康 + 27 课程 + 12 作业 + 7 评价 + 9 聚合），23 个为 planned，5 个为 verified。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），待浏览器级走查。P2/P3 功能尚未实现。接口实现状态以 OpenAPI `x-implementation-status` 为准，不在此处另维护计数。
+契约 83 个业务操作与 2 个健康检查：截至 2026-10-18，53 个为 implemented、10 个为 verified、22 个为 planned。本行只是时间点快照，权威状态以 OpenAPI `x-implementation-status` 为准。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），P1 闭环验收见 §3.8。P2/P3 功能尚未实现。
 
 <a id="handoff"></a>
 
