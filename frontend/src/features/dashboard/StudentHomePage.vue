@@ -26,7 +26,7 @@ function excerpt(text: string, max = 80): string {
   <div class="workspace-page dashboard-page">
     <header class="workspace-heading">
       <div>
-        <h1 tabindex="-1">首页</h1>
+        <h1 tabindex="-1">学习首页</h1>
         <p v-if="query.status.value === 'success' && query.data.value">
           {{ query.data.value.termId === null ? '当前没有进行中的学期' : query.data.value.termLabel }}
         </p>
@@ -42,7 +42,8 @@ function excerpt(text: string, max = 80): string {
         <li><RouterLink to="/student/messages"><strong>{{ query.data.value.unreadMessageCount }}</strong> 条未读</RouterLink></li>
       </ul>
 
-      <section class="surface dash-section" aria-labelledby="dash-current">
+      <div class="dashboard-content"><div class="dashboard-primary">
+      <section class="surface dash-section current-task" aria-labelledby="dash-current">
         <h2 id="dash-current">当前学习</h2>
         <template v-if="query.data.value.currentLearning?.type === 'assignment'">
           <h3>{{ query.data.value.currentLearning.title }}</h3>
@@ -82,18 +83,6 @@ function excerpt(text: string, max = 80): string {
         </ul>
       </section>
 
-      <section class="surface dash-section" aria-labelledby="dash-feedback">
-        <h2 id="dash-feedback">最近反馈</h2>
-        <template v-if="query.data.value.recentFeedback">
-          <p>
-            <RouterLink :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId }, query: { feedbackId: query.data.value.recentFeedback.id } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
-            <span class="muted"> · {{ formatTime(query.data.value.recentFeedback.publishedAt) }} · {{ query.data.value.recentFeedback.score }}/{{ query.data.value.recentFeedback.maxScore }}</span>
-          </p>
-          <p class="dash-text">{{ excerpt(query.data.value.recentFeedback.comment) }}</p>
-        </template>
-        <p v-else class="muted">暂无已发布的评价</p>
-      </section>
-
       <section class="surface dash-section" aria-labelledby="dash-courses">
         <header class="section-heading">
           <h2 id="dash-courses">课程总览</h2>
@@ -121,6 +110,18 @@ function excerpt(text: string, max = 80): string {
         </ul>
       </section>
 
+      </div><aside class="dashboard-secondary"><section class="surface dash-section" aria-labelledby="dash-feedback">
+        <h2 id="dash-feedback">最近反馈</h2>
+        <template v-if="query.data.value.recentFeedback">
+          <p>
+            <RouterLink :to="{ name: 'student-assignment', params: { id: query.data.value.recentFeedback.assignmentId }, query: { feedbackId: query.data.value.recentFeedback.id } }">{{ query.data.value.recentFeedback.assignmentTitle }}</RouterLink>
+            <span class="muted"> · {{ formatTime(query.data.value.recentFeedback.publishedAt) }} · {{ query.data.value.recentFeedback.score }}/{{ query.data.value.recentFeedback.maxScore }}</span>
+          </p>
+          <p class="dash-text">{{ excerpt(query.data.value.recentFeedback.comment) }}</p>
+        </template>
+        <p v-else class="muted">暂无已发布的评价</p>
+      </section>
+
       <section class="surface dash-section" aria-labelledby="dash-notice">
         <h2 id="dash-notice">最新公告</h2>
         <ActionNotice :error="target.error.value" :message="null" />
@@ -135,7 +136,7 @@ function excerpt(text: string, max = 80): string {
           </p>
         </template>
         <p v-else class="muted">暂无公告</p>
-      </section>
+      </section></aside></div>
     </template>
   </div>
 </template>

@@ -73,6 +73,15 @@ function buttonNamed(rendered: VueWrapper, name: string) {
 }
 
 describe('P1-A 课程页面验收', () => {
+  it('知学目录按服务端位置展开，支持全部收起与展开', async () => {
+    const { rendered } = await open(`/course/${P1A_IDS.offeringWeb}`)
+    expect(operationIds(scripted.requests)).toContain('listMyCourses')
+    expect(rendered.find('details.chapter-fold').attributes('open')).toBeDefined()
+    await buttonNamed(rendered, '全部收起').trigger('click')
+    expect(rendered.find('details.chapter-fold').attributes('open')).toBeUndefined()
+    await buttonNamed(rendered, '全部展开').trigger('click')
+    expect(rendered.find('details.chapter-fold').attributes('open')).toBeDefined()
+  })
   it('从完整章节URL刷新恢复身份与正确章节，不依赖先加载课程列表', async () => {
     const path = `/course/${P1A_IDS.offeringWeb}/chapter/${P1A_IDS.chapterWeb}`
     const { rendered, navigation } = await open(path, 'student', true)

@@ -48,7 +48,7 @@ async function confirmCompleted() {
         <section class="reading-section"><h2>学习资料</h2><p v-if="query.data.value.chapter.resources.length === 0" class="muted">暂无学习资料。</p><ul class="resource-list"><li v-for="resource in query.data.value.chapter.resources" :key="resource.id"><RouterLink :to="{ name: 'resource', params: { resourceId: resource.id } }"><span>{{ resource.title }}</span><span>阅读资料 →</span></RouterLink></li></ul></section>
         <section v-if="query.data.value.chapter.knowledgePoints.length" class="reading-section"><h2>相关知识点</h2><ul><li v-for="point in query.data.value.chapter.knowledgePoints" :key="point.id"><strong>{{ point.title }}</strong><p class="muted">{{ point.description }}</p></li></ul></section>
         <section class="reading-section"><h2>阅读进度</h2><p class="muted">完成确认表示你已阅读本章，不代表知识掌握评价。</p><CourseProgress v-if="confirmedProgress" :progress="confirmedProgress" :title="query.data.value.offering.title" /><button type="button" class="button" :disabled="readonly || actions.pending.value || query.data.value.chapter.studentProgress?.status === 'completed'" @click="confirmCompleted">{{ query.data.value.chapter.studentProgress?.status === 'completed' ? '已确认阅读' : '确认已阅读' }}</button></section>
-        <p v-if="query.data.value.chapter.assignments.length" class="muted">本章作业编辑与提交将在 P1-B 开放。</p>
+        <section v-if="query.data.value.chapter.assignments.length" class="reading-section"><h2>本章作业</h2><ul class="resource-list"><li v-for="assignment in query.data.value.chapter.assignments" :key="assignment.id"><RouterLink :to="{name:'student-assignment',params:{id:assignment.id}}"><span>{{ assignment.title }}</span><span>查看作业 →</span></RouterLink></li></ul></section>
       </section>
     </template>
   </div>
