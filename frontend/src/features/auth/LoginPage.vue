@@ -44,7 +44,7 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="auth-panel panel" aria-labelledby="login-title">
-    <h1 id="login-title" tabindex="-1">登录学习空间</h1>
+    <h1 id="login-title" tabindex="-1">登录知学</h1>
     <p class="auth-hint">使用课程账号登录；账号由任课教师或管理员提供。</p>
 
     <div v-if="auth.bootStatus === 'error'" class="notice notice-error" role="alert">

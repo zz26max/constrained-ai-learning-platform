@@ -158,6 +158,17 @@ afterEach(() => {
 })
 
 describe('P1-D 路由与首页', () => {
+  it('知学导航只高亮当前栏目，单角色无演示切换，调试入口不出现在菜单', async () => {
+    const page = await open('/student/home')
+    expect(page.find('.workspace-brand').text()).toContain('知学')
+    expect(page.findAll('nav[aria-label="主导航"] [aria-current="page"]')).toHaveLength(1)
+    expect(page.find('nav[aria-label="主导航"] [aria-current="page"]').text()).toBe('学习首页')
+    expect(page.find('.role-select').exists()).toBe(false)
+    expect(page.find('nav[aria-label="主导航"]').text()).not.toContain('会话调试')
+    useAuthStore().$patch({identity: {...DEMO_USER, roles:['student','teacher']}})
+    await flushPromises()
+    expect(page.find('.role-select select').exists()).toBe(true)
+  })
   it('1. 学生登录后 / 重定向到 /student/home', async () => {
     await open('/')
     expect(router?.currentRoute.value.path).toBe('/student/home')

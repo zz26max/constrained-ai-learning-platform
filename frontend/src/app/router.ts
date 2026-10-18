@@ -119,7 +119,7 @@ router.afterEach((to, _from, failure) => {
   if (failure) return
   const title = to.meta.title
   if (typeof title === 'string') {
-    document.title = title
+    document.title = title.replaceAll('学习空间', '知学')
   }
   // 切页聚焦标题（FRONTEND.md 9）；标题均带 tabindex="-1"。
   void nextTick(() => {
