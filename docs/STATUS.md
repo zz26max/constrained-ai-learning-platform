@@ -11,7 +11,7 @@
 - **代码基线**：`dc87d38`（2026-10-18）。该提交合并了 `origin/master`，是最后一次影响代码与契约的提交；之后的提交只改文档。**本地 master 尚未推送**，领先量以 `git status` 为准。
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导）、P3（学习行为分析）尚未开始**，契约中对应操作仍为 `planned`。
 - **契约状态**：83 个业务操作 + 2 个健康检查；截至 2026-10-18 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
-- **门禁现状**（2026-10-18 复跑）：前端 `npm --prefix frontend run verify` 通过，22 个测试文件 / 202 个用例；后端 `backend/target` 既有报告 0 失败（本轮 Docker 未启动，未重跑 Testcontainers 集成测试）；`scripts/validate_contract.py` 通过。
+- **门禁现状**（2026-10-18 复跑）：前端 `npm --prefix frontend run verify` 通过，22 个测试文件 / 202 个用例；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS**，384 个单元/HTTP 测试 + 206 个 Testcontainers 真实 MySQL 集成测试，0 failure/error/skipped（4:17）；`scripts/validate_contract.py` 通过。
 - **未决事项**（不阻塞 P1，进入 P2 前需定）：
   1. §1 记录的联调观察 ①～④：归档作业重发旧 revision 返回 200、公告生成的消息 `target` 为 null、陈旧 `baseVersion` 重发 `publishFeedback` 返回 200、全班公告可指向某学生的 feedback。
   2. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -24,6 +24,7 @@
 - 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
 - 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
 - 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
+- **不要用 `backend/target/surefire-reports/*.txt` 累加用例数**：该目录会残留已删除测试类的旧报告，累加会得到虚高值（2026-10-18 实测累加得 443，Maven 实际 `Tests run: 384`）。以 Maven 的 `Results:` 汇总行为准。
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
