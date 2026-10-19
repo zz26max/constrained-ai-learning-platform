@@ -43,7 +43,7 @@ function datePart(value:string,part:'month'|'day'|'time'){
 <template>
   <div class="workspace-page home-exploration" :class="[isPlus?'exploration-b exploration-bplus':'exploration-'+design]" :data-design="design">
     <header class="explore-heading">
-      <div><p class="explore-eyebrow">知学 / {{ query.data.value?.termLabel ?? '学习工作空间' }}</p><h1 tabindex="-1">{{design==='a'?'把下一步，学明白。':'每一步，向前。'}}</h1><p class="explore-intro">学习首页<span v-if="query.status.value==='success' && query.data.value"> · 本学期 {{query.data.value.pendingAssignmentCount}} 项待完成，先从仍可提交的任务开始。</span></p></div>
+      <div><p class="explore-eyebrow">知学 / {{ query.status.value==='success' && query.data.value?.termId===null?'当前没有进行中的学期':query.data.value?.termLabel ?? '学习工作空间' }}</p><h1 tabindex="-1">{{design==='a'?'把下一步，学明白。':'每一步，向前。'}}</h1><p class="explore-intro">学习首页<span v-if="query.status.value==='success' && query.data.value"> · 本学期 {{query.data.value.pendingAssignmentCount}} 项待完成，先从仍可提交的任务开始。</span></p></div>
       <RouterLink class="explore-calendar" to="/student/calendar"><AppIcon name="calendar" /><span>查看学习日历</span><span aria-hidden="true">↗</span></RouterLink>
     </header>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />

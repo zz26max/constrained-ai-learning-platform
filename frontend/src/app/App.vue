@@ -45,7 +45,7 @@ async function logout() {
 function skipToMain() { document.getElementById('main-content')?.focus() }
 </script>
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{'student-space':auth.phase==='authenticated' && role==='student'}">
     <a class="skip-link" href="#" @click.prevent="skipToMain">跳到主要内容</a>
     <header v-if="API_MODE === 'mock'" class="mock-banner" role="status">模拟模式 · 全部数据为虚构，不访问真实接口</header>
     <div :class="{'authenticated-layout':auth.phase === 'authenticated'}">

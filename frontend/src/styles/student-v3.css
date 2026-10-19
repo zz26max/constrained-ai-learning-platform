@@ -1,0 +1,18 @@
+/* V3 student foundation; teacher workspace keeps its existing presentation. */
+.student-space {--ink:#172033;--muted:#57677c;--blue-text:#2853bc;--line:#dce3ed}
+.student-space .workspace-page {max-width:1280px;margin-inline:auto;min-width:0}
+.student-space .workspace-heading {margin-bottom:24px}
+.student-space .workspace-heading h1 {font-size:28px;font-weight:650;line-height:1.45}
+.student-space .workspace-heading p {font-size:14px;line-height:1.7;color:var(--muted)}
+.student-space :is(a,button,input,select,summary):focus-visible {outline:3px solid #3563e9;outline-offset:3px}
+.student-space :is(.button,select,input) {min-height:44px}
+.student-space :is(.toolbar,.task-toolbar) label {font-size:13px}
+.student-space .tag {font-size:13px;line-height:1.6}
+.student-space button:disabled {opacity:.6;cursor:not-allowed}
+.student-space .exploration-bplus :is(.explore-course-actions a,.focus-actions>a,.explore-calendar,.explore-section-heading>a) {min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:760px){
+ .student-space .workspace-heading h1 {font-size:25px}
+ .student-space .exploration-bplus :is(.focus-course,.explore-course-info>p,.task-line-content .explore-muted,.feedback-quote) {font-size:14px}
+ .student-space .exploration-bplus :is(.bplus-group-heading small,.bplus-group-heading span,.bplus-deadline>span,.explore-heading .explore-eyebrow) {font-size:13px}
+ .student-space .task-line-action {min-width:44px}
+}

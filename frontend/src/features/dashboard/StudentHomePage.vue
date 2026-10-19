@@ -13,13 +13,13 @@ import './home-bplus.css'
 const route=useRoute()
 const home=useStudentHome()
 const {query,tasksQuery,target,nextTask,recentTasks,recentCourse,courseName,TYPE_LABELS,excerpt}=home
-const design=computed(()=>route.query.design==='bplus'?'bplus':route.query.design==='a'?'a':route.query.design==='b'?'b':'current')
+const design=computed(()=>route.query.design==='bplus'?'bplus':route.query.design==='a'?'a':route.query.design==='b'?'b':route.query.design!==undefined?'current':'bplus')
 const isPreview=computed(()=>route.query.design!==undefined)
 const choices=[{key:'current',label:'现有首页'},{key:'a',label:'A · 编辑式'},{key:'b',label:'B · 模块化'},{key:'bplus',label:'B+ · 精修'}]
 </script>
 
 <template>
-  <details v-if="design==='bplus'" class="home-preview-switch bplus-preview-switch"><summary>B+ · 候选预览<span>切换方案</span></summary><nav aria-label="首页方案" @click="($event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')"><RouterLink v-for="choice in choices" :key="choice.key" :to="{path:'/student/home',query:{design:choice.key}}" :aria-current="design===choice.key?'page':undefined">{{choice.label}}</RouterLink></nav></details>
+  <details v-if="isPreview && design==='bplus'" class="home-preview-switch bplus-preview-switch"><summary>B+ · 候选预览<span>切换方案</span></summary><nav aria-label="首页方案" @click="($event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')"><RouterLink v-for="choice in choices" :key="choice.key" :to="{path:'/student/home',query:{design:choice.key}}" :aria-current="design===choice.key?'page':undefined">{{choice.label}}</RouterLink></nav></details>
   <div v-else-if="isPreview" class="home-preview-switch" aria-label="首页方案比较">
     <span>首页视觉探索</span><nav aria-label="首页方案"><RouterLink v-for="choice in choices" :key="choice.key" :to="{path:'/student/home',query:{...route.query,design:choice.key}}" :aria-current="design===choice.key?'page':undefined">{{choice.label}}</RouterLink></nav><small>仅预览 · 切换保留同一份数据</small>
   </div>

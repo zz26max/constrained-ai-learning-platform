@@ -263,8 +263,14 @@ describe('P1-D 路由与首页', () => {
     expect(view.find('[role="progressbar"]').exists()).toBe(false)
     expect(requestsOf('listChapters')).toHaveLength(0)
   })
+  it('正式首页默认采用B+且不显示探索入口',async()=>{
+    const view=await open('/student/home')
+    expect(view.find('[data-design="bplus"]').exists()).toBe(true)
+    expect(view.find('.home-preview-switch').exists()).toBe(false)
+    expect(view.find('[data-home-action="primary"]').attributes('href')).toContain(ASSIGNMENT_2)
+  })
   it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
-    const page=await open('/student/home')
+    const page=await open('/student/home?design=current')
     expect(page.find('#dash-current').text()).toBe('接下来要做')
     expect(page.find('.current-task').text()).toContain('逾期实验')
     expect(page.find('.current-task').text()).not.toContain('响应式导航栏')
@@ -274,12 +280,12 @@ describe('P1-D 路由与首页', () => {
   })
   it('2b. 无可提交任务时给出课程入口；资格读取失败不显示成功空态',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
-    const page=await open('/student/home')
+    const page=await open('/student/home?design=current')
     expect(page.find('.current-task').text()).toContain('当前没有可提交的待办')
     expect(page.find('.current-task a.button').attributes('href')).toBe('/course')
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
-    const failed=await open('/student/home')
+    const failed=await open('/student/home?design=current')
     expect(failed.find('.current-task').text()).not.toContain('当前没有可提交的待办')
     expect(failed.find('.current-task').text()).toContain('重新加载')
   })
@@ -288,12 +294,12 @@ describe('P1-D 路由与首页', () => {
     dashboardOverride = {
       termId: null, termLabel: null, currentLearning: null, courseCount: 0, courses: [],
     }
-    const noTerm = await open('/student/home')
+    const noTerm = await open('/student/home?design=current')
     expect(noTerm.text()).toContain('当前没有进行中的学期')
     wrapper?.unmount()
 
     dashboardOverride = { courses: [course({ progress: { ...progress, completed: 0, total: 0, percent: 0, notConfigured: true } })] }
-    const notConfigured = await open('/student/home')
+    const notConfigured = await open('/student/home?design=current')
     expect(notConfigured.text()).toContain('未配置学习内容')
     expect(notConfigured.text()).not.toContain('0%')
   })
