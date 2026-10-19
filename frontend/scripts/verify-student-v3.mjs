@@ -10,7 +10,7 @@ page.setDefaultTimeout(30000)
 const base='http://127.0.0.1:4173/#',requests=[],errors=[],measurements=[]
 page.on('request',r=>{if(r.url().includes('/api/v1/'))requests.push({method:r.method(),path:new URL(r.url()).pathname})})
 page.on('pageerror',e=>errors.push(e.message))
-async function ready(){await page.locator('main h1').waitFor();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('main [role=status]')).some(n=>/正在加载|正在读取/.test(n.textContent??'')));assert.equal(await page.locator('main .state-block[role=alert]').count(),0)}
+async function ready(){await page.locator('main h1').waitFor();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('main [role=status]')).some(n=>/正在加载|正在读取|正在确认提交资格/.test(n.textContent??'')));assert.equal(await page.locator('main .state-block[role=alert]').count(),0)}
 async function design(v){const details=page.locator('details.bplus-preview-switch');if(await details.count()&&!await details.getAttribute('open')){if(!await details.evaluate(n=>n.open))await details.locator('summary').click()}const labels={current:'现有首页',a:'A · 编辑式',b:'B · 模块化',bplus:'B+ · 精修'};await page.locator('.home-preview-switch nav a').filter({hasText:labels[v]}).click();await ready();if(await page.locator('details.bplus-preview-switch').count())await page.locator('details.bplus-preview-switch').evaluate(n=>n.open=false)}
 async function snapshot(name){await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:fileURLToPath(new URL(name+'.png',out)),fullPage:true})}
 const coreReads=()=>requests.filter(r=>r.path==='/api/v1/me/dashboard'||r.path==='/api/v1/me/assignments').length

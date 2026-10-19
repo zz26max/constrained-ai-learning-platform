@@ -46,3 +46,47 @@
  .student-records .record-chapters .chapter-action {justify-self:end}
  .student-records .record-section {padding:22px 0}
 }
+/* Assignment rows keep tabular alignment and independent actions. */
+.student-space .student-tasks .task-table {border-radius:6px;border:1px solid var(--line);box-shadow:none}
+.student-space .task-table-head {background:#edf1f7;color:#46566e;font-size:13px;font-weight:600;padding-block:14px}
+.student-space .task-table-row {padding-block:20px;gap:16px}
+.student-space .task-table-row:hover,.student-space .task-table-row:focus-within {background:#f7f9fd}
+.student-space .task-table-row .task-title {font-size:15px;line-height:1.6}
+.student-space .task-table-row :is(time,.task-course) {font-size:13px;line-height:1.7}
+.student-space .task-table-row>.button {justify-self:start;min-width:88px;text-align:center}
+/* Calendar dates and agenda have separate roles. */
+.student-space .calendar-toolbar {padding-bottom:16px;border-bottom:1px solid var(--line);gap:16px}
+.student-space .calendar-board {border-radius:6px;box-shadow:none}
+.student-space .calendar-weekdays {font-size:13px;background:#edf1f7}
+.student-space .calendar-day-number {min-height:40px;min-width:36px;font-variant-numeric:tabular-nums}
+.student-space .calendar-day-number.today {outline:2px solid #3563e9;outline-offset:2px;background:transparent;color:#2853bc;font-weight:700}
+.student-space .calendar-day-number[aria-pressed=true] {background:#2853bc;color:white;border-radius:6px}
+.student-space .calendar-chip {font-size:13px;line-height:1.6}
+.student-space .calendar-chip:hover {background:#ffe8bf}
+.student-space .calendar-more {min-height:36px;font-size:13px;text-align:left}
+.student-space .calendar-agenda {background:transparent;border:0;border-radius:0;box-shadow:none;padding:0 0 0 20px;border-left:1px solid var(--line)}
+.student-space .agenda-event {gap:10px;padding:20px 0}
+.student-space .agenda-event:hover {background:#edf2fa}
+.student-space .agenda-event small {font-size:13px;line-height:1.6}
+/* Inbox keeps compact rows; unread weight is local to title and marker. */
+.student-space .student-inbox>section.surface {padding:0;background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
+.student-space .notification-list {gap:0}
+.student-space .notification-item {padding:20px 0}
+.student-space .notification-item.unread {padding-left:16px;border-left:3px solid #3563e9}
+.student-space .notification-item:not(.unread) .notification-title {font-weight:500;color:#46566e}
+.student-space .notification-header {color:#57677c;gap:8px}
+.student-space .notification-type {font-size:13px;color:#57677c;font-weight:500}
+.student-space .notification-time {font-size:13px;color:#57677c}
+.student-space .notification-actions {flex-wrap:wrap;gap:8px 12px;margin-top:12px}
+.student-space .notification-actions .button {padding:8px 12px}
+.student-space .notification-content {color:#46566e;line-height:1.7}
+.student-space .notification-title {line-height:1.6}
+.student-space .message-full summary {min-height:44px;display:flex;align-items:center;cursor:pointer;color:#2853bc;font-size:14px}
+@media(max-width:1250px){.student-space .calendar-agenda {border-left:0;border-top:1px solid var(--line);padding:20px 0 0}}
+@media(max-width:760px){
+ .student-space .task-table-row {padding:18px 16px;gap:10px}
+ .student-space .task-table-row .task-title {font-size:16px}
+ .student-space .calendar-day-number {min-height:44px}
+ .student-space .notification-time {margin-left:0;flex-basis:100%}
+ .student-space .notification-item {padding-block:18px}
+}

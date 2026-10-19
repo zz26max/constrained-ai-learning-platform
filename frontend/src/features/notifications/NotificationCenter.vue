@@ -3,6 +3,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import type { NotificationDTO } from '../../api/assignments'
+import AppIcon from '../../components/AppIcon.vue'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import { pageError, type PageError } from '../courses/page-error'
@@ -99,7 +100,7 @@ function goToPage(page: number): void {
 </script>
 
 <template>
-  <div class="workspace-page">
+  <div class="workspace-page student-inbox">
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">消息通知</h1>
@@ -123,11 +124,11 @@ function goToPage(page: number): void {
           :class="{ unread: notification.readAt === null }"
         >
           <div class="notification-header">
-            <span class="notification-type">{{ TYPE_LABELS[notification.type] }}</span>
+            <AppIcon :name="notification.type==='assignment_published'?'clipboard':notification.type==='feedback'?'chart':'bell'" :size="18" /><span class="notification-type">{{ TYPE_LABELS[notification.type] }}</span>
             <span v-if="notification.readAt === null" class="tag">● 未读</span><span v-else class="muted">已读</span>
             <time class="notification-time" :datetime="notification.createdAt">{{ formatTime(notification.createdAt) }}</time>
           </div>
-          <h2 class="notification-title">{{ notification.title }}</h2>
+          <h2 class="notification-title" :title="notification.title">{{ notification.title }}</h2>
           <p class="notification-content">{{ notification.content }}</p><details v-if="notification.content.length>100" class="message-full"><summary>展开完整消息</summary><p>{{notification.content}}</p></details>
           <div class="notification-actions">
             <button

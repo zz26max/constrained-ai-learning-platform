@@ -50,7 +50,7 @@ function courseName(id:string){return query.data.value?.classes.find(c=>c.offeri
         <div class="task-table-head" aria-hidden="true"><span>作业</span><span>所属课程</span><span>截止时间</span><span>状态</span><span>操作</span></div>
         <div v-if="!visible.length" class="empty-state"><h2>暂无符合条件的作业</h2><p>调整课程或状态筛选，查看其他任务。</p><button class="button secondary" @click="router.push({query:{status:'all'}})">清除筛选</button></div>
         <article v-for="task in visible" :key="task.id" class="task-table-row">
-          <RouterLink class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink>
+          <RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink>
           <span class="muted task-course">{{ courseName(task.offeringId) }}</span>
           <time :datetime="task.dueAt">{{ formatTime(task.dueAt) }}</time>
           <TaskStatus :task="task" :detail="details.status.value==='success'?details.data.value?.[task.id]:undefined" />
