@@ -176,6 +176,34 @@ describe('P1-D 路由与首页', () => {
     expect(requestsOf('getDashboard')).toHaveLength(1)
   })
 
+  it('首页方案切换共用同一份真实查询与任务，未知参数保留原版',async()=>{
+    const view=await open('/student/home')
+    const dashReads=requestsOf('getDashboard').length, taskReads=requestsOf('listMyAssignments').length
+    const originalTitle=view.find('.current-task h3').text()
+    await view.find('.home-preview-switch a[href="/student/home?design=a"]').trigger('click');await flushPromises()
+    expect(view.find('[data-design="a"]').exists()).toBe(true)
+    expect(view.find('#explore-focus-title').text()).toBe(originalTitle)
+    const first=view.find('[data-home-action="primary"]').attributes('data-task-id')
+    const courses=view.findAll('[data-course-id]').map(c=>c.attributes('data-course-id'))
+    await view.find('.home-preview-switch a[href="/student/home?design=b"]').trigger('click');await flushPromises()
+    expect(view.find('[data-design="b"]').exists()).toBe(true)
+    expect(view.find('[data-home-action="primary"]').attributes('data-task-id')).toBe(first)
+    expect(view.findAll('[data-course-id]').map(c=>c.attributes('data-course-id'))).toEqual(courses)
+    expect(requestsOf('getDashboard')).toHaveLength(dashReads)
+    expect(requestsOf('listMyAssignments')).toHaveLength(taskReads)
+    await router!.push('/student/home?design=unknown');await flushPromises()
+    expect(view.find('.dashboard-page').exists()).toBe(true)
+  })
+  it.each(['a','b'])('方案%s无资格任务与无反馈公告时保留可用空态',async design=>{
+    dashboardOverride={recentFeedback:null,recentNotice:null}
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
+    const view=await open('/student/home?design='+design)
+    expect(view.find('#explore-focus-title').text()).toBe('当前没有可提交的待办')
+    expect(view.find('[data-home-action="primary"]').attributes('href')).toBe('/course')
+    expect(view.find('[data-home-action="primary"]').attributes('data-task-id')).toBeUndefined()
+    expect(view.text()).toContain('暂无已发布的评价')
+    expect(view.text()).toContain('暂无课程公告')
+  })
   it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
     const page=await open('/student/home')
     expect(page.find('#dash-current').text()).toBe('接下来要做')

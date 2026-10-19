@@ -4,7 +4,7 @@ import { createMemoryHistory, type Router } from 'vue-router'
 import { registerAuthApi } from '../src/api'
 import { AuthApi } from '../src/api/auth'
 import { ApiClient } from '../src/api/client'
-import { createAppRouter } from '../src/app/router'
+import { createAppRouter, isInternalPath } from '../src/app/router'
 import { useAuthStore } from '../src/stores/auth'
 import { createScriptedTransport, DEMO_CONFIG, DEMO_USER, okEnvelope, operationIds, type ScriptedTransport } from './helpers'
 
@@ -34,6 +34,18 @@ beforeEach(() => {
 })
 
 describe('P1-A 路由守卫', () => {
+  it('仅固定首页方案可带查询恢复，外域与额外参数仍被拒绝',async()=>{
+    expect(isInternalPath('/student/home?design=a')).toBe(true)
+    expect(isInternalPath('/student/home?design=b')).toBe(true)
+    for(const path of ['https://example.com','//example.com','/student/home?design=a&return=//example.com','/student/home?design=https://example.com'])expect(isInternalPath(path)).toBe(false)
+    useAuthStore().$patch({phase:'anonymous',bootStatus:'success'})
+    const router=await newRouter('/student/home?design=b')
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.return).toBe('/student/home?design=b')
+    setAuthenticated('teacher')
+    await router.push('/student/home?design=a')
+    expect(router.currentRoute.value.name).toBe('access-denied')
+  })
   it('学生访问教师路由落到 access-denied', async () => {
     setAuthenticated('student')
     const router = await newRouter('/teacher/offerings/00000000-0000-4000-8000-000000000201')

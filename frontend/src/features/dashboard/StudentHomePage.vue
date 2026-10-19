@@ -1,53 +1,27 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { dashboardApi, assignmentsApi, coursesApi } from '../../api'
-import { allPages } from '../../api/pagination'
-import type { AssignmentDetailDTO } from '../../api/assignments'
 import TaskStatus from '../../components/TaskStatus.vue'
-import { byDeadline, byRecentStudy, taskAction } from '../assignments/task-presentation'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
-import { usePageQuery } from '../courses/use-page-query'
+import { taskAction } from '../assignments/task-presentation'
 import { formatTime } from '../courses/format'
-import { useOpenTarget } from '../notifications/use-open-target'
-
-const route = useRoute()
-const api = dashboardApi()
-const target = useOpenTarget()
-const query = usePageQuery(async signal => (await api.getDashboard({}, { signal })).data)
-watch(() => route.fullPath, () => { void query.load() }, { immediate: true })
-
-const TYPE_LABELS = { web_lab: '网页实验', sql_text: 'SQL 作业', text: '文本作业' } as const
-
-function excerpt(text: string, max = 80): string {
-  return text.length > max ? text.slice(0, max) + '…' : text
-}
-
-/** 首页优先完整待办中经服务端确认仍可提交的任务。 */
-const tasksApi=assignmentsApi(), courses=coursesApi()
-const tasksQuery=usePageQuery(async signal=>{
-  const [tasks,classes]=await Promise.all([
-    allPages((page,pageSize,signal)=>tasksApi.listMyAssignments({filter:'todo',page,pageSize},{signal}).then(r=>r.data),signal),
-    allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal),
-  ])
-  const actionable: AssignmentDetailDTO[]=[]
-  for(const task of tasks.sort(byDeadline)){
-    if(task.publicationState==='archived'||task.offeringStatus==='archived')continue
-    const detail=(await tasksApi.getAssignment(task.id,{signal})).data
-    if(detail.canSubmit){actionable.push(detail);if(actionable.length===6)break}
-  }
-  return {actionable,classes:classes.sort(byRecentStudy)}
-})
-watch(()=>route.fullPath,()=>{void tasksQuery.load()},{immediate:true})
-const nextTask=computed(()=>tasksQuery.data.value?.actionable[0])
-const recentTasks=computed(()=>tasksQuery.data.value?.actionable.slice(1,6)??[])
-const recentCourse=computed(()=>tasksQuery.data.value?.classes.find(c=>c.status==='active'&&c.currentChapter))
-function courseName(id:string){return tasksQuery.data.value?.classes.find(c=>c.offeringId===id)?.title??'课程信息未返回'}
+import { useStudentHome } from './use-student-home'
+import HomeExploration from './HomeExploration.vue'
+import './home-exploration.css'
+const route=useRoute()
+const home=useStudentHome()
+const {query,tasksQuery,target,nextTask,recentTasks,recentCourse,courseName,TYPE_LABELS,excerpt}=home
+const design=computed(()=>route.query.design==='a'?'a':route.query.design==='b'?'b':'current')
+const choices=[{key:'current',label:'现有首页'},{key:'a',label:'A · 编辑式'},{key:'b',label:'B · 模块化'}]
 </script>
 
 <template>
-  <div class="workspace-page dashboard-page">
+  <div class="home-preview-switch" aria-label="首页方案比较">
+    <span>首页视觉探索</span><nav aria-label="首页方案"><RouterLink v-for="choice in choices" :key="choice.key" :to="{path:'/student/home',query:{...route.query,design:choice.key==='current'?undefined:choice.key}}" :aria-current="design===choice.key?'page':undefined">{{choice.label}}</RouterLink></nav><small>仅预览 · 切换保留同一份数据</small>
+  </div>
+  <HomeExploration v-if="design!=='current'" :design="design" :home="home" />
+  <div v-else class="workspace-page dashboard-page">
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">学习首页</h1>
