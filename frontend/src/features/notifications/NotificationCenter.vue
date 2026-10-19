@@ -12,6 +12,7 @@ import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
 import { targetRoute } from './target-route'
 import { beijingDay } from '../calendar/dates'
+import { useMessageOverflow } from './use-message-overflow'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
 
@@ -39,6 +40,7 @@ watch(() => auth.identity?.id, () => {
 }, { immediate: true })
 
 const notifications = computed(() => query.data.value?.items ?? [])
+const { listElement, clippedIds, measureOverflow } = useMessageOverflow(notifications)
 const unreadCount = computed(() => query.data.value?.summary.unreadCount ?? 0)
 const totalPages = computed(() => Math.ceil((query.data.value?.total ?? 0) / pageSize))
 
@@ -114,11 +116,11 @@ function goToPage(page: number): void {
     <section v-if="query.status.value === 'success'" class="surface" aria-label="消息列表">
       <p v-if="notifications.length === 0" class="muted empty-state">暂无消息</p>
 
-      <ul v-else class="notification-list">
+      <ul v-else ref="listElement" class="notification-list">
         <template v-for="(notification,index) in notifications" :key="notification.id">
         <li v-if="index===0 || beijingDay(notifications[index-1]!.createdAt)!==beijingDay(notification.createdAt)" class="notification-date"><h2>{{beijingDay(notification.createdAt)}}<small v-if="index===0 && currentPage>1"> · 本页</small></h2></li>
         <li
-          class="notification-item"
+          class="notification-item" :data-message-id="notification.id"
           :class="{ unread: notification.readAt === null }"
         >
           <div class="notification-header">
@@ -127,7 +129,7 @@ function goToPage(page: number): void {
             <time class="notification-time" :datetime="notification.createdAt">{{ formatTime(notification.createdAt) }}</time>
           </div>
           <h2 class="notification-title" :title="notification.title">{{ notification.title }}</h2>
-          <p class="notification-content">{{ notification.content }}</p><details class="message-full"><summary><span class="message-expand">完整消息</span><span class="message-collapse">收起消息</span><span aria-hidden="true">⌄</span></summary><h3>{{notification.title}}</h3><p>{{notification.content}}</p></details>
+          <p class="notification-content">{{ notification.content }}</p><details v-if="clippedIds.has(notification.id)" class="message-full" @toggle="measureOverflow"><summary><span class="message-expand">完整消息</span><span class="message-collapse">收起消息</span><span aria-hidden="true">⌄</span></summary><p>{{notification.content}}</p></details>
           <div class="notification-actions">
             <button
               v-if="canOpen(notification)"

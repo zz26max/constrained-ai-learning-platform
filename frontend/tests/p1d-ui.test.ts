@@ -499,14 +499,14 @@ describe('P1-D 消息目标映射', () => {
     expect(view.find('.course-identity h2 a').attributes('href')).toBe(`/course/${OFFERING}`)
     expect(view.text()).toContain('李老师')
   })
-  it('短消息也有全文且同一北京时间日期不按标题合并通知',async()=>{
+  it('完整短消息无冗余展开且同一北京时间日期不合并通知',async()=>{
     const contents=['短消息也保留完整阅读入口','第二条相同标题的独立通知']
     scripted.setHandler(r=>r.operationId==='listMessages'?okEnvelope({items:contents.map((content,i)=>({id:`00000000-0000-4000-8000-000000000b0${i}`,offeringId:OFFERING,type:'system',title:'相同标题',content,target:null,sender:null,createdAt:i?'2026-10-13T18:00:00Z':'2026-10-14T02:00:00+08:00',readAt:null})),page:1,pageSize:20,total:2,summary:{unreadCount:2}}):normalResponse(r))
     const view=await open('/student/messages')
     expect(view.findAll('.notification-date')).toHaveLength(1)
     expect(view.findAll('.notification-item')).toHaveLength(2)
-    expect(view.findAll('.message-full')).toHaveLength(2)
-    expect(view.findAll('.message-full p').map(n=>n.text())).toEqual(contents)
+    expect(view.findAll('.message-full')).toHaveLength(0)
+    expect(view.findAll('.notification-content').map(n=>n.text())).toEqual(contents)
     expect(requestsOf('readMessage')).toHaveLength(0)
   })
   it('消息未读和类型筛选使用正式参数',async()=>{

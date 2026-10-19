@@ -1,4 +1,4 @@
-/* V3 student foundation; teacher workspace keeps its existing presentation. */
+/* Student workspace foundation. Teacher layouts keep their original presentation. */
 .student-space {--ink:#172033;--muted:#57677c;--blue-text:#2853bc;--line:#dce3ed}
 .student-space .workspace-page {max-width:1280px;margin-inline:auto;min-width:0}
 .student-space .workspace-heading {margin-bottom:24px}
@@ -10,50 +10,60 @@
 .student-space .tag {font-size:13px;line-height:1.6}
 .student-space button:disabled {opacity:.6;cursor:not-allowed}
 .student-space .exploration-bplus :is(.explore-course-actions a,.focus-actions>a,.explore-calendar,.explore-section-heading>a) {min-height:44px;display:inline-flex;align-items:center}
-@media(max-width:760px){
- .student-space .workspace-heading h1 {font-size:25px}
- .student-space .exploration-bplus :is(.focus-course,.explore-course-info>p,.task-line-content .explore-muted,.feedback-quote) {font-size:14px}
- .student-space .exploration-bplus :is(.bplus-group-heading small,.bplus-group-heading span,.bplus-deadline>span,.explore-heading .explore-eyebrow) {font-size:13px}
- .student-space .task-line-action {min-width:44px}
-}
-/* Courses retain their own compact two-column identity. */
-.student-space .course-row {border-radius:8px;gap:20px;border-top:3px solid #9bb1df;box-shadow:none}
+
+/* Courses: mark identifies the subject; title and full-width progress carry hierarchy. */
+.student-space .student-course-catalog .course-row {border:1px solid var(--line);border-radius:8px;gap:16px;padding:22px;box-shadow:none}
 .student-space .course-identity .small-label {display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
-.student-space .course-mark {display:inline-grid;place-items:center;min-width:36px;min-height:32px;padding:4px 8px;border-radius:4px;background:#e9effa;color:#2853bc;font-weight:600;overflow-wrap:anywhere}
-.student-space .course-identity h2 {margin:14px 0 8px;font-size:20px;line-height:1.5}
-.student-space .course-learning {padding-top:16px;border-top:1px solid var(--line)}
-.student-space .course-learning>p {font-size:14px;line-height:1.65;color:var(--ink)}
-.student-space .course-progress {font-size:13px}
-.student-space .course-summary {font-size:13px;gap:8px 16px}
-.student-space .course-summary a {min-height:44px}
-/* Learning history is a continuous reading path, with light activity summaries. */
-.student-records .record-section {padding:24px 0;border-top:1px solid var(--line);background:transparent;border-radius:0;box-shadow:none;margin:0}
+.student-space .course-mark {display:inline-grid;place-items:center;min-width:32px;min-height:28px;padding:3px 6px;border-radius:4px;background:#edf2fa;color:#2853bc;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.student-space .course-identity h2 {margin:12px 0 0;font-size:20px;line-height:1.55}
+.student-space .student-course-catalog .course-learning {border:0;padding:0;margin:0}
+.student-space .student-course-catalog .course-learning>p {font-size:14px;line-height:1.65;color:var(--ink);margin:0 0 12px}
+.student-space .student-course-catalog .course-learning>.course-meta {font-size:13px;color:var(--muted);margin:12px 0 0}
+.student-space .student-course-catalog .course-progress {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 12px;font-size:13px;font-variant-numeric:tabular-nums}
+.student-space .student-course-catalog .progress-track {grid-column:1/-1;grid-row:2;width:100%;max-width:none;min-width:0;height:5px;border-radius:3px}
+.student-space .student-course-catalog .course-progress>span:last-child {justify-self:end}
+.student-space .student-course-catalog .course-summary {font-size:13px;gap:6px 16px;margin-top:0;padding-top:8px}
+.student-space .student-course-catalog .course-summary a {min-height:44px;margin:0;font-size:13px}
+
+/* Records: aligned to the page origin, with a bounded reading measure. */
+.student-records>.record-section,.student-records>.task-toolbar {max-width:880px}
+.student-records .record-section {padding:20px 0;border-top:1px solid var(--line);background:transparent;border-radius:0;box-shadow:none;margin:0}
 .student-records .record-section h2 {font-size:19px;margin:0 0 18px}
-.student-records .dash-summary {display:flex;flex-wrap:wrap;gap:16px 32px}
-.student-records .dash-summary li {padding:0;border:0;background:transparent;font-size:14px}
-.student-records .dash-summary strong {font-size:22px;display:inline;color:var(--ink)}
-.student-records .record-chapters {list-style:none;padding:0 0 0 18px;margin:24px 0 0}
+.student-records .dash-summary {display:flex;flex-wrap:wrap;gap:16px 32px;margin-bottom:0}
+.student-records .dash-summary li {display:inline-flex;flex-direction:row;align-items:baseline;gap:8px;padding:0;border:0;background:transparent;font-size:14px}
+.student-records .dash-summary strong {font-size:22px;font-weight:600;display:inline;color:var(--ink);font-variant-numeric:tabular-nums}
+.student-records .record-chapters {list-style:none;padding:0 0 0 8px;margin:20px 0 0}
 .student-records .record-chapters>li {position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px 20px;align-items:center;padding:16px 0 16px 24px;border:0;border-left:2px solid #c7d4ee;min-width:0}
-.student-records .record-chapters>li::before {content:'';position:absolute;left:-7px;top:30px;width:12px;height:12px;border:2px solid #7188bd;border-radius:50%;background:#f5f7fb;box-sizing:border-box}
+.student-records .record-chapters>li::before {content:'';position:absolute;left:-7px;top:32px;width:12px;height:12px;border:2px solid #7188bd;border-radius:50%;background:var(--canvas);box-sizing:border-box}
 .student-records .record-chapters>li.is-read::before {background:#3563e9;border-color:#3563e9}
-.student-records .record-chapters a {overflow-wrap:anywhere;font-size:15px;line-height:1.6}
-.student-records .record-chapters .chapter-action {display:inline-flex;align-items:center;min-height:44px;font-size:14px}
-.student-records .dash-list li {padding:16px 0}
-@media(max-width:760px){
- .student-space .course-row {gap:16px;padding:20px}
- .student-records .record-chapters>li {grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding-left:20px}
- .student-records .record-chapters>li>a:first-child {grid-column:1/-1}
- .student-records .record-chapters .chapter-action {justify-self:end}
- .student-records .record-section {padding:22px 0}
-}
-/* Assignment rows keep tabular alignment and independent actions. */
+.student-records .record-chapters a {display:inline-flex;align-items:center;min-height:44px;overflow-wrap:anywhere;font-size:15px;line-height:1.6}
+.student-records .record-chapters .chapter-action {font-size:14px}
+.student-records .record-chapters.is-single {margin-top:12px}
+.student-records .record-chapters.is-single>li {padding-block:8px}
+.student-records .record-chapters.is-single>li::before {top:24px}
+.student-records .recent-feedback-summary {padding:0 0 16px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.student-records .recent-feedback-summary h3 {font-size:14px;color:var(--muted);font-weight:500;margin:0 0 10px}
+.student-records .record-feedback-heading,.student-records .dash-list li {display:grid;grid-template-columns:minmax(0,1fr) 238px;gap:8px 20px;align-items:center}
+.student-records .record-feedback-heading {margin:0 0 10px}
+.student-records .record-feedback-heading>a {min-height:44px;display:flex;align-items:center;overflow-wrap:anywhere;line-height:1.65;font-size:15px}
+.student-records .record-feedback-meta {display:flex;align-items:baseline;justify-content:space-between;gap:12px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.student-records .record-score {color:var(--ink);white-space:nowrap}
+.student-records .dash-list li {padding:14px 0}
+.student-records .dash-list a {overflow-wrap:anywhere;line-height:1.65;font-size:15px}
+.student-records .recent-feedback-summary .dash-text {max-width:64ch;font-size:14px;line-height:1.8;overflow-wrap:anywhere;margin:0}
+
+/* Assignments retain the V3.1 full-list priority and tabular alignment. */
 .student-space .student-tasks .task-table {border-radius:6px;border:1px solid var(--line);box-shadow:none}
 .student-space .task-table-head {background:#edf1f7;color:#46566e;font-size:13px;font-weight:600;padding-block:14px}
 .student-space .task-table-row {padding-block:20px;gap:16px}
 .student-space .task-table-row:hover,.student-space .task-table-row:focus-within {background:#f7f9fd}
 .student-space .task-table-row .task-title {font-size:15px;line-height:1.6}
+.student-space .task-table-row .task-title:focus-visible {-webkit-line-clamp:unset}
 .student-space .task-table-row :is(time,.task-course) {font-size:13px;line-height:1.7}
 .student-space .task-table-row>.button {justify-self:start;min-width:88px;text-align:center}
+.student-space .task-group-heading {margin:0;padding:12px 20px;background:#f1f4fa;border-block:1px solid var(--line);font-size:14px;line-height:1.6;font-weight:600;color:#46566e}
+.student-space .task-toolbar>span>span {display:block;margin-top:5px;font-size:13px}
+
 /* Calendar dates and agenda have separate roles. */
 .student-space .calendar-toolbar {padding-bottom:16px;border-bottom:1px solid var(--line);gap:16px}
 .student-space .calendar-board {border-radius:6px;box-shadow:none}
@@ -68,76 +78,63 @@
 .student-space .agenda-event {gap:10px;padding:20px 0}
 .student-space .agenda-event:hover {background:#edf2fa}
 .student-space .agenda-event small {font-size:13px;line-height:1.6}
-/* Inbox keeps compact rows; unread weight is local to title and marker. */
-.student-space .student-inbox>section.surface {padding:0;background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
-.student-space .notification-list {gap:0}
-.student-space .notification-item {padding:20px 0}
-.student-space .notification-item.unread {padding-left:16px;border-left:3px solid #3563e9}
-.student-space .notification-item:not(.unread) .notification-title {font-weight:500;color:#46566e}
-.student-space .notification-header {color:#57677c;gap:8px}
-.student-space .notification-type {font-size:13px;color:#57677c;font-weight:500}
-.student-space .notification-time {font-size:13px;color:#57677c}
-.student-space .notification-actions {flex-wrap:wrap;gap:8px 12px;margin-top:12px}
-.student-space .notification-actions .button {padding:8px 12px}
-.student-space .notification-content {color:#46566e;line-height:1.7}
-.student-space .notification-title {line-height:1.6}
-.student-space .message-full summary {min-height:44px;display:flex;align-items:center;cursor:pointer;color:#2853bc;font-size:14px}
-@media(max-width:1250px){.student-space .calendar-agenda {border-left:0;border-top:1px solid var(--line);padding:20px 0 0}}
-@media(max-width:760px){
- .student-space .task-table-row {padding:18px 16px;gap:10px}
- .student-space .task-table-row .task-title {font-size:16px}
- .student-space .calendar-day-number {min-height:44px}
- .student-space .notification-time {margin-left:0;flex-basis:100%}
- .student-space .notification-item {padding-block:18px}
-}
-
-.student-records .dash-summary li {display:inline-flex;flex-direction:row;align-items:baseline;gap:8px}
-/* V3.1 priority labels remain within the existing table, not independent cards. */
-.student-space .task-group-heading {margin:0;padding:12px 20px;background:#f1f4fa;border-block:1px solid var(--line);font-size:14px;line-height:1.6;font-weight:600;color:#46566e}
-.student-space .task-table-row .task-title:focus-visible {-webkit-line-clamp:unset}
-.student-space .task-toolbar>span>span {display:block;margin-top:5px;font-size:13px}
-@media(max-width:760px){.student-space .task-group-heading{padding:12px 16px}.student-space .task-table-row {gap:10px;padding-block:18px}}
-/* V3.1 removes repeated metadata without replacing the established layout. */
-.student-space .student-course-catalog .course-row {gap:14px;padding:22px}
-.student-space .student-course-catalog .course-learning {border:0;padding-top:0}
-.student-space .student-course-catalog .course-learning>p {margin:0 0 12px}
-.student-space .student-course-catalog .course-learning>.course-meta {font-size:13px;color:var(--muted);margin:12px 0 0}
-.student-space .student-course-catalog .course-summary {margin-top:0;padding-top:8px;gap:6px 16px}
-.student-space .student-course-catalog .course-summary a {margin:0;font-size:13px}
-.student-records .record-chapters.is-single {margin-top:12px}
-.student-records .record-chapters.is-single>li {padding-block:8px}
-.student-records .record-chapters.is-single>li::before {top:22px}
-.student-records .record-section {padding-block:20px}
-.student-records .recent-feedback-summary {padding:0 0 16px;border-bottom:1px solid var(--line);margin-bottom:8px}
-.student-records .recent-feedback-summary h3 {font-size:14px;color:var(--muted);font-weight:500;margin:0 0 10px}
-.student-records .recent-feedback-summary p {line-height:1.7;overflow-wrap:anywhere}
-.student-space .notification-date {list-style:none;padding:16px 0 8px;border-bottom:1px solid var(--line)}
-.student-space .notification-date h2 {font-size:14px;font-weight:600;color:var(--muted);margin:0}
-.student-space .notification-date small {font-size:13px;font-weight:400}
-.student-space .notification-content {-webkit-line-clamp:1}
-.student-space .notification-item:has(.message-full[open])>.notification-content {display:none}
-.student-space .message-full h3 {font-size:15px;line-height:1.6;overflow-wrap:anywhere;margin:4px 0 8px}
-.student-space .message-full p {font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
-.student-space .notification-actions {margin-top:4px}
-@media(max-width:760px){
- .student-space .student-course-catalog .course-row {padding:18px;gap:12px}
- .student-space .student-course-catalog .course-identity h2 {margin:10px 0 0;font-size:19px}
- .student-space .student-course-catalog .course-learning>p {margin-bottom:10px}
- .student-space .notification-content {-webkit-line-clamp:2}
- .student-space .notification-item {padding-block:16px}
-}
-.student-space .notification-item {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px}
-.student-space .notification-item>.notification-header,.student-space .notification-item>.notification-title,.student-space .notification-item>.notification-content {grid-column:1/-1}
-.student-space .notification-item>.message-full {grid-column:1;grid-row:4;min-width:0}
-.student-space .notification-item>.notification-actions {grid-column:2;grid-row:4;margin-top:0;align-self:start}
-.student-space .notification-item>.message-full[open] {grid-column:1/-1}
-.student-space .notification-item:has(.message-full[open])>.notification-actions {grid-row:5;grid-column:1/-1;margin-top:8px}
 .student-space .calendar-next {margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
 .student-space .calendar-next h4 {font-size:13px;font-weight:500;color:var(--muted);margin:0 0 8px}
 .student-space .calendar-next p {font-size:14px;line-height:1.65;overflow-wrap:anywhere;margin:8px 0}
 .student-space .calendar-next .muted {font-size:13px}
 .student-space .calendar-next .button {margin-top:8px}
-.student-space .message-full summary {gap:6px}
+
+/* Inbox: common text origin, date rhythm, and expansion only when text is clipped. */
+.student-space .student-inbox>section.surface {padding:0;background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
+.student-space .notification-list {gap:0}
+.student-space .notification-date {list-style:none;padding:22px 0 6px;border:0}
+.student-space .notification-date h2 {font-size:14px;font-weight:600;color:var(--muted);margin:0;font-variant-numeric:tabular-nums}
+.student-space .notification-date small {font-size:13px;font-weight:400}
+.student-space .notification-item {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:18px 0}
+.student-space .notification-item.unread {padding-left:0;border-left:0}
+.student-space .notification-item:not(.unread) .notification-title {font-weight:500;color:#46566e}
+.student-space .notification-item>.notification-header,.student-space .notification-item>.notification-title,.student-space .notification-item>.notification-content {grid-column:1/-1}
+.student-space .notification-header {color:var(--muted);gap:8px;line-height:1.6}
+.student-space .notification-header svg {flex-shrink:0}
+.student-space .notification-type {font-size:13px;color:var(--muted);font-weight:500}
+.student-space .notification-time {font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.student-space .notification-title {font-size:16px;line-height:1.65;font-weight:600}
+.student-space .notification-content {color:#46566e;line-height:1.7;-webkit-line-clamp:1}
+.student-space .notification-item>.notification-actions {grid-column:2;grid-row:4;align-self:start;display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:8px}
+.student-space .notification-item:not(:has(.message-full))>.notification-actions {grid-column:1/-1;justify-self:end}
+.student-space .notification-actions .button {padding:8px 12px}
+.student-space .notification-item>.message-full {grid-column:1;grid-row:4;min-width:0;margin-top:8px}
+.student-space .message-full summary {min-height:44px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--blue-text);font-size:14px}
+.student-space .message-full p {font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 0}
 .student-space .message-full .message-collapse,.student-space .message-full[open] .message-expand {display:none}
 .student-space .message-full[open] .message-collapse {display:inline}
 .student-space .message-full[open] summary>span[aria-hidden] {transform:rotate(180deg)}
+.student-space .notification-item:has(.message-full[open])>.notification-title {display:block;overflow:visible;-webkit-line-clamp:unset}
+.student-space .notification-item:has(.message-full[open])>.notification-content {display:none}
+.student-space .notification-item>.message-full[open] {grid-column:1/-1}
+.student-space .notification-item:has(.message-full[open])>.notification-actions {grid-row:5;grid-column:1/-1;margin-top:12px}
+
+@media(max-width:1250px){
+ .student-space .calendar-agenda {border-left:0;border-top:1px solid var(--line);padding:20px 0 0}
+}
+@media(max-width:760px){
+ .student-space .workspace-heading h1 {font-size:25px}
+ .student-space .exploration-bplus :is(.focus-course,.explore-course-info>p,.task-line-content .explore-muted,.feedback-quote) {font-size:14px}
+ .student-space .exploration-bplus :is(.bplus-group-heading small,.bplus-group-heading span,.bplus-deadline>span,.explore-heading .explore-eyebrow) {font-size:13px}
+ .student-space .task-line-action {min-width:44px}
+ .student-space .student-course-catalog .course-row {padding:18px;gap:14px}
+ .student-space .student-course-catalog .course-identity h2 {margin:10px 0 0;font-size:19px}
+ .student-space .student-course-catalog .course-learning>p {margin-bottom:10px}
+ .student-records .record-chapters>li {grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding-left:20px}
+ .student-records .record-chapters>li>a:first-child {grid-column:1/-1}
+ .student-records .record-chapters .chapter-action {justify-self:end}
+ .student-records .record-feedback-heading,.student-records .dash-list li {grid-template-columns:minmax(0,1fr);gap:4px}
+ .student-records .record-feedback-meta {justify-content:flex-start;gap:16px;flex-wrap:wrap}
+ .student-space .task-table-row {padding:18px 16px;gap:10px}
+ .student-space .task-table-row .task-title {font-size:16px}
+ .student-space .task-group-heading {padding:12px 16px}
+ .student-space .calendar-day-number {min-height:44px}
+ .student-space .notification-time {margin-left:0;flex-basis:100%}
+ .student-space .notification-content {-webkit-line-clamp:2}
+ .student-space .notification-item {padding-block:16px}
+}

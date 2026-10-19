@@ -123,9 +123,9 @@ function goToPage(next: number): void {
         <section class="record-section dash-section" aria-labelledby="lr-history">
           <h2 id="lr-history">评价历史</h2>
           <div v-if="recordsQuery.data.value.recentFeedback" class="recent-feedback-summary" id="lr-recent"><h3>最近反馈</h3>
-            <p>
+            <p class="record-feedback-heading">
               <RouterLink :to="{ name: 'student-assignment', params: { id: recordsQuery.data.value.recentFeedback.assignmentId }, query: { feedbackId: recordsQuery.data.value.recentFeedback.id } }">{{ recordsQuery.data.value.recentFeedback.assignmentTitle }}</RouterLink>
-              <span class="muted"> · {{ formatTime(recordsQuery.data.value.recentFeedback.publishedAt) }} · {{ recordsQuery.data.value.recentFeedback.score }}/{{ recordsQuery.data.value.recentFeedback.maxScore }}</span>
+              <span class="record-feedback-meta"><time :datetime="recordsQuery.data.value.recentFeedback.publishedAt">{{ formatTime(recordsQuery.data.value.recentFeedback.publishedAt) }}</time><span class="record-score">{{ recordsQuery.data.value.recentFeedback.score }}/{{ recordsQuery.data.value.recentFeedback.maxScore }}</span></span>
             </p>
             <p class="dash-text">{{ recordsQuery.data.value.recentFeedback.comment }}</p>
           </div>
@@ -135,7 +135,7 @@ function goToPage(next: number): void {
             <ul class="dash-list">
               <li v-for="item in pagedItems" :key="item.id">
                 <RouterLink :to="{ name: 'student-assignment', params: { id: item.assignmentId }, query: { feedbackId: item.id } }">{{ item.assignmentTitle }}</RouterLink>
-                <span class="muted">{{ formatTime(item.publishedAt) }} · {{ item.score }}/{{ item.maxScore }}</span>
+                <span class="record-feedback-meta"><time :datetime="item.publishedAt">{{ formatTime(item.publishedAt) }}</time><span class="record-score">{{ item.score }}/{{ item.maxScore }}</span></span>
               </li>
             </ul>
             <nav v-if="totalPages > 1" class="pagination" aria-label="评价历史分页">
