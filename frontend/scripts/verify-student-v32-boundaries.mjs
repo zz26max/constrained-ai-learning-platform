@@ -26,12 +26,15 @@ async function checkContrast(){
 const frozen=JSON.parse(readFileSync(new URL('responses.json',out),'utf8'));
 const scenarios=[],enlarged=[];
 let scenario='baseline';
+let releaseLoading;const loadingGate=new Promise(resolve=>releaseLoading=resolve);
 async function settle(){await ready();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))}
 try{
  await page.goto(base+'/student/home');await page.locator('#login-username').fill('student.demo');await page.locator('#login-password').fill(env.LOCAL_STUDENT_PASSWORD);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(u=>!u.hash.startsWith('#/login'));await ready();
  await page.route('**/api/v1/**',async route=>{
   if(route.request().method()!=='GET')return route.continue();
   const u=new URL(route.request().url()),key=u.pathname+u.search;
+  if(scenario==='failure'&&u.pathname==='/api/v1/me/messages')return route.abort('failed');
+  if(scenario==='loading'&&u.pathname==='/api/v1/me/messages')await loadingGate;
   const response=frozen[key]?null:await route.fetch();
   if(response&&!response.ok())return route.fulfill({response});
   const body=structuredClone(frozen[key]??await response.json()),d=body.data;
@@ -108,7 +111,13 @@ try{
  await page.emulateMedia({reducedMotion:'no-preference'});
  assert.ok((await page.locator('main .button').first().evaluate(n=>getComputedStyle(n).transitionDuration)).includes('0.12s'));
  assert.equal(await page.locator('main .button').first().evaluate(n=>getComputedStyle(n).transform),'none');
+ scenario='failure';await page.goto(base+routes.messages);await page.reload();
+ await page.locator('main [role=alert]').first().waitFor();await snapshot('state-message-error-320');
+ scenario='baseline';await page.getByRole('button',{name:'重新加载',exact:true}).click();await settle();assert.ok(await page.locator('.notification-item').count());
+ await page.goto(base+routes.home);await settle();scenario='loading';await page.goto(base+routes.messages);
+ await page.locator('main [role=status]').filter({hasText:/正在/}).first().waitFor();await snapshot('state-message-loading-320');
+ scenario='baseline';releaseLoading();await settle();assert.ok(await page.locator('.notification-item').count());
  assert.deepEqual(errors,[]);assert.deepEqual(requests.filter(r=>r.method!=='GET'&&r.path!=='/api/v1/auth/login'),[]);
- writeFileSync(new URL('boundaries-result.json',out),JSON.stringify({result:'PASS',scenarios,enlarged,messageClippingResizeKeyboardFocus:true,reducedMotion:true,businessWrites:0,browserErrors:errors},null,2));
+ writeFileSync(new URL('boundaries-result.json',out),JSON.stringify({result:'PASS',scenarios,enlarged,messageClippingResizeKeyboardFocus:true,reducedMotion:true,loadingAndErrorRetry:true,businessWrites:0,browserErrors:errors},null,2));
  console.log('PASS: V3.2 isolated boundaries, 200% text enlargement/equivalent reflow, dynamic clipping, keyboard continuity and reduced motion.');
 }finally{await browser.close()}
