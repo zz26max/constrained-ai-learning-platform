@@ -15,7 +15,7 @@ async function snapshot(name){await page.evaluate(()=>scrollTo(0,0));await page.
 async function reachable(locator){await locator.evaluate(n=>n.scrollIntoView({block:'center'}));assert.ok(await locator.evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===n||n.contains(hit)}),'click target covered')}
 const contrastChecks=[];
 async function checkContrast(){
- const samples=await page.locator('main .workspace-heading h1,main .task-course,main .task-table-row time,main .task-status .tag,main .task-table-head').evaluateAll(nodes=>nodes.slice(0,20).map(n=>{
+ const samples=await page.locator('main .workspace-heading h1,main .task-course,main .task-table-row time,main .task-status .tag,main .task-table-head,main .focus-course,main .bplus-deadline>span,main .explore-focus h2,main .record-feedback-meta,main .course-meta,main .notification-title,main .notification-content,main .calendar-chip').evaluateAll(nodes=>nodes.slice(0,80).map(n=>{
   let el=n,bg='rgb(255, 255, 255)';
   while(el){const c=getComputedStyle(el).backgroundColor;if(c!=='rgba(0, 0, 0, 0)'&&c!=='transparent'){bg=c;break}el=el.parentElement}
   return {text:n.textContent?.slice(0,30),fg:getComputedStyle(n).color,bg};
@@ -47,6 +47,7 @@ try{
    }
 
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),name+' overflow '+width);
+   if(phase==='after'&&width===390)await checkContrast();
    if(width<=760){
     const navY=[];
     for(const fraction of [0,.5,1]){await page.evaluate(f=>scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*f),fraction);navY.push((await page.locator('.mobile-primary-nav').boundingBox()).y)}
@@ -63,10 +64,19 @@ try{
   assert.ok(await page.locator('.notification-item:has(details[open])>.notification-title').innerText());assert.ok(await full.locator('p').innerText());
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await snapshot('detail-message-expanded-320');
+  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/student/home');await ready();
+  const primary=page.locator('[data-home-action=primary]');await primary.focus();
+  assert.equal(await primary.evaluate(n=>getComputedStyle(n).outlineColor),'rgb(242, 246, 255)');
+  await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.textContent?.includes('查看全部待办')),true);
+  await page.locator('.explore-focus').screenshot({path:fileURLToPath(new URL('detail-home-keyboard-focus.png',out))});
   await page.goto(base+'/student/calendar?date=2026-10-19');await ready();
   if(await page.locator('.calendar-next').count()){
    const label=await page.locator('.calendar-next p').first().innerText();await page.locator('.calendar-next button').click();await ready();assert.ok((await page.locator('.calendar-agenda').innerText()).includes(label));
   }
+  await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/student/calendar?date=2026-10-24');await ready();
+  const more=page.locator('.calendar-more').first();assert.ok((await more.boundingBox()).height>=44);
+  const hiddenCount=Number((await more.innerText()).match(/\d+/)[0]);await more.click();await ready();assert.equal(await page.locator('.agenda-event').count(),hiddenCount+2);
+  await page.locator('.calendar-agenda').screenshot({path:fileURLToPath(new URL('detail-calendar-selected-agenda.png',out))});
   await page.goto(base+'/student/assignments');await ready();
   await checkContrast();
   const rows=await page.locator('.task-table-row').all();let blocked=false;

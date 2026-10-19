@@ -6,10 +6,31 @@
 .student-space .workspace-heading p {font-size:14px;line-height:1.7;color:var(--muted)}
 .student-space :is(a,button,input,select,summary):focus-visible {outline:3px solid #3563e9;outline-offset:3px}
 .student-space :is(.button,select,input) {min-height:44px}
+.student-space .workspace-page .button {font-weight:500;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.student-space .workspace-page .button.secondary:not(:disabled):hover {background:#edf2fa;border-color:#b4c3df}
+.student-space .workspace-page .button:active:not(:disabled) {background:#e5edfb;border-color:#8fa7d4}
+.student-space .workspace-page .button.primary:active:not(:disabled) {background:#214aa7;color:white}
+.student-space .workspace-page :is(select,input):focus-visible {border-color:#3563e9}
+.student-space .filter-tabs button:active,.student-space .segmented button:active {background:#e5edfb}
+.student-space .filter-tabs button:hover:not([aria-pressed=true]) {border-color:#9eafd0;background:#f8faff}
+.student-space .workspace-page :is(a,button,summary) {scroll-margin-block:90px 110px}
+@media(prefers-reduced-motion:no-preference){
+ .student-space .workspace-page :is(.button,select,input,.filter-tabs button,.calendar-day-number,.calendar-more) {transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease}
+}
 .student-space :is(.toolbar,.task-toolbar) label {font-size:13px}
 .student-space .tag {font-size:13px;line-height:1.6}
 .student-space button:disabled {opacity:.6;cursor:not-allowed}
 .student-space .exploration-bplus :is(.explore-course-actions a,.focus-actions>a,.explore-calendar,.explore-section-heading>a) {min-height:44px;display:inline-flex;align-items:center}
+
+/* Home: keep the B+ composition, refine emphasis within its existing regions. */
+.student-space .exploration-bplus .explore-focus :focus-visible {outline-color:#f2f6ff;outline-offset:4px}
+.student-space .exploration-bplus .explore-focus .button.primary {padding:11px 18px;font-weight:600}
+.student-space .exploration-bplus .explore-focus .button.primary:active {background:#dce7ff;color:#234799;border-color:#dce7ff}
+.student-space .exploration-bplus .explore-course-actions {column-gap:12px}
+.student-space .exploration-bplus .explore-course-actions a {min-width:44px}
+.student-space .exploration-bplus .explore-course-actions a:not(.bplus-course-action) {color:var(--muted)}
+.student-space .exploration-bplus .explore-course-actions a:hover {color:var(--blue-text)}
+.student-space .exploration-bplus .feedback-score {font-variant-numeric:tabular-nums;align-items:baseline}
 
 /* Courses: mark identifies the subject; title and full-width progress carry hierarchy. */
 .student-space .student-course-catalog .course-row {border:1px solid var(--line);border-radius:8px;gap:16px;padding:22px;box-shadow:none}
@@ -60,20 +81,28 @@
 .student-space .task-table-row .task-title {font-size:15px;line-height:1.6}
 .student-space .task-table-row .task-title:focus-visible {-webkit-line-clamp:unset}
 .student-space .task-table-row :is(time,.task-course) {font-size:13px;line-height:1.7}
+.student-space .task-table-row time {font-variant-numeric:tabular-nums}
+.student-space .student-tasks .task-status {gap:6px 10px}
+.student-space .student-tasks .task-status .task-deadline {background:transparent;padding-inline:0;color:var(--muted)}
+.student-space .student-tasks .task-status .task-deadline.status-deadline {color:#865007}
+.student-space .student-tasks .task-status .task-eligibility {background:transparent;border:1px solid #e3c99f;color:#865007}
 .student-space .task-table-row>.button {justify-self:start;min-width:88px;text-align:center}
-.student-space .task-group-heading {margin:0;padding:12px 20px;background:#f1f4fa;border-block:1px solid var(--line);font-size:14px;line-height:1.6;font-weight:600;color:#46566e}
+.student-space .task-group-heading {margin:0;padding:12px 20px;background:#f5f7fb;border-top:1px solid var(--line);font-size:13px;line-height:1.6;font-weight:600;color:#46566e}
 .student-space .task-toolbar>span>span {display:block;margin-top:5px;font-size:13px}
 
 /* Calendar dates and agenda have separate roles. */
 .student-space .calendar-toolbar {padding-bottom:16px;border-bottom:1px solid var(--line);gap:16px}
 .student-space .calendar-board {border-radius:6px;box-shadow:none}
 .student-space .calendar-weekdays {font-size:13px;background:#edf1f7}
-.student-space .calendar-day-number {min-height:40px;min-width:36px;font-variant-numeric:tabular-nums}
+.student-space .calendar-day-number {min-height:40px;min-width:36px;font-size:14px;font-weight:500;font-variant-numeric:tabular-nums}
 .student-space .calendar-day-number.today {outline:2px solid #3563e9;outline-offset:2px;background:transparent;color:#2853bc;font-weight:700}
 .student-space .calendar-day-number[aria-pressed=true] {background:#2853bc;color:white;border-radius:6px}
-.student-space .calendar-chip {font-size:13px;line-height:1.6}
-.student-space .calendar-chip:hover {background:#ffe8bf}
-.student-space .calendar-more {min-height:36px;font-size:13px;text-align:left}
+.student-space .calendar-chip {font-size:13px;line-height:1.6;padding:6px;background:#fbf7ef;border-left-color:#b97715;color:#80510a}
+.student-space .calendar-chip:hover {background:#f7e8cd}
+.student-space .calendar-more {min-height:44px;width:100%;font-size:13px;text-align:left;padding:6px 2px;border-radius:3px}
+.student-space .calendar-more:hover {background:#edf2fa}
+.student-space .calendar-cell {border-color:#e6ebf2}
+.student-space .calendar-agenda>h2 {font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
 .student-space .calendar-agenda {background:transparent;border:0;border-radius:0;box-shadow:none;padding:0 0 0 20px;border-left:1px solid var(--line)}
 .student-space .agenda-event {gap:10px;padding:20px 0}
 .student-space .agenda-event:hover {background:#edf2fa}
@@ -134,6 +163,7 @@
  .student-space .task-table-row .task-title {font-size:16px}
  .student-space .task-group-heading {padding:12px 16px}
  .student-space .calendar-day-number {min-height:44px}
+ .student-space .calendar-week-strip .calendar-day-number {min-width:0}
  .student-space .notification-time {margin-left:0;flex-basis:100%}
  .student-space .notification-content {-webkit-line-clamp:2}
  .student-space .notification-item {padding-block:16px}

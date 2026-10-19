@@ -1,4 +1,4 @@
-/* B+ inherits B's focus language. Every refinement is scoped to its preview root. */
+/* B+ formal home and explicit design preview share this scoped visual language. */
 .home-preview-switch nav {max-width:100%;overflow-x:auto;flex-wrap:nowrap}.home-preview-switch nav a {flex-shrink:0}
 .home-preview-switch.bplus-preview-switch {display:block;padding:0;margin-bottom:20px;font-size:12px;border-bottom:1px solid var(--line)}
 .bplus-preview-switch>summary {min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;list-style:none;color:var(--muted)}
@@ -11,11 +11,11 @@
 .exploration-bplus .focus-main.has-bplus-task {display:grid;grid-template-columns:minmax(0,1fr) 190px;column-gap:24px;align-items:start}
 .exploration-bplus .focus-main>.explore-label,.exploration-bplus .focus-main>h2,.exploration-bplus .focus-main>.focus-course,.exploration-bplus .focus-main>.task-status,.exploration-bplus .focus-main>.focus-actions {grid-column:1}
 .exploration-bplus .focus-main>.explore-label {font-size:13px;margin-bottom:12px;line-height:1.6}
-.exploration-bplus .explore-focus h2 {font-size:29px;line-height:1.45;margin:0 0 10px;font-weight:650;max-width:none}
+.exploration-bplus .explore-focus h2 {font-size:28px;line-height:1.5;margin:0 0 10px;font-weight:600;max-width:none}
 .exploration-bplus .focus-course {font-size:14px;line-height:1.75;margin:0 0 14px}.exploration-bplus .focus-course span {display:inline;font-size:13px;margin-left:10px}.exploration-bplus .focus-course span::before {content:'· ';color:#c9d7f9}
 .exploration-bplus .focus-actions {margin-top:18px;gap:12px 18px}.exploration-bplus .focus-actions .button {min-height:44px;padding:11px 18px}.exploration-bplus .focus-actions>a:not(.button) {font-size:14px}
 .exploration-bplus .bplus-deadline {grid-column:2;grid-row:1/6;align-self:center;display:grid;gap:10px;border-left:1px solid #7188bd;padding-left:22px;min-width:0}
-.exploration-bplus .bplus-deadline>span {font-size:13px;color:#dce7ff}.exploration-bplus .bplus-deadline>time {font-size:20px;font-weight:550;line-height:1.65;color:white;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.exploration-bplus .bplus-deadline>small {font-size:13px;color:#e8efff}
+.exploration-bplus .bplus-deadline>span {font-size:13px;color:#dce7ff}.exploration-bplus .bplus-deadline>time {font-size:20px;font-weight:600;line-height:1.65;color:white;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.exploration-bplus .bplus-deadline>small {font-size:13px;color:#e8efff}
 .exploration-bplus .focus-main .tag {font-size:13px;line-height:1.6}.exploration-bplus .focus-data-warning {grid-column:1/-1}
 .exploration-bplus .explore-tasks {padding:0;background:transparent;border:0;border-radius:0}
 .exploration-bplus .explore-section-heading {align-items:center;margin-bottom:12px}.exploration-bplus .explore-section-heading h2 {font-size:20px;margin-bottom:0;font-weight:650}.exploration-bplus .explore-section-heading .explore-eyebrow {font-size:13px;margin-bottom:5px}.exploration-bplus .explore-section-heading>a {font-size:13px}

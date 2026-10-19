@@ -19,6 +19,11 @@ export function useMessageOverflow(notifications: ComputedRef<NotificationDTO[]>
         .some(el => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
       if (clipped) next.add(id)
     }
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement && focused.closest('.message-full')) {
+      const row = focused.closest<HTMLElement>('[data-message-id]')
+      if (row?.dataset.messageId && !next.has(row.dataset.messageId)) row.querySelector<HTMLElement>('.notification-title')?.focus({ preventScroll: true })
+    }
     if (next.size !== clippedIds.value.size || [...next].some(id => !clippedIds.value.has(id))) clippedIds.value = next
   }
   function schedule() {
