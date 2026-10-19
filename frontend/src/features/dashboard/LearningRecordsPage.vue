@@ -68,7 +68,7 @@ function goToPage(next: number): void {
 </script>
 
 <template>
-  <div class="workspace-page dashboard-page">
+  <div class="workspace-page dashboard-page student-records">
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">学习记录</h1>
@@ -80,7 +80,7 @@ function goToPage(next: number): void {
 
     <template v-if="selecting">
       <ApiState :status="offeringsQuery.status.value" :error="offeringsQuery.error.value" @retry="offeringsQuery.load" />
-      <section v-if="offeringsQuery.status.value === 'success' && offeringsQuery.data.value" class="surface dash-section">
+      <section v-if="offeringsQuery.status.value === 'success' && offeringsQuery.data.value" class="record-section dash-section">
         <p v-if="offeringsQuery.data.value.items.length === 0" class="muted">
           尚未加入教学班。<RouterLink to="/course">前往我的课程</RouterLink>
         </p>
@@ -107,8 +107,8 @@ function goToPage(next: number): void {
       <ApiState v-else :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
 
       <template v-if="recordsQuery.status.value === 'success' && recordsQuery.data.value">
-        <section class="surface dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chaptersQuery.data.value?.items.length}} 个章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chaptersQuery.data.value?.items" :key="chapter.id"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':'未完成'}}</span></li></ul><p v-if="!chaptersQuery.data.value?.items.length" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
-        <section class="surface dash-section" aria-labelledby="lr-summary">
+        <section class="record-section dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chaptersQuery.data.value?.items.length}} 个已开放章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chaptersQuery.data.value?.items" :key="chapter.id" :class="{'is-read':chapter.studentProgress?.status==='completed'}"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':'尚未阅读'}}</span><RouterLink class="chapter-action" :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">{{chapter.studentProgress?.status==='completed'?'复习章节':'继续阅读'}} →</RouterLink></li></ul><p v-if="!chaptersQuery.data.value?.items.length" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
+        <section class="record-section dash-section" aria-labelledby="lr-summary">
           <h2 id="lr-summary">学习汇总</h2>
           <ul class="dash-summary">
             <li><strong>{{ recordsQuery.data.value.summary.completedLabCount }}</strong> 个实验已完成</li>
@@ -117,7 +117,7 @@ function goToPage(next: number): void {
           </ul>
         </section>
 
-        <section class="surface dash-section" aria-labelledby="lr-recent">
+        <section class="record-section dash-section" aria-labelledby="lr-recent">
           <h2 id="lr-recent">最近反馈</h2>
           <template v-if="recordsQuery.data.value.recentFeedback">
             <p>
@@ -129,7 +129,7 @@ function goToPage(next: number): void {
           <p v-else class="muted">暂无已发布的评价</p>
         </section>
 
-        <section class="surface dash-section" aria-labelledby="lr-history">
+        <section class="record-section dash-section" aria-labelledby="lr-history">
           <h2 id="lr-history">评价历史</h2>
           <p v-if="recordsQuery.data.value.feedbackPage.total === 0" class="muted">暂无评价</p>
           <template v-else>
@@ -147,7 +147,7 @@ function goToPage(next: number): void {
           </template>
         </section>
 
-        <section v-if="recordsQuery.data.value.knowledgeEvidence.length>0 || recordsQuery.data.value.nextRecommendation!==null" class="surface dash-section" aria-labelledby="lr-knowledge">
+        <section v-if="recordsQuery.data.value.knowledgeEvidence.length>0 || recordsQuery.data.value.nextRecommendation!==null" class="record-section dash-section" aria-labelledby="lr-knowledge">
           <h2 id="lr-knowledge">知识点与下一步</h2>
           <p v-if="recordsQuery.data.value.knowledgeEvidence.length === 0 && recordsQuery.data.value.nextRecommendation === null" class="muted">知识点掌握分析将在 P2 开放</p>
         </section>

@@ -16,3 +16,33 @@
  .student-space .exploration-bplus :is(.bplus-group-heading small,.bplus-group-heading span,.bplus-deadline>span,.explore-heading .explore-eyebrow) {font-size:13px}
  .student-space .task-line-action {min-width:44px}
 }
+/* Courses retain their own compact two-column identity. */
+.student-space .course-row {border-radius:8px;gap:20px;border-top:3px solid #9bb1df;box-shadow:none}
+.student-space .course-identity .small-label {display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.student-space .course-mark {display:inline-grid;place-items:center;min-width:36px;min-height:32px;padding:4px 8px;border-radius:4px;background:#e9effa;color:#2853bc;font-weight:600;overflow-wrap:anywhere}
+.student-space .course-identity h2 {margin:14px 0 8px;font-size:20px;line-height:1.5}
+.student-space .course-learning {padding-top:16px;border-top:1px solid var(--line)}
+.student-space .course-learning>p {font-size:14px;line-height:1.65;color:var(--ink)}
+.student-space .course-progress {font-size:13px}
+.student-space .course-summary {font-size:13px;gap:8px 16px}
+.student-space .course-summary a {min-height:44px}
+/* Learning history is a continuous reading path, with light activity summaries. */
+.student-records .record-section {padding:24px 0;border-top:1px solid var(--line);background:transparent;border-radius:0;box-shadow:none;margin:0}
+.student-records .record-section h2 {font-size:19px;margin:0 0 18px}
+.student-records .dash-summary {display:flex;flex-wrap:wrap;gap:16px 32px}
+.student-records .dash-summary li {padding:0;border:0;background:transparent;font-size:14px}
+.student-records .dash-summary strong {font-size:22px;display:inline;color:var(--ink)}
+.student-records .record-chapters {list-style:none;padding:0 0 0 18px;margin:24px 0 0}
+.student-records .record-chapters>li {position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px 20px;align-items:center;padding:16px 0 16px 24px;border:0;border-left:2px solid #c7d4ee;min-width:0}
+.student-records .record-chapters>li::before {content:'';position:absolute;left:-7px;top:30px;width:12px;height:12px;border:2px solid #7188bd;border-radius:50%;background:#f5f7fb;box-sizing:border-box}
+.student-records .record-chapters>li.is-read::before {background:#3563e9;border-color:#3563e9}
+.student-records .record-chapters a {overflow-wrap:anywhere;font-size:15px;line-height:1.6}
+.student-records .record-chapters .chapter-action {display:inline-flex;align-items:center;min-height:44px;font-size:14px}
+.student-records .dash-list li {padding:16px 0}
+@media(max-width:760px){
+ .student-space .course-row {gap:16px;padding:20px}
+ .student-records .record-chapters>li {grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding-left:20px}
+ .student-records .record-chapters>li>a:first-child {grid-column:1/-1}
+ .student-records .record-chapters .chapter-action {justify-self:end}
+ .student-records .record-section {padding:22px 0}
+}
