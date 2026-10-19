@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const distDir = fileURLToPath(new URL('../dist', import.meta.url))
-const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError', 'CAMPUS_DEMO_ONLY', 'campus.student']
+const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError', 'CAMPUS_DEMO_ONLY', 'campus.student', 'vx-course-masthead']
 
 async function exists(candidate) {
   try {
