@@ -440,7 +440,7 @@ describe('P1-D 消息目标映射', () => {
     expect(view.findAll('.task-table-row')).toHaveLength(20)
   })
   it('待办资格跨API页全量读取后排序再分页，补交仍优先，数量不变',async()=>{
-    const items=Array.from({length:105},(_,i)=>summary(`00000000-0000-4000-8000-${String(1000+i).padStart(12,'0')}`,{title:'任务'+i,dueAt:i===104?'2026-12-01T00:00:00Z':'2026-01-01T00:00:00Z',overdue:i!==104}))
+    const items=Array.from({length:105},(_,i)=>summary(`00000000-0000-4000-8000-${String(1000+i).padStart(12,'0')}`,{title:'任务'+i,offeringId:i%2?OFFERING_2:OFFERING,dueAt:i===104?'2026-12-01T00:00:00Z':'2026-01-01T00:00:00Z',overdue:i!==104}))
     scripted.setHandler(r=>{
       if(r.operationId==='listMyAssignments'){
         const page=Number(new URL(r.path,'http://localhost').searchParams.get('page')??1)
@@ -448,7 +448,7 @@ describe('P1-D 消息目标映射', () => {
       }
       if(r.operationId==='getAssignment'){
         const t=items.find(t=>r.path.endsWith(t.id))!
-        return okEnvelope({...t,canSubmit:items.indexOf(t)>=103,submissionBlockedReason:null})
+        return okEnvelope({...t,canSubmit:items.indexOf(t)>=103,submissionBlockedReason:items.indexOf(t)>=103?null:'SUBMISSION_CLOSED'})
       }
       return normalResponse(r)
     })
@@ -464,6 +464,23 @@ describe('P1-D 消息目标映射', () => {
     await view.findAll('.pagination button').find(n=>n.text()==='下一页')!.trigger('click');await flushPromises()
     expect(requestsOf('getAssignment')).toHaveLength(105)
     expect(view.find('.task-group-heading').text()).toBe('已过期未完成')
+    await view.findAll('select')[1]!.setValue('desc');await flushPromises()
+    expect(view.findAll('.task-title').slice(0,2).map(n=>n.text())).toEqual(['任务104','任务103'])
+    expect(requestsOf('getAssignment')).toHaveLength(105)
+
+  })
+  it('全部不可提交时保留未完成数量与独立入口，不生成可处理组',async()=>{
+    const items=[summary(ASSIGNMENT,{overdue:true,dueAt:'2026-01-01T00:00:00Z'}),summary(ASSIGNMENT_2)]
+    scripted.setHandler(r=>{
+      if(r.operationId==='listMyAssignments')return okEnvelope({items,total:2,page:1,pageSize:100})
+      if(r.operationId==='getAssignment')return okEnvelope({...items.find(t=>r.path.endsWith(t.id)),canSubmit:false,submissionBlockedReason:'SUBMISSION_CLOSED'})
+      return normalResponse(r)
+    })
+    const view=await open('/student/assignments');await flushPromises()
+    expect(view.findAll('.task-group-heading').map(n=>n.text())).toEqual(['已过期未完成','暂不可提交'])
+    expect(view.findAll('.task-table-row')).toHaveLength(2)
+    expect(view.findAll('.task-table-row a.button').every(n=>n.text()==='查看详情')).toBe(true)
+    expect(view.find('.filter-tabs').text()).toContain('待完成 2')
   })
   it('资格读取失败不伪造分组或可操作入口，保留全部待办',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))

@@ -132,3 +132,12 @@
 .student-space .notification-item>.notification-actions {grid-column:2;grid-row:4;margin-top:0;align-self:start}
 .student-space .notification-item>.message-full[open] {grid-column:1/-1}
 .student-space .notification-item:has(.message-full[open])>.notification-actions {grid-row:5;grid-column:1/-1;margin-top:8px}
+.student-space .calendar-next {margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.student-space .calendar-next h4 {font-size:13px;font-weight:500;color:var(--muted);margin:0 0 8px}
+.student-space .calendar-next p {font-size:14px;line-height:1.65;overflow-wrap:anywhere;margin:8px 0}
+.student-space .calendar-next .muted {font-size:13px}
+.student-space .calendar-next .button {margin-top:8px}
+.student-space .message-full summary {gap:6px}
+.student-space .message-full .message-collapse,.student-space .message-full[open] .message-expand {display:none}
+.student-space .message-full[open] .message-collapse {display:inline}
+.student-space .message-full[open] summary>span[aria-hidden] {transform:rotate(180deg)}

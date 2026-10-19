@@ -127,7 +127,7 @@ function goToPage(page: number): void {
             <time class="notification-time" :datetime="notification.createdAt">{{ formatTime(notification.createdAt) }}</time>
           </div>
           <h2 class="notification-title" :title="notification.title">{{ notification.title }}</h2>
-          <p class="notification-content">{{ notification.content }}</p><details class="message-full"><summary>完整消息</summary><h3>{{notification.title}}</h3><p>{{notification.content}}</p></details>
+          <p class="notification-content">{{ notification.content }}</p><details class="message-full"><summary><span class="message-expand">完整消息</span><span class="message-collapse">收起消息</span><span aria-hidden="true">⌄</span></summary><h3>{{notification.title}}</h3><p>{{notification.content}}</p></details>
           <div class="notification-actions">
             <button
               v-if="canOpen(notification)"
