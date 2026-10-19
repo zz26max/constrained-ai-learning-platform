@@ -49,7 +49,7 @@ watch(offeringId,close)
 onBeforeUnmount(close)
 import {subject,density,beijingTime} from './presentation'
 import {deadlineGroups,submissionLabel} from './refinement'
-const props=defineProps<{refined?:boolean}>()
+const props=defineProps<{refined?:boolean;integrated?:boolean}>()
 const groupedDay=computed(()=>deadlineGroups(onDay(day.value)))
 const eligibility=usePageQuery(async signal=>{
  const tasks=onDay(day.value),result:Record<string,AssignmentDetailDTO>={};let cursor=0
@@ -65,8 +65,8 @@ const eligibility=usePageQuery(async signal=>{
 watch([()=>props.refined,day,()=>query.data.value],()=>{if(props.refined&&query.status.value==='success')void eligibility.load()},{immediate:true})
 function qualification(id:string){return eligibility.status.value==='loading'?'正在确认提交资格':submissionLabel(eligibility.status.value==='success'?eligibility.data.value?.[id]:undefined)}
 </script>
-<template><div class="workspace-page vx-page vx-calendar" :class="{'vx-refined':refined}">
- <header class="vx-page-heading"><div><p class="vx-eyebrow">让截止时间，有迹可循 / LEARNING CALENDAR</p><h1 tabindex="-1">学习日历</h1><p class="vx-muted">作业截止安排 · 北京时间</p></div><label>教学班<select :value="offeringId" :disabled="options.status.value!=='success'" @change="update({offering:($event.target as HTMLSelectElement).value})"><option value="">当前学期全部课程</option><option v-for="c in options.data.value" :key="c.id" :value="c.id">{{c.title}} · {{c.groupName}}</option></select></label></header>
+<template><div class="workspace-page vx-page vx-calendar" :class="{'vx-refined':refined,'v35-page':integrated}">
+ <header class="vx-page-heading"><div><p class="vx-eyebrow">{{integrated?'课程任务与截止安排':'让截止时间，有迹可循 / LEARNING CALENDAR'}}</p><h1 tabindex="-1">学习日历</h1><p class="vx-muted">作业截止安排 · 北京时间</p></div><label>教学班<select :value="offeringId" :disabled="options.status.value!=='success'" @change="update({offering:($event.target as HTMLSelectElement).value})"><option value="">当前学期全部课程</option><option v-for="c in options.data.value" :key="c.id" :value="c.id">{{c.title}} · {{c.groupName}}</option></select></label></header>
  <ApiState :status="options.status.value" :error="options.error.value" @retry="options.load"/><ApiState :status="query.status.value" :error="query.error.value" @retry="query.load"/>
  <p v-if="query.status.value==='error'" class="notice notice-warn">日程未完整加载，请重试，不将部分结果视为全部日程。</p>
  <template v-if="options.status.value==='success'&&query.status.value==='success'">

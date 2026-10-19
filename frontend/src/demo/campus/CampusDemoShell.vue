@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import App from '../../app/App.vue'
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
-const exploration=new URLSearchParams(location.search).get('explore')==='v34'
+const exploration=['v34','v35'].includes(new URLSearchParams(location.search).get('explore')??'')
 const VisualSwitcher=defineAsyncComponent(()=>import('./visual/VisualSwitcher.vue'))
 const marker=ref<HTMLElement|null>(null)
 let observer:ResizeObserver|undefined
