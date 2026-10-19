@@ -97,3 +97,38 @@
 .student-space .task-table-row .task-title:focus-visible {-webkit-line-clamp:unset}
 .student-space .task-toolbar>span>span {display:block;margin-top:5px;font-size:13px}
 @media(max-width:760px){.student-space .task-group-heading{padding:12px 16px}.student-space .task-table-row {gap:10px;padding-block:18px}}
+/* V3.1 removes repeated metadata without replacing the established layout. */
+.student-space .student-course-catalog .course-row {gap:14px;padding:22px}
+.student-space .student-course-catalog .course-learning {border:0;padding-top:0}
+.student-space .student-course-catalog .course-learning>p {margin:0 0 12px}
+.student-space .student-course-catalog .course-learning>.course-meta {font-size:13px;color:var(--muted);margin:12px 0 0}
+.student-space .student-course-catalog .course-summary {margin-top:0;padding-top:8px;gap:6px 16px}
+.student-space .student-course-catalog .course-summary a {margin:0;font-size:13px}
+.student-records .record-chapters.is-single {margin-top:12px}
+.student-records .record-chapters.is-single>li {padding-block:8px}
+.student-records .record-chapters.is-single>li::before {top:22px}
+.student-records .record-section {padding-block:20px}
+.student-records .recent-feedback-summary {padding:0 0 16px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.student-records .recent-feedback-summary h3 {font-size:14px;color:var(--muted);font-weight:500;margin:0 0 10px}
+.student-records .recent-feedback-summary p {line-height:1.7;overflow-wrap:anywhere}
+.student-space .notification-date {list-style:none;padding:16px 0 8px;border-bottom:1px solid var(--line)}
+.student-space .notification-date h2 {font-size:14px;font-weight:600;color:var(--muted);margin:0}
+.student-space .notification-date small {font-size:13px;font-weight:400}
+.student-space .notification-content {-webkit-line-clamp:1}
+.student-space .notification-item:has(.message-full[open])>.notification-content {display:none}
+.student-space .message-full h3 {font-size:15px;line-height:1.6;overflow-wrap:anywhere;margin:4px 0 8px}
+.student-space .message-full p {font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.student-space .notification-actions {margin-top:4px}
+@media(max-width:760px){
+ .student-space .student-course-catalog .course-row {padding:18px;gap:12px}
+ .student-space .student-course-catalog .course-identity h2 {margin:10px 0 0;font-size:19px}
+ .student-space .student-course-catalog .course-learning>p {margin-bottom:10px}
+ .student-space .notification-content {-webkit-line-clamp:2}
+ .student-space .notification-item {padding-block:16px}
+}
+.student-space .notification-item {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px}
+.student-space .notification-item>.notification-header,.student-space .notification-item>.notification-title,.student-space .notification-item>.notification-content {grid-column:1/-1}
+.student-space .notification-item>.message-full {grid-column:1;grid-row:4;min-width:0}
+.student-space .notification-item>.notification-actions {grid-column:2;grid-row:4;margin-top:0;align-self:start}
+.student-space .notification-item>.message-full[open] {grid-column:1/-1}
+.student-space .notification-item:has(.message-full[open])>.notification-actions {grid-row:5;grid-column:1/-1;margin-top:8px}

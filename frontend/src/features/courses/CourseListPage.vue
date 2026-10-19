@@ -8,6 +8,7 @@ import ActionNotice from '../../components/ActionNotice.vue'
 import CourseProgress from '../../components/CourseProgress.vue'
 import { usePageQuery } from './use-page-query'
 import { useCourseActions } from './use-course-actions'
+import type { CourseSummaryDTO } from '../../api/courses'
 import { statusLabel } from './format'
 import { allPages } from '../../api/pagination'
 import { byRecentStudy } from '../assignments/task-presentation'
@@ -32,6 +33,11 @@ async function join() {
     closeJoin(); await query.load()
   }
 }
+function learningEntry(course:CourseSummaryDTO) {
+  return course.status!=='archived' && course.currentChapter
+    ? {name:'chapter',params:{offeringId:course.offeringId,chapterId:course.currentChapter.id}}
+    : {name:'course',params:{offeringId:course.offeringId}}
+}
 </script>
 <template>
   <div class="workspace-page student-course-catalog">
@@ -42,10 +48,10 @@ async function join() {
     <template v-if="query.status.value === 'success' && query.data.value">
       <section v-if="query.data.value.items.length === 0" class="surface state-block"><h2>暂无符合条件的课程</h2><p>可以调整筛选条件，或使用教师提供的邀请码加入课程。</p></section>
       <ul v-else class="surface course-list" aria-label="我的课程"><li v-for="course in visibleCourses" :key="course.offeringId" class="course-row">
-        <div class="course-identity"><span class="small-label"><span class="course-mark">{{ course.mark }}</span>{{ statusLabel(course.status) }}</span><h2><RouterLink :to="{ name: 'course', params: { offeringId: course.offeringId } }" :title="course.title">{{ course.title }}</RouterLink></h2><p>{{ course.groupName }} · {{ course.teachers.map(t => t.displayName).join('、') }}</p></div>
-        <div class="course-learning"><p v-if="course.currentChapter">最近学习 · 第 {{ course.currentChapter.number }} 章 · {{ course.currentChapter.title }}</p><p v-else>暂无可阅读章节</p><CourseProgress :progress="course.progress" :title="course.title" /></div>
-        <RouterLink class="button secondary" :to="{ name: 'course', params: { offeringId: course.offeringId } }" :aria-label="'进入课程：' + course.title">{{ course.status==='archived' || !course.currentChapter ? '查看课程' : course.progress.total>0 && course.progress.completed===course.progress.total ? '复习章节' : course.progress.completed===0 ? '开始学习' : '继续学习' }} →</RouterLink>
-        <div class="course-summary"><span>{{ course.termLabel }}</span><span>{{ course.pendingAssignmentCount }} 项待办 · {{ course.unreadFeedbackCount }} 条未读反馈</span><RouterLink v-if="course.currentChapter" :to="{ name: 'chapter', params: { offeringId: course.offeringId, chapterId: course.currentChapter.id } }">{{ course.status === 'archived' || course.progress.percent===100 ? '复习章节' : '继续阅读' }} →</RouterLink></div>
+        <div class="course-identity"><span class="small-label"><span class="course-mark">{{ course.mark }}</span>{{ statusLabel(course.status) }}</span><h2><RouterLink :to="{ name: 'course', params: { offeringId: course.offeringId } }" :title="course.title">{{ course.title }}</RouterLink></h2></div>
+        <div class="course-learning"><p v-if="course.currentChapter">最近学习 · 第 {{ course.currentChapter.number }} 章 · {{ course.currentChapter.title }}</p><p v-else>暂无可阅读章节</p><CourseProgress v-if="!course.progress.notConfigured" :progress="course.progress" :title="course.title" /><p v-else class="muted">未配置学习内容</p><p class="course-meta">{{ course.groupName }} · {{ course.teachers.map(t => t.displayName).join('、') }}</p></div>
+        <RouterLink class="button secondary course-main-action" :to="learningEntry(course)" :aria-label="'学习课程：' + course.title">{{ course.status==='archived' || !course.currentChapter ? '查看课程' : course.progress.total>0 && course.progress.completed===course.progress.total ? '复习章节' : course.progress.completed===0 ? '开始学习' : '继续学习' }} →</RouterLink>
+        <div v-if="course.pendingAssignmentCount>0 || course.unreadFeedbackCount>0 || course.termId!==auth.config?.currentTermId" class="course-summary"><span v-if="course.termId!==auth.config?.currentTermId">{{ course.termLabel }}</span><RouterLink v-if="course.pendingAssignmentCount>0" :to="{path:'/student/assignments',query:{offering:course.offeringId}}">{{ course.pendingAssignmentCount }} 项待办 →</RouterLink><RouterLink v-if="course.unreadFeedbackCount>0" :to="{name:'student-progress',params:{offeringId:course.offeringId}}">{{ course.unreadFeedbackCount }} 条未读反馈 →</RouterLink></div>
       </li></ul>
       <nav class="pagination" aria-label="课程分页"><button class="button secondary" :disabled="page <= 1" @click="page -= 1">上一页</button><span>第 {{ page }} 页</span><button class="button secondary" :disabled="page * 20 >= query.data.value.total" @click="page += 1">下一页</button></nav>
     </template>

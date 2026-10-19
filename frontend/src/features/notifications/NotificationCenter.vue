@@ -11,6 +11,8 @@ import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
 import { targetRoute } from './target-route'
+import { beijingDay } from '../calendar/dates'
+import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
 
 const router = useRouter()
@@ -90,10 +92,6 @@ async function open(notification: NotificationDTO): Promise<void> {
   }
 }
 
-function formatTime(value: string): string {
-  return new Date(value).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})
-}
-
 function goToPage(page: number): void {
   if (page >= 1 && page <= totalPages.value) currentPage.value = page
 }
@@ -117,9 +115,9 @@ function goToPage(page: number): void {
       <p v-if="notifications.length === 0" class="muted empty-state">暂无消息</p>
 
       <ul v-else class="notification-list">
+        <template v-for="(notification,index) in notifications" :key="notification.id">
+        <li v-if="index===0 || beijingDay(notifications[index-1]!.createdAt)!==beijingDay(notification.createdAt)" class="notification-date"><h2>{{beijingDay(notification.createdAt)}}<small v-if="index===0 && currentPage>1"> · 本页</small></h2></li>
         <li
-          v-for="notification in notifications"
-          :key="notification.id"
           class="notification-item"
           :class="{ unread: notification.readAt === null }"
         >
@@ -129,7 +127,7 @@ function goToPage(page: number): void {
             <time class="notification-time" :datetime="notification.createdAt">{{ formatTime(notification.createdAt) }}</time>
           </div>
           <h2 class="notification-title" :title="notification.title">{{ notification.title }}</h2>
-          <p class="notification-content">{{ notification.content }}</p><details v-if="notification.content.length>100" class="message-full"><summary>展开完整消息</summary><p>{{notification.content}}</p></details>
+          <p class="notification-content">{{ notification.content }}</p><details class="message-full"><summary>完整消息</summary><h3>{{notification.title}}</h3><p>{{notification.content}}</p></details>
           <div class="notification-actions">
             <button
               v-if="canOpen(notification)"
@@ -149,7 +147,7 @@ function goToPage(page: number): void {
               标为已读
             </button>
           </div>
-        </li>
+        </li></template>
       </ul>
 
       <nav v-if="totalPages > 1" class="pagination" aria-label="消息分页">

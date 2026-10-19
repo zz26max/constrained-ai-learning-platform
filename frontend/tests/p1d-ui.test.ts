@@ -324,6 +324,15 @@ describe('P1-D 学习记录', () => {
     expect(page.text()).toContain('评价作业 1')
   })
 
+  it('最近反馈仅按ID去重，同标题不同反馈仍独立呈现',async()=>{
+    learningRecords=recordsFor(2)
+    learningRecords.feedbackPage.items[1]!.assignmentTitle=learningRecords.feedbackPage.items[0]!.assignmentTitle
+    const view=await open(`/student/progress/${OFFERING}`)
+    const links=view.findAll('main a').filter(n=>n.attributes('href')?.includes('feedbackId='))
+    expect(links).toHaveLength(2)
+    expect(new Set(links.map(n=>n.attributes('href'))).size).toBe(2)
+    expect(view.find('.recent-feedback-summary').text()).toContain('整体不错')
+  })
   it('5b. 超过 20 份评价向服务端请求第三页，汇总和最近评价保持不变', async () => {
     learningRecords = recordsFor(23)
     const page = await open(`/student/progress/${OFFERING}`)
@@ -463,6 +472,25 @@ describe('P1-D 消息目标映射', () => {
     expect(view.findAll('.task-group-heading')).toHaveLength(0)
     expect(view.find('.task-table-row').text()).toContain('查看详情')
     expect(view.find('.filter-tabs').text()).toContain('待完成 1')
+  })
+  it('课程零计数不重复展示，主要操作直达章节且课程详情仍保留',async()=>{
+    dashboardOverride={courses:[course({termId:DEMO_CONFIG.currentTermId,currentChapter:{id:CHAPTER,title:'章节',number:1},progress:{...progress,unit:'chapter',completed:1,total:1,percent:100}})]}
+    const view=await open('/course')
+    expect(view.find('.course-summary').exists()).toBe(false)
+    expect(view.find('.course-main-action').text()).toContain('复习章节')
+    expect(view.find('.course-main-action').attributes('href')).toContain(`/chapter/${CHAPTER}`)
+    expect(view.find('.course-identity h2 a').attributes('href')).toBe(`/course/${OFFERING}`)
+    expect(view.text()).toContain('李老师')
+  })
+  it('短消息也有全文且同一北京时间日期不按标题合并通知',async()=>{
+    const contents=['短消息也保留完整阅读入口','第二条相同标题的独立通知']
+    scripted.setHandler(r=>r.operationId==='listMessages'?okEnvelope({items:contents.map((content,i)=>({id:`00000000-0000-4000-8000-000000000b0${i}`,offeringId:OFFERING,type:'system',title:'相同标题',content,target:null,sender:null,createdAt:i?'2026-10-13T18:00:00Z':'2026-10-14T02:00:00+08:00',readAt:null})),page:1,pageSize:20,total:2,summary:{unreadCount:2}}):normalResponse(r))
+    const view=await open('/student/messages')
+    expect(view.findAll('.notification-date')).toHaveLength(1)
+    expect(view.findAll('.notification-item')).toHaveLength(2)
+    expect(view.findAll('.message-full')).toHaveLength(2)
+    expect(view.findAll('.message-full p').map(n=>n.text())).toEqual(contents)
+    expect(requestsOf('readMessage')).toHaveLength(0)
   })
   it('消息未读和类型筛选使用正式参数',async()=>{
     const view=await open('/student/messages')

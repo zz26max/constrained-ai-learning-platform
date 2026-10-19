@@ -60,7 +60,8 @@ const restricted = computed(() => {
   return recordsQuery.status.value === 'error' && (kind === 'forbidden' || kind === 'not-found')
 })
 
-const pagedItems = computed(() => recordsQuery.data.value?.feedbackPage.items ?? [])
+// Deduplicate only the exact feedback ID already shown in the highlight, never its title.
+const pagedItems = computed(() => (recordsQuery.data.value?.feedbackPage.items ?? []).filter(item=>item.id!==recordsQuery.data.value?.recentFeedback?.id))
 const totalPages = computed(() => Math.max(1, Math.ceil((recordsQuery.data.value?.feedbackPage.total ?? 0) / PAGE_SIZE)))
 
 function goToPage(next: number): void {
@@ -109,7 +110,7 @@ function goToPage(next: number): void {
       <ApiState v-else :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
 
       <template v-if="recordsQuery.status.value === 'success' && recordsQuery.data.value">
-        <section class="record-section dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chapterPath.total}} 个已开放章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chapterPath.chapters" :key="chapter.id" :class="{'is-read':chapter.studentProgress?.status==='completed'}"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':chapter.studentProgress?.status==='not_started'?'尚未阅读':'阅读状态未知'}}</span><RouterLink class="chapter-action" :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">{{chapter.studentProgress?.status==='completed'?'复习章节':'继续阅读'}} →</RouterLink></li></ul><p v-if="!chapterPath.total" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
+        <section class="record-section dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chapterPath.total}} 个已开放章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters" :class="{'is-single':chapterPath.total===1}"><li v-for="chapter in chapterPath.chapters" :key="chapter.id" :class="{'is-read':chapter.studentProgress?.status==='completed'}"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':chapter.studentProgress?.status==='not_started'?'尚未阅读':'阅读状态未知'}}</span><RouterLink class="chapter-action" :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">{{chapter.studentProgress?.status==='completed'?'复习章节':'继续阅读'}} →</RouterLink></li></ul><p v-if="!chapterPath.total" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
         <section class="record-section dash-section" aria-labelledby="lr-summary">
           <h2 id="lr-summary">学习汇总</h2>
           <ul class="dash-summary">
@@ -119,20 +120,16 @@ function goToPage(next: number): void {
           </ul>
         </section>
 
-        <section class="record-section dash-section" aria-labelledby="lr-recent">
-          <h2 id="lr-recent">最近反馈</h2>
-          <template v-if="recordsQuery.data.value.recentFeedback">
+        <section class="record-section dash-section" aria-labelledby="lr-history">
+          <h2 id="lr-history">评价历史</h2>
+          <div v-if="recordsQuery.data.value.recentFeedback" class="recent-feedback-summary" id="lr-recent"><h3>最近反馈</h3>
             <p>
               <RouterLink :to="{ name: 'student-assignment', params: { id: recordsQuery.data.value.recentFeedback.assignmentId }, query: { feedbackId: recordsQuery.data.value.recentFeedback.id } }">{{ recordsQuery.data.value.recentFeedback.assignmentTitle }}</RouterLink>
               <span class="muted"> · {{ formatTime(recordsQuery.data.value.recentFeedback.publishedAt) }} · {{ recordsQuery.data.value.recentFeedback.score }}/{{ recordsQuery.data.value.recentFeedback.maxScore }}</span>
             </p>
             <p class="dash-text">{{ recordsQuery.data.value.recentFeedback.comment }}</p>
-          </template>
-          <p v-else class="muted">暂无已发布的评价</p>
-        </section>
+          </div>
 
-        <section class="record-section dash-section" aria-labelledby="lr-history">
-          <h2 id="lr-history">评价历史</h2>
           <p v-if="recordsQuery.data.value.feedbackPage.total === 0" class="muted">暂无评价</p>
           <template v-else>
             <ul class="dash-list">
