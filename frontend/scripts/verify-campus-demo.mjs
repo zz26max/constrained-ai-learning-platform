@@ -49,7 +49,7 @@ try{
   flows.push({task:'A',width,result:'PASS',path:'首页近期任务→选课系统→工作区→保存并提交→列表'})
   await go('/student/home')
   await page.getByRole('link',{name:'查看全部待办',exact:false}).click();await ready()
-  assert.match(await page.locator('main').innerText(),/待完成|待处理/)
+  assert.equal(await page.getByRole('button',{name:/待完成/}).getAttribute('aria-pressed'),'true');assert.match(await page.locator('.task-table-row').first().innerText(),/校园网访问/)
   flows.push({task:'B',width,result:'PASS',path:'首页→查看全部待办→资格分组'})
   await go('/course')
   const card=page.locator('.course-row').filter({hasText:'数据库原理'})
@@ -61,12 +61,12 @@ try{
   await page.evaluate(()=>{location.hash='/course'});await ready()
   assert.match(await page.locator('.course-row').filter({hasText:'数据库原理'}).innerText(),/4 \/ 5/)
   await go('/student/progress')
-  await page.locator('main select').selectOption('33000000-0000-4000-8000-000000000104');await ready();assert.equal(await page.locator('.record-chapters li').count(),1);await page.getByRole('link',{name:'复习章节',exact:false}).click();await ready();assert.match(await page.locator('main h1').innerText(),/软件过程与需求分析/);flows.push({task:'D',width,result:'PASS',path:'学习记录→软件工程基础→已阅读章节→复习'})
+  await page.locator('main select').selectOption('33000000-0000-4000-8000-000000000104');await ready();assert.equal(await page.locator('.record-chapters li').count(),1);await page.getByRole('link',{name:'复习章节',exact:false}).click();await ready();assert.match(await page.locator('main h1').innerText(),/软件过程与需求分析/);await page.goBack();await ready();assert.match(page.url(),/000000000104/);flows.push({task:'D',width,result:'PASS',path:'学习记录→软件工程基础→已阅读章节→复习'})
   await snap(`records-state-${width}`)
   await go('/student/messages')
-  await page.getByRole('button',{name:'查看评价',exact:true}).first().click();await ready();await page.getByText('整体完成较好，但实验报告需要进一步补充结果分析。',{exact:true}).waitFor();await snap(`feedback-${width}`);flows.push({task:'E',width,result:'PASS',path:'消息→评价通知→对应作业→提交快照与教师评价'})
+  await page.getByRole('button',{name:'查看评价',exact:true}).first().click();await ready();await page.getByText('整体完成较好，但实验报告需要进一步补充结果分析。',{exact:true}).waitFor();await snap(`feedback-${width}`);await page.goBack();await ready();flows.push({task:'E',width,result:'PASS',path:'消息→评价通知→对应作业→提交快照与教师评价'})
   await go('/student/calendar?date=2026-10-24')
-  assert.equal(await page.locator('.agenda-event').count(),3);await page.locator('.agenda-event').first().click();await page.getByRole('dialog').getByRole('link',{name:'查看作业',exact:true}).click();await ready();assert.match(await page.locator('main h1').innerText(),/软件需求分析|栈与队列|集合/);flows.push({task:'F',width,result:'PASS',path:'日历10月24日→三项日程→详情→对应作业'})
+  assert.equal(await page.locator('.agenda-event').count(),3);await page.locator('.agenda-event').first().click();await page.getByRole('dialog').getByRole('link',{name:'查看作业',exact:true}).click();await ready();assert.match(await page.locator('main h1').innerText(),/软件需求分析|栈与队列|集合/);await page.goBack();await ready();assert.match(page.url(),/date=2026-10-24/);flows.push({task:'F',width,result:'PASS',path:'日历10月24日→三项日程→详情→对应作业'})
  }
  await page.setViewportSize({width:320,height:844})
  await go('/student/messages')
@@ -97,5 +97,9 @@ try{
  assert.deepEqual(network,[],'preview must not send any real API request')
  assert.deepEqual(errors,[])
  writeFileSync(new URL('result.json',out),JSON.stringify({checks,flows,network,errors},null,2))
+ const labels={home:'学习首页',courses:'我的课程',records:'学习记录',assignments:'我的作业',calendar:'学习日历',messages:'消息通知'}
+ const cards=Object.entries(labels).map(([key,label])=>`<section><h2>${label}</h2><div class="pair">${['desktop','mobile'].map(size=>`<a href="current/${key}-${size}.png"><span>${size==='desktop'?'桌面 1440':'手机 390'}</span><img loading="lazy" src="current/${key}-${size}.png" alt="${label} ${size}"></a>`).join('')}</div></section>`).join('')
+ const details=['submitted-1440','submitted-390','feedback-1440','feedback-390','records-state-390','message-expanded-320','record-case-104','record-case-106','record-case-102','calendar-week','calendar-cross-month']
+ writeFileSync(new URL('index.html',out),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>知学V3.3当前版本截图</title><style>body{font:16px/1.7 system-ui;margin:32px;background:#f5f7fb;color:#18233a}main{max-width:1280px;margin:auto}section{background:white;padding:24px;margin:24px 0;border:1px solid #dce2ee;border-radius:12px}.pair{display:grid;grid-template-columns:2fr 1fr;gap:20px}a{color:#234fa5}img{display:block;width:100%;height:500px;object-fit:contain;object-position:top;border:1px solid #ddd;margin-top:12px}@media(max-width:700px){.pair{grid-template-columns:1fr}body{margin:16px}}</style><main><h1>知学 LMS V3.3</h1><p>固定演示时间：2026-10-19 10:00 北京时间。current 文件夹仅含当前版本12张截图；点击图片查看原图。不是学生参与记录。</p>${cards}<section><h2>必要交互证据</h2><p>${details.map(name=>`<a href="${name}.png">${name}</a>`).join(' · ')}</p><p><a href="result.json">流程与视口结果</a> · <a href="isolation.json">隔离检查</a> · <a href="contract-samples.json">契约响应样本</a></p></section></main></html>`)
  console.log(JSON.stringify({checks:checks.length,flows,network,errors},null,2))
 }catch(error){console.error('FAILED URL',page.url(),(await page.locator('main').innerText()).slice(-5000));await snap('failure');throw error}finally{await browser.close()}
