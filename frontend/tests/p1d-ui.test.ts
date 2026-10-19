@@ -92,15 +92,16 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
       return okEnvelope({ ...records, feedbackPage: { ...records.feedbackPage, page, pageSize,
         items: records.feedbackPage.items.slice((page - 1) * pageSize, page * pageSize) } })
     }
-    case 'listMyCourses': return okEnvelope({ items: [course(), course({ offeringId: OFFERING_2, title: '数据库' })], page: 1, pageSize: 50, total: 2 })
+    case 'listMyCourses': {const items=(dashboardOverride.courses as unknown[]|undefined)??[course(),course({offeringId:OFFERING_2,title:'数据库'})];return okEnvelope({items,page:1,pageSize:100,total:items.length})}
     case 'listNotices': return okEnvelope({ items: noticeItems, page: 1, pageSize: 20, total: noticeItems.length })
     case 'getNotice': return okEnvelope({ id: NOTICE, offeringId: OFFERING, title: '公告', content: '', target: null, createdAt: '2026-10-14T02:00:00Z', recipientCount: 1, ...noticeDetail })
     case 'getFeedback': return okEnvelope(feedback(FEEDBACK, ASSIGNMENT, '作业'))
     case 'listMessages': return okEnvelope({ items: [], page: 1, pageSize: 20, total: 0, summary: { unreadCount: 0 } })
     case 'listMyAssignments': return okEnvelope({ items: [
       summary(ASSIGNMENT, { publicationState: 'archived', title: '旧实验' }),
-      summary(ASSIGNMENT_2, { overdue: true, title: '逾期实验' }),
-    ], summary: { allCount: 2 } })
+      summary(ASSIGNMENT_2, { overdue: true, title: '逾期实验',dueAt:'2026-10-01T00:00:00Z' }),
+    ], page:1,pageSize:100,total:2, summary: { allCount: 2 } })
+    case 'getAssignment': return okEnvelope({...summary(ASSIGNMENT_2,{title:'逾期实验'}),canSubmit:true,submissionBlockedReason:null})
     case 'getOffering': return okEnvelope({
       id: OFFERING, courseId: '00000000-0000-4000-8000-000000000101', title: 'Web 前端开发技术', groupName: '计算机 2301 班',
       termId: TERM, termLabel: '2026 秋季学期', status: 'active', teachers: [{ id: DEMO_USER.id, displayName: '李老师' }],
@@ -175,75 +176,25 @@ describe('P1-D 路由与首页', () => {
     expect(requestsOf('getDashboard')).toHaveLength(1)
   })
 
-  it('2. currentLearning 三种分支渲染正确按钮与链接，逾期显示文字', async () => {
-    const assignmentPage = await open('/student/home')
-    const continueLink = assignmentPage.findAll('a').find(item => item.text() === '开始作答')
-    expect(continueLink?.attributes('href')).toBe(`/student/assignments/${ASSIGNMENT}`)
-    expect(assignmentPage.text()).not.toContain('已逾期')
-    wrapper?.unmount()
-
-    dashboardOverride = { currentLearning: currentAssignment({ overdue: true, resume: { activeFile: 'index.html', savedAt: '2026-10-14T01:00:00Z', workspaceRevision: 2 } }) }
-    const overduePage = await open('/student/home')
-    expect(overduePage.text()).toContain('继续上次的工作')
-    expect(overduePage.text()).toContain('已逾期')
-    wrapper?.unmount()
-
-    dashboardOverride = { currentLearning: { type: 'chapter', offeringId: OFFERING, chapterId: CHAPTER, title: '第三章', description: '布局' } }
-    const chapterPage = await open('/student/home')
-    const chapterLink = chapterPage.findAll('a').find(item => item.text() === '继续学习')
-    expect(chapterLink?.attributes('href')).toBe(`/course/${OFFERING}/chapter/${CHAPTER}`)
-    wrapper?.unmount()
-
-    dashboardOverride = { currentLearning: null }
-    const emptyPage = await open('/student/home')
-    expect(emptyPage.text()).toContain('暂无待完成任务')
-    expect(emptyPage.findAll('a').find(item => item.text() === '查看我的课程')?.attributes('href')).toBe('/course')
+  it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
+    const page=await open('/student/home')
+    expect(page.find('#dash-current').text()).toBe('接下来要做')
+    expect(page.find('.current-task').text()).toContain('逾期实验')
+    expect(page.find('.current-task').text()).not.toContain('响应式导航栏')
+    expect(page.find('.current-task a.button').text()).toBe('开始作答')
+    expect(page.find('.current-task a.button').attributes('href')).toContain(ASSIGNMENT_2)
+    expect(page.element.innerHTML.indexOf('接下来要做')).toBeLessThan(page.element.innerHTML.indexOf('学习概览'))
   })
-
-  it('2b. 待办按列渲染，操作随提交/归档变化，逾期只标一次并给出截止日期', async () => {
-    const LONG = '超长标题：这是一个用于验证首页待办列表在标题很长时不会挤压课程、截止时间与操作按钮的测试作业标题'
-    dashboardOverride = {
-      otherPendingAssignments: [
-        summary(ASSIGNMENT, { title: '待作答的作业' }),
-        summary(ASSIGNMENT_2, { title: '已提交待批阅', latestSubmissionId: '00000000-0000-4000-8000-000000000901' }),
-        summary('00000000-0000-4000-8000-000000000703', { title: '已评阅作业',
-          latestSubmissionId: '00000000-0000-4000-8000-000000000902', publishedFeedbackId: FEEDBACK }),
-      ],
-    }
-    const page = await open('/student/home')
-    const rows = page.findAll('.dash-todo > li')
-    expect(rows).toHaveLength(3)
-    // 标题 / 课程 / 截止 / 状态 / 操作 各列都有内容
-    const texts = rows.map(row => row.text())
-    const actions = rows.map(row => row.find('.dash-todo__action').text())
-    expect(texts[0]).toContain('待作答的作业')
-    expect(texts[0]).toContain('Web 前端开发技术')
-    expect(texts[0]).toContain('11月12日')
-    expect(actions).toEqual(['继续作答', '查看提交', '查看评价'])
+  it('2b. 无可提交任务时给出课程入口；资格读取失败不显示成功空态',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
+    const page=await open('/student/home')
+    expect(page.find('.current-task').text()).toContain('当前没有可提交的待办')
+    expect(page.find('.current-task a.button').attributes('href')).toBe('/course')
     wrapper?.unmount()
-
-    dashboardOverride = {
-      otherPendingAssignments: [
-        summary(ASSIGNMENT, { title: '已归档作业', publicationState: 'archived', overdue: true, dueAt: '2026-10-01T15:59:59Z' }),
-      ],
-    }
-    const archived = await open('/student/home')
-    const archivedRow = archived.find('.dash-todo > li')
-    expect(archivedRow.text()).toContain('已归档')
-    expect(archivedRow.find('.dash-todo__action').text()).toBe('查看详情')
-    expect(archivedRow.text().match(/已逾期/g) ?? []).toHaveLength(1)
-    expect(archivedRow.text()).toContain('10月1日')
-    wrapper?.unmount()
-
-    dashboardOverride = { otherPendingAssignments: [summary(ASSIGNMENT, { title: LONG })] }
-    const longPage = await open('/student/home')
-    expect(longPage.find('.dash-todo > li .dash-todo__title').text()).toBe(LONG)
-    wrapper?.unmount()
-
-    dashboardOverride = { otherPendingAssignments: [], recentFeedback: null }
-    const empty = await open('/student/home')
-    expect(empty.text()).toContain('当前没有其他待办')
-    expect(empty.text()).toContain('暂无已发布的评价')
+    scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
+    const failed=await open('/student/home')
+    expect(failed.find('.current-task').text()).not.toContain('当前没有可提交的待办')
+    expect(failed.find('.current-task').text()).toContain('重新加载')
   })
 
   it('3. termId 为 null 显示无学期提示；notConfigured 不显示 0%', async () => {
@@ -276,8 +227,7 @@ describe('P1-D 学习记录', () => {
   it('5a. P2 字段显示阶段说明，needsPracticeCount 为 null 不显示 0', async () => {
     learningRecords = recordsFor(1)
     const page = await open(`/student/progress/${OFFERING}`)
-    expect(page.text()).toContain('P2 开放')
-    expect(page.text()).toContain('知识点掌握分析将在 P2 开放')
+        expect(page.text()).not.toContain('P2 开放')
     expect(page.text()).toContain('评价作业 1')
   })
 
@@ -303,16 +253,16 @@ describe('P1-D 学习记录', () => {
     const page = await open('/student/progress/not-a-uuid')
     expect(page.text()).toContain('链接无效')
     expect(requestsOf('getMyLearningRecords')).toHaveLength(0)
-    expect(requestsOf('listMyCourses')).toHaveLength(0)
+    expect(requestsOf('listMyCourses')).toHaveLength(1)
   })
 
-  it('5d. 无参页列出教学班，点选后进入对应记录页', async () => {
+  it('5d. 无参页默认最近课程，并可用选择器切换', async () => {
     const page = await open('/student/progress')
-    expect(page.text()).toContain('数据库')
-    const link = page.findAll('a').find(item => item.text() === '数据库')
-    await link?.trigger('click')
+    expect(router?.currentRoute.value.path).toBe(`/student/progress/${OFFERING}`)
+    await page.find('select').setValue(OFFERING_2)
     await flushPromises()
     expect(router?.currentRoute.value.path).toBe(`/student/progress/${OFFERING_2}`)
+    expect(page.text()).toContain('章节学习进度')
   })
 
   it('5e. 403/404 显示无法查看并给出返回入口', async () => {
@@ -366,24 +316,49 @@ describe('P1-D 消息目标映射', () => {
     await next!.trigger('click')
     await flushPromises()
     expect(router?.currentRoute.value.query.page).toBe('2')
-    expect(requestsOf(operation).at(-1)?.path).toContain('page=2&pageSize=20')
+    expect(requestsOf(operation).at(-1)?.path).toContain(role==='student'?'page=2&pageSize=100':'page=2&pageSize=20')
     expect(page.text()).toContain('分页作业23')
     expect(page.text()).not.toContain('分页作业20')
   })
-  it('空 target 的课程公告进入本班公告列表，打开不标读', async () => {
+  it('学生作业组合筛选覆盖完整数据，筛选重置页码，空结果可清除',async()=>{
+    const items=Array.from({length:43},(_,i)=>summary(`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,{title:`任务${i}`,offeringId:i<23?OFFERING:OFFERING_2,assignmentState:i%2?'SUBMITTED':'NOT_STARTED'}))
+    scripted.setHandler(r=>r.operationId==='listMyAssignments'?okEnvelope({items,total:items.length,page:1,pageSize:100}):normalResponse(r))
+    const view=await open('/student/assignments?status=all&page=2')
+    expect(view.findAll('.task-table-row')).toHaveLength(20)
+    await view.findAll('.filter-tabs button').find(b=>b.text().startsWith('已提交'))!.trigger('click');await flushPromises()
+    expect(router?.currentRoute.value.query.page).toBe('1')
+    expect(view.findAll('.task-table-row')).toHaveLength(20)
+    await view.findAll('select')[0]!.setValue(OFFERING_2);await flushPromises()
+    expect(view.findAll('.task-table-row')).toHaveLength(10)
+    expect(view.findAll('.task-table-row').every(row=>row.text().includes('数据库'))).toBe(true)
+    await view.findAll('.filter-tabs button').find(b=>b.text().startsWith('已批改'))!.trigger('click');await flushPromises()
+    expect(view.text()).toContain('暂无符合条件的作业')
+    await view.findAll('button').find(b=>b.text()==='清除筛选')!.trigger('click');await flushPromises()
+    expect(router?.currentRoute.value.query.status).toBe('all')
+    expect(view.findAll('.task-table-row')).toHaveLength(20)
+  })
+  it('消息未读和类型筛选使用正式参数',async()=>{
+    const view=await open('/student/messages')
+    await view.findAll('.filter-tabs button').find(b=>b.text()==='未读')!.trigger('click');await flushPromises()
+    expect(requestsOf('listMessages').at(-1)?.path).toContain('read=unread')
+    await view.findAll('.filter-tabs button').find(b=>b.text()==='评价')!.trigger('click');await flushPromises()
+    expect(requestsOf('listMessages').at(-1)?.path).toContain('type=feedback')
+    expect(requestsOf('listMessages').at(-1)?.path).toContain('read=all')
+  })
+  it('空 target 的课程公告进入本班公告列表，打开后显式标读', async () => {
     scripted.setHandler(request => request.operationId === 'listMessages'
       ? okEnvelope({ items: [{ id: NOTICE, offeringId: OFFERING, type: 'course_notice', title: '历史公告',
         content: '公告正文', target: null, sender: null, createdAt: '2026-10-14T02:00:00Z', readAt: null }],
         page: 1, pageSize: 20, total: 1, summary: { unreadCount: 1 } })
       : normalResponse(request))
     const page = await open('/student/messages')
-    const view = page.findAll('button').find(button => button.text() === '查看')
+    const view = page.findAll('button').find(button => button.text() === '查看公告')
     expect(view).toBeDefined()
     await view!.trigger('click')
     await flushPromises()
     expect(router?.currentRoute.value.fullPath).toBe(`/student/offerings/${OFFERING}/notices`)
     expect(requestsOf('listNotices')).toHaveLength(1)
-    expect(requestsOf('readMessage')).toHaveLength(0)
+    expect(requestsOf('readMessage')).toHaveLength(1)
   })
   it('7. targetRoute 覆盖六种 type 与非法 UUID', () => {
     const t = (type: string, id = RESOURCE, offeringId = OFFERING) => targetRoute({ type, id, offeringId } as never)
@@ -448,9 +423,9 @@ describe('P1-D 只读加载', () => {
 
 describe('P1-D 归档与期限', () => {
   it('10a. 作业列表显示已归档与已逾期文字标签', async () => {
-    const page = await open('/student/assignments')
+    const page = await open('/student/assignments?status=all')
     expect(page.text()).toContain('已归档')
-    expect(page.text()).toContain('已逾期')
+    expect(page.text()).toContain('已截止')
   })
 
   it('10b. 归档作业工作区提示只读且提交按钮遵循 canSave 禁用', async () => {

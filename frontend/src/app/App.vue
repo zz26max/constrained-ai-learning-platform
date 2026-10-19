@@ -63,5 +63,9 @@ function skipToMain() { document.getElementById('main-content')?.focus() }
         <footer v-if="auth.phase === 'authenticated'" class="workspace-footer"><span>知学 · 专注学习，从容成长</span><span>课程、实践与反馈</span></footer>
       </div>
     </div>
+    <nav v-if="auth.phase==='authenticated' && role==='student'" class="mobile-primary-nav" aria-label="手机主导航">
+      <RouterLink v-for="item in [studentNav[0]!,studentNav[2]!,studentNav[1]!,studentNav[5]!]" :key="item.to" :to="item.to" :aria-current="item.active()?'page':undefined"><AppIcon :name="item.icon" />{{ item.label.replace('学习首页','首页').replace('我的','').replace('消息通知','消息') }}</RouterLink>
+      <button :aria-expanded="menuOpen" aria-label="更多导航" @click="menuOpen=!menuOpen"><AppIcon name="menu" />更多</button>
+    </nav>
   </div>
 </template>

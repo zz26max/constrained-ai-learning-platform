@@ -172,7 +172,7 @@ export class AssignmentsApi {
     return this.request('getFeedback', options, feedbackId)
   }
 
-  listMessages(query: { page?: number; pageSize?: number } = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listMessages']>> {
+  listMessages(query: NonNullable<operations['listMessages']['parameters']['query']> = {}, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['listMessages']>> {
     return this.request('listMessages', options, undefined, undefined, query)
   }
 

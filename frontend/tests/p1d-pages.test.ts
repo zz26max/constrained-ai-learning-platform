@@ -137,7 +137,7 @@ describe('消息中心 /student/messages', () => {
     expect(page.text()).toContain('新作业发布')
     expect(page.text()).toContain('周五测验')
     expect(page.text()).toContain('2 条未读')
-    expect(requestsOf('listMessages')[0]?.path).toBe('/api/v1/me/messages?page=1&pageSize=20')
+    expect(requestsOf('listMessages')[0]?.path).toBe('/api/v1/me/messages?page=1&pageSize=20&read=all')
     expect(requestsOf('readMessage')).toHaveLength(0)
   })
 

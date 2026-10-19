@@ -23,10 +23,11 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
   switch (request.operationId) {
     case 'listMyAssignments':
       return okEnvelope({ items: [
-        { id: P1B_IDS.assignmentWeb, offeringId: P1A_IDS.offeringWeb, chapterId: P1A_IDS.chapterWeb, title: 'HTML 表单实现', type: 'web_lab', isRequired: true, publicationState: 'published', description: '完成编程任务', dueAt: '2026-11-01T16:00:00Z', assignmentState: 'not_started', overdue: false, latestSubmissionId: null, publishedFeedbackId: null, unreadFeedback: false, offeringStatus: 'active' },
-      ]})
+        { id: P1B_IDS.assignmentWeb, offeringId: P1A_IDS.offeringWeb, chapterId: P1A_IDS.chapterWeb, title: 'HTML 表单实现', type: 'web_lab', isRequired: true, publicationState: 'published', description: '完成编程任务', dueAt: '2026-11-01T16:00:00Z', assignmentState: 'NOT_STARTED', overdue: false, latestSubmissionId: null, publishedFeedbackId: null, unreadFeedback: false, offeringStatus: 'active' },
+      ],total:1,page:1,pageSize:100})
+    case 'listMyCourses': return okEnvelope({items:[],page:1,pageSize:100,total:0})
     case 'getAssignment':
-      return okEnvelope({ id, offeringId: P1A_IDS.offeringWeb, chapterId: P1A_IDS.chapterWeb, title: 'HTML 表单实现', type: 'web_lab', isRequired: true, publicationState: 'published', description: '完成编程任务', dueAt: '2026-11-01T16:00:00Z', assignmentState: 'not_started', overdue: false, latestSubmissionId: null, publishedFeedbackId: null, unreadFeedback: false, requirements: ['实现功能', '通过测试'], estimatedMinutes: 120, maxScore: 80, rubric: [{ criterionId: 'c1', title: '代码正确性', description: '实现符合需求', maxScore: 50 }], knowledgePointIds: [], lateUntil: '2026-11-03T16:00:00Z', allowResubmit: true, maxAttempts: 3, attemptsUsed: 0, canSubmit: true, submissionBlockedReason: null, aiPolicyVersion: 1, offeringStatus: 'active' })
+      return okEnvelope({ id, offeringId: P1A_IDS.offeringWeb, chapterId: P1A_IDS.chapterWeb, title: 'HTML 表单实现', type: 'web_lab', isRequired: true, publicationState: 'published', description: '完成编程任务', dueAt: '2026-11-01T16:00:00Z', assignmentState: 'NOT_STARTED', overdue: false, latestSubmissionId: null, publishedFeedbackId: null, unreadFeedback: false, requirements: ['实现功能', '通过测试'], estimatedMinutes: 120, maxScore: 80, rubric: [{ criterionId: 'c1', title: '代码正确性', description: '实现符合需求', maxScore: 50 }], knowledgePointIds: [], lateUntil: '2026-11-03T16:00:00Z', allowResubmit: true, maxAttempts: 3, attemptsUsed: 0, canSubmit: true, submissionBlockedReason: null, aiPolicyVersion: 1, offeringStatus: 'active' })
     case 'getWorkspace':
       return okEnvelope({ assignmentId: id, revision: 1, files: [{ path: 'index.html', content: '<!DOCTYPE html>\n<html>\n</html>' }], activeFile: 'index.html', savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null })
     case 'saveWorkspace':

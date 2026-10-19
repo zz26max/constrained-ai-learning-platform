@@ -6,6 +6,8 @@ import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
+import { allPages } from '../../api/pagination'
+import { byRecentStudy } from '../assignments/task-presentation'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,8 +23,18 @@ const page = computed(() => {
   return Number.isInteger(value) && value >= 1 && value <= 2147483647 ? value : 1
 })
 
-const offeringsQuery = usePageQuery(async signal =>
-  (await courses.listMyCourses({ status: 'all', page: 1, pageSize: 50 }, { signal })).data)
+const offeringsQuery = usePageQuery(async signal => ({items:(await allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal)).sort(byRecentStudy)}))
+void offeringsQuery.load()
+const currentCourse=computed(()=>offeringsQuery.data.value?.items.find(c=>c.offeringId===rawId.value))
+const chaptersQuery=usePageQuery(async signal=>{
+  if(!isUuid(rawId.value))throw new Error('课程链接无效')
+  return (await courses.listChapters(rawId.value,{signal})).data
+})
+watch(rawId,()=>{if(isUuid(rawId.value))void chaptersQuery.load()},{immediate:true})
+watch(()=>offeringsQuery.data.value,async value=>{
+  if(selecting.value&&value?.items[0])await router.replace({name:'student-progress',params:{offeringId:value.items[0].offeringId}})
+})
+const completedChapters=computed(()=>chaptersQuery.data.value?.items.filter(c=>c.studentProgress?.status==='completed').length??0)
 
 const recordsQuery = usePageQuery(async signal => {
   const id = rawId.value
@@ -32,9 +44,8 @@ const recordsQuery = usePageQuery(async signal => {
 
 watch(() => route.fullPath, async () => {
   if (selecting.value) {
-    await offeringsQuery.load()
     const items = offeringsQuery.data.value?.items ?? []
-    if (offeringsQuery.status.value === 'success' && items.length === 1 && items[0]) {
+    if (offeringsQuery.status.value === 'success' && items[0]) {
       await router.replace({ name: 'student-progress', params: { offeringId: items[0].offeringId } })
     }
   } else if (!invalidLink.value) {
@@ -64,6 +75,8 @@ function goToPage(next: number): void {
         <p v-if="selecting">选择一个教学班查看学习记录。</p>
       </div>
     </header>
+    <div class="task-toolbar"><label>课程<select :value="rawId??''" :disabled="offeringsQuery.status.value!=='success'" @change="router.push({name:'student-progress',params:{offeringId:($event.target as HTMLSelectElement).value}})"><option v-if="!currentCourse" :value="rawId??''">{{rawId?'当前课程':'选择课程'}}</option><option v-for="course in offeringsQuery.data.value?.items" :key="course.offeringId" :value="course.offeringId">{{course.title}} · {{course.groupName}}</option></select></label></div>
+    <ApiState v-if="offeringsQuery.status.value==='error'" :status="offeringsQuery.status.value" :error="offeringsQuery.error.value" @retry="offeringsQuery.load" />
 
     <template v-if="selecting">
       <ApiState :status="offeringsQuery.status.value" :error="offeringsQuery.error.value" @retry="offeringsQuery.load" />
@@ -94,13 +107,13 @@ function goToPage(next: number): void {
       <ApiState v-else :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
 
       <template v-if="recordsQuery.status.value === 'success' && recordsQuery.data.value">
+        <section class="surface dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chaptersQuery.data.value?.items.length}} 个章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chaptersQuery.data.value?.items" :key="chapter.id"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':'未完成'}}</span></li></ul><p v-if="!chaptersQuery.data.value?.items.length" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
         <section class="surface dash-section" aria-labelledby="lr-summary">
           <h2 id="lr-summary">学习汇总</h2>
           <ul class="dash-summary">
             <li><strong>{{ recordsQuery.data.value.summary.completedLabCount }}</strong> 个实验已完成</li>
             <li><strong>{{ recordsQuery.data.value.summary.publishedFeedbackCount }}</strong> 份评价已发布</li>
-            <li v-if="recordsQuery.data.value.summary.needsPracticeCount === null">待加强知识点：P2 开放</li>
-            <li v-else><strong>{{ recordsQuery.data.value.summary.needsPracticeCount }}</strong> 个待加强知识点</li>
+            <li v-if="recordsQuery.data.value.summary.needsPracticeCount !== null"><strong>{{ recordsQuery.data.value.summary.needsPracticeCount }}</strong> 个待加强知识点</li>
           </ul>
         </section>
 
@@ -134,7 +147,7 @@ function goToPage(next: number): void {
           </template>
         </section>
 
-        <section class="surface dash-section" aria-labelledby="lr-knowledge">
+        <section v-if="recordsQuery.data.value.knowledgeEvidence.length>0 || recordsQuery.data.value.nextRecommendation!==null" class="surface dash-section" aria-labelledby="lr-knowledge">
           <h2 id="lr-knowledge">知识点与下一步</h2>
           <p v-if="recordsQuery.data.value.knowledgeEvidence.length === 0 && recordsQuery.data.value.nextRecommendation === null" class="muted">知识点掌握分析将在 P2 开放</p>
         </section>

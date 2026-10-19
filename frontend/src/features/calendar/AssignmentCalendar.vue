@@ -8,6 +8,7 @@ import { usePageQuery } from '../courses/use-page-query'
 import { isUuid, formatTime } from '../courses/format'
 import { addDays, beijingDay, monthDays, shiftMonth, validDay, weekDays } from './dates'
 import ApiState from '../../components/ApiState.vue'
+import { assignmentStateLabel } from '../assignments/format'
 
 const route=useRoute(), router=useRouter(), auth=useAuthStore(), api=assignmentsApi(), courses=coursesApi()
 const teacher=computed(()=>route.path.startsWith('/teacher'))
@@ -25,7 +26,7 @@ const query=usePageQuery(async signal=>{
   const rows=teacher.value
     ? await allPages(async(page,pageSize,signal)=>(await api.listTeacherAssignments(selected,{page,pageSize},{signal})).data,signal)
     : await allPages(async(page,pageSize,signal)=>(await api.listMyAssignments({page,pageSize,filter:'all',...(selected?{offeringId:selected}:{}),...(auth.config?.currentTermId?{termId:auth.config.currentTermId}:{})},{signal})).data,signal)
-  return rows.filter(a=>a.publicationState!=='draft').map(a=>({id:a.id,title:a.title,offeringId:a.offeringId,dueAt:a.dueAt,state:a.publicationState,course:options.data.value?.find(c=>c.id===a.offeringId)?.title??''}))
+  return rows.filter(a=>a.publicationState!=='draft').map(a=>({id:a.id,title:a.title,offeringId:a.offeringId,dueAt:a.dueAt,state:a.publicationState,process:'assignmentState' in a ? a.assignmentState : null,course:options.data.value?.find(c=>c.id===a.offeringId)?.title??''}))
 })
 watch([teacher,()=>auth.identity?.id],()=>{void options.load()},{immediate:true})
 watch([offeringId,()=>options.data.value,()=>options.status.value],()=>{if(options.status.value==='success') void query.load()},{immediate:true})
@@ -55,9 +56,9 @@ onBeforeUnmount(close)
         <div class="calendar-layout"><section class="surface calendar-board" aria-label="作业日历">
           <div class="calendar-desktop"><div class="calendar-weekdays"><span v-for="w in weekdays" :key="w">{{w}}</span></div><div class="calendar-grid" :class="{'calendar-week-grid':view==='week'}"><div v-for="d in days" :key="d" class="calendar-cell" :class="{outside:d.slice(0,7)!==day.slice(0,7),selected:d===day}"><button class="calendar-day-number" :class="{today:d===today}" :aria-label="d+' 日程'" :aria-pressed="d===day" @click="update({date:d})">{{Number(d.slice(8))}}</button><button v-for="a in onDay(d).slice(0,view==='month'?2:undefined)" :key="a.id" class="calendar-chip" :title="a.title" @click="update({date:d});open(a.id)"><span>{{a.state==='archived'?'归档':'截止'}}</span> {{a.title}}</button><button v-if="view==='month'&&onDay(d).length>2" class="calendar-more" @click="update({date:d})">还有 {{onDay(d).length-2}} 项</button></div></div></div>
           <div class="calendar-mobile"><div class="calendar-controls between"><button class="button secondary" @click="move(-1,true)">上一周</button><button class="button secondary" @click="move(1,true)">下一周</button></div><div class="calendar-week-strip"><button v-for="(d,i) in weekDays(day)" :key="d" class="calendar-day-number" :class="{today:d===today}" :aria-label="d+' 日程'" :aria-pressed="d===day" @click="update({date:d})"><small>{{weekdays[i]}}</small><span>{{Number(d.slice(8))}}</span><i v-if="onDay(d).length" /></button></div></div>
-        </section><aside class="surface calendar-agenda"><h2>{{Number(day.slice(5,7))}} 月 {{Number(day.slice(8))}} 日</h2><p class="muted">{{onDay(day).length}} 项截止日程</p><button v-for="a in onDay(day)" :key="a.id" class="agenda-event" @click="open(a.id)"><span class="tag">{{a.state==='archived'?'已归档':'作业截止'}}</span><strong>{{a.title}}</strong><small>{{a.course}}</small><small>{{formatTime(a.dueAt)}}</small></button><div v-if="!onDay(day).length" class="calendar-empty"><h3>当天暂无截止日程</h3><p class="muted">选择其他日期查看作业安排。</p></div></aside></div>
+        </section><aside class="surface calendar-agenda"><h2>{{Number(day.slice(5,7))}} 月 {{Number(day.slice(8))}} 日</h2><p class="muted">{{onDay(day).length}} 项截止日程</p><button v-for="a in onDay(day)" :key="a.id" class="agenda-event" @click="open(a.id)"><span class="tag">{{a.state==='archived'?'已归档':'作业截止'}}</span><strong>{{a.title}}</strong><span v-if="a.process" class="tag">{{a.process==='REVIEWED'?'✓ 已批改':assignmentStateLabel(a.process)}}</span><small>{{a.course}}</small><small>{{formatTime(a.dueAt)}}</small></button><div v-if="!onDay(day).length" class="calendar-empty"><h3>当天暂无截止日程</h3><p class="muted">选择其他日期查看作业安排。</p></div></aside></div>
       </template>
     </template>
-    <dialog ref="dialog" class="workspace-dialog calendar-dialog" aria-label="日程详情" @cancel.prevent="close"><template v-if="active"><div class="section-heading"><h2>{{active.title}}</h2><button class="button secondary" @click="close">关闭</button></div><p>{{active.course}}</p><p>{{formatTime(active.dueAt)}}</p><p v-if="active.state==='archived'" class="notice notice-info">已归档，历史内容只读。</p><RouterLink class="button primary" :to="{name:teacher?'teacher-assignment':'student-assignment',params:{id:active.id}}">查看作业</RouterLink></template></dialog>
+    <dialog ref="dialog" class="workspace-dialog calendar-dialog" aria-label="日程详情" @cancel.prevent="close"><template v-if="active"><div class="section-heading"><h2>{{active.title}}</h2><button class="button secondary" @click="close">关闭</button></div><p>{{active.course}}</p><p v-if="active.process">处理状态：{{active.process==='REVIEWED'?'已批改':assignmentStateLabel(active.process)}}</p><p>{{formatTime(active.dueAt)}}</p><p v-if="active.state==='archived'" class="notice notice-info">已归档，历史内容只读。</p><RouterLink class="button primary" :to="{name:teacher?'teacher-assignment':'student-assignment',params:{id:active.id}}">查看作业</RouterLink></template></dialog>
   </div>
 </template>
