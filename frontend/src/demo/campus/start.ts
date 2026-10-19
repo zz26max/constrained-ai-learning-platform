@@ -33,6 +33,11 @@ registerAssignmentsApi(new AssignmentsApi(client))
 registerDashboardApi(new DashboardApi(client))
 registerNoticesApi(new NoticesApi(client))
 registerStatsApi(new StatsApi(client))
+// Opt-in visual exploration changes presentation only within this isolated entry.
+if(new URLSearchParams(location.search).get('explore')==='v34'){
+ const {installVisualPreview}=await import('./visual/install')
+ installVisualPreview(router)
+}
 
 const app = createApp(App)
 app.use(createPinia())
