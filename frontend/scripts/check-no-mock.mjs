@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const distDir = fileURLToPath(new URL('../dist', import.meta.url))
-const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError']
+const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError', 'CAMPUS_DEMO_ONLY', 'campus.student']
 
 async function exists(candidate) {
   try {
@@ -42,6 +42,7 @@ if (files.length === 0) {
 }
 
 const violations = []
+if(await exists(path.join(distDir,'campus.html')))violations.push('campus.html 不得进入生产构建')
 for (const file of files) {
   const text = await readFile(file, 'utf8')
   for (const sentinel of SENTINELS) {

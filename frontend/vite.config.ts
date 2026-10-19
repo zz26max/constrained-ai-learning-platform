@@ -65,7 +65,12 @@ export default defineConfig(({ command, mode }) => {
     throw new Error('生产构建拒绝 mock 模式：npm run build 必须以真实模式产出。')
   }
   return {
-    plugins: [vue()],
+    plugins: [vue(), {name:'deny-campus-in-normal-server',configureServer(server){
+      server.middlewares.use((req,res,next)=>{
+        if(req.url?.split('?')[0]==='/campus.html'||req.url?.startsWith('/src/demo/campus/')){res.statusCode=404;res.end('Not found');return}
+        next()
+      })
+    }}],
     appType: 'spa',
     server: {
       headers: { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' },
