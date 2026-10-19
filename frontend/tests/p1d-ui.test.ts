@@ -177,7 +177,7 @@ describe('P1-D 路由与首页', () => {
   })
 
   it('首页方案切换共用同一份真实查询与任务，未知参数保留原版',async()=>{
-    const view=await open('/student/home')
+    const view=await open('/student/home?design=current')
     const dashReads=requestsOf('getDashboard').length, taskReads=requestsOf('listMyAssignments').length
     const originalTitle=view.find('.current-task h3').text()
     await view.find('.home-preview-switch a[href="/student/home?design=a"]').trigger('click');await flushPromises()
@@ -203,6 +203,65 @@ describe('P1-D 路由与首页', () => {
     expect(view.find('[data-home-action="primary"]').attributes('data-task-id')).toBeUndefined()
     expect(view.text()).toContain('暂无已发布的评价')
     expect(view.text()).toContain('暂无课程公告')
+  })
+  it('B+按同一截止时间分组，任务保持独立入口且只显示最近一门课程',async()=>{
+    const tasks=[summary(ASSIGNMENT,{dueAt:'2026-10-21T00:00:00Z'}),...['2','3','4'].map(n=>summary(`00000000-0000-4000-8000-00000000070${n}`,{title:`同组任务${n}`,dueAt:'2026-10-24T14:00:00Z'}))]
+    scripted.setHandler(r=>{
+      if(r.operationId==='listMyAssignments')return okEnvelope({items:tasks,total:tasks.length,page:1,pageSize:100})
+      if(r.operationId==='getAssignment')return okEnvelope({...tasks.find(t=>r.path.endsWith(t.id)),canSubmit:true})
+      return normalResponse(r)
+    })
+    const view=await open('/student/home?design=bplus')
+    expect(view.find('[data-design="bplus"]').exists()).toBe(true)
+    expect(view.findAll('.bplus-group-heading')).toHaveLength(1)
+    expect(view.find('.bplus-group-heading').text()).toContain('3 项任务')
+    expect(view.findAll('.bplus-task-list [data-task-id]')).toHaveLength(3)
+    expect(view.findAll('[data-course-id]')).toHaveLength(1)
+    expect(view.find('.explore-focus').findAll('time')).toHaveLength(1)
+    expect(view.findAll('.bplus-task-list time')).toHaveLength(0)
+    expect(view.findAll('.bplus-task-list a.task-line-action')).toHaveLength(3)
+  })
+  it.each([
+    {status:'completed',label:'复习章节',id:CHAPTER},
+    {status:'not_started',label:'继续学习',id:CHAPTER},
+    {status:null,label:'查看课程',id:null},
+    {status:'empty',label:'查看课程',id:null},
+  ])('B+真实章节状态$status决定$label，不用课程摘要100%冒充阅读结论',async({status,label,id})=>{
+    dashboardOverride={courses:[course({currentChapter:{id:CHAPTER,number:1,title:'真实章节'},progress:{...progress,percent:100,completed:5}})]}
+    scripted.setHandler(r=>r.operationId==='listChapters'?okEnvelope({offeringId:OFFERING,items:status==='empty'?[]:[{id:CHAPTER,number:1,title:'真实章节',publicationState:'published',studentProgress:status?{status}:null}]}):normalResponse(r))
+    const view=await open('/student/home?design=bplus')
+    const link=view.find('.bplus-course-action')
+    expect(link.text()).toContain(label)
+    expect(link.attributes('href')).toBe(id?`/course/${OFFERING}/chapter/${id}`:`/course/${OFFERING}`)
+    expect(view.find('.explore-courses').text()).not.toContain('已结课')
+    if(status==='completed')expect(view.text()).toContain('后续内容以教师发布为准')
+  })
+  it('B+章节读取失败不显示伪造进度，保留重试和查看课程',async()=>{
+    scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
+    const view=await open('/student/home?design=bplus')
+    expect(view.find('.explore-courses').text()).toContain('重新加载')
+    expect(view.find('.bplus-course-action').text()).toContain('查看课程')
+    expect(view.find('.explore-courses [role="progressbar"]').exists()).toBe(false)
+  })
+  it('正常首页不显示视觉探索控件，原版预览仍可比较',async()=>{
+    const view=await open('/student/home')
+    expect(view.find('.home-preview-switch').exists()).toBe(false)
+    await router!.push('/student/home?design=current');await flushPromises()
+    expect(view.find('.home-preview-switch').exists()).toBe(true)
+    expect(view.find('.dashboard-page').exists()).toBe(true)
+  })
+  it('B+空任务、空课程与无反馈公告时不虚构学习信息',async()=>{
+    dashboardOverride={courseCount:0,pendingAssignmentCount:0,unreadMessageCount:0,courses:[],currentLearning:null,recentFeedback:null,recentNotice:null}
+    scripted.setHandler(r=>r.operationId==='listMyAssignments'?okEnvelope({items:[],total:0,page:1,pageSize:100}):normalResponse(r))
+    const view=await open('/student/home?design=bplus')
+    expect(view.find('#explore-focus-title').text()).toBe('当前没有可提交的待办')
+    expect(view.find('[data-home-action="primary"]').attributes('href')).toBe('/course')
+    expect(view.text()).toContain('本学期暂无课程')
+    expect(view.text()).toContain('暂无已发布的评价')
+    expect(view.text()).toContain('暂无课程公告')
+    expect(view.find('.bplus-deadline').exists()).toBe(false)
+    expect(view.find('[role="progressbar"]').exists()).toBe(false)
+    expect(requestsOf('listChapters')).toHaveLength(0)
   })
   it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
     const page=await open('/student/home')

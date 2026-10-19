@@ -37,6 +37,8 @@ describe('P1-A 路由守卫', () => {
   it('仅固定首页方案可带查询恢复，外域与额外参数仍被拒绝',async()=>{
     expect(isInternalPath('/student/home?design=a')).toBe(true)
     expect(isInternalPath('/student/home?design=b')).toBe(true)
+    expect(isInternalPath('/student/home?design=bplus')).toBe(true)
+    expect(isInternalPath('/student/home?design=current')).toBe(true)
     for(const path of ['https://example.com','//example.com','/student/home?design=a&return=//example.com','/student/home?design=https://example.com'])expect(isInternalPath(path)).toBe(false)
     useAuthStore().$patch({phase:'anonymous',bootStatus:'success'})
     const router=await newRouter('/student/home?design=b')
