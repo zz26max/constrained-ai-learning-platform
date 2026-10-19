@@ -34,6 +34,46 @@ try{
    measurements.push({name,width,overflow:false});
   }
  }
+
+ await page.setViewportSize({width:390,height:844});
+ await page.goto(base+'/student/assignments');await ready();
+ for(const name of ['已提交','已批改','全部','待完成']){await page.getByRole('button',{name:new RegExp('^'+name)}).click();await ready()}
+ const blocked=page.locator('.task-table-row').filter({hasText:'已截止'});
+ for(const row of await blocked.all())assert.equal(await row.locator('a.button').innerText(),'查看详情');
+ await page.goto(base+'/student/calendar');await ready();
+ await page.getByRole('button',{name:'下一周',exact:true}).click();await ready();
+ await page.locator('.calendar-week-strip button').last().click();await ready();
+ assert.equal(await page.locator('.calendar-week-strip [aria-pressed=true]').count(),1);
+ await page.goto(base+'/student/messages');await ready();
+ for(const name of ['未读','作业','评价','公告','全部']){await page.getByRole('button',{name,exact:true}).click();await ready()}
+ await page.getByRole('button',{name:'更多导航',exact:true}).click();
+ await page.keyboard.press('Escape');assert.equal(await page.locator('.workspace-sidebar.is-open').count(),0);
+ // Display fixtures only intercept GET responses in this isolated browser page.
+ let scenario='long';
+ await page.route('**/api/v1/**',async route=>{
+  if(route.request().method()!=='GET')return route.continue();
+  const response=await route.fetch();
+  if(!response.ok())return route.fulfill({response});
+  const body=await response.json();const path=new URL(route.request().url()).pathname;const data=body.data;
+  if(path==='/api/v1/me/courses'&&data?.items){
+   if(scenario==='empty')data.items=[];
+   else data.items.forEach((c,i)=>{c.title=i===0?'计算机网络与分布式系统':'课程2026-10-19T13-28-00-003Z_AdvancedLearningSystems'.repeat(4)})
+   if(scenario==='empty')data.total=0;
+  }
+  if(path.endsWith('/chapters')&&data?.items){
+   if(['empty','no-records'].includes(scenario))data.items=[];
+   if(scenario==='many'&&data.items[0])data.items=Array.from({length:24},(_,i)=>({...data.items[0],id:'10000000-0000-4000-8000-'+String(i).padStart(12,'0'),number:i+1,title:'章节 '+(i+1)+' · 数据组织与学习路径',studentProgress:null}));
+  }
+  if(path.endsWith('/learning-records')&&scenario==='no-records'&&data?.summary){data.summary.completedLabCount=0;data.summary.publishedFeedbackCount=0;data.recentFeedback=null;data.feedbackPage.items=[];data.feedbackPage.total=0}
+  await route.fulfill({response,json:body});
+ });
+ for(scenario of ['long','many','empty','no-records']){
+  for(const [name,route] of Object.entries({courses:'/course',records:'/student/progress'})){
+   await page.goto(base+route);await ready();
+   for(const width of [390,1440]){await page.setViewportSize({width,height:width===390?844:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await snapshot('fixture-'+scenario+'-'+name+'-'+width)}
+  }
+ }
+ await page.unroute('**/api/v1/**');
  assert.deepEqual(errors,[]);
  assert.deepEqual(requests.filter(r=>r.method!=='GET'&&r.path!=='/api/v1/auth/login'),[]);
  writeFileSync(new URL('result.json',out),JSON.stringify({result:'PASS',measurements,browserErrors:errors,businessWrites:0},null,2));

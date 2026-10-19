@@ -90,3 +90,5 @@
  .student-space .notification-time {margin-left:0;flex-basis:100%}
  .student-space .notification-item {padding-block:18px}
 }
+
+.student-records .dash-summary li {display:inline-flex;flex-direction:row;align-items:baseline;gap:8px}

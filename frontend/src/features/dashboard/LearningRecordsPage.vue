@@ -6,6 +6,7 @@ import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
+import { chapterOverview } from './bplus-presentation'
 import { allPages } from '../../api/pagination'
 import { byRecentStudy } from '../assignments/task-presentation'
 
@@ -34,7 +35,8 @@ watch(rawId,()=>{if(isUuid(rawId.value))void chaptersQuery.load()},{immediate:tr
 watch(()=>offeringsQuery.data.value,async value=>{
   if(selecting.value&&value?.items[0])await router.replace({name:'student-progress',params:{offeringId:value.items[0].offeringId}})
 })
-const completedChapters=computed(()=>chaptersQuery.data.value?.items.filter(c=>c.studentProgress?.status==='completed').length??0)
+const chapterPath=computed(()=>chapterOverview(chaptersQuery.data.value?.items??[]))
+const completedChapters=computed(()=>chapterPath.value.completed)
 
 const recordsQuery = usePageQuery(async signal => {
   const id = rawId.value
@@ -107,7 +109,7 @@ function goToPage(next: number): void {
       <ApiState v-else :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
 
       <template v-if="recordsQuery.status.value === 'success' && recordsQuery.data.value">
-        <section class="record-section dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chaptersQuery.data.value?.items.length}} 个已开放章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chaptersQuery.data.value?.items" :key="chapter.id" :class="{'is-read':chapter.studentProgress?.status==='completed'}"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':'尚未阅读'}}</span><RouterLink class="chapter-action" :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">{{chapter.studentProgress?.status==='completed'?'复习章节':'继续阅读'}} →</RouterLink></li></ul><p v-if="!chaptersQuery.data.value?.items.length" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
+        <section class="record-section dash-section" aria-labelledby="chapter-summary"><h2 id="chapter-summary">章节学习进度</h2><ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><p><strong>{{completedChapters}}</strong> / {{chapterPath.total}} 个已开放章节已阅读</p><p v-if="currentCourse?.currentChapter" class="muted">最近阅读：{{currentCourse.currentChapter.title}} <span v-if="currentCourse.lastStudiedAt"> · {{formatTime(currentCourse.lastStudiedAt)}}</span></p><ul class="record-chapters"><li v-for="chapter in chapterPath.chapters" :key="chapter.id" :class="{'is-read':chapter.studentProgress?.status==='completed'}"><RouterLink :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">第 {{chapter.number}} 章 · {{chapter.title}}</RouterLink><span class="tag">{{chapter.studentProgress?.status==='completed'?'✓ 已阅读':chapter.studentProgress?.status==='in_progress'?'阅读中':chapter.studentProgress?.status==='not_started'?'尚未阅读':'阅读状态未知'}}</span><RouterLink class="chapter-action" :to="{name:'chapter',params:{offeringId:rawId,chapterId:chapter.id}}">{{chapter.studentProgress?.status==='completed'?'复习章节':'继续阅读'}} →</RouterLink></li></ul><p v-if="!chapterPath.total" class="muted">暂无已发布章节，教师发布后即可开始学习。</p></template></section>
         <section class="record-section dash-section" aria-labelledby="lr-summary">
           <h2 id="lr-summary">学习汇总</h2>
           <ul class="dash-summary">
