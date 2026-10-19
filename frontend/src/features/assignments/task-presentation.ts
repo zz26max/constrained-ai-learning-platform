@@ -27,3 +27,11 @@ export function deadlineLabel(dueAt: string, now = Date.now()): string {
   if (diff <= 86400000) return `◷ ${Math.ceil(diff / 3600000)} 小时后截止`
   return `${Math.ceil(diff / 86400000)} 天后截止`
 }
+
+/** Only confirmed server eligibility establishes priority; dates never grant submission. */
+export function todoPriority(detail: AssignmentDetailDTO): number {
+  return detail.canSubmit === true ? 0 : detail.overdue ? 1 : 2
+}
+export function todoGroupLabel(detail: AssignmentDetailDTO): string {
+  return ['可继续处理', '已过期未完成', '暂不可提交'][todoPriority(detail)]!
+}

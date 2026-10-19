@@ -101,7 +101,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
       summary(ASSIGNMENT, { publicationState: 'archived', title: '旧实验' }),
       summary(ASSIGNMENT_2, { overdue: true, title: '逾期实验',dueAt:'2026-10-01T00:00:00Z' }),
     ], page:1,pageSize:100,total:2, summary: { allCount: 2 } })
-    case 'getAssignment': return okEnvelope({...summary(ASSIGNMENT_2,{title:'逾期实验'}),canSubmit:true,submissionBlockedReason:null})
+    case 'getAssignment': return okEnvelope({...summary(request.path.split('/').at(-1)!,{title:'逾期实验'}),canSubmit:true,submissionBlockedReason:null})
     case 'getOffering': return okEnvelope({
       id: OFFERING, courseId: '00000000-0000-4000-8000-000000000101', title: 'Web 前端开发技术', groupName: '计算机 2301 班',
       termId: TERM, termLabel: '2026 秋季学期', status: 'active', teachers: [{ id: DEMO_USER.id, displayName: '李老师' }],
@@ -429,6 +429,40 @@ describe('P1-D 消息目标映射', () => {
     await view.findAll('button').find(b=>b.text()==='清除筛选')!.trigger('click');await flushPromises()
     expect(router?.currentRoute.value.query.status).toBe('all')
     expect(view.findAll('.task-table-row')).toHaveLength(20)
+  })
+  it('待办资格跨API页全量读取后排序再分页，补交仍优先，数量不变',async()=>{
+    const items=Array.from({length:105},(_,i)=>summary(`00000000-0000-4000-8000-${String(1000+i).padStart(12,'0')}`,{title:'任务'+i,dueAt:i===104?'2026-12-01T00:00:00Z':'2026-01-01T00:00:00Z',overdue:i!==104}))
+    scripted.setHandler(r=>{
+      if(r.operationId==='listMyAssignments'){
+        const page=Number(new URL(r.path,'http://localhost').searchParams.get('page')??1)
+        return okEnvelope({items:items.slice((page-1)*100,page*100),total:105,page,pageSize:100})
+      }
+      if(r.operationId==='getAssignment'){
+        const t=items.find(t=>r.path.endsWith(t.id))!
+        return okEnvelope({...t,canSubmit:items.indexOf(t)>=103,submissionBlockedReason:null})
+      }
+      return normalResponse(r)
+    })
+    const view=await open('/student/assignments')
+    for(let i=0;i<25;i++)await flushPromises()
+    expect(requestsOf('listMyAssignments')).toHaveLength(2)
+    expect(requestsOf('getAssignment')).toHaveLength(105)
+    expect(view.findAll('.task-title').slice(0,2).map(n=>n.text())).toEqual(['任务103','任务104'])
+    expect(view.findAll('.task-table-row')[0]!.text()).toContain('继续补交')
+    expect(view.findAll('.task-table-row')[2]!.text()).toContain('查看详情')
+    expect(view.findAll('.task-group-heading').map(n=>n.text())).toEqual(['可继续处理','已过期未完成'])
+    expect(view.find('.filter-tabs').text()).toContain('待完成 105')
+    await view.findAll('.pagination button').find(n=>n.text()==='下一页')!.trigger('click');await flushPromises()
+    expect(requestsOf('getAssignment')).toHaveLength(105)
+    expect(view.find('.task-group-heading').text()).toBe('已过期未完成')
+  })
+  it('资格读取失败不伪造分组或可操作入口，保留全部待办',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
+    const view=await open('/student/assignments');await flushPromises()
+    expect(view.text()).toContain('当前仅按截止时间排序')
+    expect(view.findAll('.task-group-heading')).toHaveLength(0)
+    expect(view.find('.task-table-row').text()).toContain('查看详情')
+    expect(view.find('.filter-tabs').text()).toContain('待完成 1')
   })
   it('消息未读和类型筛选使用正式参数',async()=>{
     const view=await open('/student/messages')
