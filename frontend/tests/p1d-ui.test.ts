@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, type Router } from 'vue-router'
 import App from '../src/app/App.vue'
+import HistoricalHome from '../src/features/dashboard/StudentHomePage.vue'
 import { createAppRouter } from '../src/app/router'
 import {
   registerAssignmentsApi, registerAuthApi, registerCoursesApi,
@@ -118,7 +119,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
 
 const requestsOf = (operationId: string) => scripted.requests.filter(request => request.operationId === operationId)
 
-async function open(path: string, role: 'student' | 'teacher' = 'student'): Promise<VueWrapper> {
+async function open(path: string, role: 'student' | 'teacher' = 'student', historical = false): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().$patch({
@@ -126,12 +127,16 @@ async function open(path: string, role: 'student' | 'teacher' = 'student'): Prom
     identity: { ...DEMO_USER, roles: [role] }, config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms] },
   })
   router = createAppRouter(createMemoryHistory())
+  if(historical)router.addRoute({name:'student-home',path:'/student/home',component:HistoricalHome,meta:{requiresAuth:true,requiresRole:'student'}})
   await router.push(path)
   await router.isReady()
   wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router] } })
   await flushPromises()
   return wrapper
 }
+
+// Historical design tests mount the preserved page explicitly, never enable it in production.
+const openLegacy=(path:string)=>open(path,'student',true)
 
 beforeEach(() => {
   dashboardOverride = {}
@@ -170,6 +175,36 @@ describe('P1-D 路由与首页', () => {
     await flushPromises()
     expect(page.find('.role-select select').exists()).toBe(true)
   })
+
+  it('正式首页使用服务端资格而非看板旧任务，明确补交及排序依据',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2,{title:'真实补交任务',overdue:true}),canSubmit:true}):normalResponse(r))
+    const view=await open('/student/home')
+    expect(view.get('#explore-focus-title').text()).toBe('真实补交任务')
+    expect(view.get('.explore-focus').text()).toContain('已逾期，可补交')
+    expect(view.get('[data-home-action=primary]').text()).toContain('继续补交')
+    expect(view.get('[data-home-action=primary]').attributes('href')).toContain(ASSIGNMENT_2)
+    expect(view.get('.polish-task-context').text()).toContain('截止时间先后')
+  })
+  it('正式首页资格失败不能展示成功空态，课程章节失败可重试',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-permission'):r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
+    const view=await open('/student/home')
+    expect(view.get('.explore-focus').text()).toContain('req-permission')
+    expect(view.get('.explore-focus').text()).not.toContain('当前没有可提交的待办')
+    expect(view.find('[data-home-action=primary]').exists()).toBe(false)
+    expect(view.get('.explore-courses').text()).toContain('课程未完整加载')
+    wrapper?.unmount()
+    scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
+    const chapters=await open('/student/home')
+    expect(chapters.get('.explore-courses').text()).toContain('req-chapters')
+    expect(chapters.get('.bplus-course-action').text()).toContain('查看课程')
+  })
+  it('正式首页无资格待办时保留课程入口，不虚构学习进度',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
+    const view=await open('/student/home')
+    expect(view.get('#explore-focus-title').text()).toBe('当前没有可提交的待办')
+    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/course/'+OFFERING)
+    expect(view.find('[role=progressbar]').exists()).toBe(false)
+  })
   it('1. 学生登录后 / 重定向到 /student/home', async () => {
     await open('/')
     expect(router?.currentRoute.value.path).toBe('/student/home')
@@ -177,7 +212,7 @@ describe('P1-D 路由与首页', () => {
   })
 
   it('首页方案切换共用同一份真实查询与任务，未知参数保留原版',async()=>{
-    const view=await open('/student/home?design=current')
+    const view=await openLegacy('/student/home?design=current')
     const dashReads=requestsOf('getDashboard').length, taskReads=requestsOf('listMyAssignments').length
     const originalTitle=view.find('.current-task h3').text()
     await view.find('.home-preview-switch a[href="/student/home?design=a"]').trigger('click');await flushPromises()
@@ -197,7 +232,7 @@ describe('P1-D 路由与首页', () => {
   it.each(['a','b'])('方案%s无资格任务与无反馈公告时保留可用空态',async design=>{
     dashboardOverride={recentFeedback:null,recentNotice:null}
     scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
-    const view=await open('/student/home?design='+design)
+    const view=await openLegacy('/student/home?design='+design)
     expect(view.find('#explore-focus-title').text()).toBe('当前没有可提交的待办')
     expect(view.find('[data-home-action="primary"]').attributes('href')).toBe('/course')
     expect(view.find('[data-home-action="primary"]').attributes('data-task-id')).toBeUndefined()
@@ -211,7 +246,7 @@ describe('P1-D 路由与首页', () => {
       if(r.operationId==='getAssignment')return okEnvelope({...tasks.find(t=>r.path.endsWith(t.id)),canSubmit:true})
       return normalResponse(r)
     })
-    const view=await open('/student/home?design=bplus')
+    const view=await openLegacy('/student/home?design=bplus')
     expect(view.find('[data-design="bplus"]').exists()).toBe(true)
     expect(view.findAll('.bplus-group-heading')).toHaveLength(1)
     expect(view.find('.bplus-group-heading').text()).toContain('3 项任务')
@@ -229,7 +264,7 @@ describe('P1-D 路由与首页', () => {
   ])('B+真实章节状态$status决定$label，不用课程摘要100%冒充阅读结论',async({status,label,id})=>{
     dashboardOverride={courses:[course({currentChapter:{id:CHAPTER,number:1,title:'真实章节'},progress:{...progress,percent:100,completed:5}})]}
     scripted.setHandler(r=>r.operationId==='listChapters'?okEnvelope({offeringId:OFFERING,items:status==='empty'?[]:[{id:CHAPTER,number:1,title:'真实章节',publicationState:'published',studentProgress:status?{status}:null}]}):normalResponse(r))
-    const view=await open('/student/home?design=bplus')
+    const view=await openLegacy('/student/home?design=bplus')
     const link=view.find('.bplus-course-action')
     expect(link.text()).toContain(label)
     expect(link.attributes('href')).toBe(id?`/course/${OFFERING}/chapter/${id}`:`/course/${OFFERING}`)
@@ -238,22 +273,22 @@ describe('P1-D 路由与首页', () => {
   })
   it('B+章节读取失败不显示伪造进度，保留重试和查看课程',async()=>{
     scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
-    const view=await open('/student/home?design=bplus')
+    const view=await openLegacy('/student/home?design=bplus')
     expect(view.find('.explore-courses').text()).toContain('重新加载')
     expect(view.find('.bplus-course-action').text()).toContain('查看课程')
     expect(view.find('.explore-courses [role="progressbar"]').exists()).toBe(false)
   })
-  it('正常首页不显示视觉探索控件，原版预览仍可比较',async()=>{
+  it('正式首页忽略旧探索参数，不显示评审控件',async()=>{
     const view=await open('/student/home')
     expect(view.find('.home-preview-switch').exists()).toBe(false)
     await router!.push('/student/home?design=current');await flushPromises()
-    expect(view.find('.home-preview-switch').exists()).toBe(true)
-    expect(view.find('.dashboard-page').exists()).toBe(true)
+    expect(view.find('.home-preview-switch').exists()).toBe(false)
+    expect(view.find('.vc-home').exists()).toBe(true)
   })
   it('B+空任务、空课程与无反馈公告时不虚构学习信息',async()=>{
     dashboardOverride={courseCount:0,pendingAssignmentCount:0,unreadMessageCount:0,courses:[],currentLearning:null,recentFeedback:null,recentNotice:null}
     scripted.setHandler(r=>r.operationId==='listMyAssignments'?okEnvelope({items:[],total:0,page:1,pageSize:100}):normalResponse(r))
-    const view=await open('/student/home?design=bplus')
+    const view=await openLegacy('/student/home?design=bplus')
     expect(view.find('#explore-focus-title').text()).toBe('当前没有可提交的待办')
     expect(view.find('[data-home-action="primary"]').attributes('href')).toBe('/course')
     expect(view.text()).toContain('本学期暂无课程')
@@ -270,7 +305,7 @@ describe('P1-D 路由与首页', () => {
     expect(view.find('[data-home-action="primary"]').attributes('href')).toContain(ASSIGNMENT_2)
   })
   it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
-    const page=await open('/student/home?design=current')
+    const page=await openLegacy('/student/home?design=current')
     expect(page.find('#dash-current').text()).toBe('接下来要做')
     expect(page.find('.current-task').text()).toContain('逾期实验')
     expect(page.find('.current-task').text()).not.toContain('响应式导航栏')
@@ -280,12 +315,12 @@ describe('P1-D 路由与首页', () => {
   })
   it('2b. 无可提交任务时给出课程入口；资格读取失败不显示成功空态',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
-    const page=await open('/student/home?design=current')
+    const page=await openLegacy('/student/home?design=current')
     expect(page.find('.current-task').text()).toContain('当前没有可提交的待办')
     expect(page.find('.current-task a.button').attributes('href')).toBe('/course')
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
-    const failed=await open('/student/home?design=current')
+    const failed=await openLegacy('/student/home?design=current')
     expect(failed.find('.current-task').text()).not.toContain('当前没有可提交的待办')
     expect(failed.find('.current-task').text()).toContain('重新加载')
   })
@@ -294,12 +329,12 @@ describe('P1-D 路由与首页', () => {
     dashboardOverride = {
       termId: null, termLabel: null, currentLearning: null, courseCount: 0, courses: [],
     }
-    const noTerm = await open('/student/home?design=current')
+    const noTerm = await openLegacy('/student/home?design=current')
     expect(noTerm.text()).toContain('当前没有进行中的学期')
     wrapper?.unmount()
 
     dashboardOverride = { courses: [course({ progress: { ...progress, completed: 0, total: 0, percent: 0, notConfigured: true } })] }
-    const notConfigured = await open('/student/home?design=current')
+    const notConfigured = await openLegacy('/student/home?design=current')
     expect(notConfigured.text()).toContain('未配置学习内容')
     expect(notConfigured.text()).not.toContain('0%')
   })
