@@ -6,7 +6,8 @@ import SubjectGlyph from './SubjectGlyph.vue'
 import SubjectIdentity from './SubjectIdentity.vue'
 import CountProgress from './CountProgress.vue'
 import IntegratedTaskStatus from './CraftTaskState.vue'
-import {subject} from './presentation'
+import {subject,beijingTime} from './presentation'
+import {taskDayGroups,taskContentTone} from './content-presentation'
 import {chapterEntry} from './refinement'
 
 import { computed, watch } from 'vue'
@@ -22,7 +23,7 @@ import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
 import AppIcon from '../../../components/AppIcon.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
-import { groupByDeadline, compactDeadline, chapterOverview } from '../../../features/dashboard/bplus-presentation'
+import { compactDeadline, chapterOverview } from '../../../features/dashboard/bplus-presentation'
 const route=useRoute()
 const direction='a'
 const design='bplus' as const
@@ -31,7 +32,7 @@ const {query,tasksQuery,target,nextTask,recentTasks,recentCourse,courseName,TYPE
 const isPlus=computed(()=>design==='bplus')
 const selectedCourse=computed(()=>tasksQuery.data.value?.classes[0])
 const displayedCourses=computed(()=>tasksQuery.data.value?.classes.slice(0,isPlus.value?1:2)??[])
-const deadlineGroups=computed(()=>groupByDeadline(recentTasks.value))
+const deadlineGroups=computed(()=>taskDayGroups(recentTasks.value))
 function courseById(id:string|null|undefined){return tasksQuery.data.value?.classes.find(c=>c.offeringId===id)}
 const courses=coursesApi()
 const chaptersQuery=usePageQuery(async signal=>{
@@ -95,7 +96,7 @@ function datePart(value:string,part:'month'|'day'|'time'){
           <header class="explore-section-heading"><div><p class="explore-eyebrow">{{isPlus?'截止时间 · 北京时间':'按截止时间排序'}}</p><h2 id="explore-tasks-title">近期任务</h2></div><RouterLink to="/student/assignments">全部作业 ↗</RouterLink></header>
           <p v-if="tasksQuery.status.value==='loading'" class="explore-muted" role="status">正在读取近期任务…</p>
           <p v-else-if="tasksQuery.status.value==='error'" class="explore-muted">任务未完整加载，请在上方重试。</p>
-          <div v-else-if="isPlus&&recentTasks.length" class="bplus-task-groups"><section v-for="group in deadlineGroups" :key="group.key" class="bplus-task-group" :aria-label="compactDeadline(group.dueAt)+'截止任务'"><header class="bplus-group-heading"><CraftDate :value="group.dueAt"/><span>{{group.tasks.length}} 项任务</span><small>{{deadlineLabel(group.dueAt)}}</small></header><ul class="bplus-task-list"><li v-for="task in group.tasks" :key="task.id" :data-task-id="task.id"><div class="task-line-content"><RouterLink class="explore-task-name" :title="task.title" :to="{name:'student-assignment',params:{id:task.id}}">{{task.title}}</RouterLink><p class="explore-muted"><SubjectIdentity :course="courseById(task.offeringId)" /></p><IntegratedTaskStatus :task="task" :detail="task" :show-deadline="false" /></div><RouterLink class="task-line-action" :to="{name:'student-assignment',params:{id:task.id}}">{{taskAction(task,task)}} →</RouterLink></li></ul></section></div>
+          <div v-else-if="isPlus&&recentTasks.length" class="bplus-task-groups"><section v-for="group in deadlineGroups" :key="group.key" class="bplus-task-group" :data-day="group.key" :aria-label="group.key+'截止任务'"><header class="bplus-group-heading"><CraftDate :value="group.dueAt" day-only/><span>{{group.tasks.length}} 项任务</span><small>{{group.context}}</small></header><ul class="bplus-task-list"><li v-for="task in group.tasks" :key="task.id" :data-task-id="task.id" :data-tone="taskContentTone(task,task)"><div class="task-line-content"><RouterLink class="explore-task-name" :title="task.title" :to="{name:'student-assignment',params:{id:task.id}}">{{task.title}}</RouterLink><p class="explore-muted"><SubjectIdentity :course="courseById(task.offeringId)" /></p><div class="content-task-meta"><IntegratedTaskStatus :task="task" :detail="task" :show-deadline="false" /><p class="content-task-time"><time :datetime="task.dueAt">{{beijingTime(task.dueAt)}} 截止</time><span>{{deadlineLabel(task.dueAt)}}</span></p></div></div><RouterLink class="task-line-action" :to="{name:'student-assignment',params:{id:task.id}}">{{taskAction(task,task)}} →</RouterLink></li></ul></section></div>
           <ul v-else-if="recentTasks.length" class="explore-task-list">
             <li v-for="task in recentTasks" :key="task.id" :data-task-id="task.id">
               <div class="task-date-index"><span>{{datePart(task.dueAt,'month')}}</span><strong>{{datePart(task.dueAt,'day')}}</strong><small>{{datePart(task.dueAt,'time')}}</small></div>

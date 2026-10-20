@@ -1,0 +1,115 @@
+/* Adopted content hierarchy. Release-only: historical previews retain their baseline. */
+.student-release{
+ --content-paper:var(--surface);--content-row:#f8fafd;--content-band:#edf2f8;
+ --content-line:var(--line);--content-rail:#bdcce4;--content-ink:var(--ink);
+ --content-muted:var(--muted);--content-warm:#80500b;--content-warm-line:#ba995c;
+ --content-gap-small:6px;--content-gap-medium:14px;
+ --content-radius:8px;
+}
+/* Date rail and a continuous task surface per calendar day. */
+.student-release .vc-page.vc-home .bplus-task-group{grid-template-columns:86px minmax(0,1fr);gap:18px;padding:0 0 20px;border:0;align-items:stretch}
+.student-release .vc-page.vc-home .bplus-group-heading{border-left:2px solid var(--content-rail);padding:6px 0 8px 12px;gap:var(--content-gap-small)}
+.student-release .vc-page.vc-home .bplus-group-heading .vc-date{display:flex;flex-direction:column;align-items:start;gap:4px}
+.student-release .vc-page.vc-home .bplus-group-heading .vc-date-day{font-size:36px;color:var(--content-ink)}
+.student-release .vc-page.vc-home .bplus-group-heading>small{font-size:13px;color:var(--content-muted);line-height:1.6}
+.student-release .vc-page.vc-home .bplus-task-list{background:var(--content-paper);border:1px solid var(--content-line);border-radius:var(--content-radius);overflow:hidden}
+.student-release .vc-page.vc-home .bplus-task-list>li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 16px;padding:var(--content-gap-medium) 16px;border-bottom:1px solid var(--content-line)}
+.student-release .vc-page.vc-home .bplus-task-list>li:last-child{border-bottom:0}
+.student-release .vc-page.vc-home .bplus-task-list>li:hover,
+.student-release .vc-page.vc-home .bplus-task-list>li:focus-within{background:var(--content-row)}
+.student-release .vc-page.vc-home .explore-task-name{font-size:16px;font-weight:650;line-height:1.65}
+.student-release .vc-page.vc-home .task-line-content>.explore-muted{margin:6px 0 9px}
+.student-release .vc-page.vc-home .content-task-meta{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.student-release .content-task-time{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;line-height:1.65;color:var(--content-muted);font-variant-numeric:tabular-nums}
+.student-release .content-task-time time{font-weight:600}
+.student-release .vc-page.vc-home .task-line-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:7px 10px;border:1px solid #c5d1e2;border-radius:6px;background:var(--content-paper);font-size:13px;justify-self:end;align-self:center;text-decoration:none}
+.student-release .vc-page.vc-home .task-line-action:hover{background:#eef3fc;border-color:#8da6d4}
+.student-release .vc-page.vc-home [data-tone=soon] .content-task-time,
+.student-release .vc-page.vc-home [data-tone=overdue] .content-task-time{color:var(--content-warm)}
+/* Task rows retain columns and scanning density; only true state changes emphasis. */
+.student-release .vc-page.vc-tasks .task-table-head{background:var(--content-band);font-size:13px;color:var(--content-muted)}
+.student-release .vc-page.vc-tasks .task-group-heading{background:var(--content-band);border-left:3px solid #7896c6;font-size:14px}
+.student-release .vc-page.vc-tasks[data-craft=b] .task-table-row{gap:16px;border-bottom-color:var(--content-line);transition:background-color 140ms ease}
+.student-release .vc-page.vc-tasks .task-title{font-weight:650;line-height:1.65}
+.student-release .vc-page.vc-tasks .task-course{margin-top:7px}
+.student-release .vc-page.vc-tasks[data-craft=b] .vc-task-date{border-left:2px solid var(--content-rail);padding-left:10px}
+.student-release .vc-page.vc-tasks .vc-task-date .vc-date-time{font-weight:600}
+.student-release .vc-page.vc-tasks [data-tone=soon] .vc-task-date,
+.student-release .vc-page.vc-tasks [data-tone=overdue] .vc-task-date{border-left-color:var(--content-warm-line)}
+.student-release .vc-page.vc-tasks [data-tone=soon] .vc-due-state,
+.student-release .vc-page.vc-tasks [data-tone=overdue] .vc-due-state{color:var(--content-warm);font-weight:600}
+.student-release .vc-page.vc-tasks [data-tone=submitted],
+.student-release .vc-page.vc-tasks [data-tone=reviewed]{background:var(--content-row)}
+.student-release .vc-page.vc-tasks [data-tone=archived] .vc-task-date{border-left-style:dashed}
+.student-release .vc-page.vc-tasks .task-table-row:hover,
+.student-release .vc-page.vc-tasks .task-table-row:focus-within{background:#f0f5fc}
+.student-release .vc-page.vc-tasks .task-table-row>.vc-task-state{gap:6px}
+.student-release .vc-page.vc-tasks .task-table-row>.button{border-color:#bdcce4}
+/* Event stream: stable type/source, readable body, time and actions in one footer. */
+.student-release .vc-page.vc-inbox .notification-item,
+.student-release .vc-page.vc-inbox .notification-item.unread{padding:18px 14px 18px 60px;gap:0 18px}
+.student-release .vc-page.vc-inbox .notification-item.unread{background:#fafbfe;box-shadow:inset 2px 0 #6a8bd0}
+.student-release .vc-page.vc-inbox .notification-item.unread .notification-title{font-weight:700}
+.student-release .vc-page.vc-inbox .notification-item:not(.unread) .notification-title{font-weight:600;color:var(--content-ink)}
+.student-release .vc-page.vc-inbox .notification-item:hover,
+.student-release .vc-page.vc-inbox .notification-item:focus-within{background:#f3f6fc}
+.student-release .vc-page.vc-inbox .v35-message-glyph{left:12px;top:18px;border-radius:7px;border:1px solid #d9e2ef}
+.student-release .vc-page.vc-inbox .notification-date:not(:first-child){margin-top:18px}
+.student-release .vc-page.vc-inbox .notification-date h2{font-size:14px;line-height:1.6;font-weight:650;background:var(--content-band);font-variant-numeric:tabular-nums}
+.student-release .vc-page.vc-inbox .notification-item>.notification-title{margin-top:7px;margin-bottom:6px;line-height:1.65}
+.student-release .vc-page.vc-inbox .notification-item>.notification-time{grid-column:1;grid-row:5;align-self:center;margin:8px 0 0;font-size:13px}
+.student-release .vc-page.vc-inbox .notification-item>.notification-actions,
+.student-release .vc-page.vc-inbox .notification-item:not(:has(.message-full))>.notification-actions,
+.student-release .vc-page.vc-inbox .notification-item:has(.message-full[open])>.notification-actions{grid-column:2;grid-row:5;justify-self:end;gap:4px 10px;margin-top:8px}
+.student-release .vc-page.vc-inbox .notification-item>.message-full,
+.student-release .vc-page.vc-inbox .notification-item>.message-full[open]{grid-column:1/-1;grid-row:6;margin-top:0}
+.student-release .vc-page.vc-inbox .notification-actions .button{background:transparent}
+/* Secondary structured areas share surfaces and rhythms, not one universal card. */
+.student-release .vx-courses .vx-course-copy .vx-count-progress{padding-top:12px;border-top:1px solid var(--content-line)}
+.student-release .vx-courses .vx-course-links{border-top:1px solid var(--content-line);padding-top:8px}
+.student-release .vx-records .vx-path-body{border-color:var(--content-line);background:var(--content-paper)}
+.student-release .vx-records .vx-path-body:focus-within{background:var(--content-row);border-color:#8da6d4}
+.student-release .vx-records .vx-feedback-history>ul{background:var(--content-paper);border:1px solid var(--content-line);border-radius:var(--content-radius);padding:0 14px}
+.student-release .vx-calendar .vx-day-cell.selected{box-shadow:inset 0 0 0 2px #6e8dc7;background:#f3f6fc}
+.student-release .vx-calendar .vx-day-cell .vx-calendar-chip{border-left:2px solid var(--vx-accent);padding-left:7px}
+.student-release .vx-calendar .vx-agenda{border:1px solid var(--content-line);border-top:2px solid #7896c6;border-radius:var(--content-radius);background:var(--content-paper);padding:18px}
+.student-release .vx-calendar .vx-deadline-heading{background:var(--content-row);padding:10px 12px;border-bottom:1px solid var(--content-line)}
+.student-release .vc-page.vc-home .feedback-quote{border-left:2px solid #aabdd8;padding-left:12px}
+@media(max-width:1100px){
+ .student-release .vc-page.vc-home .bplus-task-list>li{grid-template-columns:minmax(0,1fr);gap:8px}
+ .student-release .vc-page.vc-home .task-line-action{justify-self:start}
+}
+@media(max-width:760px){
+ .student-release .vc-page.vc-home .bplus-task-group{grid-template-columns:62px minmax(0,1fr);gap:10px;padding-bottom:16px}
+ .student-release .vc-page.vc-home .bplus-group-heading{padding-left:8px}
+ .student-release .vc-page.vc-home .bplus-group-heading .vc-date-day{font-size:32px}
+ .student-release .vc-page.vc-home .bplus-group-heading>span{font-size:12px}
+ .student-release .vc-page.vc-home .bplus-group-heading>small{font-size:12px}
+ .student-release .vc-page.vc-home .bplus-task-list>li{padding:12px;gap:8px}
+ .student-release .vc-page.vc-home .explore-task-name{font-size:15px;line-height:1.65}
+ .student-release .vc-page.vc-home .content-task-meta{display:grid;gap:4px}
+ .student-release .vc-page.vc-home .task-line-action{padding:6px 10px}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row{gap:10px 12px}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row>.vc-task-date{grid-column:1/-1;grid-row:2;padding-left:10px}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row>.vc-task-state{grid-column:1;grid-row:3;align-self:center}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row>.button{grid-column:2;grid-row:3;align-self:center}
+ .student-release .vc-page.vc-inbox .notification-item,
+ .student-release .vc-page.vc-inbox .notification-item.unread{padding:14px 10px;gap:0 10px}
+ .student-release .vc-page.vc-inbox .v35-message-glyph{left:5px;top:14px}
+ .student-release .vc-page.vc-inbox .notification-item>.notification-header{padding-left:36px;min-height:32px}
+ .student-release .vc-page.vc-inbox .notification-item>.notification-time{grid-column:1/-1;grid-row:5;margin-top:8px}
+ .student-release .vc-page.vc-inbox .notification-item>.notification-actions,
+ .student-release .vc-page.vc-inbox .notification-item:has(.message-full[open])>.notification-actions{grid-column:2;grid-row:6;margin-top:0;gap:4px 8px}
+ .student-release .vc-page.vc-inbox .notification-item:not(:has(.message-full))>.notification-actions{grid-column:1/-1;grid-row:6;margin-top:0}
+ .student-release .vc-page.vc-inbox .notification-item>.message-full{grid-column:1;grid-row:6;margin:0}
+ .student-release .vc-page.vc-inbox .notification-item>.message-full[open]{grid-column:1/-1;grid-row:7;padding-top:6px}
+ .student-release .vc-page.vc-inbox .notification-date:not(:first-child){margin-top:12px}
+ .student-release .vx-calendar .vx-agenda{padding:14px}
+}
+@media(max-width:360px){
+ .student-release .vc-page.vc-home .bplus-task-group{grid-template-columns:54px minmax(0,1fr);gap:8px}
+ .student-release .vc-page.vc-home .bplus-task-list>li{padding:10px}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row>.vc-task-state{grid-column:1/-1;grid-row:3}
+ .student-release .vc-page.vc-tasks[data-craft=b] .task-table-row>.button{grid-column:1/-1;grid-row:4;justify-self:end}
+}
+@media(prefers-reduced-motion:reduce){.student-release .task-table-row{transition:none!important}}

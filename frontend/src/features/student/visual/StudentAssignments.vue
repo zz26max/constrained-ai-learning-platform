@@ -9,6 +9,7 @@ import ApiState from '../../../components/ApiState.vue'
 import IntegratedTaskStatus from './CraftTaskState.vue'
 import SubjectIdentity from './SubjectIdentity.vue'
 import CraftDate from './CraftDate.vue'
+import {taskContentTone} from './content-presentation'
 import {deadlineLabel} from '../../../features/assignments/task-presentation'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
@@ -83,7 +84,7 @@ function courseName(id:string){return query.data.value?.classes.find(c=>c.offeri
         <div v-if="!visible.length" class="empty-state"><h2>暂无符合条件的作业</h2><p>调整课程或状态筛选，查看其他任务。</p><button class="button secondary" @click="router.push({query:{status:'all'}})">清除筛选</button></div>
         <template v-for="(task,index) in visible" :key="task.id">
         <h2 v-if="filter==='todo' && groupLabel(task.id) && (index===0 || groupLabel(visible[index-1]!.id)!==groupLabel(task.id))" class="task-group-heading">{{groupLabel(task.id)}}</h2>
-        <article class="task-table-row" :data-task-id="task.id">
+        <article class="task-table-row" :data-task-id="task.id" :data-tone="taskContentTone(task,details.status.value==='success'?details.data.value?.[task.id]:undefined)">
           <div class="vc-task-copy"><RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink><div class="task-course"><SubjectIdentity :course="query.data.value.classes.find(c=>c.offeringId===task.offeringId)" /></div></div>
           <div class="vc-task-date"><CraftDate :value="task.dueAt"/><span class="vc-due-state">{{deadlineLabel(task.dueAt)}}</span></div>
           <IntegratedTaskStatus :show-deadline="false" :task="task" :detail="details.status.value==='success'?details.data.value?.[task.id]:undefined" />
