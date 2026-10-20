@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {visualVersion} from './mode'
 import {craftDirection} from './craft-mode'
 
 import { computed, ref, shallowRef, watch } from 'vue'
@@ -108,7 +109,7 @@ function goToPage(page: number): void {
 </script>
 
 <template>
-  <div class="workspace-page vx-page v35-page vc-page vc-inbox student-inbox" :data-craft="direction">
+  <div class="workspace-page vx-page v35-page vc-page vc-inbox student-inbox" :data-craft="direction" :data-polish="visualVersion==='v361'" :data-unread="route.query.unread??'a'">
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">消息通知</h1>

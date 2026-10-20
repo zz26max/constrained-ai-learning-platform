@@ -3,7 +3,7 @@ import App from '../../app/App.vue'
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 const exploration=['v34','v35'].includes(new URLSearchParams(location.search).get('explore')??'')
 const VisualSwitcher=defineAsyncComponent(()=>import('./visual/VisualSwitcher.vue'))
-const craft=new URLSearchParams(location.search).get('explore')==='v36'
+const craft=['v36','v361'].includes(new URLSearchParams(location.search).get('explore')??'')
 const CraftSwitcher=defineAsyncComponent(()=>import('./visual/CraftSwitcher.vue'))
 const marker=ref<HTMLElement|null>(null)
 let observer:ResizeObserver|undefined

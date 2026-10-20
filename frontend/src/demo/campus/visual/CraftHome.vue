@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {visualVersion} from './mode'
 import {craftDirection} from './craft-mode'
 
 import '../../../features/dashboard/home-exploration.css'
@@ -58,7 +59,7 @@ function datePart(value:string,part:'month'|'day'|'time'){
 }
 </script>
 <template>
-  <div class="workspace-page vx-page v35-page v35-home vc-page vc-home home-exploration" :class="[isPlus?'exploration-b exploration-bplus':'exploration-'+design]" :data-design="design" :data-craft="direction">
+  <div class="workspace-page vx-page v35-page v35-home vc-page vc-home home-exploration" :class="[isPlus?'exploration-b exploration-bplus':'exploration-'+design]" :data-design="design" :data-craft="direction" :data-polish="visualVersion==='v361'" :data-unread="route.query.unread??'a'">
     <header class="explore-heading">
       <div><p class="explore-eyebrow">知学 / {{ query.status.value==='success' && query.data.value?.termId===null?'当前没有进行中的学期':query.data.value?.termLabel ?? '学习工作空间' }}</p><h1 tabindex="-1">学习首页</h1><p class="explore-intro"><span v-if="query.status.value==='success' && query.data.value">本学期 {{query.data.value.pendingAssignmentCount}} 项待完成，先从仍可提交的任务开始。</span></p></div>
       <RouterLink class="explore-calendar" to="/student/calendar"><AppIcon name="calendar" /><span>查看学习日历</span><span aria-hidden="true">↗</span></RouterLink>
@@ -79,7 +80,7 @@ function datePart(value:string,part:'month'|'day'|'time'){
                 <p v-if="nextTask.title.includes('�')" role="alert" class="focus-data-warning">原始标题存在乱码，请联系教师修正。</p>
                 <IntegratedTaskStatus :task="nextTask" :detail="nextTask" :show-deadline="!isPlus" />
                 <div v-if="isPlus" class="bplus-deadline"><span>截止 · 北京时间</span><CraftDate :value="nextTask.dueAt"/><small>{{deadlineLabel(nextTask.dueAt)}}</small></div>
-                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="{name:'student-assignment',params:{id:nextTask.id}}">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办 <span aria-hidden="true">↗</span></RouterLink></div>
+                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="{name:'student-assignment',params:{id:nextTask.id}}">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办 <span aria-hidden="true">↗</span></RouterLink></div><p v-if="visualVersion==='v361'" class="polish-task-context"><span>按可提交任务的截止时间先后展示，包含补交任务。</span></p>
               </template>
               <template v-else>
                 <h2 id="explore-focus-title">当前没有可提交的待办</h2><p class="focus-empty-text">把时间留给课程学习。已截止任务与历史提交仍可查看。</p>

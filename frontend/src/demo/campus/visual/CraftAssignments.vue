@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {visualVersion} from './mode'
 import {craftDirection} from './craft-mode'
 
 import { computed, watch } from 'vue'
@@ -71,7 +72,7 @@ function groupLabel(id:string):string {
 function courseName(id:string){return query.data.value?.classes.find(c=>c.offeringId===id)?.title??'课程信息未返回'}
 </script>
 <template>
-  <div class="workspace-page vx-page v35-page vc-page vc-tasks student-tasks" :data-craft="direction">
+  <div class="workspace-page vx-page v35-page vc-page vc-tasks student-tasks" :data-craft="direction" :data-polish="visualVersion==='v361'" :data-unread="route.query.unread??'a'">
     <header class="workspace-heading"><div><h1 tabindex="-1">我的作业</h1><p>先处理待完成任务，截止时间均为北京时间。</p></div></header>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <template v-if="query.status.value==='success' && query.data.value">
