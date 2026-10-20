@@ -1,0 +1,7 @@
+/* Isolated review presentation only; V3.6 stays unchanged. */
+.vc-home[data-polish=true] .polish-task-context{display:flex;flex-direction:column;gap:5px;margin:12px 0 0;line-height:1.65;color:#e4ecfc;font-size:13px}
+.vc-home[data-polish=true] .polish-task-context strong{font-size:15px;color:#fff}
+.vc-inbox[data-polish=true][data-unread=b] .notification-item.unread{background:#fafbfe;box-shadow:inset 2px 0 #6a8bd0}
+.vc-inbox[data-polish=true][data-unread=b] .notification-item.unread .notification-title{font-weight:700}
+
+.vc-home[data-polish=true] .vc-permission.is-late{font-weight:700;color:#fff}

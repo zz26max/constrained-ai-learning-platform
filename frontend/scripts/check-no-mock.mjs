@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const distDir = fileURLToPath(new URL('../dist', import.meta.url))
-const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError', 'CAMPUS_DEMO_ONLY', 'campus.student', 'vx-course-masthead']
+const SENTINELS = ['MOCK_LAYER_ACTIVE', 'mock-demo-pass', 'MockNotImplementedError', 'CAMPUS_DEMO_ONLY', 'campus.student', 'installCampusClock', '高校演示 · 虚构数据', '视觉工艺评审', '体验精修评审']
 
 async function exists(candidate) {
   try {
@@ -61,3 +61,24 @@ if (violations.length > 0) {
 }
 
 console.log(`PASS: ${files.length} 个构建产物文件，未发现 mock 层内容（${SENTINELS.join(' / ')}）。`)
+
+// Presentation classes may ship; the demo module graph must never be reachable.
+const sourceRoot=fileURLToPath(new URL('../src/',import.meta.url))
+const seen=new Set()
+async function walk(file){
+ if(seen.has(file))return
+ seen.add(file)
+ if(file.includes(path.sep+'demo'+path.sep)||file.includes(path.sep+'mocks'+path.sep)){
+  // Explicit mock mode is dynamically eliminated by the real production build;
+  // keep the bundle sentinels above for that existing transport branch.
+  if(file.includes(path.sep+'demo'+path.sep))throw new Error('Production imports demo module: '+path.relative(sourceRoot,file))
+  return
+ }
+ const text=await readFile(file,'utf8')
+ for(const match of text.matchAll(/(?:from\s*|import\s*\(?\s*|@import\s*)['"](\.[^'"]+)['"]/g)){
+  const base=path.resolve(path.dirname(file),match[1])
+  for(const candidate of [base,base+'.ts',base+'.vue',base+'.css',path.join(base,'index.ts')])if(await exists(candidate)&&!(await stat(candidate)).isDirectory()){await walk(candidate);break}
+ }
+}
+await walk(path.join(sourceRoot,'main.ts'))
+console.log('PASS: production dependency graph contains no demo entry, clock, transport or review controls.')
