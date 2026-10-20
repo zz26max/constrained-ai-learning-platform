@@ -134,7 +134,7 @@ function goToPage(page: number): void {
           <div class="notification-header">
             <MessageTypeGlyph :type="notification.type"/><span class="notification-type">{{ TYPE_LABELS[notification.type] }}</span>
             <span v-if="notification.readAt === null" class="tag">● 未读</span><span v-else class="muted">已读</span>
-            
+
           </div>
           <p v-if="courseById(notification.offeringId)" class="v35-message-course"><SubjectIdentity :course="courseById(notification.offeringId)" /></p><h2 tabindex="-1" class="notification-title" :title="notification.title">{{ notification.title }}</h2>
           <p class="notification-content">{{ notification.content }}</p><time class="notification-time" :datetime="notification.createdAt">{{ formatTime(notification.createdAt) }}</time><details v-if="clippedIds.has(notification.id)" class="message-full" @toggle="measureOverflow"><summary><span class="message-expand">完整消息</span><span class="message-collapse">收起消息</span><span aria-hidden="true">⌄</span></summary><p>{{notification.content}}</p></details>
