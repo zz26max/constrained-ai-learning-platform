@@ -1,9 +1,11 @@
 import { ref } from 'vue'
 import type { MyCoursesQuery } from '../../../api/courses'
 import type { Router } from 'vue-router'
-export type VisualVersion='v33'|'v34'|'v341'|'v35'
+export type VisualVersion='v33'|'v34'|'v341'|'v35'|'v36'
 const requested=new URLSearchParams(location.hash.split('?')[1]??'').get('visual')
-export const visualVersion=ref<VisualVersion>(requested==='v33'||requested==='v341'||requested==='v34'?requested:new URLSearchParams(location.search).get('explore')==='v35'?'v35':'v34')
+const entry=new URLSearchParams(location.search).get('explore')
+const allowed:VisualVersion[]=entry==='v36'?['v35','v36']:entry==='v35'?['v33','v34','v341','v35']:['v33','v34','v341']
+export const visualVersion=ref<VisualVersion>(allowed.includes(requested as VisualVersion)?requested as VisualVersion:entry==='v36'?'v36':entry==='v35'?'v35':'v34')
 export const previewTerm=ref('')
 export const previewCourseStatus=ref<NonNullable<MyCoursesQuery['status']>>('active')
 export const previewCoursePage=ref(1)

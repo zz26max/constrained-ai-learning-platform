@@ -3,6 +3,8 @@ import App from '../../app/App.vue'
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 const exploration=['v34','v35'].includes(new URLSearchParams(location.search).get('explore')??'')
 const VisualSwitcher=defineAsyncComponent(()=>import('./visual/VisualSwitcher.vue'))
+const craft=new URLSearchParams(location.search).get('explore')==='v36'
+const CraftSwitcher=defineAsyncComponent(()=>import('./visual/CraftSwitcher.vue'))
 const marker=ref<HTMLElement|null>(null)
 let observer:ResizeObserver|undefined
 onMounted(()=>{observer=new ResizeObserver(()=>document.documentElement.style.setProperty('--campus-marker-height',`${marker.value?.offsetHeight??0}px`));if(marker.value)observer.observe(marker.value)})
@@ -16,7 +18,7 @@ function reset() { window.location.reload() }
       <span>演示日期：2026-10-19 10:00（北京时间）</span>
       <button type="button" @click="reset">重置演示</button>
       <details><summary>隔离与操作说明</summary><p>课程阅读、工作区保存、模拟提交与消息已读仅保存在本页内存；刷新即重置。不会访问正式接口或数据库。教师、AI 辅导、真实评测和选课操作未包含在演示中。演示账号：campus.student / campus-preview。</p></details>
-    </aside><VisualSwitcher v-if="exploration"/></div>
+    </aside><CraftSwitcher v-if="craft"/><VisualSwitcher v-else-if="exploration"/></div>
     <App />
   </div>
 </template>

@@ -34,7 +34,10 @@ registerDashboardApi(new DashboardApi(client))
 registerNoticesApi(new NoticesApi(client))
 registerStatsApi(new StatsApi(client))
 // Opt-in visual exploration changes presentation only within this isolated entry.
-if(new URLSearchParams(location.search).get('explore')==='v35'){
+if(new URLSearchParams(location.search).get('explore')==='v36'){
+ const {installCraftPreview}=await import('./visual/install-craft')
+ installCraftPreview(router)
+}else if(new URLSearchParams(location.search).get('explore')==='v35'){
  const {installIntegrationPreview}=await import('./visual/install-integration')
  installIntegrationPreview(router)
 }else if(new URLSearchParams(location.search).get('explore')==='v34'){
