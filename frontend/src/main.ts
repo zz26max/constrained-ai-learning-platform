@@ -29,7 +29,7 @@ registerDashboardApi(await createDefaultDashboardApi())
 registerNoticesApi(await createDefaultNoticesApi())
 registerStatsApi(await createDefaultStatsApi())
 
-const app = createApp(App)
+const app = createApp(App,{studentVisual:true})
 app.use(createPinia())
 app.use(router)
 app.mount('#app')

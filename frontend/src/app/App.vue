@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import { defaultEntry, isInternalPath } from './router'
 import AppIcon from '../components/AppIcon.vue'
 
+defineProps<{studentVisual?:boolean}>()
 const auth = useAuthStore(), router = useRouter(), route = useRoute()
 const loggingOut = ref(false), menuOpen = ref(false), menuTrigger = ref<HTMLButtonElement | null>(null)
 const dualRole = computed(() => auth.identity?.roles.includes('student') && auth.identity.roles.includes('teacher'))
@@ -45,7 +46,7 @@ async function logout() {
 function skipToMain() { document.getElementById('main-content')?.focus() }
 </script>
 <template>
-  <div class="app-shell" :class="{'student-space':auth.phase==='authenticated' && role==='student'}">
+  <div class="app-shell" :class="{'student-space':auth.phase==='authenticated' && role==='student','student-release':studentVisual && auth.phase==='authenticated' && role==='student'}">
     <a class="skip-link" href="#" @click.prevent="skipToMain">跳到主要内容</a>
     <header v-if="API_MODE === 'mock'" class="mock-banner" role="status">模拟模式 · 全部数据为虚构，不访问真实接口</header>
     <div :class="{'authenticated-layout':auth.phase === 'authenticated'}">

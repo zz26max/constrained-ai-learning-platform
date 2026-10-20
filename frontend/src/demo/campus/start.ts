@@ -33,6 +33,19 @@ registerAssignmentsApi(new AssignmentsApi(client))
 registerDashboardApi(new DashboardApi(client))
 registerNoticesApi(new NoticesApi(client))
 registerStatsApi(new StatsApi(client))
+// Pin pre-migration routes for every historical demo entry, independent of release defaults.
+for(const [name,loader] of [
+ ['student-home',()=>import('../../features/dashboard/StudentHomePage.vue')],
+ ['student-assignments',()=>import('../../features/assignments/AssignmentList.vue')],
+ ['student-messages',()=>import('../../features/notifications/NotificationCenter.vue')],
+ ['courses',()=>import('../../features/courses/CourseListPage.vue')],
+ ['student-progress',()=>import('../../features/dashboard/LearningRecordsPage.vue')],
+ ['student-progress-select',()=>import('../../features/dashboard/LearningRecordsPage.vue')],
+ ['student-calendar',()=>import('../../features/calendar/AssignmentCalendar.vue')],
+] as const){
+ const route=router.getRoutes().find(r=>r.name===name)!
+ router.addRoute({name,path:route.path,meta:route.meta,component:(await loader()).default})
+}
 // Opt-in visual exploration changes presentation only within this isolated entry.
 if(['v36','v361'].includes(new URLSearchParams(location.search).get('explore')??'')){
  const {installCraftPreview}=await import('./visual/install-craft')

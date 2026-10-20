@@ -6,7 +6,7 @@ import NotFoundPage from '../features/NotFoundPage.vue'
 import { useAuthStore } from '../stores/auth'
 import type { components } from '../api/generated/schema'
 import AccessDeniedPage from './AccessDeniedPage.vue'
-import CourseListPage from '../features/courses/CourseListPage.vue'
+import CourseListPage from '../features/student/visual/StudentCourses.vue'
 import OfferingPage from '../features/courses/OfferingPage.vue'
 import ChapterPage from '../features/courses/ChapterPage.vue'
 import ResourcePage from '../features/courses/ResourcePage.vue'
@@ -20,10 +20,11 @@ import AssignmentEditor from '../features/assignments/AssignmentEditor.vue'
 import TeacherFeedbackEditor from '../features/assignments/TeacherFeedbackEditor.vue'
 import NotificationCenter from '../features/student/visual/StudentMessages.vue'
 import StudentHomePage from '../features/student/visual/StudentHome.vue'
-import LearningRecordsPage from '../features/dashboard/LearningRecordsPage.vue'
+import LearningRecordsPage from '../features/student/visual/StudentRecords.vue'
 import NoticeListPage from '../features/notices/NoticeListPage.vue'
 import NoticeDetailPage from '../features/notices/NoticeDetailPage.vue'
 import AssignmentCalendar from '../features/calendar/AssignmentCalendar.vue'
+import StudentCalendar from '../features/student/visual/StudentCalendar.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -47,7 +48,7 @@ export function defaultEntry(user: components['schemas']['UserDTO'] | null): str
 }
 
 const routes: RouteRecordRaw[] = [
-  {name:'student-calendar',path:'/student/calendar',component:AssignmentCalendar,meta:{requiresAuth:true,requiresRole:'student',title:'学习日历 · 知学'}},
+  {name:'student-calendar',path:'/student/calendar',component:StudentCalendar,meta:{requiresAuth:true,requiresRole:'student',title:'学习日历 · 知学'}},
   {name:'teacher-calendar',path:'/teacher/calendar',component:AssignmentCalendar,meta:{requiresAuth:true,requiresRole:'teacher',title:'教学日历 · 知学'}},
   {
     name: 'login',

@@ -1,5 +1,4 @@
 /* Independent V3.5 review only. Earlier preview roots never receive v35-page. */
-.vx-switcher select{min-height:44px;max-width:124px;border:1px solid #92a6c9;border-radius:6px;background:white;color:#253656;font-size:12px;padding:0 6px}
 .v35-page{--v35-brand:#2853bc;--v35-ink:#192c4d;--v35-muted:#53647b;--v35-line:#d9e1ed;--v35-soft:#eef2ff;--ink:var(--v35-ink);--muted:var(--v35-muted);--line:var(--v35-line)}
 .v35-page h1{font-size:28px;line-height:1.4}.v35-page .workspace-heading{padding-bottom:20px;border-bottom:1px solid var(--v35-line);margin-bottom:22px}.v35-page .workspace-heading p{font-size:13px;margin-top:8px}
 .v35-page a:focus-visible,.v35-page button:focus-visible{outline:3px solid #2853bc;outline-offset:3px}.v35-page a,.v35-page button{touch-action:manipulation}.v35-page .button{min-height:44px}

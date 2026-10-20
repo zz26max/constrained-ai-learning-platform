@@ -1,1 +1,2 @@
 @import "../../../features/student/visual/integration.css";
+.vx-switcher select{min-height:44px;max-width:124px;border:1px solid #92a6c9;border-radius:6px;background:white;color:#253656;font-size:12px;padding:0 6px}

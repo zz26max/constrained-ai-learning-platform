@@ -366,7 +366,7 @@ describe('P1-D 学习记录', () => {
     const links=view.findAll('main a').filter(n=>n.attributes('href')?.includes('feedbackId='))
     expect(links).toHaveLength(2)
     expect(new Set(links.map(n=>n.attributes('href'))).size).toBe(2)
-    expect(view.find('.recent-feedback-summary').text()).toContain('整体不错')
+    expect(view.find('.vx-feedback').text()).toContain('整体不错')
   })
   it('5b. 超过 20 份评价向服务端请求第三页，汇总和最近评价保持不变', async () => {
     learningRecords = recordsFor(23)
@@ -383,7 +383,7 @@ describe('P1-D 学习记录', () => {
     expect(page.text()).toContain('评价作业 23')
     expect(page.text()).toContain('第 3 / 3 页')
     expect(requestsOf('getMyLearningRecords').at(-1)?.path).toContain('page=3&pageSize=10')
-    expect(page.text()).toContain('23 份评价已发布')
+    expect(page.get('.vx-results').text()).toContain('已发布评价23份')
   })
 
   it('5c. 非法 offeringId 不发请求并显示链接无效', async () => {
@@ -399,7 +399,7 @@ describe('P1-D 学习记录', () => {
     await page.find('select').setValue(OFFERING_2)
     await flushPromises()
     expect(router?.currentRoute.value.path).toBe(`/student/progress/${OFFERING_2}`)
-    expect(page.text()).toContain('章节学习进度')
+    expect(page.text()).toContain('章节学习路径')
   })
 
   it('5e. 403/404 显示无法查看并给出返回入口', async () => {
@@ -525,13 +525,14 @@ describe('P1-D 消息目标映射', () => {
     expect(view.find('.task-table-row').text()).toContain('查看详情')
     expect(view.find('.filter-tabs').text()).toContain('待完成 1')
   })
-  it('课程零计数不重复展示，主要操作直达章节且课程详情仍保留',async()=>{
+  it('课程零计数不重复展示，主要操作按真实章节状态直达且详情仍保留',async()=>{
+    scripted.setHandler(r=>r.operationId==='listChapters'?okEnvelope({offeringId:OFFERING,items:[{id:CHAPTER,number:1,title:'章节',publicationState:'published',studentProgress:{status:'completed'}}]}):normalResponse(r))
     dashboardOverride={courses:[course({termId:DEMO_CONFIG.currentTermId,currentChapter:{id:CHAPTER,title:'章节',number:1},progress:{...progress,unit:'chapter',completed:1,total:1,percent:100}})]}
     const view=await open('/course')
     expect(view.find('.course-summary').exists()).toBe(false)
-    expect(view.find('.course-main-action').text()).toContain('复习章节')
-    expect(view.find('.course-main-action').attributes('href')).toContain(`/chapter/${CHAPTER}`)
-    expect(view.find('.course-identity h2 a').attributes('href')).toBe(`/course/${OFFERING}`)
+    expect(view.find('.vx-course-primary').text()).toContain('复习章节')
+    expect(view.find('.vx-course-primary').attributes('href')).toContain(`/chapter/${CHAPTER}`)
+    expect(view.find('.vx-course-copy h2 a').attributes('href')).toBe(`/course/${OFFERING}`)
     expect(view.text()).toContain('李老师')
   })
   it('完整短消息无冗余展开且同一北京时间日期不合并通知',async()=>{

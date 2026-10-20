@@ -1,4 +1,6 @@
-<script lang="ts">
+<script setup lang="ts">
 import Component from '../../../features/student/visual/CraftDate.vue'
-export default Component
+
+const props=defineProps<{value:string}>()
 </script>
+<template><Component v-bind="props"/></template>
