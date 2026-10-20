@@ -130,7 +130,7 @@ async function open(path: string, role: 'student' | 'teacher' = 'student', histo
   if(historical)router.addRoute({name:'student-home',path:'/student/home',component:HistoricalHome,meta:{requiresAuth:true,requiresRole:'student'}})
   await router.push(path)
   await router.isReady()
-  wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router] } })
+  wrapper = mount(App, { props:{studentVisual:true}, attachTo: document.body, global: { plugins: [pinia, router] } })
   await flushPromises()
   return wrapper
 }
@@ -204,6 +204,20 @@ describe('P1-D 路由与首页', () => {
     expect(view.get('#explore-focus-title').text()).toBe('当前没有可提交的待办')
     expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/course/'+OFFERING)
     expect(view.find('[role=progressbar]').exists()).toBe(false)
+  })
+
+  it('正式课程保留真实空态与读取错误，不用空课程掩盖失败',async()=>{
+    scripted.setHandler(r=>r.operationId==='listMyCourses'?okEnvelope({items:[],page:1,pageSize:100,total:0}):normalResponse(r))
+    const empty=await open('/course');expect(empty.text()).toContain('暂无符合条件的课程');expect(empty.find('.student-release').exists()).toBe(true)
+    wrapper?.unmount()
+    scripted.setHandler(r=>r.operationId==='listMyCourses'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-course-failure'):normalResponse(r))
+    const failed=await open('/course');expect(failed.text()).toContain('req-course-failure');expect(failed.text()).not.toContain('暂无符合条件的课程')
+  })
+  it('教师日历保持原页面且不获得学生视觉容器',async()=>{
+    const teacher=await open('/teacher/calendar','teacher')
+    expect(teacher.get('main h1').text()).toBe('教学日历')
+    expect(teacher.find('.student-release').exists()).toBe(false)
+    expect(teacher.find('.vx-calendar').exists()).toBe(false)
   })
   it('1. 学生登录后 / 重定向到 /student/home', async () => {
     await open('/')

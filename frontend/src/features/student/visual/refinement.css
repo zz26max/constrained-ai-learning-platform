@@ -1,83 +1,83 @@
 /* V3.4.1 only: initial V3.4 remains available without this opt-in root class. */
-.vx-page.vx-refined .vx-reading-total>strong{font-size:48px}
-.vx-page.vx-refined .vx-reading-total>.vx-muted{font-size:14px}
-.vx-page.vx-refined .vx-course-masthead{padding:22px 0}
-.vx-page.vx-refined .vx-record-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.8fr);gap:28px}
-.vx-page.vx-refined .vx-record-grid.is-short{grid-template-columns:minmax(0,1fr)}
-.vx-page.vx-refined .is-short .vx-evidence{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
-.vx-page.vx-refined .is-short .vx-empty{display:grid;grid-template-columns:60px minmax(0,1fr) auto;gap:6px 18px;align-items:center;padding:22px}
-.vx-page.vx-refined .is-short .vx-empty .vx-glyph{grid-column:1;grid-row:1/3;width:56px;height:72px;margin:0}
-.vx-page.vx-refined .is-short .vx-empty .vx-glyph svg{width:40px;height:40px}
-.vx-page.vx-refined .is-short .vx-empty h3{grid-column:2;align-self:end}
-.vx-page.vx-refined .is-short .vx-empty p{grid-column:2;align-self:start;margin:0}
-.vx-page.vx-refined .is-short .vx-empty>.button{grid-column:3;grid-row:1/3}
-.vx-page.vx-refined .vx-section-heading h2{font-size:20px}
-.vx-page.vx-refined .vx-section-heading{margin-bottom:12px}
-.vx-page.vx-refined .vx-last-position{margin-bottom:14px}
-.vx-page.vx-refined .vx-path{margin:16px 0}
-.vx-page.vx-refined .vx-path>li{grid-template-columns:32px minmax(0,1fr);gap:12px;padding-bottom:12px}
-.vx-page.vx-refined .vx-path-node{width:32px;height:32px;margin-top:6px;font-size:12px;border-radius:7px}
-.vx-page.vx-refined .vx-path>li:not(:last-child):before{left:15px;top:38px;bottom:-6px;background:#c0ccde}
-.vx-page.vx-refined .vx-path-body{padding:12px 16px}
-.vx-page.vx-refined .vx-path>li[data-state=completed] .vx-path-node{background:var(--vx-soft);color:var(--vx-accent);border:1px solid #b6c4d9}
-.vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-path-node{background:var(--vx-accent);color:#fff;border:1px solid var(--vx-accent)}
-.vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-path-body{border:1px solid var(--vx-line);border-left:3px solid var(--vx-accent);box-shadow:none;background:var(--vx-soft)}
-.vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-node-caption{font-weight:500}
-.vx-page.vx-refined .vx-evidence{gap:20px}
-.vx-page.vx-refined .vx-overview{padding:20px;background:#fafbfd}
-.vx-page.vx-refined .vx-overview h2{font-size:18px}
-.vx-page.vx-refined .vx-results{gap:22px;margin-top:18px;padding-top:16px}
-.vx-page.vx-refined .vx-results dd{font-size:26px}
-.vx-page.vx-refined .vx-feedback{padding:0 20px 18px}
-.vx-page.vx-refined .vx-feedback-score{margin:14px 0}
-.vx-page.vx-refined .vx-feedback-score strong{font-size:34px;color:var(--vx-ink)}
-.vx-page.vx-refined .vx-feedback h3 a{font-weight:600}
-.vx-page.vx-refined .vx-count-label{align-items:baseline;flex-wrap:wrap;gap:4px 12px}
-.vx-page.vx-refined .vx-count-label strong{color:var(--vx-ink);font-size:16px}
-.vx-page.vx-refined .vx-progress-percent{font-size:12px;color:var(--vx-muted);white-space:nowrap}
-.vx-page.vx-refined .vx-segments{gap:3px}
+:where(.student-space) .vx-page.vx-refined .vx-reading-total>strong{font-size:48px}
+:where(.student-space) .vx-page.vx-refined .vx-reading-total>.vx-muted{font-size:14px}
+:where(.student-space) .vx-page.vx-refined .vx-course-masthead{padding:22px 0}
+:where(.student-space) .vx-page.vx-refined .vx-record-grid{grid-template-columns:minmax(0,1.45fr) minmax(280px,.8fr);gap:28px}
+:where(.student-space) .vx-page.vx-refined .vx-record-grid.is-short{grid-template-columns:minmax(0,1fr)}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-evidence{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty{display:grid;grid-template-columns:60px minmax(0,1fr) auto;gap:6px 18px;align-items:center;padding:22px}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty .vx-glyph{grid-column:1;grid-row:1/3;width:56px;height:72px;margin:0}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty .vx-glyph svg{width:40px;height:40px}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty h3{grid-column:2;align-self:end}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty p{grid-column:2;align-self:start;margin:0}
+:where(.student-space) .vx-page.vx-refined .is-short .vx-empty>.button{grid-column:3;grid-row:1/3}
+:where(.student-space) .vx-page.vx-refined .vx-section-heading h2{font-size:20px}
+:where(.student-space) .vx-page.vx-refined .vx-section-heading{margin-bottom:12px}
+:where(.student-space) .vx-page.vx-refined .vx-last-position{margin-bottom:14px}
+:where(.student-space) .vx-page.vx-refined .vx-path{margin:16px 0}
+:where(.student-space) .vx-page.vx-refined .vx-path>li{grid-template-columns:32px minmax(0,1fr);gap:12px;padding-bottom:12px}
+:where(.student-space) .vx-page.vx-refined .vx-path-node{width:32px;height:32px;margin-top:6px;font-size:12px;border-radius:7px}
+:where(.student-space) .vx-page.vx-refined .vx-path>li:not(:last-child):before{left:15px;top:38px;bottom:-6px;background:#c0ccde}
+:where(.student-space) .vx-page.vx-refined .vx-path-body{padding:12px 16px}
+:where(.student-space) .vx-page.vx-refined .vx-path>li[data-state=completed] .vx-path-node{background:var(--vx-soft);color:var(--vx-accent);border:1px solid #b6c4d9}
+:where(.student-space) .vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-path-node{background:var(--vx-accent);color:#fff;border:1px solid var(--vx-accent)}
+:where(.student-space) .vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-path-body{border:1px solid var(--vx-line);border-left:3px solid var(--vx-accent);box-shadow:none;background:var(--vx-soft)}
+:where(.student-space) .vx-page.vx-refined .vx-path>li[data-state=in_progress] .vx-node-caption{font-weight:500}
+:where(.student-space) .vx-page.vx-refined .vx-evidence{gap:20px}
+:where(.student-space) .vx-page.vx-refined .vx-overview{padding:20px;background:#fafbfd}
+:where(.student-space) .vx-page.vx-refined .vx-overview h2{font-size:18px}
+:where(.student-space) .vx-page.vx-refined .vx-results{gap:22px;margin-top:18px;padding-top:16px}
+:where(.student-space) .vx-page.vx-refined .vx-results dd{font-size:26px}
+:where(.student-space) .vx-page.vx-refined .vx-feedback{padding:0 20px 18px}
+:where(.student-space) .vx-page.vx-refined .vx-feedback-score{margin:14px 0}
+:where(.student-space) .vx-page.vx-refined .vx-feedback-score strong{font-size:34px;color:var(--vx-ink)}
+:where(.student-space) .vx-page.vx-refined .vx-feedback h3 a{font-weight:600}
+:where(.student-space) .vx-page.vx-refined .vx-count-label{align-items:baseline;flex-wrap:wrap;gap:4px 12px}
+:where(.student-space) .vx-page.vx-refined .vx-count-label strong{color:var(--vx-ink);font-size:16px}
+:where(.student-space) .vx-page.vx-refined .vx-progress-percent{font-size:12px;color:var(--vx-muted);white-space:nowrap}
+:where(.student-space) .vx-page.vx-refined .vx-segments{gap:3px}
 /* Identity, progress, action: three weights, rather than every line in subject color. */
-.vx-page.vx-refined .vx-course-sheet{grid-template-columns:68px minmax(0,1fr)}
-.vx-page.vx-refined .vx-subject-rail{padding:18px 6px;gap:0}
-.vx-page.vx-refined .vx-subject-rail .vx-glyph{width:56px;height:76px}
-.vx-page.vx-refined .vx-subject-rail .vx-glyph svg{width:42px;height:42px}
-.vx-page.vx-refined .vx-subject-family{display:none}
-.vx-page.vx-refined .vx-course-copy{padding:20px}
-.vx-page.vx-refined .vx-course-topline>span:first-child{color:var(--vx-muted);font-weight:400;letter-spacing:0}
-.vx-page.vx-refined .vx-course-primary{color:var(--vx-ink);border-bottom:0;padding:0;font-weight:600}
-.vx-page.vx-refined .vx-course-primary>span{color:var(--vx-accent)}
-.vx-page.vx-refined .vx-course-primary:hover{text-decoration:underline;text-decoration-color:var(--vx-accent)}
-.vx-page.vx-refined .vx-course-links{padding-top:4px;margin-top:10px}
-.vx-page.vx-refined .vx-course-links a{color:var(--vx-muted);font-size:13px}
+:where(.student-space) .vx-page.vx-refined .vx-course-sheet{grid-template-columns:68px minmax(0,1fr)}
+:where(.student-space) .vx-page.vx-refined .vx-subject-rail{padding:18px 6px;gap:0}
+:where(.student-space) .vx-page.vx-refined .vx-subject-rail .vx-glyph{width:56px;height:76px}
+:where(.student-space) .vx-page.vx-refined .vx-subject-rail .vx-glyph svg{width:42px;height:42px}
+:where(.student-space) .vx-page.vx-refined .vx-subject-family{display:none}
+:where(.student-space) .vx-page.vx-refined .vx-course-copy{padding:20px}
+:where(.student-space) .vx-page.vx-refined .vx-course-topline>span:first-child{color:var(--vx-muted);font-weight:400;letter-spacing:0}
+:where(.student-space) .vx-page.vx-refined .vx-course-primary{color:var(--vx-ink);border-bottom:0;padding:0;font-weight:600}
+:where(.student-space) .vx-page.vx-refined .vx-course-primary>span{color:var(--vx-accent)}
+:where(.student-space) .vx-page.vx-refined .vx-course-primary:hover{text-decoration:underline;text-decoration-color:var(--vx-accent)}
+:where(.student-space) .vx-page.vx-refined .vx-course-links{padding-top:4px;margin-top:10px}
+:where(.student-space) .vx-page.vx-refined .vx-course-links a{color:var(--vx-muted);font-size:13px}
 /* Quantities explain density. Subject color stays on course identity, not a second scale. */
-.vx-page.vx-refined .vx-quantity-note{font-size:12px;color:var(--vx-muted);margin:0 0 12px}
-.vx-page.vx-refined .vx-day-cell[data-density=one],.vx-page.vx-refined .vx-day-cell[data-density=two]{background:#fff}
-.vx-page.vx-refined .vx-day-cell[data-density=many]{background:#f0f3f7}
-.vx-page.vx-refined .vx-day-cell.outside{background:#f6f7fa}
-.vx-page.vx-refined .vx-day-cell.selected{background:#eef2ff;outline:2px solid #2853bc;outline-offset:-2px}
-.vx-page.vx-refined .vx-day-heading>span{font-size:11px;line-height:1.4}
-.vx-page.vx-refined .vx-date-button.today{background:transparent;color:#2853bc;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
-.vx-page.vx-refined .vx-day-cell.selected .vx-date-button{background:#2853bc;color:#fff}
-.vx-page.vx-refined .vx-calendar-chip{color:var(--vx-ink);padding-left:7px}
-.vx-page.vx-refined .vx-more{padding-left:9px}
-.vx-page.vx-refined .vx-agenda-heading{margin-bottom:20px}
-.vx-page.vx-refined .vx-agenda-heading>strong{font-size:42px}
-.vx-page.vx-refined .vx-time-groups,.vx-page.vx-refined .vx-agenda-group-items{list-style:none;margin:0;padding:0}
-.vx-page.vx-refined .vx-time-groups>li+li{margin-top:22px}
-.vx-page.vx-refined .vx-deadline-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid var(--vx-line);padding:0 0 10px;margin-bottom:4px}
-.vx-page.vx-refined .vx-deadline-heading time{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
-.vx-page.vx-refined .vx-deadline-heading time span,.vx-page.vx-refined .vx-deadline-heading>span{font-size:12px;font-weight:400;color:var(--vx-muted)}
-.vx-page.vx-refined .vx-agenda-group-items>li{padding-top:12px}
-.vx-page.vx-refined .vx-agenda-event{padding:0 0 14px 12px;gap:7px}
-.vx-page.vx-refined .vx-agenda-meta{gap:10px}
-.vx-page.vx-refined .vx-eligibility-note{font-size:12px;line-height:1.7;color:var(--vx-muted);margin-top:18px}
-@media(min-width:761px){.vx-page.vx-refined .vx-path-body{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}.vx-page.vx-refined .vx-node-caption{grid-column:1/-1}.vx-page.vx-refined .vx-path-body .vx-text-action{white-space:nowrap}.vx-page.vx-refined .is-many .vx-path-body{padding:8px 14px}}
-@media(max-width:1100px){.vx-page.vx-refined .vx-record-grid{grid-template-columns:minmax(0,1fr)}.vx-page.vx-refined .vx-feedback{padding:0 0 18px}}
-@media(max-width:600px){.vx-page.vx-refined .vx-course-masthead{padding:16px 0}.vx-page.vx-refined .vx-reading-total>strong{font-size:26px}.vx-page.vx-refined .vx-section-heading h2{font-size:18px}.vx-page.vx-refined .vx-path>li{grid-template-columns:28px minmax(0,1fr);gap:8px;padding-bottom:10px}.vx-page.vx-refined .vx-path-node{width:28px;height:28px;font-size:11px}.vx-page.vx-refined .vx-path>li:not(:last-child):before{left:13px;top:34px}.vx-page.vx-refined .vx-path-body{padding:10px 12px}.vx-page.vx-refined .vx-record-grid{gap:16px}.vx-page.vx-refined .is-short .vx-evidence{grid-template-columns:minmax(0,1fr)}.vx-page.vx-refined .vx-overview{padding:18px}.vx-page.vx-refined .vx-feedback{padding:0 0 18px}}
-@media(max-width:600px){.vx-page.vx-refined .is-short .vx-empty{grid-template-columns:52px minmax(0,1fr);gap:8px 12px;padding:18px}.vx-page.vx-refined .is-short .vx-empty .vx-glyph{width:52px;height:66px}.vx-page.vx-refined .is-short .vx-empty>.button{grid-column:1/-1;grid-row:auto;justify-self:start;margin-top:8px}}
+:where(.student-space) .vx-page.vx-refined .vx-quantity-note{font-size:12px;color:var(--vx-muted);margin:0 0 12px}
+:where(.student-space) .vx-page.vx-refined .vx-day-cell[data-density=one],:where(.student-space) .vx-page.vx-refined .vx-day-cell[data-density=two]{background:#fff}
+:where(.student-space) .vx-page.vx-refined .vx-day-cell[data-density=many]{background:#f0f3f7}
+:where(.student-space) .vx-page.vx-refined .vx-day-cell.outside{background:#f6f7fa}
+:where(.student-space) .vx-page.vx-refined .vx-day-cell.selected{background:#eef2ff;outline:2px solid #2853bc;outline-offset:-2px}
+:where(.student-space) .vx-page.vx-refined .vx-day-heading>span{font-size:11px;line-height:1.4}
+:where(.student-space) .vx-page.vx-refined .vx-date-button.today{background:transparent;color:#2853bc;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+:where(.student-space) .vx-page.vx-refined .vx-day-cell.selected .vx-date-button{background:#2853bc;color:#fff}
+:where(.student-space) .vx-page.vx-refined .vx-calendar-chip{color:var(--vx-ink);padding-left:7px}
+:where(.student-space) .vx-page.vx-refined .vx-more{padding-left:9px}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-heading{margin-bottom:20px}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-heading>strong{font-size:42px}
+:where(.student-space) .vx-page.vx-refined .vx-time-groups,:where(.student-space) .vx-page.vx-refined .vx-agenda-group-items{list-style:none;margin:0;padding:0}
+:where(.student-space) .vx-page.vx-refined .vx-time-groups>li+li{margin-top:22px}
+:where(.student-space) .vx-page.vx-refined .vx-deadline-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid var(--vx-line);padding:0 0 10px;margin-bottom:4px}
+:where(.student-space) .vx-page.vx-refined .vx-deadline-heading time{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+:where(.student-space) .vx-page.vx-refined .vx-deadline-heading time span,:where(.student-space) .vx-page.vx-refined .vx-deadline-heading>span{font-size:12px;font-weight:400;color:var(--vx-muted)}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-group-items>li{padding-top:12px}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-event{padding:0 0 14px 12px;gap:7px}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-meta{gap:10px}
+:where(.student-space) .vx-page.vx-refined .vx-eligibility-note{font-size:12px;line-height:1.7;color:var(--vx-muted);margin-top:18px}
+@media(min-width:761px){:where(.student-space) .vx-page.vx-refined .vx-path-body{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}:where(.student-space) .vx-page.vx-refined .vx-node-caption{grid-column:1/-1}:where(.student-space) .vx-page.vx-refined .vx-path-body .vx-text-action{white-space:nowrap}:where(.student-space) .vx-page.vx-refined .is-many .vx-path-body{padding:8px 14px}}
+@media(max-width:1100px){:where(.student-space) .vx-page.vx-refined .vx-record-grid{grid-template-columns:minmax(0,1fr)}:where(.student-space) .vx-page.vx-refined .vx-feedback{padding:0 0 18px}}
+@media(max-width:600px){:where(.student-space) .vx-page.vx-refined .vx-course-masthead{padding:16px 0}:where(.student-space) .vx-page.vx-refined .vx-reading-total>strong{font-size:26px}:where(.student-space) .vx-page.vx-refined .vx-section-heading h2{font-size:18px}:where(.student-space) .vx-page.vx-refined .vx-path>li{grid-template-columns:28px minmax(0,1fr);gap:8px;padding-bottom:10px}:where(.student-space) .vx-page.vx-refined .vx-path-node{width:28px;height:28px;font-size:11px}:where(.student-space) .vx-page.vx-refined .vx-path>li:not(:last-child):before{left:13px;top:34px}:where(.student-space) .vx-page.vx-refined .vx-path-body{padding:10px 12px}:where(.student-space) .vx-page.vx-refined .vx-record-grid{gap:16px}:where(.student-space) .vx-page.vx-refined .is-short .vx-evidence{grid-template-columns:minmax(0,1fr)}:where(.student-space) .vx-page.vx-refined .vx-overview{padding:18px}:where(.student-space) .vx-page.vx-refined .vx-feedback{padding:0 0 18px}}
+@media(max-width:600px){:where(.student-space) .vx-page.vx-refined .is-short .vx-empty{grid-template-columns:52px minmax(0,1fr);gap:8px 12px;padding:18px}:where(.student-space) .vx-page.vx-refined .is-short .vx-empty .vx-glyph{width:52px;height:66px}:where(.student-space) .vx-page.vx-refined .is-short .vx-empty>.button{grid-column:1/-1;grid-row:auto;justify-self:start;margin-top:8px}}
 
-@media(max-width:760px){.vx-page.vx-refined .vx-quantity-note{display:none}.vx-page.vx-refined .vx-week-day{min-height:88px}.vx-page.vx-refined .vx-week-day[data-density=one],.vx-page.vx-refined .vx-week-day[data-density=two]{background:transparent}.vx-page.vx-refined .vx-week-day[data-density=many]{background:#eef0f4}.vx-page.vx-refined .vx-week-day.today{border-color:transparent}.vx-page.vx-refined .vx-week-day.today strong{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px;color:#2853bc}.vx-page.vx-refined .vx-week-day[aria-pressed=true]{background:#2853bc;color:white}.vx-page.vx-refined .vx-week-day.today[aria-pressed=true] strong{color:white}.vx-page.vx-refined .vx-week-controls{flex-wrap:wrap}.vx-page.vx-refined .vx-time-grid{gap:20px}}
-@media(max-width:600px){.vx-page.vx-refined .vx-course-copy{padding:16px}.vx-page.vx-refined .vx-subject-rail{padding:0;width:46px}.vx-page.vx-refined .vx-subject-rail .vx-glyph{width:46px;height:62px}.vx-page.vx-refined .vx-subject-rail .vx-glyph svg{width:32px;height:32px}.vx-page.vx-refined .vx-course-links{margin-top:6px;padding-top:0}.vx-page.vx-refined .vx-agenda-heading>strong{font-size:36px}.vx-page.vx-refined .vx-deadline-heading time{font-size:18px}}
-@media(max-width:360px){.vx-page.vx-refined .vx-week-strip{gap:0;margin-inline:-12px;width:calc(100% + 24px)}.vx-page.vx-refined .vx-week-day{min-width:44px}}
+@media(max-width:760px){:where(.student-space) .vx-page.vx-refined .vx-quantity-note{display:none}:where(.student-space) .vx-page.vx-refined .vx-week-day{min-height:88px}:where(.student-space) .vx-page.vx-refined .vx-week-day[data-density=one],:where(.student-space) .vx-page.vx-refined .vx-week-day[data-density=two]{background:transparent}:where(.student-space) .vx-page.vx-refined .vx-week-day[data-density=many]{background:#eef0f4}:where(.student-space) .vx-page.vx-refined .vx-week-day.today{border-color:transparent}:where(.student-space) .vx-page.vx-refined .vx-week-day.today strong{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px;color:#2853bc}:where(.student-space) .vx-page.vx-refined .vx-week-day[aria-pressed=true]{background:#2853bc;color:white}:where(.student-space) .vx-page.vx-refined .vx-week-day.today[aria-pressed=true] strong{color:white}:where(.student-space) .vx-page.vx-refined .vx-week-controls{flex-wrap:wrap}:where(.student-space) .vx-page.vx-refined .vx-time-grid{gap:20px}}
+@media(max-width:600px){:where(.student-space) .vx-page.vx-refined .vx-course-copy{padding:16px}:where(.student-space) .vx-page.vx-refined .vx-subject-rail{padding:0;width:46px}:where(.student-space) .vx-page.vx-refined .vx-subject-rail .vx-glyph{width:46px;height:62px}:where(.student-space) .vx-page.vx-refined .vx-subject-rail .vx-glyph svg{width:32px;height:32px}:where(.student-space) .vx-page.vx-refined .vx-course-links{margin-top:6px;padding-top:0}:where(.student-space) .vx-page.vx-refined .vx-agenda-heading>strong{font-size:36px}:where(.student-space) .vx-page.vx-refined .vx-deadline-heading time{font-size:18px}}
+@media(max-width:360px){:where(.student-space) .vx-page.vx-refined .vx-week-strip{gap:0;margin-inline:-12px;width:calc(100% + 24px)}:where(.student-space) .vx-page.vx-refined .vx-week-day{min-width:44px}}
 
-.vx-page.vx-refined .vx-agenda-meta{font-size:12px}.vx-page.vx-refined .vx-agenda-meta>.vx-eligibility{color:var(--vx-muted);border-left:1px solid var(--vx-line);padding-left:8px}
+:where(.student-space) .vx-page.vx-refined .vx-agenda-meta{font-size:12px}:where(.student-space) .vx-page.vx-refined .vx-agenda-meta>.vx-eligibility{color:var(--vx-muted);border-left:1px solid var(--vx-line);padding-left:8px}
