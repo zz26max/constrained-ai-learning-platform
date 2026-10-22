@@ -6,6 +6,7 @@
 
 | 文档 | 负责内容 | 谁能改 |
 | --- | --- | --- |
+| [学生端视觉收敛](features/student-ui-convergence.md) | Claude 视觉收敛方案与范围记录 | 前端维护任务 |
 | [STATUS.md](STATUS.md) | 进度、交接、验证记录、已知限制 | 任何实现任务可直接更新 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 架构、跨端业务规则、阶段与工作包 | 用户授权的维护任务 |
 | [FRONTEND.md](FRONTEND.md) / [BACKEND.md](BACKEND.md) | 本端工程、状态、存储、事务 | 用户授权的维护任务 |

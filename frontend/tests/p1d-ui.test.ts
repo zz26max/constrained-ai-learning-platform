@@ -297,7 +297,7 @@ describe('P1-D 路由与首页', () => {
     expect(view.find('.home-preview-switch').exists()).toBe(false)
     await router!.push('/student/home?design=current');await flushPromises()
     expect(view.find('.home-preview-switch').exists()).toBe(false)
-    expect(view.find('.vc-home').exists()).toBe(true)
+    expect(view.find('.sr-home').exists()).toBe(true)
   })
   it('B+空任务、空课程与无反馈公告时不虚构学习信息',async()=>{
     dashboardOverride={courseCount:0,pendingAssignmentCount:0,unreadMessageCount:0,courses:[],currentLearning:null,recentFeedback:null,recentNotice:null}

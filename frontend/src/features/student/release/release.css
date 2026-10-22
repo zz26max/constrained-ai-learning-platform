@@ -1,0 +1,276 @@
+/* 正式学生端（首页/课程/作业 + 外壳）唯一样式来源。规则见 frontend/DESIGN.md「学生端视觉收敛」。
+   只在 .student-release 内生效；历史版本层以 vx-/vc-/v35-/exploration 根类限定，不再命中 sr-* 页面。 */
+.student-release {
+  --sr-canvas:#f4f6f9; --sr-surface:#fff; --sr-ink:#1c2d49; --sr-muted:#52627a;
+  --sr-line:#dde3ec; --sr-line-strong:#c5cfdd; --sr-sunken:#f7f9fc;
+  --sr-brand:#2853bc; --sr-brand-hover:#2147a3; --sr-brand-soft:#eef2fb;
+  --sr-focus:#1f3b84; --sr-warn:#8a5208; --sr-warn-soft:#fbf3e6;
+  --sr-r-s:6px; --sr-r-m:10px; --sr-r-focus:14px;
+  --sr-serif:Georgia,"Times New Roman",serif;
+  background:var(--sr-canvas);
+}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:1280px}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) a {text-decoration:none}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) h1 {font-size:28px;font-weight:650;line-height:1.35;margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
+
+/* 学科身份：颜色只表示学科 */
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family] {--acc:#52627a;--acc-soft:#edf1f5}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=code] {--acc:#2853bc;--acc-soft:#eef2fb}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=data] {--acc:#1b6b65;--acc-soft:#e8f3ef}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=systems] {--acc:#5a527e;--acc-soft:#f0eef7}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=explore] {--acc:#805e1e;--acc-soft:#faf3e4}
+.student-release .v35-subject {display:inline-flex;align-items:baseline;gap:8px;min-width:0;color:var(--sr-muted);font-size:13px}
+.student-release .v35-subject-mark {flex-shrink:0;padding:0 6px;border-radius:4px;background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:700;line-height:1.7;letter-spacing:.02em}
+.student-release .v35-subject>span:last-child {overflow-wrap:anywhere}
+.student-release .vx-glyph {display:grid;place-items:center;color:var(--acc)}
+.student-release .vx-glyph>span {display:none}
+
+/* 日期：衬线数字只在这里 */
+.student-release .vc-date {display:inline-grid;grid-template-columns:auto auto;justify-content:start;justify-self:start;width:auto;align-items:baseline;column-gap:6px;font-variant-numeric:tabular-nums}
+.student-release .vc-date-month {grid-column:1;grid-row:1;font-size:13px;color:var(--sr-muted)}
+.student-release .vc-date-day {grid-column:2;grid-row:1}
+.student-release .vc-date::before {content:none}
+.student-release .vc-date-day {font-family:var(--sr-serif);font-size:28px;font-weight:400;line-height:1;color:var(--sr-ink)}
+.student-release .vc-date-time {grid-column:1/-1;font-size:14px;font-weight:600;color:var(--sr-ink);margin-top:4px}
+
+/* 任务状态：进度点 + 资格文字，同一行 */
+.student-release .vc-task-state {display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;font-size:14px;margin:0;background:none;padding:0}
+.student-release .vc-process {display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--sr-ink);background:none;padding:0}
+.student-release .vc-process>i {width:7px;height:7px;border-radius:50%;background:var(--sr-brand)}
+.student-release .vc-process[data-state=NOT_STARTED]>i {background:var(--sr-line-strong)}
+.student-release .vc-process:is([data-state=SUBMITTED],[data-state=REVIEWED])>i {background:#247052}
+.student-release .vc-permission {color:var(--sr-muted);background:none;border:0;padding:0}
+.student-release .vc-permission.is-late {color:var(--sr-warn);font-weight:600}
+/* ===== 首页 ===== */
+.student-release .sr-home .explore-heading {display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:0 0 24px}
+.student-release .sr-home .sr-intro {margin:6px 0 0;color:var(--sr-muted);font-size:14px}
+.student-release .sr-home .sr-overview {display:flex;flex-wrap:wrap;gap:4px 24px;margin:8px 0 0}
+.student-release .sr-home .sr-overview a {display:inline-flex;align-items:baseline;gap:4px;min-height:32px;color:var(--sr-muted);font-size:14px}
+.student-release .sr-home .sr-overview strong {font-size:18px;font-weight:650;color:var(--sr-ink);font-variant-numeric:tabular-nums}
+.student-release .sr-home .sr-overview a:hover strong {color:var(--sr-brand)}
+.student-release .sr-home .explore-calendar {display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font-size:14px;flex-shrink:0}
+.student-release .sr-home .explore-calendar:hover {border-color:var(--sr-brand);color:var(--sr-brand)}
+.student-release .sr-home .explore-composition {display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+.student-release .sr-home :is(.explore-primary-column,.explore-secondary-column) {display:grid;gap:24px;min-width:0}
+
+/* 焦点卡：唯一深色、唯一 14px 圆角 */
+.student-release .sr-home .explore-focus {background:var(--sr-focus);color:#fff;border-radius:var(--sr-r-focus);padding:28px 32px;border:0;box-shadow:none}
+.student-release .sr-home .focus-main {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:32px;align-items:start}
+.student-release .sr-home .focus-main>* {grid-column:1;margin:0}
+.student-release .sr-home .explore-label {font-size:13px;color:#c9d5f2;margin:0 0 10px}
+.student-release .sr-home #explore-focus-title {font-size:26px;line-height:1.35;color:#fff;overflow-wrap:anywhere}
+.student-release .sr-home .focus-course {display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;color:#c9d5f2;font-size:14px}
+.student-release .sr-home .focus-course .v35-subject {color:#e4ebfa;font-size:14px}
+.student-release .sr-home .focus-course .v35-subject-mark {background:#ffffff1f;color:#fff}
+.student-release .sr-home .explore-focus .vc-task-state {margin-top:14px}
+.student-release .sr-home .explore-focus :is(.vc-process,.vc-permission) {color:#e4ebfa}
+.student-release .sr-home .explore-focus .vc-process>i {background:#9fb8f5}
+.student-release .sr-home .explore-focus .vc-permission.is-late {color:#ffd9a3}
+.student-release .sr-home .bplus-deadline {grid-column:2;grid-row:1/span 6;display:grid;gap:4px;align-content:start;min-width:132px;padding-left:28px;border-left:1px solid #ffffff2e}
+.student-release .sr-home .bplus-deadline>span {font-size:13px;color:#c9d5f2}
+.student-release .sr-home .bplus-deadline :is(.vc-date-month,.vc-date-day,.vc-date-time) {color:#fff}
+.student-release .sr-home .bplus-deadline .vc-date-day {font-size:44px}
+.student-release .sr-home .bplus-deadline .vc-date-time {font-size:16px}
+.student-release .sr-home .bplus-deadline small {font-size:13px;color:#c9d5f2}
+.student-release .sr-home .focus-actions {display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;margin-top:22px}
+.student-release .sr-home .explore-focus .button.primary {background:#fff;color:var(--sr-focus);border:0;border-radius:var(--sr-r-s);min-height:44px;padding:0 20px;font-weight:650}
+.student-release .sr-home .explore-focus .button.primary:hover {background:#e9eefb}
+.student-release .sr-home .focus-actions>a:not(.button) {display:inline-flex;align-items:center;min-height:44px;color:#e4ebfa;font-size:14px;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#ffffff59}
+.student-release .sr-home .explore-focus :focus-visible {outline-color:#fff}
+.student-release .sr-home .polish-task-context {margin-top:12px;font-size:13px;color:#b7c6ea}
+.student-release .sr-home .focus-empty-text {margin-top:8px;color:#c9d5f2;font-size:14px}
+
+/* 区块标题 */
+.student-release .sr-home .explore-section-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px}
+.student-release .sr-home .explore-section-heading>a {display:inline-flex;align-items:center;min-height:44px;color:var(--sr-brand);font-size:14px}
+.student-release .sr-home .explore-empty {color:var(--sr-muted);font-size:14px;margin:0}
+/* 近期任务：一日一组，日期轨道 + 连续任务区 */
+.student-release .sr-home .bplus-task-groups {display:grid;gap:12px}
+.student-release .sr-home .bplus-task-group {display:grid;grid-template-columns:96px minmax(0,1fr);background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);overflow:hidden}
+.student-release .sr-home .bplus-group-heading {display:flex;flex-direction:column;gap:4px;padding:16px;background:var(--sr-sunken);border-right:1px solid var(--sr-line)}
+.student-release .sr-home .bplus-group-heading>span {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-home .bplus-group-heading small {font-size:13px;font-weight:600;color:var(--sr-ink)}
+.student-release .sr-home .bplus-task-list {list-style:none;margin:0;padding:0}
+.student-release .sr-home .bplus-task-list>li {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 16px;padding:14px 20px;border-top:1px solid var(--sr-line)}
+.student-release .sr-home .bplus-task-list>li:first-child {border-top:0}
+.student-release .sr-home .bplus-task-list>li:hover {background:var(--sr-sunken)}
+.student-release .sr-home .task-line-content {display:grid;gap:4px;min-width:0}
+.student-release .sr-home .explore-task-name {color:var(--sr-ink);font-weight:650;font-size:15px;overflow-wrap:anywhere}
+.student-release .sr-home .explore-task-name:hover {color:var(--sr-brand)}
+.student-release .sr-home .content-task-meta {display:flex;flex-wrap:wrap;align-items:center;gap:2px 16px}
+.student-release .sr-home .content-task-meta .vc-task-state {font-size:13px}
+.student-release .sr-home .content-task-time {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-home li[data-tone=overdue] .content-task-time {color:var(--sr-warn);font-weight:600}
+.student-release .sr-home .task-line-action {display:inline-flex;align-items:center;min-height:44px;padding:0 4px;color:var(--sr-brand);font-size:14px;font-weight:600;white-space:nowrap}
+.student-release .sr-home .task-line-action:hover {text-decoration:underline;text-underline-offset:4px}
+
+/* 右栏：三块同一种白色面板 */
+.student-release .sr-home :is(.explore-courses,.explore-feedback,.explore-notice) {background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);padding:20px 22px;box-shadow:none;margin:0}
+.student-release .sr-home .explore-notes {display:grid;gap:24px}
+.student-release .sr-home :is(.explore-feedback,.explore-notice)>h2 {margin-bottom:12px}
+.student-release .sr-home .explore-course-list {list-style:none;margin:0;padding:0}
+.student-release .sr-home .v35-recent-course-heading {display:grid;grid-template-columns:48px minmax(0,1fr);gap:14px;align-items:start}
+.student-release .sr-home .v35-recent-course-heading .vx-glyph {width:48px;height:56px;border-radius:var(--sr-r-s);background:var(--acc-soft)}
+.student-release .sr-home .v35-recent-course-heading .vx-glyph svg {width:28px;height:28px}
+.student-release .sr-home .v35-recent-course-heading h3 {margin:2px 0;font-size:16px;line-height:1.45;overflow-wrap:anywhere}
+.student-release .sr-home .v35-recent-course-heading h3 a {color:var(--sr-ink)}
+.student-release .sr-home .explore-course-info {display:grid;gap:10px;margin-top:16px}
+.student-release .sr-home .explore-course-info>p {margin:0;font-size:14px}
+.student-release .sr-home :is(.bplus-course-hint,.explore-chapter,.explore-course-counts) {color:var(--sr-muted);font-size:13px}
+.student-release .sr-home .explore-course-actions {display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding-top:4px;border-top:1px solid var(--sr-line)}
+.student-release .sr-home .explore-course-actions a {display:inline-flex;align-items:center;min-height:44px;color:var(--sr-muted);font-size:14px}
+.student-release .sr-home .explore-course-actions a:hover {color:var(--sr-brand)}
+.student-release .sr-home .explore-course-actions .bplus-course-action {color:var(--sr-brand);font-weight:650}
+.student-release .sr-home .v35-feedback-course {margin:0 0 8px}
+.student-release .sr-home .feedback-score {display:flex;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums}
+.student-release .sr-home .feedback-score strong {font-size:32px;font-weight:650;line-height:1.1}
+.student-release .sr-home .feedback-score :is(span,small) {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-home .feedback-title {display:block;margin:8px 0;color:var(--sr-ink);font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.student-release .sr-home .feedback-quote {margin:0 0 8px;padding-left:12px;border-left:2px solid var(--sr-line-strong);font-size:14px;color:var(--sr-ink)}
+.student-release .sr-home .explore-notice {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px}
+.student-release .sr-home .explore-notice>* {grid-column:1}
+.student-release .sr-home .notice-open {justify-self:start;padding:0;border:0;background:none;color:var(--sr-ink);font-weight:600;font-size:14px;text-align:left;min-height:32px;overflow-wrap:anywhere;cursor:pointer}
+.student-release .sr-home .notice-open:hover {color:var(--sr-brand)}
+.student-release .sr-home .notice-read {grid-column:2;grid-row:2;align-self:start;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-home .notice-read[data-unread=true] {color:var(--sr-brand);font-weight:600}
+/* 章节进度（首页最近课程与课程页共用） */
+.student-release .vx-count-progress {display:grid;gap:8px}
+.student-release .vx-count-label {display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .vx-count-label strong {color:var(--sr-ink);font-weight:650}
+.student-release .vx-segments {display:grid;grid-template-columns:repeat(var(--segment-count),minmax(0,1fr));gap:3px}
+.student-release .vx-segments i {height:6px;border-radius:3px;background:linear-gradient(to right,var(--acc,var(--sr-brand)) var(--fill),#e3e8f0 var(--fill))}
+
+/* ===== 我的课程 ===== */
+.student-release .sr-courses .vx-page-heading {display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:0 0 20px}
+.student-release .sr-courses .vx-page-heading p {margin:6px 0 0;font-size:14px}
+.student-release .sr-courses .vx-course-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;margin:0 0 20px}
+.student-release .sr-courses .vx-course-toolbar>p {margin-left:auto;align-self:center}
+.student-release .sr-courses .vx-course-grid {list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.student-release .sr-courses .vx-course-sheet {display:grid;grid-template-columns:56px minmax(0,1fr);background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);overflow:hidden;min-width:0}
+.student-release .sr-courses .vx-subject-rail {display:flex;justify-content:center;align-items:flex-start;padding-top:20px;background:var(--acc-soft)}
+.student-release .sr-courses .vx-subject-rail .vx-glyph svg {width:28px;height:28px}
+.student-release .sr-courses .vx-course-copy {display:grid;gap:12px;align-content:start;padding:18px 20px 12px;min-width:0}
+.student-release .sr-courses .vx-course-topline {display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-courses .vx-course-topline [data-status=archived] {color:var(--sr-warn)}
+.student-release .sr-courses .vx-course-copy h2 {margin-top:-6px;font-size:18px;line-height:1.45;overflow-wrap:anywhere}
+.student-release .sr-courses .vx-course-copy h2 a {color:var(--sr-ink)}
+.student-release .sr-courses .vx-course-copy h2 a:hover {color:var(--sr-brand)}
+.student-release .sr-courses .vx-course-meta {margin-top:-8px}
+.student-release .sr-courses .vx-position {margin:0;font-size:14px;color:var(--sr-ink);overflow-wrap:anywhere}
+.student-release .sr-courses .vx-position>span {display:block;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-courses .vx-course-actions {display:flex;align-items:center;gap:12px;padding-top:12px;border-top:1px solid var(--sr-line)}
+.student-release .sr-courses .vx-course-primary {display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);color:var(--sr-brand);font-size:14px;font-weight:600}
+.student-release .sr-courses .vx-course-primary:hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
+.student-release .sr-courses .vx-course-links {display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-courses .vx-course-links a {display:inline-flex;align-items:center;min-height:44px;color:var(--sr-brand)}
+.student-release .sr-courses .vx-empty {padding:40px 24px;text-align:center;background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m)}
+.student-release .sr-courses .pagination {margin-top:20px}
+/* 通用控件：下拉框与按钮统一外观 */
+.student-release :is(.sr-courses,.sr-tasks) label {display:grid;gap:6px;font-size:13px;color:var(--sr-muted)}
+.student-release :is(.sr-courses,.sr-tasks) select {min-height:44px;padding:0 36px 0 12px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2352627a' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 12px center;appearance:none;color:var(--sr-ink);font-size:14px}
+.student-release :is(.sr-courses,.sr-tasks) select:hover {border-color:var(--sr-brand)}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) .button {min-height:44px;border-radius:var(--sr-r-s);font-size:14px;font-weight:600;padding:0 16px;box-shadow:none}
+.student-release :is(.sr-courses,.sr-tasks) .button.secondary {background:var(--sr-surface);border:1px solid var(--sr-line-strong);color:var(--sr-brand)}
+.student-release :is(.sr-courses,.sr-tasks) .button.secondary:not(:disabled):hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
+
+/* ===== 我的作业 ===== */
+.student-release .sr-tasks .workspace-heading {margin:0 0 20px}
+.student-release .sr-tasks .workspace-heading p {margin:6px 0 0;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-tasks .filter-tabs {display:inline-flex;gap:2px;padding:4px;margin:0 0 20px;background:#e9edf3;border-radius:var(--sr-r-m);max-width:100%;overflow-x:auto}
+.student-release .sr-tasks .filter-tabs button {min-height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--sr-r-s);background:transparent;color:var(--sr-muted);font-size:14px;white-space:nowrap}
+.student-release .sr-tasks .filter-tabs button:hover:not([aria-pressed=true]) {color:var(--sr-ink);background:#ffffff80;border-color:transparent}
+.student-release .sr-tasks .filter-tabs button[aria-pressed=true] {background:var(--sr-surface);border-color:var(--sr-line);color:var(--sr-ink);font-weight:650}
+.student-release .sr-tasks .filter-tabs button span {margin-left:4px;color:var(--sr-muted);font-weight:400;font-variant-numeric:tabular-nums}
+.student-release .sr-tasks .task-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;margin:0 0 16px}
+.student-release .sr-tasks .task-toolbar label:first-child select {width:min(360px,100%)}
+.student-release .sr-tasks .task-toolbar label:nth-child(2) select {width:180px}
+.student-release .sr-tasks .task-toolbar>span {margin-left:auto;align-self:center;text-align:right;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tasks .task-toolbar>span>span {display:block}
+.student-release .sr-tasks section.task-table {padding:0;background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);box-shadow:none;overflow:hidden}
+.student-release .sr-tasks :is(.task-table-head,.task-table-row) {display:grid;grid-template-columns:148px minmax(0,1fr) 200px 120px;gap:16px;align-items:center;padding:0 20px}
+.student-release .sr-tasks .task-table-head {padding-block:12px;background:var(--sr-sunken);border-bottom:1px solid var(--sr-line);color:var(--sr-muted);font-size:13px;font-weight:600}
+.student-release .sr-tasks .task-table-row {padding-block:16px;border-top:1px solid var(--sr-line)}
+.student-release .sr-tasks .task-table-head+.task-table-row,.student-release .sr-tasks .task-group-heading+.task-table-row {border-top:0}
+.student-release .sr-tasks .task-table-row:hover {background:var(--sr-sunken)}
+.student-release .sr-tasks .vc-task-date {order:-1;display:grid;gap:2px;padding-left:12px;border-left:2px solid var(--sr-line-strong)}
+.student-release .sr-tasks .vc-due-state {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tasks [data-tone=overdue] .vc-task-date {border-left-color:#d9a65c}
+.student-release .sr-tasks [data-tone=overdue] .vc-due-state {color:var(--sr-warn);font-weight:600}
+.student-release .sr-tasks [data-tone=soon] .vc-task-date {border-left-color:var(--sr-brand)}
+.student-release .sr-tasks [data-tone=soon] .vc-due-state {color:var(--sr-brand);font-weight:600}
+.student-release .sr-tasks .vc-task-copy {display:grid;gap:4px;min-width:0}
+.student-release .sr-tasks .task-title {color:var(--sr-ink);font-size:15px;font-weight:650;line-height:1.5;overflow-wrap:anywhere}
+.student-release .sr-tasks .task-title:hover {color:var(--sr-brand)}
+.student-release .sr-tasks .task-table-row>.button {justify-self:end;min-width:96px}
+.student-release .sr-tasks .task-group-heading[data-group=open]+.task-table-row>.button {background:var(--sr-brand);border-color:var(--sr-brand);color:#fff}
+.student-release .sr-tasks .task-group-heading[data-group=open]+.task-table-row>.button:hover {background:var(--sr-brand-hover)}
+.student-release .sr-tasks .task-group-heading {margin:0;padding:10px 20px;font-size:14px;font-weight:650;border-top:1px solid var(--sr-line);border-bottom:1px solid var(--sr-line);box-shadow:inset 3px 0 0 var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-ink)}
+.student-release .sr-tasks .task-group-heading[data-group=closed] {box-shadow:inset 3px 0 0 #d9a65c;background:var(--sr-warn-soft);color:var(--sr-warn)}
+.student-release .sr-tasks .task-table-head+.task-group-heading {border-top:0}
+/* ===== 公共外壳 ===== */
+.student-release .workspace-sidebar {border-right-color:var(--sr-line)}
+.student-release .workspace-sidebar nav .nav-item {color:var(--sr-muted);border-radius:var(--sr-r-s)}
+.student-release .workspace-sidebar nav .nav-item:hover {background:var(--sr-canvas);color:var(--sr-ink)}
+.student-release .workspace-sidebar nav .nav-item.is-active {background:var(--sr-brand-soft);color:var(--sr-brand);font-weight:650}
+.student-release .workspace-topbar {border-bottom-color:var(--sr-line)}
+.student-release .workspace-footer {border-top-color:var(--sr-line);font-size:13px}
+.student-release .mobile-primary-nav a[aria-current=page] {color:var(--sr-brand);background:var(--sr-brand-soft);border-radius:var(--sr-r-s)}
+
+@media (prefers-reduced-motion:no-preference) {
+  .student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(a,button,select,li,.task-table-row) {transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease}
+}
+
+/* ===== ≤1100px：首页单列，作业表头隐藏 ===== */
+@media (max-width:1100px) {
+  .student-release .sr-home .explore-composition {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-home .explore-secondary-column {grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .student-release .sr-tasks .task-table-head {display:none}
+  .student-release .sr-tasks .task-table-row {grid-template-columns:132px minmax(0,1fr) auto;grid-template-areas:"date copy action" "date state action"}
+  .student-release .sr-tasks .vc-task-date {grid-area:date}
+  .student-release .sr-tasks .vc-task-copy {grid-area:copy}
+  .student-release .sr-tasks .task-table-row>.vc-task-state {grid-area:state}
+  .student-release .sr-tasks .task-table-row>.button {grid-area:action}
+}
+@media (max-width:900px) {
+  .student-release .sr-courses .vx-course-grid {grid-template-columns:minmax(0,1fr)}
+}
+
+/* ===== ≤760px：手机 ===== */
+@media (max-width:760px) {
+  .student-release .menu-toggle {display:none}
+  .student-release :is(.sr-home,.sr-courses,.sr-tasks) h1 {font-size:25px}
+  .student-release .sr-home .explore-heading {margin-bottom:18px}
+  .student-release .sr-home .explore-calendar {padding:0 12px}
+  .student-release .sr-home .explore-secondary-column {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-home .explore-focus {padding:22px 20px}
+  .student-release .sr-home #explore-focus-title {font-size:22px}
+  .student-release .sr-home .focus-main {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-home .bplus-deadline {grid-column:1;grid-row:auto;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-top:16px;padding:14px 0 0;border-left:0;border-top:1px solid #ffffff2e}
+  .student-release .sr-home .bplus-deadline .vc-date-day {font-size:30px}
+  .student-release .sr-home .bplus-deadline .vc-date-time {grid-column:auto;margin:0}
+  .student-release .sr-home .focus-actions .button.primary {flex:1 1 100%}
+  .student-release .sr-home .bplus-task-group {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-home .bplus-group-heading {flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:10px 16px;border-right:0;border-bottom:1px solid var(--sr-line)}
+  .student-release .sr-home .bplus-group-heading .vc-date-day {font-size:22px}
+  .student-release .sr-home .bplus-task-list>li {padding:12px 16px;gap:4px 12px}
+  .student-release .sr-home :is(.explore-courses,.explore-feedback,.explore-notice) {padding:18px}
+  .student-release .sr-courses .vx-page-heading .button {flex-shrink:0}
+  .student-release .sr-courses .vx-course-toolbar>label {flex:1 1 140px}
+  .student-release .sr-courses .vx-course-toolbar select {width:100%}
+  .student-release .sr-courses .vx-course-toolbar>p {margin-left:0;flex-basis:100%}
+  .student-release .sr-courses .vx-course-sheet {grid-template-columns:44px minmax(0,1fr)}
+  .student-release .sr-courses .vx-subject-rail {padding-top:16px}
+  .student-release .sr-courses .vx-subject-rail .vx-glyph svg {width:24px;height:24px}
+  .student-release .sr-courses .vx-course-copy {padding:14px 16px 8px;gap:10px}
+  .student-release .sr-courses .vx-course-copy h2 {font-size:17px}
+  .student-release .sr-tasks .filter-tabs {display:flex}
+  .student-release .sr-tasks .task-toolbar>label {flex:1 1 140px}
+  .student-release .sr-tasks .task-toolbar label:is(:first-child,:nth-child(2)) select {width:100%}
+  .student-release .sr-tasks .task-toolbar>span {margin-left:0;text-align:left;flex-basis:100%}
+  .student-release .sr-tasks .task-table-row {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"copy copy" "date date" "state action";gap:10px 12px;padding:16px}
+  .student-release .sr-tasks .task-table-row>.button {justify-self:end}
+  .student-release .sr-tasks .task-group-heading {padding:10px 16px}
+}

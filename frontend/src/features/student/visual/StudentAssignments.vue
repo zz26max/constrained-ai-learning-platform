@@ -15,7 +15,6 @@ import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
 import { byDeadline, matchesTask, taskAction, todoPriority, todoGroupLabel, type TaskFilter } from '../../../features/assignments/task-presentation'
 const route=useRoute(), router=useRouter(), api=assignmentsApi(), courses=coursesApi()
-const direction='b'
 const PAGE_SIZE=20
 const filters: {key:TaskFilter;label:string}[]=[{key:'todo',label:'待完成'},{key:'submitted',label:'已提交'},{key:'reviewed',label:'已批改'},{key:'all',label:'全部'}]
 const filter=computed<TaskFilter>(()=>filters.some(f=>f.key===route.query.status) ? route.query.status as TaskFilter : 'todo')
@@ -71,7 +70,7 @@ function groupLabel(id:string):string {
 function courseName(id:string){return query.data.value?.classes.find(c=>c.offeringId===id)?.title??'课程信息未返回'}
 </script>
 <template>
-  <div class="workspace-page vx-page v35-page vc-page vc-tasks student-tasks" :data-craft="direction" :data-polish="true" data-unread="a">
+  <div class="workspace-page sr-tasks student-tasks">
     <header class="workspace-heading"><div><h1 tabindex="-1">我的作业</h1><p>先处理待完成任务，截止时间均为北京时间。</p></div></header>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <template v-if="query.status.value==='success' && query.data.value">
@@ -80,10 +79,10 @@ function courseName(id:string){return query.data.value?.classes.find(c=>c.offeri
       <p v-if="details.status.value==='loading'" role="status" class="muted">正在确认提交资格…</p>
       <p v-if="details.status.value==='error'" role="alert">提交资格未能完整加载，当前仅按截止时间排序，可查看详情。<button class="button secondary" @click="details.load">重试</button></p>
       <section class="surface task-table" aria-label="作业列表">
-        <div class="task-table-head" aria-hidden="true"><span>作业与课程</span><span>截止安排</span><span>作答状态</span><span>下一步</span></div>
+        <div class="task-table-head" aria-hidden="true"><span>截止</span><span>作业与课程</span><span>作答状态</span><span>操作</span></div>
         <div v-if="!visible.length" class="empty-state"><h2>暂无符合条件的作业</h2><p>调整课程或状态筛选，查看其他任务。</p><button class="button secondary" @click="router.push({query:{status:'all'}})">清除筛选</button></div>
         <template v-for="(task,index) in visible" :key="task.id">
-        <h2 v-if="filter==='todo' && groupLabel(task.id) && (index===0 || groupLabel(visible[index-1]!.id)!==groupLabel(task.id))" class="task-group-heading">{{groupLabel(task.id)}}</h2>
+        <h2 v-if="filter==='todo' && groupLabel(task.id) && (index===0 || groupLabel(visible[index-1]!.id)!==groupLabel(task.id))" class="task-group-heading" :data-group="groupLabel(task.id)==='可继续处理'?'open':'closed'">{{groupLabel(task.id)}}</h2>
         <article class="task-table-row" :data-task-id="task.id" :data-tone="taskContentTone(task,details.status.value==='success'?details.data.value?.[task.id]:undefined)">
           <div class="vc-task-copy"><RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink><div class="task-course"><SubjectIdentity :course="query.data.value.classes.find(c=>c.offeringId===task.offeringId)" /></div></div>
           <div class="vc-task-date"><CraftDate :value="task.dueAt"/><span class="vc-due-state">{{deadlineLabel(task.dueAt)}}</span></div>
