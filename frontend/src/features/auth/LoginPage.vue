@@ -43,6 +43,8 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
+  <div class="auth-page">
+  <div class="auth-brand"><span class="auth-mark" aria-hidden="true">知</span><div><strong>知学</strong><small>课程、实践与反馈</small></div></div>
   <section class="auth-panel panel" aria-labelledby="login-title">
     <h1 id="login-title" tabindex="-1">登录知学</h1>
     <p class="auth-hint">使用课程账号登录；账号由任课教师或管理员提供。</p>
@@ -100,4 +102,5 @@ async function submit(): Promise<void> {
       </p>
     </form>
   </section>
+  </div>
 </template>
