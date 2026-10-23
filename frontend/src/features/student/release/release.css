@@ -107,9 +107,11 @@
 .student-release .sr-home .task-line-action {display:inline-flex;align-items:center;min-height:44px;padding:0 4px;color:var(--sr-brand);font-size:14px;font-weight:600;white-space:nowrap}
 .student-release .sr-home .task-line-action:hover {text-decoration:underline;text-underline-offset:4px}
 
-/* 右栏：三块同一种白色面板 */
-.student-release .sr-home :is(.explore-courses,.explore-feedback,.explore-notice) {background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);padding:20px 22px;box-shadow:none;margin:0}
-.student-release .sr-home .explore-notes {display:grid;gap:24px}
+/* 右栏：最近课程一张卡；反馈与公告合成一张“跟进”面板，内部用分隔线组织 */
+.student-release .sr-home .explore-courses {background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);padding:20px 22px;box-shadow:none;margin:0}
+.student-release .sr-home .explore-notes {display:grid;gap:0;background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);padding:20px 22px;margin:0}
+.student-release .sr-home :is(.explore-feedback,.explore-notice) {background:none;border:0;border-radius:0;padding:0;margin:0}
+.student-release .sr-home .explore-notes>*+* {border-top:1px solid var(--sr-line);margin-top:18px;padding-top:18px}
 .student-release .sr-home :is(.explore-feedback,.explore-notice)>h2 {margin-bottom:12px}
 .student-release .sr-home .explore-course-list {list-style:none;margin:0;padding:0}
 .student-release .sr-home .v35-recent-course-heading {display:grid;grid-template-columns:48px minmax(0,1fr);gap:14px;align-items:start}
@@ -149,19 +151,23 @@
 .student-release .sr-courses .vx-course-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;margin:0 0 20px}
 .student-release .sr-courses .vx-course-toolbar>p {margin-left:auto;align-self:center}
 .student-release .sr-courses .vx-course-grid {list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.student-release .sr-courses .vx-course-sheet {display:grid;grid-template-columns:56px minmax(0,1fr);background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);overflow:hidden;min-width:0}
-.student-release .sr-courses .vx-subject-rail {display:flex;justify-content:center;align-items:flex-start;padding-top:20px;background:var(--acc-soft)}
-.student-release .sr-courses .vx-subject-rail .vx-glyph svg {width:28px;height:28px}
-.student-release .sr-courses .vx-course-copy {display:grid;gap:12px;align-content:start;padding:18px 20px 12px;min-width:0}
+.student-release .sr-courses .vx-course-sheet {display:grid;grid-template-columns:44px minmax(0,1fr);background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);overflow:hidden;min-width:0}
+.student-release .sr-courses .vx-subject-rail {display:flex;justify-content:center;align-items:flex-start;padding-top:14px;background:var(--acc-soft)}
+.student-release .sr-courses .vx-subject-rail .vx-glyph svg {width:22px;height:22px}
+.student-release .sr-courses .vx-course-copy {display:grid;gap:6px;align-content:start;padding:12px 16px 10px;min-width:0}
 .student-release .sr-courses .vx-course-topline {display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--sr-muted)}
 .student-release .sr-courses .vx-course-topline [data-status=archived] {color:var(--sr-warn)}
-.student-release .sr-courses .vx-course-copy h2 {margin-top:-6px;font-size:18px;line-height:1.45;overflow-wrap:anywhere}
+.student-release .sr-courses .vx-course-copy h2 {margin-top:-4px;font-size:17px;line-height:1.45;overflow-wrap:anywhere}
 .student-release .sr-courses .vx-course-copy h2 a {color:var(--sr-ink)}
 .student-release .sr-courses .vx-course-copy h2 a:hover {color:var(--sr-brand)}
-.student-release .sr-courses .vx-course-meta {margin-top:-8px}
+.student-release .sr-courses .vx-course-meta {margin-top:-6px}
+.student-release .sr-courses .vx-count-progress {gap:6px}
+.student-release .sr-courses .vx-count-label {font-size:12px}
+.student-release .sr-courses .vx-segments i {height:4px}
 .student-release .sr-courses .vx-position {margin:0;font-size:14px;color:var(--sr-ink);overflow-wrap:anywhere}
-.student-release .sr-courses .vx-position>span {display:block;font-size:13px;color:var(--sr-muted)}
-.student-release .sr-courses .vx-course-actions {display:flex;align-items:center;gap:12px;padding-top:12px;border-top:1px solid var(--sr-line)}
+.student-release .sr-courses .vx-position>span {display:inline;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-courses .vx-position>span::after {content:' · '}
+.student-release .sr-courses .vx-course-actions {display:flex;align-items:center;gap:12px;padding-top:8px;border-top:1px solid var(--sr-line)}
 .student-release .sr-courses .vx-course-primary {display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);color:var(--sr-brand);font-size:14px;font-weight:600}
 .student-release .sr-courses .vx-course-primary:hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
 .student-release .sr-courses .vx-course-links {display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--sr-muted)}
@@ -190,9 +196,9 @@
 .student-release .sr-tasks .task-toolbar>span {margin-left:auto;align-self:center;text-align:right;font-size:13px;color:var(--sr-muted)}
 .student-release .sr-tasks .task-toolbar>span>span {display:block}
 .student-release .sr-tasks section.task-table {padding:0;background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);box-shadow:none;overflow:hidden}
-.student-release .sr-tasks :is(.task-table-head,.task-table-row) {display:grid;grid-template-columns:148px minmax(0,1fr) 200px 120px;gap:16px;align-items:center;padding:0 20px}
-.student-release .sr-tasks .task-table-head {padding-block:12px;background:var(--sr-sunken);border-bottom:1px solid var(--sr-line);color:var(--sr-muted);font-size:13px;font-weight:600}
-.student-release .sr-tasks .task-table-row {padding-block:16px;border-top:1px solid var(--sr-line)}
+.student-release .sr-tasks :is(.task-table-head,.task-table-row) {display:grid;grid-template-columns:128px minmax(0,1fr) 190px 112px;gap:14px;align-items:center;padding:0 20px}
+.student-release .sr-tasks .task-table-head {padding-block:10px;background:var(--sr-sunken);border-bottom:1px solid var(--sr-line);color:var(--sr-muted);font-size:13px;font-weight:600}
+.student-release .sr-tasks .task-table-row {padding-block:12px;border-top:1px solid var(--sr-line)}
 .student-release .sr-tasks .task-table-head+.task-table-row,.student-release .sr-tasks .task-group-heading+.task-table-row {border-top:0}
 .student-release .sr-tasks .task-table-row:hover {background:var(--sr-sunken)}
 .student-release .sr-tasks .vc-task-date {order:-1;display:grid;gap:2px;padding-left:12px;border-left:2px solid var(--sr-line-strong)}
@@ -202,6 +208,10 @@
 .student-release .sr-tasks [data-tone=soon] .vc-task-date {border-left-color:var(--sr-brand)}
 .student-release .sr-tasks [data-tone=soon] .vc-due-state {color:var(--sr-brand);font-weight:600}
 .student-release .sr-tasks .vc-task-copy {display:grid;gap:4px;min-width:0}
+/* 截止列压成两行：月日与时刻同行，相对截止紧随，避免行高被三行日期撑开 */
+.student-release .sr-tasks .vc-task-date .vc-date {display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;width:100%;max-width:100%}
+.student-release .sr-tasks .vc-task-date .vc-date-day {font-size:26px}
+.student-release .sr-tasks .vc-task-date .vc-date-time {grid-column:auto;margin-top:0;font-size:13px}
 .student-release .sr-tasks .task-title {color:var(--sr-ink);font-size:15px;font-weight:650;line-height:1.5;overflow-wrap:anywhere}
 .student-release .sr-tasks .task-title:hover {color:var(--sr-brand)}
 .student-release .sr-tasks .task-table-row>.button {justify-self:end;min-width:96px}
@@ -256,7 +266,7 @@
   .student-release .sr-home .bplus-group-heading {flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:10px 16px;border-right:0;border-bottom:1px solid var(--sr-line)}
   .student-release .sr-home .bplus-group-heading .vc-date-day {font-size:22px}
   .student-release .sr-home .bplus-task-list>li {padding:12px 16px;gap:4px 12px}
-  .student-release .sr-home :is(.explore-courses,.explore-feedback,.explore-notice) {padding:18px}
+  .student-release .sr-home :is(.explore-courses,.explore-notes) {padding:18px}
   .student-release .sr-courses .vx-page-heading .button {flex-shrink:0}
   .student-release .sr-courses .vx-course-toolbar>label {flex:1 1 140px}
   .student-release .sr-courses .vx-course-toolbar select {width:100%}
