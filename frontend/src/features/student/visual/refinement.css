@@ -16,7 +16,7 @@
 :where(.student-space) .vx-page.vx-refined .vx-last-position{margin-bottom:14px}
 :where(.student-space) .vx-page.vx-refined .vx-path{margin:16px 0}
 :where(.student-space) .vx-page.vx-refined .vx-path>li{grid-template-columns:32px minmax(0,1fr);gap:12px;padding-bottom:12px}
-:where(.student-space) .vx-page.vx-refined .vx-path-node{width:32px;height:32px;margin-top:6px;font-size:12px;border-radius:7px}
+:where(.student-space) .vx-page.vx-refined .vx-path-node{width:32px;height:32px;margin-top:6px;font-size:12px;border-radius:var(--radius-control)}
 :where(.student-space) .vx-page.vx-refined .vx-path>li:not(:last-child):before{left:15px;top:38px;bottom:-6px;background:#c0ccde}
 :where(.student-space) .vx-page.vx-refined .vx-path-body{padding:12px 16px}
 :where(.student-space) .vx-page.vx-refined .vx-path>li[data-state=completed] .vx-path-node{background:var(--vx-soft);color:var(--vx-accent);border:1px solid #b6c4d9}

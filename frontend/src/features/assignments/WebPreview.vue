@@ -23,4 +23,4 @@ onBeforeUnmount(() => { window.removeEventListener('message', receive); reset() 
     <iframe v-if="source" :key="nonce" ref="frame" title="学生作品隔离预览" sandbox="allow-scripts" referrerpolicy="no-referrer" :srcdoc="source" />
   </section>
 </template>
-<style scoped>iframe { width: 100%; min-height: 360px; border: 1px solid var(--border); background: white; }</style>
+<style scoped>iframe { width: 100%; min-height: 360px; border: 1px solid var(--line-strong); background: var(--surface); }</style>

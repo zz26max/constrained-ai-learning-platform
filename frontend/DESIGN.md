@@ -159,3 +159,29 @@ V3.2保留V3.1视觉架构；上述为最终规则，覆盖历史探索条目中
 - 去重：页面内不重复面包屑与学期；侧栏不重复“工作空间”；课程筛选为进行中时不逐卡显示状态；日期轨道不显示“截止安排”，相对天数每组一次；手机只保留底部“更多”一个菜单入口。
 - 链接：站内链接不加 ↗；主按钮可保留 →。列表行操作为文字链接，首条主任务保留实心按钮。
 - 作业：桌面固定列宽 148px / 1fr / 200px / 120px；过期与暂不可提交分组使用 warn 色，区别于可继续处理。课程仅一页时不显示分页。
+
+## 设计基线（M1，2026-10-23 起生效，覆盖以上同职责描述）
+
+`src/styles/tokens.css` 是颜色、字体、字号、间距、圆角、焦点与动效的唯一来源；页面与组件只引用变量，不再写死色值。已迁移：外壳与旧页（zhixue/courses）、学生端 release、消息页 craft、学生消息/反馈、工作区编辑器、Web 预览、教师评价编辑器；`visual/refinement/integration/student-v3` 仍有字面色值与字号，M2 逐页迁移。
+
+| 类别 | tokens |
+| --- | --- |
+| 表面 | `--canvas #f4f6f9` `--surface #fff` `--sunken #f7f9fc` |
+| 文字 | `--ink #1c2d49` `--muted #52627a` `--line #dde3ec` `--line-strong #c5cfdd` `--line-control #8993a0` |
+| 品牌 | `--blue #2853bc` `--blue-hover #2147a3` `--blue-soft #eef2fb` `--focus-ring #1f3b84` |
+| 语义 | `--green/--green-soft` `--orange/--orange-soft` `--red/--red-soft` |
+| 字体 | `--font-sans` 系统中文栈 `--font-serif` 仅日期与分数 `--font-mono` 代码 |
+| 字号 | `--fs-h1 28` `--fs-h1-sm 25` `--fs-title 20` `--fs-control 14` `--fs-body 15` `--fs-meta 13` `--fs-micro 12` |
+| 间距 | `--space-1..7`（4/8/12/16/24/32/48） |
+| 形状 | `--radius-control 6` `--radius-panel 10` `--radius-hero 14`；`--radius-button` 为控件别名 |
+| 动效 | `--ease 120ms ease`，只用于颜色与边框 |
+
+规则：
+
+- 正文 15px、控件文字 14px、辅助 13px、微 12px；h1 28 / 手机 25，全站一致，旧页不再各自定义标题字号。
+- 品牌蓝只有一个：外壳、旧页、学生页、消息页都用 `--blue`；不再出现 #3768e5 / #244eae / #0066cc。
+- 圆角只三档，不再出现 7/8/9/12px 字面量。
+- 阴影只留给对话框等浮层；surface、品牌标、卡片不带装饰阴影。
+- 表单控件边框用 `--line-control`（对白底 ≥3:1），分隔线用 `--line`。
+- 焦点环 `--focus-ring` 3px；路由聚焦的 h1 不显示浏览器默认焦点框。
+- 新增页面或组件需要新颜色时，先加 token 再引用。

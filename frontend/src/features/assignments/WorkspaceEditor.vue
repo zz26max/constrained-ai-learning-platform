@@ -403,17 +403,17 @@ onBeforeUnmount(() => {
 <style scoped>
 .workspace-editor {
   width: 100%;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-control);
+  line-height: 1.6;
+  padding: var(--space-4);
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-control);
   resize: vertical;
 }
 
 .workspace-editor:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--canvas);
   cursor: not-allowed;
 }
 </style>

@@ -22,7 +22,7 @@
 .student-release .vc-page.vc-home .content-task-meta{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
 .student-release .content-task-time{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;line-height:1.65;color:var(--content-muted);font-variant-numeric:tabular-nums}
 .student-release .content-task-time time{font-weight:600}
-.student-release .vc-page.vc-home .task-line-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:7px 10px;border:1px solid #c5d1e2;border-radius:6px;background:var(--content-paper);font-size:13px;justify-self:end;align-self:center;text-decoration:none}
+.student-release .vc-page.vc-home .task-line-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:7px 10px;border:1px solid #c5d1e2;border-radius:var(--radius-control);background:var(--content-paper);font-size:13px;justify-self:end;align-self:center;text-decoration:none}
 .student-release .vc-page.vc-home .task-line-action:hover{background:#eef3fc;border-color:#8da6d4}
 .student-release .vc-page.vc-home [data-tone=soon] .content-task-time,
 .student-release .vc-page.vc-home [data-tone=overdue] .content-task-time{color:var(--content-warm)}
@@ -53,7 +53,7 @@
 .student-release .vc-page.vc-inbox .notification-item:not(.unread) .notification-title{font-weight:600;color:var(--content-ink)}
 .student-release .vc-page.vc-inbox .notification-item:hover,
 .student-release .vc-page.vc-inbox .notification-item:focus-within{background:#f3f6fc}
-.student-release .vc-page.vc-inbox .v35-message-glyph{left:12px;top:18px;border-radius:7px;border:1px solid #d9e2ef}
+.student-release .vc-page.vc-inbox .v35-message-glyph{left:12px;top:18px;border-radius:var(--radius-control);border:1px solid #d9e2ef}
 .student-release .vc-page.vc-inbox .notification-date:not(:first-child){margin-top:18px}
 .student-release .vc-page.vc-inbox .notification-date h2{font-size:14px;line-height:1.6;font-weight:650;background:var(--content-band);font-variant-numeric:tabular-nums}
 .student-release .vc-page.vc-inbox .notification-item>.notification-title{margin-top:7px;margin-bottom:6px;line-height:1.65}

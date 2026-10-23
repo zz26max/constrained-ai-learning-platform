@@ -169,16 +169,16 @@ function goToPage(page: number): void {
 </template>
 
 <style scoped>
-.empty-state { padding: 3rem; text-align: center; }
-.notification-list { display: flex; flex-direction: column; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
-.notification-item { padding: 16px 0; border: 0; border-bottom:1px solid var(--line); border-radius:0; min-width:0; }
-.notification-item.unread { background-color:transparent; border-left:3px solid var(--blue);padding-left:14px; }
+.empty-state { padding: var(--space-7); text-align: center; }
+.notification-list { display: flex; flex-direction: column; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
+.notification-item { padding: var(--space-4) 0; border: 0; border-bottom:1px solid var(--line); border-radius:0; min-width:0; }
+.notification-item.unread { background-color:transparent; }
 .notification-header { display: flex; gap: 8px; flex-wrap:wrap; align-items: center; margin-bottom: 8px; }
-.notification-type { font-size: 0.875rem; font-weight: 600; color: var(--primary, #0066cc); }
-.notification-time { margin-left: auto; font-size: 0.875rem; color: var(--text-muted, #666); }
+.notification-type { font-size: var(--fs-meta); font-weight: 600; color: var(--blue); }
+.notification-time { margin-left: auto; font-size: var(--fs-meta); color: var(--muted); }
 .notification-title { font-size:16px; font-weight:600; margin:0 0 6px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .notification-content { font-size:14px; margin:0;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
-.notification-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border, #e0e0e0); }
-.page-info { font-size: 0.875rem; color: var(--text-muted, #666); }
+.notification-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.pagination { display: flex; justify-content: center; align-items: center; gap: var(--space-4); margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }
+.page-info { font-size: var(--fs-meta); color: var(--muted); }
 </style>

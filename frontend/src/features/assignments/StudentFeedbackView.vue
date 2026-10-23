@@ -65,65 +65,68 @@ const formatDate = (date: string | null | undefined) => {
 
 <style scoped>
 .feedback-view {
-  margin-top: 1.5rem;
+  margin-top: var(--space-5);
 }
 
 .feedback-summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: var(--surface-secondary, #f5f5f5);
-  border-radius: 0.5rem;
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  background: var(--canvas);
+  border-radius: var(--radius-control);
 }
 
 .score-display {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .score-display .label {
-  font-size: 0.875rem;
-  color: var(--text-muted, #666);
+  font-size: var(--fs-meta);
+  color: var(--muted);
 }
 
 .score-display .score {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--primary, #0066cc);
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .overall-comment {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-5);
 }
 
 .rubric-scores {
-  margin-top: 1.5rem;
+  margin-top: var(--space-5);
 }
 
 .rubric-item {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: var(--surface-secondary, #f5f5f5);
-  border-radius: 0.5rem;
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background: var(--canvas);
+  border-radius: var(--radius-control);
 }
 
 .rubric-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .rubric-header .score {
-  font-weight: bold;
-  color: var(--primary, #0066cc);
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .rubric-comment {
-  margin-top: 0.5rem;
-  color: var(--text-secondary, #333);
+  margin-top: var(--space-2);
+  color: var(--muted);
 }
 </style>

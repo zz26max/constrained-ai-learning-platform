@@ -1,11 +1,11 @@
 /* 正式学生端（首页/课程/作业 + 外壳）唯一样式来源。规则见 frontend/DESIGN.md「学生端视觉收敛」。
    只在 .student-release 内生效；历史版本层以 vx-/vc-/v35-/exploration 根类限定，不再命中 sr-* 页面。 */
 .student-release {
-  --sr-canvas:#f4f6f9; --sr-surface:#fff; --sr-ink:#1c2d49; --sr-muted:#52627a;
-  --sr-line:#dde3ec; --sr-line-strong:#c5cfdd; --sr-sunken:#f7f9fc;
-  --sr-brand:#2853bc; --sr-brand-hover:#2147a3; --sr-brand-soft:#eef2fb;
-  --sr-focus:#1f3b84; --sr-warn:#8a5208; --sr-warn-soft:#fbf3e6;
-  --sr-r-s:6px; --sr-r-m:10px; --sr-r-focus:14px;
+  --sr-canvas:var(--canvas); --sr-surface:var(--surface); --sr-ink:var(--ink); --sr-muted:var(--muted);
+  --sr-line:var(--line); --sr-line-strong:var(--line-strong); --sr-sunken:var(--sunken);
+  --sr-brand:var(--blue); --sr-brand-hover:var(--blue-hover); --sr-brand-soft:var(--blue-soft);
+  --sr-focus:var(--focus-ring); --sr-warn:var(--orange); --sr-warn-soft:var(--orange-soft);
+  --sr-r-s:var(--radius-control); --sr-r-m:var(--radius-panel); --sr-r-focus:var(--radius-hero);
   --sr-serif:Georgia,"Times New Roman",serif;
   background:var(--sr-canvas);
 }
@@ -23,7 +23,7 @@
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=systems] {--acc:#5a527e;--acc-soft:#f0eef7}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=explore] {--acc:#805e1e;--acc-soft:#faf3e4}
 .student-release .v35-subject {display:inline-flex;align-items:baseline;gap:8px;min-width:0;color:var(--sr-muted);font-size:13px}
-.student-release .v35-subject-mark {flex-shrink:0;padding:0 6px;border-radius:4px;background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:700;line-height:1.7;letter-spacing:.02em}
+.student-release .v35-subject-mark {flex-shrink:0;padding:0 6px;border-radius:var(--radius-control);background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:700;line-height:1.7;letter-spacing:.02em}
 .student-release .v35-subject>span:last-child {overflow-wrap:anywhere}
 .student-release .vx-glyph {display:grid;place-items:center;color:var(--acc)}
 .student-release .vx-glyph>span {display:none}

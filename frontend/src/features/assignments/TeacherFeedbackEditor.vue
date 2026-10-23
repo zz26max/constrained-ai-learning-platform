@@ -241,7 +241,7 @@ onBeforeUnmount(()=>{closePublishDialog();window.removeEventListener('beforeunlo
 </template>
 
 <style scoped>
-.rubric-item { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-secondary); border-radius: 0.5rem; }
-.button-group { display: flex; gap: 1rem; margin-top: 1.5rem; }
-pre { overflow: auto; max-height: 20rem; }
+.rubric-item { margin-bottom: var(--space-5); padding: var(--space-4); background: var(--canvas); border-radius: var(--radius-control); }
+.button-group { display: flex; gap: var(--space-4); margin-top: var(--space-5); }
+pre { overflow: auto; max-height: 320px; }
 </style>
