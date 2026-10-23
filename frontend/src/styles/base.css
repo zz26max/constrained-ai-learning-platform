@@ -22,8 +22,8 @@ input {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
-  /* 焦点样式沿用原型：深底可读的浅蓝轮廓 */
-  outline: 3px solid #90afff;
+  /* 焦点环用 tokens 里的深蓝焦点色；浅蓝 #90afff 在白底只有 2.15:1，不满足非文本对比。 */
+  outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
 }
 
