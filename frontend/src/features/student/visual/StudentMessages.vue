@@ -117,10 +117,10 @@ function goToPage(page: number): void {
 
     <nav class="filter-tabs" aria-label="消息筛选"><button v-for="f in messageFilters" :key="f.key" :aria-pressed="messageFilter===f.key" @click="messageFilter=f.key">{{f.label}}</button></nav>
 
-    <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
+    <ApiState v-if="!query.data.value || query.status.value === 'error'" :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <ActionNotice :error="actions.error.value ?? navigateError" :message="actions.message.value" />
 
-    <section v-if="query.status.value === 'success'" class="surface" aria-label="消息列表">
+    <section v-if="query.data.value" class="surface" aria-label="消息列表">
       <p v-if="notifications.length === 0" class="muted empty-state">暂无消息</p>
 
       <ul v-else ref="listElement" class="notification-list">

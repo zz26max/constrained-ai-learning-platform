@@ -92,7 +92,17 @@ const canStartWork = computed(() => {
           <span v-if="query.data.value.publicationState === 'archived'" class="tag">已归档</span>
         </p>
       </div>
-      <RouterLink class="button secondary" to="/student/assignments">← 返回列表</RouterLink>
+      <div class="workspace-heading-actions">
+        <RouterLink
+          v-if="canStartWork"
+          class="button"
+          :class="{ secondary: query.data.value?.canSubmit !== true }"
+          :to="{ name: 'student-workspace', params: { id: assignmentId } }"
+        >
+          进入工作区
+        </RouterLink>
+        <RouterLink class="button secondary" to="/student/assignments">← 返回列表</RouterLink>
+      </div>
     </header>
 
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
@@ -136,16 +146,10 @@ const canStartWork = computed(() => {
           <p v-if="!canStartWork" class="muted">
             {{ query.data.value.publicationState === 'archived' ? '作业已归档' : '教学班已归档' }}，无法编辑工作区。
           </p>
-          <p v-if="canStartWork && !query.data.value.canSubmit" class="muted">
-            暂不能提交：{{ BLOCKED_LABELS[query.data.value.submissionBlockedReason ?? ''] ?? '当前不可提交' }}。
+          <p v-else-if="query.data.value.canSubmit !== true" class="muted">
+            暂不能提交：{{ BLOCKED_LABELS[query.data.value.submissionBlockedReason ?? ''] ?? '当前不可提交' }}。仍可在工作区保存练习内容。
           </p>
-          <RouterLink
-            v-if="canStartWork"
-            class="button"
-            :to="{ name: 'student-workspace', params: { id: assignmentId } }"
-          >
-            进入工作区
-          </RouterLink>
+          <p v-else class="muted">提交时会先保存最新编辑，教师收到的是本次确认的版本。</p>
         </section>
       </section>
 

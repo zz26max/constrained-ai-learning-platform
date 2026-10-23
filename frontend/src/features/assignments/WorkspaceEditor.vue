@@ -258,13 +258,19 @@ onBeforeUnmount(() => {
   <div class="workspace-page">
     <header class="workspace-heading">
       <div>
-        <h1 tabindex="-1">工作区</h1>
-        <p v-if="query.data.value">
-          <span v-if="saveState.error || saveState.paused">未保存 · 本地内容已保留</span>
-          <span v-else-if="saveState.saving">正在保存...</span>
-          <span v-else-if="saveState.pendingSave">等待保存...</span>
-          <span v-else-if="saveState.lastSavedRevision > 0">已保存 · 版本 {{ saveState.lastSavedRevision }}</span>
-          <span v-else>未保存</span>
+        <h1 tabindex="-1">{{ assignmentQuery.data.value?.title ?? '工作区' }}</h1>
+        <p>
+          <RouterLink :to="{ name: 'student-assignment', params: { id: assignmentId } }">← 作业说明</RouterLink>
+          <template v-if="query.data.value">
+            <span aria-hidden="true"> · </span>
+            <span role="status" aria-live="polite">
+              <span v-if="saveState.error || saveState.paused">未保存 · 本地内容已保留</span>
+              <span v-else-if="saveState.saving">正在保存...</span>
+              <span v-else-if="saveState.pendingSave">等待保存...</span>
+              <span v-else-if="saveState.lastSavedRevision > 0">已保存 · 版本 {{ saveState.lastSavedRevision }}</span>
+              <span v-else>未保存</span>
+            </span>
+          </template>
         </p>
       </div>
       <button

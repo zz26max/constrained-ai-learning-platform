@@ -15,6 +15,7 @@
 .workspace-page h2{font-size:18px;line-height:1.5;font-weight:600;margin:0}
 .workspace-page h3{font-size:16px;line-height:1.5;font-weight:600;margin:0}
 .workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}
+.workspace-heading-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .workspace-heading p{font-size:13px;color:var(--muted);line-height:1.6;margin:6px 0 0}
 .workspace-page .button,.workspace-sidebar .button{font-size:13px;white-space:nowrap}
 .workspace-page .button:not(.secondary){background:var(--blue);color:white}

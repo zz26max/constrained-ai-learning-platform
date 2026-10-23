@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest'
-import {taskAction,matchesTask,byDeadline,byRecentStudy,deadlineLabel} from '../src/features/assignments/task-presentation'
+import {taskAction,canEnterWorkspace,matchesTask,byDeadline,byRecentStudy,deadlineLabel} from '../src/features/assignments/task-presentation'
 import type {AssignmentSummaryDTO,AssignmentDetailDTO} from '../src/api/assignments'
 import type {CourseSummaryDTO} from '../src/api/courses'
 const task=(over:Partial<AssignmentSummaryDTO>={})=>({id:'a',dueAt:'2026-10-20T00:00:00Z',assignmentState:'NOT_STARTED',offeringStatus:'active',publicationState:'published',...over} as AssignmentSummaryDTO)
@@ -17,6 +17,18 @@ describe('学生任务展示与服务端权限',()=>{
     expect(taskAction(task({offeringStatus:'archived'}),late)).toBe('查看详情')
     expect(taskAction(task({assignmentState:'SUBMITTED'}),late)).toBe('查看提交')
     expect(taskAction(task({assignmentState:'REVIEWED'}),late)).toBe('查看评价')
+  })
+  it('只有确认可提交的未完成任务直达工作区，其余进说明页',()=>{
+    const allowed={canSubmit:true,overdue:false} as AssignmentDetailDTO
+    expect(canEnterWorkspace(task(),allowed)).toBe(true)
+    expect(canEnterWorkspace(task({assignmentState:'IN_PROGRESS'}),allowed)).toBe(true)
+    expect(canEnterWorkspace(task(),{canSubmit:true,overdue:true} as AssignmentDetailDTO)).toBe(true)
+    expect(canEnterWorkspace(task())).toBe(false)
+    expect(canEnterWorkspace(task(),{canSubmit:false} as AssignmentDetailDTO)).toBe(false)
+    expect(canEnterWorkspace(task({assignmentState:'SUBMITTED'}),allowed)).toBe(false)
+    expect(canEnterWorkspace(task({assignmentState:'REVIEWED'}),allowed)).toBe(false)
+    expect(canEnterWorkspace(task({publicationState:'archived'}),allowed)).toBe(false)
+    expect(canEnterWorkspace(task({offeringStatus:'archived'}),allowed)).toBe(false)
   })
   it('状态筛选区分待办/提交/评价；截止顺序稳定',()=>{
     expect(matchesTask(task(),'todo')).toBe(true)

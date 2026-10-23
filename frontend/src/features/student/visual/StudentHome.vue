@@ -13,7 +13,8 @@ import CraftDate from './CraftDate.vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { coursesApi } from '../../../api'
 import { useStudentHome } from '../../../features/dashboard/use-student-home'
-import { taskAction, deadlineLabel } from '../../../features/assignments/task-presentation'
+import { taskAction, deadlineLabel, canEnterWorkspace } from '../../../features/assignments/task-presentation'
+import type { AssignmentDetailDTO } from '../../../api/assignments'
 import { formatTime } from '../../../features/courses/format'
 
 import ApiState from '../../../components/ApiState.vue'
@@ -29,6 +30,13 @@ const deadlineGroups=computed(()=>taskDayGroups(recentTasks.value))
 // 组标题只显示一次相对截止；"截止安排"这类占位语不展示。
 function groupContext(group:{context:string;dueAt:string}){return group.context==='截止安排'?deadlineLabel(group.dueAt):group.context}
 function courseById(id:string|null|undefined){return tasksQuery.data.value?.classes.find(c=>c.offeringId===id)}
+// 主操作直达工作区；资格未确认或不可提交时退回说明页，让标签与实际去向一致。
+function taskEntry(task:AssignmentDetailDTO|null|undefined){
+  if(!task)return {name:'student-assignments'} as const
+  return canEnterWorkspace(task,task)
+    ? {name:'student-workspace',params:{id:task.id}}
+    : {name:'student-assignment',params:{id:task.id}}
+}
 const courses=coursesApi()
 const chaptersQuery=usePageQuery(async signal=>{
   const id=selectedCourse.value?.offeringId
@@ -72,7 +80,7 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
                 <p v-if="nextTask.title.includes('�')" role="alert" class="focus-data-warning">原始标题存在乱码，请联系教师修正。</p>
                 <IntegratedTaskStatus :task="nextTask" :detail="nextTask" :show-deadline="false" />
                 <div class="bplus-deadline"><span>截止（北京时间）</span><CraftDate :value="nextTask.dueAt"/><small>{{deadlineLabel(nextTask.dueAt)}}</small></div>
-                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="{name:'student-assignment',params:{id:nextTask.id}}">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
+                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="taskEntry(nextTask)">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
                 <p class="polish-task-context">按可提交任务的截止时间先后展示，包含补交任务。</p>
               </template>
               <template v-else>
@@ -87,7 +95,7 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
           <header class="explore-section-heading"><h2 id="explore-tasks-title">近期任务</h2><RouterLink to="/student/assignments">全部作业</RouterLink></header>
           <p v-if="tasksQuery.status.value==='loading'" class="explore-muted" role="status">正在读取近期任务…</p>
           <p v-else-if="tasksQuery.status.value==='error'" class="explore-muted">任务未完整加载，请在上方重试。</p>
-          <div v-else-if="recentTasks.length" class="bplus-task-groups"><section v-for="group in deadlineGroups" :key="group.key" class="bplus-task-group" :data-day="group.key" :aria-label="group.key+'截止任务'"><header class="bplus-group-heading"><CraftDate :value="group.dueAt" day-only/><span>{{group.tasks.length}} 项任务</span><small>{{groupContext(group)}}</small></header><ul class="bplus-task-list"><li v-for="task in group.tasks" :key="task.id" :data-task-id="task.id" :data-tone="taskContentTone(task,task)"><div class="task-line-content"><RouterLink class="explore-task-name" :title="task.title" :to="{name:'student-assignment',params:{id:task.id}}">{{task.title}}</RouterLink><p class="explore-muted"><SubjectIdentity :course="courseById(task.offeringId)" /></p><div class="content-task-meta"><IntegratedTaskStatus :task="task" :detail="task" :show-deadline="false" /><span class="content-task-time">{{beijingTime(task.dueAt)}} 截止</span></div></div><RouterLink class="task-line-action" :to="{name:'student-assignment',params:{id:task.id}}">{{taskAction(task,task)}}</RouterLink></li></ul></section></div>
+          <div v-else-if="recentTasks.length" class="bplus-task-groups"><section v-for="group in deadlineGroups" :key="group.key" class="bplus-task-group" :data-day="group.key" :aria-label="group.key+'截止任务'"><header class="bplus-group-heading"><CraftDate :value="group.dueAt" day-only/><span>{{group.tasks.length}} 项任务</span><small>{{groupContext(group)}}</small></header><ul class="bplus-task-list"><li v-for="task in group.tasks" :key="task.id" :data-task-id="task.id" :data-tone="taskContentTone(task,task)"><div class="task-line-content"><RouterLink class="explore-task-name" :title="task.title" :to="{name:'student-assignment',params:{id:task.id}}">{{task.title}}</RouterLink><p class="explore-muted"><SubjectIdentity :course="courseById(task.offeringId)" /></p><div class="content-task-meta"><IntegratedTaskStatus :task="task" :detail="task" :show-deadline="false" /><span class="content-task-time">{{beijingTime(task.dueAt)}} 截止</span></div></div><RouterLink class="task-line-action" :to="taskEntry(task)">{{taskAction(task,task)}}</RouterLink></li></ul></section></div>
           <p v-else class="explore-empty">没有更多可提交的近期任务。已截止任务可在全部作业中查看。</p>
         </section>
 

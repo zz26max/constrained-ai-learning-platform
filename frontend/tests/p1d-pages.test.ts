@@ -155,6 +155,28 @@ describe('消息中心 /student/messages', () => {
     expect(page.text()).toContain('1 条未读')
   })
 
+  it('标已读后的刷新期间保留列表，不整块闪空', async () => {
+    const page = await open('/student/messages', 'student')
+    let releaseRefresh!: () => void
+    let waiting = false
+    const gate = new Promise<void>(resolve => { releaseRefresh = resolve })
+    scripted.setHandler(async request => {
+      if (request.operationId === 'listMessages' && waiting) await gate
+      return normalResponse(request)
+    })
+    const button = page.findAll('button').find(item => item.text() === '标为已读')
+    if (!button) throw new Error('未找到标为已读按钮')
+    waiting = true
+    await button.trigger('click')
+    await flushPromises()
+    // 刷新请求仍挂起时，已加载的消息必须留在页面上。
+    expect(page.findAll('.notification-item')).toHaveLength(2)
+    expect(page.text()).toContain('标为已读')
+    releaseRefresh()
+    await flushPromises()
+    expect(page.text()).toContain('1 条未读')
+  })
+
   it('列表为空时显示空状态', async () => {
     scripted.setHandler(request => request.operationId === 'listMessages'
       ? okEnvelope({ items: [], page: 1, pageSize: 20, total: 0, summary: { unreadCount: 0 } })

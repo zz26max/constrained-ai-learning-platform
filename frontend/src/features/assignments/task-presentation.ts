@@ -19,6 +19,12 @@ export function taskAction(task: AssignmentSummaryDTO, detail?: AssignmentDetail
   if (detail.overdue) return '继续补交'
   return task.assignmentState === 'IN_PROGRESS' ? '继续作答' : '开始作答'
 }
+/** 列表里的主操作直达工作区，但只限服务端确认可提交、且仍可作答的任务；其余进说明页。 */
+export function canEnterWorkspace(task: AssignmentSummaryDTO, detail?: AssignmentDetailDTO): boolean {
+  if (task.publicationState === 'archived' || task.offeringStatus === 'archived') return false
+  if (detail?.canSubmit !== true) return false
+  return task.assignmentState === 'NOT_STARTED' || task.assignmentState === 'IN_PROGRESS'
+}
 export function deadlineLabel(dueAt: string, now = Date.now()): string {
   const diff = Date.parse(dueAt) - now
   if (!Number.isFinite(diff)) return '截止时间不可识别'

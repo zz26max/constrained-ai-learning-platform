@@ -94,7 +94,17 @@ const invalid = (context: MockRequestContext, message = '输入不符合要求�
 const missing = (context: MockRequestContext) => fail(context, 404, 'NOT_FOUND', '对象不存在或不可访问。')
 const archived = (context: MockRequestContext) => fail(context, 409, 'OFFERING_ARCHIVED', '教学班已归档，当前只能查看历史内容。')
 
-const idFor = (context: MockRequestContext) => new URL(context.path, 'http://mock.local').pathname.split('/').filter(Boolean).at(-1) || ''
+/** 契约里不少路径以动作名结尾（/workspace、/read、/publish…），参数要取动作名之前的一段。 */
+const ACTION_SEGMENTS = new Set([
+  'workspace', 'submissions', 'publish', 'archive', 'read', 'stats', 'progress', 'feedback',
+  'chapters', 'notices', 'members', 'invites', 'knowledge-points', 'resources',
+  'assignments', 'learning-records', 'messages', 'mark-read',
+])
+const idFor = (context: MockRequestContext) => {
+  const parts = new URL(context.path, 'http://mock.local').pathname.split('/').filter(Boolean)
+  while (parts.length > 1 && ACTION_SEGMENTS.has(parts[parts.length - 1]!)) parts.pop()
+  return parts[parts.length - 1] ?? ''
+}
 
 const object = (value: unknown): value is Body => value !== null && typeof value === 'object' && !Array.isArray(value)
 const text = (value: unknown, maximum: number, minimum = 0): value is string => typeof value === 'string' && value.length >= minimum && value.length <= maximum

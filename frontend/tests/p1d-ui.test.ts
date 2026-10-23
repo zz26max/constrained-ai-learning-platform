@@ -182,7 +182,7 @@ describe('P1-D 路由与首页', () => {
     expect(view.get('#explore-focus-title').text()).toBe('真实补交任务')
     expect(view.get('.explore-focus').text()).toContain('已逾期，可补交')
     expect(view.get('[data-home-action=primary]').text()).toContain('继续补交')
-    expect(view.get('[data-home-action=primary]').attributes('href')).toContain(ASSIGNMENT_2)
+    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/student/workspaces/'+ASSIGNMENT_2)
     expect(view.get('.polish-task-context').text()).toContain('截止时间先后')
   })
   it('正式首页资格失败不能展示成功空态，课程章节失败可重试',async()=>{

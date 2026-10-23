@@ -3,7 +3,7 @@
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi, coursesApi } from '../../../api'
-import type { AssignmentDetailDTO } from '../../../api/assignments'
+import type { AssignmentDetailDTO, AssignmentSummaryDTO } from '../../../api/assignments'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
 import IntegratedTaskStatus from './CraftTaskState.vue'
@@ -13,7 +13,7 @@ import {taskContentTone} from './content-presentation'
 import {deadlineLabel} from '../../../features/assignments/task-presentation'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
-import { byDeadline, matchesTask, taskAction, todoPriority, todoGroupLabel, type TaskFilter } from '../../../features/assignments/task-presentation'
+import { byDeadline, matchesTask, taskAction, todoPriority, todoGroupLabel, canEnterWorkspace, type TaskFilter } from '../../../features/assignments/task-presentation'
 const route=useRoute(), router=useRouter(), api=assignmentsApi(), courses=coursesApi()
 const PAGE_SIZE=20
 const filters: {key:TaskFilter;label:string}[]=[{key:'todo',label:'待完成'},{key:'submitted',label:'已提交'},{key:'reviewed',label:'已批改'},{key:'all',label:'全部'}]
@@ -68,6 +68,13 @@ function groupLabel(id:string):string {
   return detail?todoGroupLabel(detail):''
 }
 function courseName(id:string){return query.data.value?.classes.find(c=>c.offeringId===id)?.title??'课程信息未返回'}
+function detailOf(id:string){return details.status.value==='success'?details.data.value?.[id]:undefined}
+// 可继续作答的任务直达工作区；已评价/已提交仍进说明页并带上反馈定位。
+function taskEntry(task:AssignmentSummaryDTO){
+  return canEnterWorkspace(task,detailOf(task.id))
+    ? {name:'student-workspace',params:{id:task.id}}
+    : {name:'student-assignment',params:{id:task.id},...(task.publishedFeedbackId?{query:{feedbackId:task.publishedFeedbackId}}:{})}
+}
 </script>
 <template>
   <div class="workspace-page sr-tasks student-tasks">
@@ -87,7 +94,7 @@ function courseName(id:string){return query.data.value?.classes.find(c=>c.offeri
           <div class="vc-task-copy"><RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink><div class="task-course"><SubjectIdentity :course="query.data.value.classes.find(c=>c.offeringId===task.offeringId)" /></div></div>
           <div class="vc-task-date"><CraftDate :value="task.dueAt"/><span class="vc-due-state">{{deadlineLabel(task.dueAt)}}</span></div>
           <IntegratedTaskStatus :show-deadline="false" :task="task" :detail="details.status.value==='success'?details.data.value?.[task.id]:undefined" />
-          <RouterLink class="button secondary" :to="{name:'student-assignment',params:{id:task.id},query:task.publishedFeedbackId?{feedbackId:task.publishedFeedbackId}:{}}">{{ taskAction(task,details.status.value==='success'?details.data.value?.[task.id]:undefined) }}</RouterLink>
+          <RouterLink class="button secondary" :to="taskEntry(task)">{{ taskAction(task,details.status.value==='success'?details.data.value?.[task.id]:undefined) }}</RouterLink>
         </article></template>
       </section>
       <nav v-if="totalPages>1" class="pagination" aria-label="作业列表分页"><button class="button secondary" :disabled="page<=1" @click="router.push({query:{...route.query,page:String(page-1)}})">上一页</button><span>第 {{ page }} / {{ totalPages }} 页</span><button class="button secondary" :disabled="page>=totalPages" @click="router.push({query:{...route.query,page:String(page+1)}})">下一页</button></nav>

@@ -27,6 +27,11 @@ input:focus-visible {
   outline-offset: 4px;
 }
 
+/* 路由切换后以编程方式聚焦 h1；标题不是可交互控件，不显示浏览器默认焦点框。 */
+main h1:focus {
+  outline: none;
+}
+
 #app,
 .app-shell {
   min-height: 100vh;
