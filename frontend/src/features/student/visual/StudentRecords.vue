@@ -69,7 +69,6 @@ function goToPage(next: number): void {
   void router.push({ query: { ...route.query, page: String(next) } })
 }
 import SubjectGlyph from './SubjectGlyph.vue'
-import CountProgress from './CountProgress.vue'
 import { subject,chapterState } from './presentation'
 import {chapterEntry} from './refinement'
 withDefaults(defineProps<{refined?:boolean;integrated?:boolean}>(),{refined:true,integrated:true})
@@ -93,7 +92,7 @@ withDefaults(defineProps<{refined?:boolean;integrated?:boolean}>(),{refined:true
      </template>
     </section>
     <aside class="vx-evidence" aria-label="课程学习成果">
-     <section class="vx-overview"><p class="vx-eyebrow">{{refined?'阅读累积，成果可见。':'课程学习概览'}}</p><h2>{{refined?'课程学习概览':'阅读累积，成果可见。'}}</h2><CountProgress :refined="refined" v-if="chaptersQuery.status.value==='success'" :completed="completedChapters" :total="chapterPath.total" :title="currentCourse?.title??'课程'"/><p class="vx-muted">阅读进度不代表知识掌握程度。</p><dl class="vx-results"><div><dt>已完成实验</dt><dd>{{recordsQuery.data.value.summary.completedLabCount}}<small>个</small></dd></div><div><dt>已发布评价</dt><dd>{{recordsQuery.data.value.summary.publishedFeedbackCount}}<small>份</small></dd></div><div v-if="recordsQuery.data.value.summary.needsPracticeCount!==null"><dt>待加强知识点</dt><dd>{{recordsQuery.data.value.summary.needsPracticeCount}}</dd></div></dl></section>
+     <section class="vx-overview"><p class="vx-eyebrow">{{refined?'阅读累积，成果可见。':'课程学习概览'}}</p><h2>{{refined?'课程学习概览':'阅读累积，成果可见。'}}</h2><p class="vx-muted">阅读进度不代表知识掌握程度。</p><dl class="vx-results"><div><dt>已开放章节</dt><dd>{{chapterPath.total}}<small>个</small></dd></div><div><dt>已完成实验</dt><dd>{{recordsQuery.data.value.summary.completedLabCount}}<small>个</small></dd></div><div><dt>已发布评价</dt><dd>{{recordsQuery.data.value.summary.publishedFeedbackCount}}<small>份</small></dd></div><div v-if="recordsQuery.data.value.summary.needsPracticeCount!==null"><dt>待加强知识点</dt><dd>{{recordsQuery.data.value.summary.needsPracticeCount}}</dd></div></dl></section>
      <section class="vx-feedback"><p class="vx-eyebrow">{{refined?'教师反馈':'教师的回应 / FEEDBACK'}}</p><template v-if="recordsQuery.data.value.recentFeedback"><div class="vx-feedback-score"><strong>{{recordsQuery.data.value.recentFeedback.score}}</strong><span>/ {{recordsQuery.data.value.recentFeedback.maxScore}}<small>本次作业评价</small></span></div><h3><RouterLink :to="{name:'student-assignment',params:{id:recordsQuery.data.value.recentFeedback.assignmentId},query:{feedbackId:recordsQuery.data.value.recentFeedback.id}}">{{recordsQuery.data.value.recentFeedback.assignmentTitle}} ↗</RouterLink></h3><p>{{recordsQuery.data.value.recentFeedback.comment}}</p><time class="vx-muted" :datetime="recordsQuery.data.value.recentFeedback.publishedAt">{{formatTime(recordsQuery.data.value.recentFeedback.publishedAt)}}</time></template><template v-else><h3>暂时还没有教师评价</h3><p class="vx-muted">完成作业并等待教师发布后，可在这里回顾具体反馈。</p><RouterLink class="vx-text-action" :to="{path:'/student/assignments',query:{offering:rawId}}">查看课程作业 →</RouterLink></template></section>
     </aside>
    </div>

@@ -220,6 +220,35 @@
 .student-release .sr-tasks .task-group-heading {margin:0;padding:10px 20px;font-size:14px;font-weight:650;border-top:1px solid var(--sr-line);border-bottom:1px solid var(--sr-line);box-shadow:inset 3px 0 0 var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-ink)}
 .student-release .sr-tasks .task-group-heading[data-group=closed] {box-shadow:inset 3px 0 0 #d9a65c;background:var(--sr-warn-soft);color:var(--sr-warn)}
 .student-release .sr-tasks .task-table-head+.task-group-heading {border-top:0}
+
+/* ===== 学习记录：路径改为连续行，节点轨保留 ===== */
+.student-release .vx-records .vx-path-body {padding:10px 0;background:none;border:0;border-bottom:1px solid var(--sr-line);border-radius:0}
+.student-release .vx-records .vx-path>li:last-child .vx-path-body {border-bottom:0}
+.student-release .vx-records .vx-path>li[data-state=in_progress] .vx-path-body {background:none;box-shadow:none;border:0;border-bottom:1px solid var(--sr-line);border-left:3px solid var(--vx-accent);padding-left:12px}
+.student-release .vx-records .vx-feedback-history>ul {border:1px solid var(--sr-line);border-radius:var(--sr-r-m)}
+.student-release .vx-records .vx-feedback-history>ul>li {border-bottom:1px solid var(--sr-line)}
+.student-release .vx-records .vx-feedback-history>ul>li:last-child {border-bottom:0}
+
+/* ===== 学习日历：月格紧凑、空态收短 ===== */
+.student-release .vx-calendar .vx-day-cell {min-height:92px;padding:6px}
+.student-release .vx-calendar .vx-calendar-empty {padding:2px 0 8px}
+.student-release .vx-calendar .vx-calendar-empty>span {font-size:32px}
+.student-release .vx-calendar .vx-calendar-empty>h3 {font-size:15px;margin:6px 0}
+.student-release .vx-calendar .vx-calendar-empty p {margin:6px 0}
+.student-release .vx-calendar .vx-calendar-empty h4 {margin:12px 0 6px;padding-top:12px}
+.student-release .vx-calendar .vx-agenda {padding:16px}
+.student-release .vx-calendar .vx-deadline-heading {padding:8px 10px}
+
+/* ===== 消息：行密度与操作权重 ===== */
+.student-release .vc-page.vc-inbox .notification-item {padding:14px 14px 14px 56px;gap:0 18px}
+.student-release .vc-page.vc-inbox .notification-item.unread {padding:14px 12px 14px 56px}
+.student-release .vc-page.vc-inbox .notification-item>.notification-title {font-size:16px;margin:6px 0 4px}
+.student-release .vc-page.vc-inbox .notification-item>.notification-content {line-height:1.7}
+.student-release .vc-page.vc-inbox .notification-item>.notification-time {margin-top:6px;font-size:12px}
+.student-release .vc-page.vc-inbox .notification-actions {margin-top:6px}
+.student-release .vc-page.vc-inbox .notification-actions .text-action {min-height:44px;padding:0 8px;border:0;background:none;color:var(--sr-muted);font-size:14px}
+.student-release .vc-page.vc-inbox .notification-actions .text-action:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:4px}
+
 /* ===== 公共外壳 ===== */
 .student-release .workspace-sidebar {border-right-color:var(--sr-line)}
 .student-release .workspace-sidebar nav .nav-item {color:var(--sr-muted);border-radius:var(--sr-r-s)}

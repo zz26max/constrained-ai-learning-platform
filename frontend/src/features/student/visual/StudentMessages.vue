@@ -149,7 +149,7 @@ function goToPage(page: number): void {
             <button
               v-if="notification.readAt === null"
               type="button"
-              class="button secondary"
+              class="text-action"
               :disabled="actions.pending.value"
               @click="markRead(notification)"
             >
