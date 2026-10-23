@@ -73,8 +73,8 @@
 .chapter-number{font-size:13px;color:var(--muted);align-self:start;padding-top:3px}
 .workspace-page .tag{display:inline-block;padding:3px 8px;line-height:1.6;font-size:12px;border-radius:var(--radius-control);white-space:nowrap;color:var(--muted);background:var(--canvas)}
 .reading-page{max-width:1040px}
-.reading-content{padding:26px 32px}
-.reading-section{border-top:1px solid var(--line);margin-top:24px;padding-top:22px}
+.reading-content{padding:24px 28px}
+.reading-section{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}
 .reading-section>h2{margin-bottom:12px}
 .reading-section ul{padding-left:24px}
 .reading-section .resource-list{padding:0}
