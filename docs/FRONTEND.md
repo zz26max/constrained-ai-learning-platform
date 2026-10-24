@@ -182,6 +182,7 @@ API 字符串均为不可信输入。Vue 普通文本插值可用于文字显示
 - 复用原生 dialog 和 details；保留 Escape 关闭、对话框关闭后返回焦点、切页聚焦标题、跳到主要内容、减少动效与清晰键盘焦点。
 - 空课程、无待办和加载失败分别说明原因与下一步；长标题自然换行，页面不横向溢出，教师表格在自己的容器内滚动。
 - 正式界面使用现有功能样式与 `zhixue.css` 统一主题；日历独立样式，不直接加载React原型CSS或运行时。素材按需放入正式工程 `src/assets/`。
+- 样式分层冻结（2026-10-24 起）：`features/student/visual/` 下的历史叠层（student/content/craft/integration/polish/refinement/secondary/visual）只维护不再新增；学生端新页面与新组件的样式只进 `tokens.css`、`release.css` 与页面自身样式，禁止新增第 9 个叠层文件。
 
 历次视觉调整、Git 提交及截图检查记录保存在[视觉历史](archive/UI_DESIGN_HISTORY.md)，其中旧课程网格、旧深色首页和旧字号仅属于当时版本。那些检查记录说明静态原型的历史验证，不能代替真实前后端联调验收。
 
