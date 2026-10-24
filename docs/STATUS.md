@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：单一分支 `master`，当前 `8f20f75`（2026-10-24 UI 审计分支合流、两轮文档审计收口后，`frontend/ui-audit-p1` 已删除；**未部署**）。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`；更早基线与各候选版本的提交见 §1 会话日志。本块第一个哈希为当前基线，须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。
+- **代码基线**：本块第一个哈希 `8b47536` 为最近一次基线回填（2026-10-24 分支清理同步），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除，本地与远端无其他分支）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后均为文档、校验脚本与死规则清理提交，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导、学习行为分析，契约 17 个操作）与 P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始**，契约中对应操作仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **文档审计第 3 轮处置**（2026-10-24，`master`，基于 `8b47536`）：依据第 3 轮外部审计（已归档为 [DOC_AUDIT_R3_2026-10-24.md](archive/DOC_AUDIT_R3_2026-10-24.md)）——R1 §0 基线块"均在/当前"式零滞后绝对措辞改为两段式（回填哈希 + "其后均为治理提交，见 §1"），与校验器 ≤3 容忍度匹配，此后正文不再随每次提交失实；R3 落后分支 `frontend/ui-audit-p1` 已在报告时点后删除（`8b47536`）。**R2 复核为误判**：报告断言 `HomeExploration.vue` 是生产首页渲染器，实测 `router.ts:22,69` 的 `/student/home` 指向 `features/student/visual/StudentHome.vue`（V3.6.1 独立实现，不消费 design 参数），`dashboard/StudentHomePage.vue` 仅被 campus 演示与 `p1d-ui.test.ts` 引用——`140ec78` 的 N8 理由与 README 改写均成立，本注记防止后人据 R2 误删生产无关但被引用的演示组件。R2 附带暴露的真实残留已清理：`router.ts` 登录回跳白名单仍放行已无组件消费的 `/student/home?design=…` 参数（该残留正是误导审计的原因），删除该分支并同步改写 `router.test.ts` 断言（design 参数样本移入拒绝清单）。nit：`check_links` 扫描范围补入 `DEBUGGING.md` 与 `frontend/README.md`；nit2 复核为误报（§4 恰为 5 个竞态：归档 2 + AI 2 + 死锁 1，§0"5 个"准确）。检查：`npm --prefix frontend run verify` 通过；`validate_contract.py` 通过。未做：CLAUDE.md 用户层规则仍未动。
 
 - **文档审计第 2 轮处置**（2026-10-24，`master` 单一基线，基于 `9be3cbb`）：依据第 2 轮外部文档审计（已归档为 [DOC_AUDIT_R2_2026-10-24.md](archive/DOC_AUDIT_R2_2026-10-24.md)）修复全部新发现——N1 §0 代码基线块由已漂移 4 个提交的 `c5ec604`/`37620a0` 更正为合流后的 `9be3cbb`；N2 阶段块"P3（学习行为分析）"按契约 `x-phase`（P2 含 17 个操作含 recordLearningEvents/tutoring/help，P3 仅 createCheck/getCheck）更正为"P2（受限式 AI 辅导、学习行为分析）、P3（独立运行检查）"；N3 FRONTEND §9 删除被 M1 取代的旧字号 bullet（27/24/14）并改写 zhixue.css 与 tokens 的表述；N4 修复归档搬迁留下的 4 条死链（V3.1/V3.2 的 .cache 相对链接改为本机目录说明、V3.4 的 DESIGN.md 改指同目录 frontend-DESIGN.md）；N5 门禁块去掉随登记数漂移的链接计数。工具侧：`validate_contract.py` 的 `check_links` 扫描范围扩至 features/ 与 archive/（消除"提交声称链接全可达、校验器实际不扫"的盲区），`check_status_baseline` 新增"§0 第一个基线 commit 必须是 HEAD 祖先且落后不超过 3 个提交"拦截基线漂移（N1 案例）。顺手项：N6 docs/README 校验器描述同步三目录与新基线规则、N7 student-ui-convergence.md 头部声明指向现行规范、N8 frontend/README 删除已失效的 V3/B+ 预览入口两段（design 参数路由已移除）、N9 §1 引言补归档路径迁移对照、N10 §1 引言明确 §4 已知限制为现行清单。检查：`validate_contract.py` 通过（三目录登记 32 份、链接扩展扫描 248 条全可达、基线 9be3cbb 为 HEAD 祖先；扩展扫描另发现并修复 2026-10-08_HANDOFF_AUDIT.md 一条指向根 README 已不存在锚点的历史死链）。未做：N9 所列历史日志内旧路径按"日志不改写"保留，仅靠 §1 引言对照说明。
 
