@@ -9,6 +9,7 @@ import {
   createDefaultDashboardApi, registerDashboardApi,
   createDefaultNoticesApi, registerNoticesApi,
   createDefaultStatsApi, registerStatsApi,
+  createDefaultTutoringApi, registerTutoringApi,
 } from './api'
 import './styles/base.css'
 import './styles/courses.css'
@@ -30,6 +31,7 @@ registerAssignmentsApi(await createDefaultAssignmentsApi())
 registerDashboardApi(await createDefaultDashboardApi())
 registerNoticesApi(await createDefaultNoticesApi())
 registerStatsApi(await createDefaultStatsApi())
+registerTutoringApi(await createDefaultTutoringApi())
 
 const app = createApp(App,{studentVisual:true})
 app.use(createPinia())

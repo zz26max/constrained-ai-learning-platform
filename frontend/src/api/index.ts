@@ -4,6 +4,7 @@ import { AssignmentsApi } from './assignments'
 import { DashboardApi } from './dashboard'
 import { NoticesApi } from './notices'
 import { StatsApi } from './stats'
+import { TutoringApi } from './tutoring'
 import { ApiClient } from './client'
 import { realTransport } from './real-transport'
 import type { ApiMode } from '../app/api-mode'
@@ -14,6 +15,7 @@ let registeredAssignments: AssignmentsApi | null = null
 let registeredDashboard: DashboardApi | null = null
 let registeredNotices: NoticesApi | null = null
 let registeredStats: StatsApi | null = null
+let registeredTutoring: TutoringApi | null = null
 
 export function registerCoursesApi(api: CoursesApi): void {
   registeredCourses = api
@@ -110,11 +112,31 @@ export async function createDefaultStatsApi(): Promise<StatsApi> {
   return new StatsApi(new ApiClient(realTransport))
 }
 
+export function registerTutoringApi(api: TutoringApi): void {
+  registeredTutoring = api
+}
+
+export function tutoringApi(): TutoringApi {
+  if (registeredTutoring === null) {
+    throw new Error('TutoringApi 尚未注册：请先在应用启动时调用 registerTutoringApi()。')
+  }
+  return registeredTutoring
+}
+
+export async function createDefaultTutoringApi(): Promise<TutoringApi> {
+  if (import.meta.env.VITE_API_MODE === 'mock') {
+    const { mockTransport } = await import('../mocks/index')
+    return new TutoringApi(new ApiClient(mockTransport))
+  }
+  return new TutoringApi(new ApiClient(realTransport))
+}
+
 export { CoursesApi } from './courses'
 export { AssignmentsApi } from './assignments'
 export { DashboardApi } from './dashboard'
 export { NoticesApi } from './notices'
 export { StatsApi } from './stats'
+export { TutoringApi } from './tutoring'
 export type * from './courses'
 export type * from './assignments'
 export type * from './dashboard'

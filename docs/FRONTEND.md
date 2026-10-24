@@ -81,6 +81,7 @@ frontend/
 | `/resource/{resourceId}` | 资料，P1 | `/resources/{resourceId}`；从响应恢复课程与章节上下文 |
 | `/student/assignments` | 个人作业，P1 | `/me/assignments` 的班级、状态筛选和分页 |
 | `/student/assignments/{assignmentId}` | 作业详情，P1 | 作业要求、提交限制、最近提交与公开评价（提交详情与评价在此页展示，不另设路由） |
+| `/student/assignments/{assignmentId}/tutoring` | AI 辅导，P2（2026-10-24 起并行开发，mock 先行） | `/assignments/{assignmentId}/ai-policy`、`/tutoring/sessions`、`/tutoring/sessions/{sessionId}/messages`、`/tutoring/requests/{tutoringRequestId}`；政策未启用显示阶段说明，发送后按 §6 轮询 |
 | `/student/workspaces/{assignmentId}` | 作业编辑，P1 | 工作区读取/保存/提交；按 `type` 选择编辑模式 |
 | `/student/progress` / `/student/progress/{offeringId}` | 学习记录，P1/P2 | `/me/offerings/{offeringId}/learning-records?page=1&pageSize=10`；P2 再显示知识分析 |
 | `/student/messages` | 消息中心，P1/P2 | `/me/messages`、标记已读及全部已读 |
