@@ -26,6 +26,9 @@ import NoticeDetailPage from '../features/notices/NoticeDetailPage.vue'
 import AssignmentCalendar from '../features/calendar/AssignmentCalendar.vue'
 import StudentCalendar from '../features/student/visual/StudentCalendar.vue'
 import TutoringPage from '../features/tutoring/TutoringPage.vue'
+import HelpRequestListPage from '../features/help/HelpRequestListPage.vue'
+import HelpRequestDetailPage from '../features/help/HelpRequestDetailPage.vue'
+import HelpRequestCreatePage from '../features/help/HelpRequestCreatePage.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -80,6 +83,9 @@ const routes: RouteRecordRaw[] = [
   { name: 'student-assignments', path: '/student/assignments', component: AssignmentList, meta: { requiresAuth: true, requiresRole: 'student', title: '我的作业 · 学习空间' } },
   { name: 'student-assignment', path: '/student/assignments/:id', component: AssignmentDetail, meta: { requiresAuth: true, requiresRole: 'student', title: '作业详情 · 学习空间' } },
   { name: 'student-tutoring', path: '/student/assignments/:id/tutoring', component: TutoringPage, meta: { requiresAuth: true, requiresRole: 'student', title: 'AI 辅导 · 学习空间' } },
+  { name: 'student-help-new', path: '/student/assignments/:id/help', component: HelpRequestCreatePage, meta: { requiresAuth: true, requiresRole: 'student', title: '发起求助 · 学习空间' } },
+  { name: 'student-help-requests', path: '/student/help-requests', component: HelpRequestListPage, meta: { requiresAuth: true, requiresRole: 'student', title: '我的求助 · 学习空间' } },
+  { name: 'student-help-request', path: '/student/help-requests/:id', component: HelpRequestDetailPage, meta: { requiresAuth: true, requiresRole: 'student', title: '求助详情 · 学习空间' } },
   { name: 'student-workspace', path: '/student/workspaces/:id', component: WorkspaceEditor, meta: { requiresAuth: true, requiresRole: 'student', title: '工作区 · 学习空间' } },
   { name: 'student-messages', path: '/student/messages', component: NotificationCenter, meta: { requiresAuth: true, requiresRole: 'student', title: '消息 · 学习空间' } },
   { name: 'teacher-feedback', path: '/teacher/submissions/:submissionId/feedback', component: TeacherFeedbackEditor, meta: { requiresAuth: true, requiresRole: 'teacher', title: '批阅作业 · 学习空间' } },

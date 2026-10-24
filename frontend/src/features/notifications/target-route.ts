@@ -4,7 +4,7 @@ import { isUuid } from '../assignments/format'
 
 /**
  * 把消息/公告的跳转目标映射成站内路由。
- * - 返回 null：不可跳转（help_request 属 P2、id 或 offeringId 不是 UUID）。
+ * - 返回 null：不可跳转（id 或 offeringId 不是 UUID）。
  * - 返回 'needs-feedback-lookup'：feedback 需先 getFeedback(id) 取 assignmentId，再跳作业详情。
  * 只返回命名路由对象，不拼接字符串 URL。
  */
@@ -16,6 +16,7 @@ export function targetRoute(target: TargetDTO): RouteLocationRaw | 'needs-feedba
     case 'resource': return { name: 'resource', params: { resourceId: target.id } }
     case 'assignment': return { name: 'student-assignment', params: { id: target.id } }
     case 'feedback': return 'needs-feedback-lookup'
+    case 'help_request': return { name: 'student-help-request', params: { id: target.id } }
     default: return null
   }
 }

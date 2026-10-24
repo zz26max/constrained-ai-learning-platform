@@ -589,7 +589,8 @@ describe('P1-D 消息目标映射', () => {
     expect(t('resource', RESOURCE)).toEqual({ name: 'resource', params: { resourceId: RESOURCE } })
     expect(t('assignment', ASSIGNMENT)).toEqual({ name: 'student-assignment', params: { id: ASSIGNMENT } })
     expect(t('feedback', FEEDBACK)).toBe('needs-feedback-lookup')
-    expect(t('help_request')).toBeNull()
+    // P2 起求助消息可跳转本人求助详情（FRONTEND §4）。
+    expect(t('help_request')).toEqual({ name: 'student-help-request', params: { id: RESOURCE } })
     expect(t('assignment', 'not-a-uuid')).toBeNull()
     expect(t('assignment', ASSIGNMENT, '../evil')).toBeNull()
   })

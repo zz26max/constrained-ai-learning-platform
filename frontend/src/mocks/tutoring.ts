@@ -1,8 +1,9 @@
 import type { components } from '../api/generated/schema'
-import type { AiPolicyDTO, TutoringMessageDTO, TutoringRequestDTO, TutoringResult } from '../api/tutoring'
+import type { AiPolicyDTO, HelpRequestDTO, TutoringMessageDTO, TutoringRequestDTO, TutoringResult } from '../api/tutoring'
 import { mockSession } from './auth'
-import { MOCK_STUDENT, fail, guard, invalid, missing, ok, paginate, pageWindow, searchParams, segment } from './envelope'
-import { P1B_IDS } from './assignments'
+import { MOCK_STUDENT, MOCK_TEACHER, fail, guard, invalid, missing, ok, paginate, pageWindow, searchParams, segment } from './envelope'
+import { mockAssignmentStore, P1B_IDS } from './assignments'
+import { P1A_IDS } from './courses'
 import { randomUUID } from './random'
 import type { MockHandler, MockRequestContext, MockResult } from './types'
 
@@ -12,6 +13,8 @@ const uuid = (value: number) => '00000000-0000-4000-8000-' + String(value).padSt
 export const P2_IDS = {
   seededSession: uuid(901),
   seededRequest: uuid(902),
+  seededHelpAnswered: uuid(911),
+  seededHelpOpen: uuid(912),
 } as const
 
 const fixtureTime = '2026-10-14T02:00:00Z'
@@ -59,8 +62,48 @@ interface StoredRequest {
   polls: number
 }
 
+interface StoredHelpReply { id: string; content: string; teacher: { id: string; displayName: string }; createdAt: string }
+
+interface StoredHelpRequest {
+  id: string
+  studentId: string
+  offeringId: string
+  assignmentId: string
+  title: string
+  content: string
+  studentAttempt: string
+  workspaceRevision: number | null
+  sharedTutoringRequestIds: string[]
+  issueTags: string[]
+  status: 'open' | 'answered' | 'closed'
+  createdAt: string
+  updatedAt: string
+  replies: StoredHelpReply[]
+}
+
+function helpSummary(stored: StoredHelpRequest): HelpRequestDTO {
+  return {
+    id: stored.id, offeringId: stored.offeringId, assignmentId: stored.assignmentId,
+    title: stored.title, content: stored.content, studentAttempt: stored.studentAttempt,
+    workspaceRevision: stored.workspaceRevision, sharedTutoringRequestIds: stored.sharedTutoringRequestIds,
+    issueTags: stored.issueTags, status: stored.status, createdAt: stored.createdAt, updatedAt: stored.updatedAt,
+  }
+}
+
+type SharedSnapshotDTO = NonNullable<components['schemas']['HelpRequestDetailDTO']['sharedSnapshot']>
+
+/** 共享快照取自工作区 mock 的当前文件（最多 3 个，契约上限）；90 天保留期。 */
+function sharedSnapshot(revision: number | null): SharedSnapshotDTO | null {
+  if (revision === null) return null
+  const files = mockAssignmentStore.workspaces.get(P1B_IDS.assignmentWeb)?.dto.files.slice(0, 3) ?? null
+  if (files === null || files.length === 0) return null
+  const expires = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString()
+  return { files: structuredClone(files), expiresAt: expires, contentUnavailableReason: null }
+}
+
 const sessions = new Map<string, StoredSession>()
 const requests = new Map<string, StoredRequest>()
+const helpRequests = new Map<string, StoredHelpRequest>()
 /** 跨会话共享：同学生同作业已交付的最高提示层次（DEVELOPMENT §7.1）。 */
 const highestLevel = new Map<string, number>()
 
@@ -71,6 +114,7 @@ function sessionSummary({ id, assignmentId, createdAt, status, pendingRequestId,
 export function resetMockTutoringState(): void {
   sessions.clear()
   requests.clear()
+  helpRequests.clear()
   highestLevel.clear()
   highestLevel.set(`${MOCK_STUDENT.id}:${P1B_IDS.assignmentWeb}`, 1)
   const seeded: StoredSession = {
@@ -83,6 +127,33 @@ export function resetMockTutoringState(): void {
     ],
   }
   sessions.set(seeded.id, seeded)
+  /** 种子求助共享了该请求的 AI 片段，因此请求本身也以终态存在。 */
+  requests.set(P2_IDS.seededRequest, {
+    dto: {
+      id: P2_IDS.seededRequest, sessionId: seeded.id, status: 'completed',
+      result: { mode: 'guided_question', hintLevel: 1, policyVersion: 1, generationPolicyVersion: 1, content: seeded.messages[1]!.content ?? '', nextAction: 'try_and_report', contentUnavailableReason: null },
+      error: null, createdAt: fixtureTime, completedAt: fixtureTime,
+    },
+    studentId: MOCK_STUDENT.id, sessionId: seeded.id, action: 'ask',
+    content: '窄屏时菜单溢出，应该检查哪里？', polls: 2,
+  })
+  helpRequests.set(P2_IDS.seededHelpAnswered, {
+    id: P2_IDS.seededHelpAnswered, studentId: MOCK_STUDENT.id, offeringId: P1A_IDS.offeringWeb,
+    assignmentId: P1B_IDS.assignmentWeb, title: '窄屏溢出仍未解决',
+    content: '菜单在 480px 以下溢出容器，已经缩小 gap 无效，想请老师看看思路。',
+    studentAttempt: '把 gap 从 16px 改到 8px，问题依旧；加边框观察发现导航项没有收缩。',
+    workspaceRevision: 2, sharedTutoringRequestIds: [P2_IDS.seededRequest],
+    issueTags: ['layout_overflow'], status: 'answered', createdAt: fixtureTime, updatedAt: fixtureTime,
+    replies: [{ id: randomUUID(), content: '方向正确：给导航项加 min-width: 0 或允许 flex-shrink，再检查是否设了 white-space: nowrap。', teacher: { id: MOCK_TEACHER.id, displayName: MOCK_TEACHER.displayName }, createdAt: fixtureTime }],
+  })
+  helpRequests.set(P2_IDS.seededHelpOpen, {
+    id: P2_IDS.seededHelpOpen, studentId: MOCK_STUDENT.id, offeringId: P1A_IDS.offeringWeb,
+    assignmentId: P1B_IDS.assignmentWeb, title: '弹性对齐的期望行为',
+    content: '页脚三项内容在宽屏希望两端对齐、窄屏居中，应该用什么组合？',
+    studentAttempt: '试过 space-between，窄屏会挤在一起。', workspaceRevision: null,
+    sharedTutoringRequestIds: [], issueTags: ['flex_alignment'], status: 'open',
+    createdAt: fixtureTime, updatedAt: fixtureTime, replies: [],
+  })
 }
 
 function wantsCompleteSolution(content: string): boolean {
@@ -246,6 +317,84 @@ const handleGetRequest: MockHandler = context => {
   return ok(context, request.dto)
 }
 
+/** 详情在摘要之上补齐共享快照、共享 AI 片段与教师回复；共享仅允许已终态请求（已审核片段）。 */
+function helpDetail(stored: StoredHelpRequest): components['schemas']['HelpRequestDetailDTO'] {
+  const sharedTutoringResults = stored.sharedTutoringRequestIds.map(requestId => {
+    const request = requests.get(requestId)
+    const content = request?.dto.result?.content ?? null
+    return { requestId, content, expiresAt: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString(), contentUnavailableReason: null }
+  })
+  return {
+    ...helpSummary(stored),
+    sharedSnapshot: sharedSnapshot(stored.workspaceRevision),
+    sharedTutoringResults,
+    replies: structuredClone(stored.replies),
+  }
+}
+
+const handleCreateHelpRequest: MockHandler = context => {
+  const account = studentAccount(context, ['student'])
+  if (!('id' in account)) return account
+  const body = bodyJson(context)
+  if (body.assignmentId !== P1B_IDS.assignmentWeb) return missing(context)
+  const title = typeof body.title === 'string' ? body.title : ''
+  const content = typeof body.content === 'string' ? body.content : ''
+  const attempt = typeof body.studentAttempt === 'string' ? body.studentAttempt : ''
+  if (title.trim() === '' || title.length > 200) return invalid(context, '标题必填，最长 200 字。', 'title')
+  if (content.trim() === '' || content.length > 8000) return invalid(context, '问题描述必填，最长 8000 字。', 'content')
+  if (attempt.trim() === '' || attempt.length > 8000) return invalid(context, '必须先描述你的实际尝试。', 'studentAttempt')
+  const tags = Array.isArray(body.issueTags) ? body.issueTags : []
+  const vocabulary: string[] = ISSUE_TAGS.items.map(item => item.tag)
+  if (tags.some((tag: unknown) => typeof tag !== 'string' || !vocabulary.includes(tag)) || new Set(tags).size !== tags.length) {
+    return invalid(context, '问题标签只能选择本班词表中的选项，且不重复。', 'issueTags')
+  }
+  const shared = Array.isArray(body.sharedTutoringRequestIds) ? body.sharedTutoringRequestIds : []
+  if (shared.some((id: unknown) => typeof id !== 'string')) return invalid(context, '共享的 AI 对话片段不合法。', 'sharedTutoringRequestIds')
+  for (const id of shared as string[]) {
+    const request = requests.get(id)
+    if (request === undefined || request.studentId !== account.id || sessions.get(request.sessionId)?.assignmentId !== P1B_IDS.assignmentWeb) {
+      return invalid(context, '只能共享本人本作业的 AI 对话片段。', 'sharedTutoringRequestIds')
+    }
+    if (request.dto.status !== 'completed' && request.dto.status !== 'fallback') {
+      return invalid(context, '只能共享已有结果的 AI 对话片段。', 'sharedTutoringRequestIds')
+    }
+  }
+  const revision = body.workspaceRevision
+  if (revision !== undefined && revision !== null && (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 1)) {
+    return invalid(context, '工作区版本不合法。', 'workspaceRevision')
+  }
+  const nowIso = now()
+  const stored: StoredHelpRequest = {
+    id: randomUUID(), studentId: account.id, offeringId: P1A_IDS.offeringWeb, assignmentId: P1B_IDS.assignmentWeb,
+    title, content, studentAttempt: attempt,
+    workspaceRevision: revision === undefined ? null : revision,
+    sharedTutoringRequestIds: structuredClone(shared), issueTags: structuredClone(tags),
+    status: 'open', createdAt: nowIso, updatedAt: nowIso, replies: [],
+  }
+  helpRequests.set(stored.id, stored)
+  return ok(context, helpSummary(stored), 201)
+}
+
+const handleListHelpRequests: MockHandler = context => {
+  const account = studentAccount(context, ['student'])
+  if (!('id' in account)) return account
+  const window = pageWindow(searchParams(context))
+  if (window === null) return invalid(context, '分页参数不合法。', 'page')
+  const status = searchParams(context).get('status')
+  const mine = [...helpRequests.values()]
+    .filter(item => item.studentId === account.id && (status === null || item.status === status))
+    .map(helpSummary)
+  return ok(context, paginate(mine, window))
+}
+
+const handleGetHelpRequest: MockHandler = context => {
+  const account = studentAccount(context, ['student'])
+  if (!('id' in account)) return account
+  const stored = helpRequests.get(segment(context, 4))
+  if (stored === undefined || stored.studentId !== account.id) return missing(context)
+  return ok(context, helpDetail(stored))
+}
+
 export const tutoringHandlers: Record<string, MockHandler> = {
   getAiPolicy: handleGetAiPolicy,
   getIssueTags: handleGetIssueTags,
@@ -254,6 +403,9 @@ export const tutoringHandlers: Record<string, MockHandler> = {
   listTutoringMessages: handleListMessages,
   sendTutoringMessage: handleSendMessage,
   getTutoringRequest: handleGetRequest,
+  createHelpRequest: handleCreateHelpRequest,
+  listHelpRequests: handleListHelpRequests,
+  getHelpRequest: handleGetHelpRequest,
 }
 
 resetMockTutoringState()

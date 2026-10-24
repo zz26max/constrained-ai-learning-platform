@@ -7,6 +7,7 @@ const paths: Record<string, string> = {
   chart: 'M4 20V10 M10 20V4 M16 20v-8 M22 20H2',
   calendar: 'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',
   bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18 M9.5 9a2.5 2.5 0 1 1 3.8 2.1c-.8.5-1.3 1-1.3 1.9 M12 17h.01',
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   close: 'm6 6 12 12 M18 6 6 18',
 }

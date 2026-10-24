@@ -19,6 +19,7 @@ const studentNav = [
   {to:'/student/progress', label:'学习记录', icon:'chart', active: () => route.path.startsWith('/student/progress')},
   {to:'/student/calendar', label:'学习日历', icon:'calendar', active: () => route.path === '/student/calendar'},
   {to:'/student/messages', label:'消息通知', icon:'bell', active: () => route.path === '/student/messages'},
+  {to:'/student/help-requests', label:'我的求助', icon:'help', active: () => route.path.startsWith('/student/help-requests')},
 ]
 const teacherNav = [
   {to:'/teacher', label:'教学工作台', icon:'home', active: () => route.path === '/teacher'},

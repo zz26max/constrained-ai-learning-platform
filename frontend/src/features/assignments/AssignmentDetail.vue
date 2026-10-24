@@ -100,6 +100,12 @@ const canStartWork = computed(() => {
           AI 辅导
         </RouterLink>
         <RouterLink
+          class="button secondary"
+          :to="{ name: 'student-help-new', params: { id: assignmentId } }"
+        >
+          教师求助
+        </RouterLink>
+        <RouterLink
           v-if="canStartWork"
           class="button"
           :class="{ secondary: query.data.value?.canSubmit !== true }"

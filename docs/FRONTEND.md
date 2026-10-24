@@ -82,11 +82,12 @@ frontend/
 | `/student/assignments` | 个人作业，P1 | `/me/assignments` 的班级、状态筛选和分页 |
 | `/student/assignments/{assignmentId}` | 作业详情，P1 | 作业要求、提交限制、最近提交与公开评价（提交详情与评价在此页展示，不另设路由） |
 | `/student/assignments/{assignmentId}/tutoring` | AI 辅导，P2（2026-10-24 起并行开发，mock 先行） | `/assignments/{assignmentId}/ai-policy`、`/tutoring/sessions`、`/tutoring/sessions/{sessionId}/messages`、`/tutoring/requests/{tutoringRequestId}`；政策未启用显示阶段说明，发送后按 §6 轮询 |
+| `/student/assignments/{assignmentId}/help` | 发起教师求助，P2（mock 先行） | 作业与工作区读取、`/offerings/{offeringId}/issue-tags`、`/me/help-requests`；可共享当前工作区版本与本人已交付 AI 对话片段 |
+| `/student/help-requests` / `/student/help-requests/{id}` | 我的求助列表与详情，P2（mock 先行） | `/me/help-requests`（状态筛选/分页）、`/me/help-requests/{id}`（共享快照、AI 片段与教师回复）；消息 target `help_request` 跳详情 |
 | `/student/workspaces/{assignmentId}` | 作业编辑，P1 | 工作区读取/保存/提交；按 `type` 选择编辑模式 |
 | `/student/progress` / `/student/progress/{offeringId}` | 学习记录，P1/P2 | `/me/offerings/{offeringId}/learning-records?page=1&pageSize=10`；P2 再显示知识分析 |
 | `/student/messages` | 消息中心，P1/P2 | `/me/messages`、标记已读及全部已读 |
 | `/student/offerings/{offeringId}/notices` / `/student/notices/{noticeId}` | 课程公告，P1 | 课程公告列表与详情，支持晚加入成员读取 |
-| `/student/help-requests/{id}` | 本人求助详情，P2 | `/me/help-requests/{id}`、教师回复 |
 | `/teacher` | 授课教学班选择，P1 | `/teacher/offerings`；显示本人授课范围 |
 | `/teacher/offerings/{id}` | 教师工作台，P1 | 班级统计、成员、章节、资料、公告和邀请 |
 | `/teacher/offerings/{offeringId}/assignments` | 作业管理，P1 | 本班作业列表、发布及归档 |
