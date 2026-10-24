@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：本块第一个哈希 `2bd46c2` 为最近一次基线回填（2026-10-24 P2-A 前端 UI 合入 master），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`：P2-A 前端在 `frontend/p2` 分支完成（自 `2c5329e` 切出，2026-10-24 fast-forward 合入，本地分支指针保留未推送）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交、两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互，未触契约与后端）与 P2-A 前端四包，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
+- **代码基线**：本块第一个哈希 `7c52ac2` 为最近一次基线回填（2026-10-24 P2-B 教师学生记录页与脚本退役收口），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。开发分支 `frontend/p2b`（P2 前端，自 master `70af2de` 切出）；`codex/p2-backend` 为后端进行中快照存档分支（`df27a2d`，与 master 同基）；主干 `master`。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交、两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互）、P2-A 前端四包与 P2-B 事件上报，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支完成 P2-A 全部 UI（mock 并行开发，用户明确本分支只做 UI）：学生 AI 辅导主链路（`65a37d6`）、学生求助流（`be9519e`）、教师求助处理与 help_reply 消息闭环（`33e1052`）、教师 AI 政策配置（`3e67bc2`，政策按作业可变、教师改动学生侧即时生效）；剩余为后端实现与真实联调**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **P2-B 续：教师查看学生学习记录页 + P2-1 清理**（2026-10-24，`frontend/p2b`，`0de5a86`/`7c52ac2`）：① 新增 TeacherStudentProgressPage（/teacher/offerings/:offeringId/students/:studentId/progress）——概览三项计数、knowledge-v2 知识点掌握列表（状态/新鲜度/证据/解释）、下一步建议（targetRoute 受控跳转）、最近反馈高亮与评价历史分页（链接指向教师作业页）；入口为工作台"班级成员"页学生行的"学习记录"按钮（教师行不加），成员行网格改 4 列并适配断点。接口复用 P1 已实现操作 getStudentLearningRecords（TeacherLearningRecordsDTO），mock 处理器与 API 声明此前已存在。② 退役 verify-home-exploration/verify-home-bplus 两脚本及其 package.json/README 登记（design 参数路由 019baae 移除后其一损坏，最终审计 P2-1）。检查：`npm run verify` 通过（37 文件 330 用例）；vue-tsc 零错误；mock 4175 实测成员入口与详情页三段（概览/知识点空态/反馈空态）如实渲染。未做：知识证据非空态对照（依赖后端 P2-B 数据）；真实模式验证（该接口 P1 已实现，待确认 8080 现役后端包含后可直接真验）。
 
 - **P2-B 开工：学习事件上报器（mock 并行开发）与后端快照存档**（2026-10-24，分支 `frontend/p2b` 自 `70af2de` 切出，提交 `5290748`；另有 `codex/p2-backend` 分支存档提交 `df27a2d`）：用户告知后端开发因额度受阻、询问前端可否继续。处置：① 工作区发现的未提交后端 P2 工作（tutoring/helprequests/analytics 三模块 + V11-V13 迁移 + 契约 17 操作状态翻转 + 文档修改，51 文件）经用户选择"先存档再切分支"后，原样提交到 `codex/p2-backend`（`df27a2d`，提交说明明确"存档不代表通过任何门禁"），该分支与 master 同基；② 前端切干净分支 `frontend/p2b` 完成事件上报包——`features/analytics/reporter.ts`（trackLearningEvent 单入口，未认证丢弃、会话内同对象去重、10 条/10 秒冲刷、≤50 批、30 秒退避重试 3 次、卸载尽力冲刷）+ `mocks/analytics.ts`（1..50 校验、四类型字段与 payload 白名单、按 eventId 幂等）+ 章节/资料/编辑器/预览四处接入（editor 的 activeFile 限契约枚举，preview viewport 当前固定 desktop）+ FRONTEND §2/§6 登记。检查：`npm run verify` 通过（37 文件 330 用例，新增 learning-events 8 例）。未做：真实后端联调；卸载冲刷可能丢失关闭前最后一批（§6 已注明已知限制）；`codex/p2-backend` 的 mvnw verify 与契约 flips 证据收口（等待后端额度恢复）。
 
