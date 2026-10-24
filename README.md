@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-契约基线 **1.1.0**，共 83 个业务操作与 2 个健康检查。截至 2026-10-15，**P0-A、P1-A、P1-B、P1-C、P1-D 已完成**：认证、课程与教学班、作业与工作区、提交与评价、多班聚合均有后端实现；57 个操作 `implemented`、5 个 `verified`、23 个 `planned`。P2（受限式 AI 辅导、学习行为分析）与 P3（独立运行检查）尚未实现。接口实现状态以 [接口契约](docs/openapi.yaml) 的 `x-implementation-status` 为准，不在本文件另维护计数。
+契约基线 **1.1.0**，共 83 个业务操作与 2 个健康检查。截至 2026-10-18，**P0-A、P1-A、P1-B、P1-C、P1-D 已完成**：认证、课程与教学班、作业与工作区、提交与评价、多班聚合均有后端实现；53 个操作 `implemented`、10 个 `verified`、22 个 `planned`。P2（受限式 AI 辅导、学习行为分析）与 P3（独立运行检查）尚未实现。接口实现状态以 [接口契约](docs/openapi.yaml) 的 `x-implementation-status` 为准，不在本文件另维护计数。
 
 ## 文档入口
 
@@ -127,7 +127,6 @@ docs/
   DEBUGGING.md                  后端调试指引
   openapi.yaml                  共享结构契约
   README.md                     文档索引、权威边界与阅读顺序
-  DEBUGGING.md                  后端调试指引
   features/                     已交付工作包的设计与验收场景
   archive/                      历史文档快照，不是规范
 scripts/
