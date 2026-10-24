@@ -403,7 +403,7 @@ export interface paths {
         put?: never;
         /**
          * submitAssignment
-         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision,reflection}`。结果约定：新建 201 `SubmissionSummaryDTO`，创建代码与评价标准不可变快照；同一学生同一作业的该 `workspaceRevision` 已提交过时 200 返回原提交，不新建、不占次数（自然幂等，请求中的 reflection 不覆盖原值）。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision,reflection}`。结果约定：新建 201 `SubmissionSummaryDTO`，创建代码与评价标准不可变快照；同一学生同一作业的该 `workspaceRevision` 已提交过时 200 返回原提交，不新建、不占次数（自然幂等，请求中的 reflection 不覆盖原值；班级归档后同 revision 重发同样按此幂等返回原提交，新建提交才受归档阻断）。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["submitAssignment"];
         delete?: never;
@@ -481,7 +481,7 @@ export interface paths {
         };
         /**
          * listMessages
-         * @description 权限：学生或教师本人。请求约定：可选 `offeringId,type,read=all\|unread\|read`；`page,pageSize`。结果约定：200 `List<NotificationDTO>`；`summary:{unreadCount}`；按 `createdAt` 降序。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：学生或教师本人。请求约定：可选 `offeringId,type,read=all\|unread\|read`；`page,pageSize`。结果约定：200 `List<NotificationDTO>`；`summary:{unreadCount}`；按 `createdAt` 降序。course_notice 消息的 target 继承公告跳转目标（公告无目标时为 null）。业务规则以 DEVELOPMENT.md 为准。
          */
         get: operations["listMessages"];
         put?: never;
@@ -1019,7 +1019,7 @@ export interface paths {
         put?: never;
         /**
          * publishFeedback
-         * @description 权限：本班授课教师。请求约定：`{baseVersion}`。结果约定：200 `TeacherFeedbackDTO`，version加1；同事务写公开评价、站内消息和接收记录，学生转REVIEWED。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班授课教师。请求约定：`{baseVersion}`。结果约定：200 `TeacherFeedbackDTO`，version加1；同事务写公开评价、站内消息和接收记录，学生转REVIEWED。已发布评价的重复发布：baseVersion 等于发布前版本或当前版本时幂等返回 200 原视图，不重复加版本或通知；其余 baseVersion 409。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["publishFeedback"];
         delete?: never;
@@ -1103,7 +1103,7 @@ export interface paths {
         put?: never;
         /**
          * createNotice
-         * @description 权限：本班授课教师。请求约定：`{title,content,target?}`。结果约定：201 `{id,offeringId,title,content,createdAt,recipientCount}`，向当前班学生生成通知。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班授课教师。请求约定：`{title,content,target?}`。结果约定：201 `{id,offeringId,title,content,createdAt,recipientCount}`，向当前班学生生成通知；公告带 target 时生成的 course_notice 消息继承该 target（无目标时为 null）。全班公告 target 不能为 feedback（feedback 仅定向公告可用，422 VALIDATION_ERROR）。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["createNotice"];
         delete?: never;

@@ -126,7 +126,18 @@ function noticeWrite(value: unknown): value is NoticeWrite {
   const body = value as Record<string, unknown>
   if (!Object.keys(body).every(key => ['title', 'content', 'target'].includes(key))) return false
   if (typeof body['title'] !== 'string' || body['title'].length < 1 || body['title'].length > 200) return false
+  if (!noticeTargetValid(body['target'])) return false
   return typeof body['content'] === 'string' && body['content'].length <= 8000
+}
+
+/** 与真实后端对齐（契约 1.1.1）：全班公告 target 禁止 feedback，help_request 在 P1 同样拒绝。 */
+function noticeTargetValid(target: unknown): boolean {
+  if (target === undefined || target === null) return true
+  if (typeof target !== 'object' || Array.isArray(target)) return false
+  const record = target as Record<string, unknown>
+  if (!Object.keys(record).every(key => ['type', 'id', 'offeringId'].includes(key))) return false
+  if (typeof record['type'] !== 'string' || typeof record['id'] !== 'string' || typeof record['offeringId'] !== 'string') return false
+  return record['type'] !== 'feedback' && record['type'] !== 'help_request'
 }
 
 function handleCreateNotice(context: MockRequestContext): MockResult {
