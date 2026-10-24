@@ -172,7 +172,7 @@ function goToPage(page: number): void {
 .empty-state { padding: var(--space-7); text-align: center; }
 .notification-list { display: flex; flex-direction: column; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
 .notification-item { padding: var(--space-4) 0; border: 0; border-bottom:1px solid var(--line); border-radius:0; min-width:0; }
-.notification-item.unread { background-color:transparent; }
+/* 未读行的浅蓝底、3px 侧线与未读标签白底胶囊均由 release.css 定义（压过冻结层同特异性规则） */
 .notification-header { display: flex; gap: 8px; flex-wrap:wrap; align-items: center; margin-bottom: 8px; }
 .notification-type { font-size: var(--fs-meta); font-weight: 600; color: var(--blue); }
 .notification-time { margin-left: auto; font-size: var(--fs-meta); color: var(--muted); }

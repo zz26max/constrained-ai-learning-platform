@@ -16,12 +16,12 @@
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
 
-/* 学科身份：颜色只表示学科 */
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family] {--acc:#52627a;--acc-soft:#edf1f5}
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=code] {--acc:#2853bc;--acc-soft:#eef2fb}
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=data] {--acc:#1b6b65;--acc-soft:#e8f3ef}
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=systems] {--acc:#5a527e;--acc-soft:#f0eef7}
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=explore] {--acc:#805e1e;--acc-soft:#faf3e4}
+/* 学科身份：颜色只表示学科（--subject-* 令牌） */
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family] {--acc:var(--subject-neutral);--acc-soft:var(--subject-neutral-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=code] {--acc:var(--subject-code);--acc-soft:var(--subject-code-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=data] {--acc:var(--subject-data);--acc-soft:var(--subject-data-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=systems] {--acc:var(--subject-systems);--acc-soft:var(--subject-systems-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) [data-family=explore] {--acc:var(--subject-explore);--acc-soft:var(--subject-explore-soft)}
 .student-release .v35-subject {display:inline-flex;align-items:baseline;gap:8px;min-width:0;color:var(--sr-muted);font-size:13px}
 .student-release .v35-subject-mark {flex-shrink:0;padding:0 6px;border-radius:var(--radius-control);background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:700;line-height:1.7;letter-spacing:.02em}
 .student-release .v35-subject>span:last-child {overflow-wrap:anywhere}
@@ -47,17 +47,19 @@
 /* ===== 首页 ===== */
 .student-release .sr-home .explore-heading {display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:0 0 24px}
 .student-release .sr-home .sr-intro {margin:6px 0 0;color:var(--sr-muted);font-size:14px}
-.student-release .sr-home .sr-overview {display:flex;flex-wrap:wrap;gap:4px 24px;margin:8px 0 0}
-.student-release .sr-home .sr-overview a {display:inline-flex;align-items:baseline;gap:4px;min-height:32px;color:var(--sr-muted);font-size:14px}
-.student-release .sr-home .sr-overview strong {font-size:18px;font-weight:650;color:var(--sr-ink);font-variant-numeric:tabular-nums}
+/* 概览指标：三枚可点指标章，数字承担视觉主角，悬停描边转品牌色 */
+.student-release .sr-home .sr-overview {display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0}
+.student-release .sr-home .sr-overview a {display:inline-flex;align-items:baseline;gap:7px;min-height:40px;padding:5px 16px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);color:var(--sr-muted);font-size:13px}
+.student-release .sr-home .sr-overview strong {font-size:22px;font-weight:650;color:var(--sr-ink);font-variant-numeric:tabular-nums;line-height:1}
+.student-release .sr-home .sr-overview a:hover {border-color:var(--sr-brand)}
 .student-release .sr-home .sr-overview a:hover strong {color:var(--sr-brand)}
 .student-release .sr-home .explore-calendar {display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font-size:14px;flex-shrink:0}
 .student-release .sr-home .explore-calendar:hover {border-color:var(--sr-brand);color:var(--sr-brand)}
 .student-release .sr-home .explore-composition {display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
 .student-release .sr-home :is(.explore-primary-column,.explore-secondary-column) {display:grid;gap:24px;min-width:0}
 
-/* 焦点卡：唯一深色、唯一 14px 圆角 */
-.student-release .sr-home .explore-focus {background:var(--sr-focus);color:#fff;border-radius:var(--sr-r-focus);padding:28px 32px;border:0;box-shadow:none}
+/* 焦点卡：唯一深色、唯一 14px 圆角；右上同色系光晕提供纵深，不加装饰元素 */
+.student-release .sr-home .explore-focus {background:radial-gradient(130% 160% at 88% -12%,#ffffff1a,transparent 52%) , var(--sr-focus);color:#fff;border-radius:var(--sr-r-focus);padding:28px 32px;border:0;box-shadow:none}
 .student-release .sr-home .focus-main {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:32px;align-items:start}
 .student-release .sr-home .focus-main>* {grid-column:1;margin:0}
 .student-release .sr-home .explore-label {font-size:13px;color:#c9d5f2;margin:0 0 10px}
@@ -128,7 +130,7 @@
 .student-release .sr-home .explore-course-actions .bplus-course-action {color:var(--sr-brand);font-weight:650}
 .student-release .sr-home .v35-feedback-course {margin:0 0 8px}
 .student-release .sr-home .feedback-score {display:flex;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums}
-.student-release .sr-home .feedback-score strong {font-size:32px;font-weight:650;line-height:1.1}
+.student-release .sr-home .feedback-score strong {font-size:34px;font-weight:500;line-height:1.1;font-family:var(--sr-serif)}
 .student-release .sr-home .feedback-score :is(span,small) {font-size:13px;color:var(--sr-muted)}
 .student-release .sr-home .feedback-title {display:block;margin:8px 0;color:var(--sr-ink);font-weight:600;font-size:14px;overflow-wrap:anywhere}
 .student-release .sr-home .feedback-quote {margin:0 0 8px;padding-left:12px;border-left:2px solid var(--sr-line-strong);font-size:14px;color:var(--sr-ink)}
@@ -137,7 +139,7 @@
 .student-release .sr-home .notice-open {justify-self:start;padding:0;border:0;background:none;color:var(--sr-ink);font-weight:600;font-size:14px;text-align:left;min-height:32px;overflow-wrap:anywhere;cursor:pointer}
 .student-release .sr-home .notice-open:hover {color:var(--sr-brand)}
 .student-release .sr-home .notice-read {grid-column:2;grid-row:2;align-self:start;font-size:13px;color:var(--sr-muted)}
-.student-release .sr-home .notice-read[data-unread=true] {color:var(--sr-brand);font-weight:600}
+.student-release .sr-home .notice-read[data-unread=true] {display:inline-flex;align-items:center;gap:6px;padding:2px 12px;border-radius:999px;background:var(--sr-brand-soft);color:var(--sr-brand);font-weight:600;line-height:1.7}
 /* 章节进度（首页最近课程与课程页共用） */
 .student-release .vx-count-progress {display:grid;gap:8px}
 .student-release .vx-count-label {display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
@@ -156,6 +158,7 @@
 .student-release .sr-courses .vx-subject-rail .vx-glyph svg {width:22px;height:22px}
 .student-release .sr-courses .vx-course-copy {display:grid;gap:6px;align-content:start;padding:12px 16px 10px;min-width:0}
 .student-release .sr-courses .vx-course-topline {display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-courses .vx-course-topline>span:first-child {color:var(--acc);font-weight:600;letter-spacing:.06em}
 .student-release .sr-courses .vx-course-topline [data-status=archived] {color:var(--sr-warn)}
 .student-release .sr-courses .vx-course-copy h2 {margin-top:-4px;font-size:17px;line-height:1.45;overflow-wrap:anywhere}
 .student-release .sr-courses .vx-course-copy h2 a {color:var(--sr-ink)}
@@ -248,6 +251,19 @@
 .student-release .vc-page.vc-inbox .notification-actions {margin-top:6px}
 .student-release .vc-page.vc-inbox .notification-actions .text-action {min-height:44px;padding:0 8px;border:0;background:none;color:var(--sr-muted);font-size:14px}
 .student-release .vc-page.vc-inbox .notification-actions .text-action:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:4px}
+/* 类型色编码：类型字与图标随消息类型着色，扫读先看颜色再看文字 */
+.student-release .vc-inbox .notification-item[data-notification-type=course_notice] {--msg:var(--subject-code)}
+.student-release .vc-inbox .notification-item[data-notification-type=assignment_published] {--msg:var(--orange)}
+.student-release .vc-inbox .notification-item[data-notification-type=feedback] {--msg:var(--green)}
+.student-release .vc-inbox .notification-item[data-notification-type=system],
+.student-release .vc-inbox .notification-item[data-notification-type=help_reply] {--msg:var(--muted)}
+.student-release .vc-inbox .notification-type {color:var(--msg,var(--blue))}
+.student-release .vc-inbox .v35-message-glyph {color:var(--msg,var(--blue))}
+/* 未读 = 3px 品牌侧线 + 浅蓝底；标记已读时侧线与底色一起过渡回收，形成操作闭环。
+   选择器带 .vc-page 以压过冻结层 content.css 的同特异性未读规则。 */
+.student-release .vc-page.vc-inbox .notification-item {border-radius:var(--sr-r-m);transition:background-color var(--dur-fast) ease,box-shadow var(--dur-move) var(--ease-out)}
+.student-release .vc-page.vc-inbox .notification-item.unread {box-shadow:inset 3px 0 0 var(--blue);background:var(--blue-soft)}
+.student-release .vc-page.vc-inbox .notification-item.unread .tag {color:var(--blue);background:var(--surface)}
 
 /* ===== 公共外壳 ===== */
 .student-release .workspace-sidebar {border-right-color:var(--sr-line)}
