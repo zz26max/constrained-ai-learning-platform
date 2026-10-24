@@ -92,7 +92,7 @@ frontend/
 | `/teacher/offerings/{id}` | 教师工作台，P1 | 班级统计、成员、章节、资料、公告和邀请 |
 | `/teacher/offerings/{offeringId}/assignments` | 作业管理，P1 | 本班作业列表、发布及归档 |
 | `/teacher/offerings/{offeringId}/assignments/new` | 布置作业，P1 | 班级章节/知识点；建立草稿后进入草稿详情 |
-| `/teacher/assignments/{id}` | 作业编辑与提交列表，P1 | `/teacher/assignments/{id}`、提交列表 |
+| `/teacher/assignments/{id}` | 作业编辑与提交列表，P1；2026-10-24 起已发布作业内嵌 AI 政策配置（P2，mock 先行） | `/teacher/assignments/{id}`、提交列表、`/teacher/assignments/{id}/ai-policy`（乐观锁 baseVersion，平台固定项只读展示） |
 | `/teacher/submissions/{submissionId}/feedback` | 批阅，P1 | 提交快照、学生信息、草稿评价；保存 draft 后显式发布 |
 | `/teacher/help-requests/{id}` | 求助处理，P2（mock 先行） | 教师求助详情（含学生身份、共享快照与 AI 片段）、回复（生成 help_reply 消息）与关闭（重复关闭幂等）；列表入口在教学班工作台"学生求助"页签（`/teacher/offerings/{offeringId}/help-requests`，状态筛选/分页） |
 | `/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2 | `/teacher/offerings/{id}/students/{studentId}/learning-records` |

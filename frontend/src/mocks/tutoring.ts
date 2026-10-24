@@ -21,14 +21,20 @@ export const P2_IDS = {
 const fixtureTime = '2026-10-14T02:00:00Z'
 const now = () => new Date().toISOString()
 
-/** mock 政策：仅已发布的演示作业启用引导模式；数值与 DEVELOPMENT §7 默认建议一致。 */
-const POLICY: AiPolicyDTO = {
-  assignmentId: P1B_IDS.assignmentWeb, version: 1, enabled: true,
+/** 政策模板：数值与 DEVELOPMENT §7 默认建议一致；边界文案平台持有，教师不可改。 */
+const POLICY_TEMPLATE: Omit<AiPolicyDTO, 'assignmentId' | 'version'> = {
+  enabled: true,
   allowedActions: ['ask', 'concept', 'next_hint'], allowedModes: ['concept', 'debug_hint', 'guided_question'],
   restrictCompleteSolution: true, allowCodeBlocks: false, maxHintLevel: 3, requireAttemptFromLevel: 2,
   dailyUserLimit: 30, dailyAssignmentLimit: 12, perMinuteLimit: 3, maxOutputTokens: 800,
   boundaryText: '引导模式：AI 只解释概念、指出排查方向并提出引导问题，不提供完整可提交实现。',
 }
+
+/** 平台只读上限：教师值不得超过（契约 AiPolicyWriteDTO 描述）。 */
+const PLATFORM_CAPS = { dailyUserLimit: 30, dailyAssignmentLimit: 12, perMinuteLimit: 3, maxOutputTokens: 800 } as const
+
+/** 按作业存储的可变政策：教师 updateAiPolicy 写入后学生侧立即生效。 */
+const policies = new Map<string, AiPolicyDTO>()
 
 const ISSUE_TAGS = {
   version: 1,
@@ -117,6 +123,8 @@ export function resetMockTutoringState(): void {
   requests.clear()
   helpRequests.clear()
   highestLevel.clear()
+  policies.clear()
+  policies.set(P1B_IDS.assignmentWeb, { assignmentId: P1B_IDS.assignmentWeb, version: 1, ...structuredClone(POLICY_TEMPLATE) })
   highestLevel.set(`${MOCK_STUDENT.id}:${P1B_IDS.assignmentWeb}`, 1)
   const seeded: StoredSession = {
     id: P2_IDS.seededSession, assignmentId: P1B_IDS.assignmentWeb, studentId: MOCK_STUDENT.id,
@@ -162,23 +170,23 @@ function wantsCompleteSolution(content: string): boolean {
 }
 
 /** 终态结果按意图决定：索答走 fallback，concept 固定第 1 层，ask 维持最高层，next_hint 升一层。 */
-function buildResult(action: TutoringWrite['action'], content: string, highest: number): TutoringResult {
+function buildResult(action: TutoringWrite['action'], content: string, highest: number, policy: AiPolicyDTO): TutoringResult {
   if (wantsCompleteSolution(content)) {
-    return { mode: 'fallback', hintLevel: highest, policyVersion: 1, generationPolicyVersion: 1, content: FALLBACK_CONTENT, nextAction: 'try_and_report', contentUnavailableReason: null }
+    return { mode: 'fallback', hintLevel: highest, policyVersion: policy.version, generationPolicyVersion: policy.version, content: FALLBACK_CONTENT, nextAction: 'try_and_report', contentUnavailableReason: null }
   }
   if (action === 'concept') {
-    return { mode: 'concept', hintLevel: 1, policyVersion: 1, generationPolicyVersion: 1, content: '弹性盒布局中，容器按主轴与交叉轴组织子项；子项的基础尺寸由 flex-basis 决定，收缩与放大分别由 flex-shrink 与 flex-grow 控制。', nextAction: 'review_concept', contentUnavailableReason: null }
+    return { mode: 'concept', hintLevel: 1, policyVersion: policy.version, generationPolicyVersion: policy.version, content: '弹性盒布局中，容器按主轴与交叉轴组织子项；子项的基础尺寸由 flex-basis 决定，收缩与放大分别由 flex-shrink 与 flex-grow 控制。', nextAction: 'review_concept', contentUnavailableReason: null }
   }
   if (action === 'next_hint') {
-    const level = Math.min(highest + 1, POLICY.maxHintLevel)
+    const level = Math.min(highest + 1, policy.maxHintLevel)
     const hints = [
       '', '观察问题：确认溢出出现的视口宽度，并检查容器此时计算后的宽度。',
       '相关概念：检查子项是否设置了固定 min-width，或被 flex-shrink: 0 排除了收缩。',
       '验证修改：给可疑子项临时加边框，缩窄视口验证收缩是否生效。',
     ]
-    return { mode: 'debug_hint', hintLevel: level, policyVersion: 1, generationPolicyVersion: 1, content: hints[level] ?? hints[1]!, nextAction: 'try_and_report', contentUnavailableReason: null }
+    return { mode: 'debug_hint', hintLevel: level, policyVersion: policy.version, generationPolicyVersion: policy.version, content: hints[level] ?? hints[1]!, nextAction: 'try_and_report', contentUnavailableReason: null }
   }
-  return { mode: 'guided_question', hintLevel: Math.max(highest, 1), policyVersion: 1, generationPolicyVersion: 1, content: '你已经在缩小间距上做了一次尝试。如果仍然超出，问题更可能出在某个子项不可收缩；你觉得哪个子项最可疑，为什么？', nextAction: 'try_and_report', contentUnavailableReason: null }
+  return { mode: 'guided_question', hintLevel: Math.max(highest, 1), policyVersion: policy.version, generationPolicyVersion: policy.version, content: '你已经在缩小间距上做了一次尝试。如果仍然超出，问题更可能出在某个子项不可收缩；你觉得哪个子项最可疑，为什么？', nextAction: 'try_and_report', contentUnavailableReason: null }
 }
 
 /** 请求状态机：第 1 次轮询 queued→running，第 2 次轮询出终态并落助手消息；终态不再变化。 */
@@ -191,8 +199,15 @@ function advanceRequest(request: StoredRequest): void {
   }
   const session = sessions.get(request.sessionId)
   const key = `${request.studentId}:${session?.assignmentId ?? ''}`
+  const policy = policies.get(session?.assignmentId ?? '')
+  if (policy === undefined) {
+    request.dto.status = 'failed'
+    request.dto.error = { code: 'INTERNAL_ERROR', message: '作业政策不可用。' }
+    request.dto.completedAt = now()
+    return
+  }
   const highest = highestLevel.get(key) ?? 0
-  const result = buildResult(request.action, request.content, highest)
+  const result = buildResult(request.action, request.content, highest, policy)
   request.dto.result = result
   request.dto.status = result.mode === 'fallback' ? 'fallback' : 'completed'
   request.dto.completedAt = now()
@@ -226,8 +241,9 @@ function studentAccount(context: MockRequestContext, roles: readonly ('student' 
 const handleGetAiPolicy: MockHandler = context => {
   const denied = guard(context, ['student', 'teacher'])
   if (denied !== null) return denied
-  if (segment(context, 3) !== P1B_IDS.assignmentWeb) return missing(context)
-  return ok(context, POLICY)
+  const policy = policies.get(segment(context, 3))
+  if (policy === undefined) return missing(context)
+  return ok(context, policy)
 }
 
 const handleGetIssueTags: MockHandler = context => {
@@ -257,7 +273,9 @@ const handleCreateSession: MockHandler = context => {
     createdAt: now(), status: 'active', pendingRequestId: null, lastMessageAt: null, messages: [], nextSequence: 1,
   }
   sessions.set(session.id, session)
-  return ok(context, { id: session.id, assignmentId: session.assignmentId, createdAt: session.createdAt, policyVersion: POLICY.version }, 201)
+  const policy = policies.get(session.assignmentId)
+  if (policy === undefined) return missing(context)
+  return ok(context, { id: session.id, assignmentId: session.assignmentId, createdAt: session.createdAt, policyVersion: policy.version }, 201)
 }
 
 const handleListMessages: MockHandler = context => {
@@ -281,15 +299,19 @@ const handleSendMessage: MockHandler = context => {
   const content = body.content
   if (action !== 'ask' && action !== 'concept' && action !== 'next_hint') return invalid(context, 'action 只能是 ask、concept 或 next_hint。', 'action')
   if (typeof content !== 'string' || (action === 'ask' && content.trim() === '')) return invalid(context, '提问内容不能为空。', 'content')
+  const policy = policies.get(session.assignmentId)
+  if (policy === undefined) return missing(context)
+  if (!policy.enabled) return fail(context, 409, 'AI_DISABLED', '该作业未启用 AI 辅导。')
+  if (!policy.allowedActions.includes(action)) return invalid(context, `当前政策不允许 ${action}。`, 'action')
   const key = `${account.id}:${session.assignmentId}`
   const highest = highestLevel.get(key) ?? 0
   const targetLevel = action === 'next_hint' ? highest + 1 : highest
-  if (action === 'next_hint' && targetLevel > POLICY.maxHintLevel) {
+  if (action === 'next_hint' && targetLevel > policy.maxHintLevel) {
     return { status: 409, bodyJson: { error: { code: 'HINT_LIMIT_REACHED', message: '下一提示层次超过政策上限。', details: {} }, requestId: randomUUID() } }
   }
   const attemptMissing = body.studentAttempt === undefined || body.studentAttempt === null || body.studentAttempt === ''
-  if (attemptMissing && targetLevel >= POLICY.requireAttemptFromLevel) {
-    return invalid(context, '从第 2 层提示开始需要先描述你的实际尝试。', 'studentAttempt')
+  if (attemptMissing && targetLevel >= policy.requireAttemptFromLevel) {
+    return invalid(context, `从第 ${policy.requireAttemptFromLevel} 层提示开始需要先描述你的实际尝试。`, 'studentAttempt')
   }
   for (const request of requests.values()) {
     if (request.studentId === account.id && sessions.get(request.sessionId)?.assignmentId === session.assignmentId && (request.dto.status === 'queued' || request.dto.status === 'running')) {
@@ -464,8 +486,64 @@ const handleCloseHelpRequest: MockHandler = context => {
   return ok(context, { id: stored.id, status: stored.status, updatedAt: stored.updatedAt })
 }
 
+const handleGetTeacherAiPolicy: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const policy = policies.get(segment(context, 4))
+  if (policy === undefined) return missing(context)
+  return ok(context, policy)
+}
+
+/** 教师只能调整班内预算与层次；平台固定项（禁完整实现/禁代码块）与只读上限由契约锁定。 */
+const handleUpdateAiPolicy: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const policy = policies.get(segment(context, 4))
+  if (policy === undefined) return missing(context)
+  const body = bodyJson(context)
+  if (typeof body.baseVersion !== 'number' || !Number.isInteger(body.baseVersion)) return invalid(context, 'baseVersion 必填。', 'baseVersion')
+  if (body.baseVersion !== policy.version) {
+    return { status: 409, bodyJson: { error: { code: 'AI_POLICY_VERSION_CONFLICT', message: '政策已被更新，请刷新后重试。', details: {} }, requestId: randomUUID() } }
+  }
+  if (body.restrictCompleteSolution !== true) return invalid(context, 'restrictCompleteSolution 固定为 true。', 'restrictCompleteSolution')
+  if (body.allowCodeBlocks !== false) return invalid(context, 'allowCodeBlocks 固定为 false。', 'allowCodeBlocks')
+  if (typeof body.enabled !== 'boolean') return invalid(context, 'enabled 必填。', 'enabled')
+  const actions = Array.isArray(body.allowedActions) ? body.allowedActions : []
+  const modes = Array.isArray(body.allowedModes) ? body.allowedModes : []
+  const validActions = ['ask', 'concept', 'next_hint'], validModes = ['concept', 'debug_hint', 'guided_question']
+  if (new Set(actions).size !== actions.length || actions.some((item: unknown) => !validActions.includes(item as string))) return invalid(context, 'allowedActions 不合法或重复。', 'allowedActions')
+  if (new Set(modes).size !== modes.length || modes.some((item: unknown) => !validModes.includes(item as string))) return invalid(context, 'allowedModes 不合法或重复。', 'allowedModes')
+  if (body.enabled && (actions.length === 0 || modes.length === 0)) return invalid(context, '启用时至少保留一种动作与一种模式。', 'allowedActions')
+  const limits: Array<[string, unknown, number]> = [
+    ['maxHintLevel', body.maxHintLevel, 3],
+    ['requireAttemptFromLevel', body.requireAttemptFromLevel, 2],
+    ['dailyAssignmentLimit', body.dailyAssignmentLimit, PLATFORM_CAPS.dailyAssignmentLimit],
+    ['maxOutputTokens', body.maxOutputTokens, PLATFORM_CAPS.maxOutputTokens],
+  ]
+  for (const [field, value, cap] of limits) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > cap) return invalid(context, `${field} 必须是 1 到 ${cap} 之间的整数。`, field)
+  }
+  if (body.dailyUserLimit !== undefined && body.dailyUserLimit !== PLATFORM_CAPS.dailyUserLimit) return invalid(context, 'dailyUserLimit 为平台只读配置，只能回传当前值。', 'dailyUserLimit')
+  if (body.perMinuteLimit !== undefined && body.perMinuteLimit !== PLATFORM_CAPS.perMinuteLimit) return invalid(context, 'perMinuteLimit 为平台只读配置，只能回传当前值。', 'perMinuteLimit')
+  const updated: AiPolicyDTO = {
+    ...policy,
+    version: policy.version + 1,
+    enabled: body.enabled,
+    allowedActions: structuredClone(actions),
+    allowedModes: structuredClone(modes),
+    maxHintLevel: body.maxHintLevel as number,
+    requireAttemptFromLevel: body.requireAttemptFromLevel as number,
+    dailyAssignmentLimit: body.dailyAssignmentLimit as number,
+    maxOutputTokens: body.maxOutputTokens as number,
+  }
+  policies.set(policy.assignmentId, updated)
+  return ok(context, updated)
+}
+
 export const tutoringHandlers: Record<string, MockHandler> = {
   getAiPolicy: handleGetAiPolicy,
+  getTeacherAiPolicy: handleGetTeacherAiPolicy,
+  updateAiPolicy: handleUpdateAiPolicy,
   getIssueTags: handleGetIssueTags,
   listTutoringSessions: handleListSessions,
   createTutoringSession: handleCreateSession,

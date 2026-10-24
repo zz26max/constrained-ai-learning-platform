@@ -10,6 +10,7 @@ import { useAssignmentActions } from './use-assignment-actions'
 import { isUuid } from './format'
 import { assignmentBody, localDateTime, templateFiles } from './assignment-form'
 import TeacherSubmissionList from './TeacherSubmissionList.vue'
+import TeacherAiPolicyPanel from '../tutoring/TeacherAiPolicyPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -269,6 +270,8 @@ function addCriterion(): void {
       <label v-for="file in form.initialFiles" :key="file.path">{{ file.path }}<textarea v-model="file.content" rows="8" spellcheck="false" /></label>
       </fieldset>
     </fieldset>
+    <TeacherAiPolicyPanel v-if="assignmentId && published" :assignment-id="assignmentId" />
+    <p v-else-if="assignmentId && !published && query.data.value?.publicationState === 'draft'" class="notice notice-info" role="note">AI 辅导政策在作业发布后配置。</p>
     <TeacherSubmissionList v-if="assignmentId && query.status.value === 'success' && query.data.value?.publicationState !== 'draft'" :assignment-id="assignmentId" />
   </div>
 </template>
