@@ -21,6 +21,7 @@ frontend/
       auth/ courses/ assignments/ feedback/ notifications/
       workspace/         编辑状态、串行保存、提交协调
       tutoring/          P2 会话与轮询
+      analytics/         P2 学习事件上报（客户端来源）
       teacher/           教师页面与工作流
     components/          可复用基础组件
     preview/             受限预览装配与消息校验
@@ -138,6 +139,8 @@ Web 编辑 `index.html/style.css/script.js`，SQL 编辑 `answer.sql`，文字�
 P1 站内通知及其接收者与公告/评价在同一数据库事务写入，发布成功后学生反馈的 `messageId` 有值。成功展示消息或反馈后显式调用已读接口，普通 GET 不自动标记已读。P1 不需要等待异步投递消息，后续规模扩大才单独设计异步通知。
 
 P2 AI 查询使用 1 秒起步、逐步退避至 5 秒的轮询；离开停止，重进按本人会话和 pendingRequestId 恢复。HTTP 200 只表示状态查询成功，`failed/fallback` 依契约展示。AI、求助、分析和 P3 检查未开放时显示明确阶段状态，不能保留模拟成功结果或把未开放分析解释为零分。
+
+P2 学习事件上报（`features/analytics/reporter.ts`，2026-10-24）是尽力而为的后台行为：仅四种客户端事件（章节/资料/编辑器/预览打开），未认证丢弃；同一会话（sessionStorage sessionId）内同一对象重复打开去重；队列满 10 条或 10 秒冲刷，单批 ≤50；失败 30 秒退避重试，超 3 次丢弃；卸载时仅在有缓存 CSRF 令牌时尽力冲刷（可能丢失关闭前最后一批，已知限制）。上报失败不提示用户、不影响页面功能。
 
 ## 7. 安全渲染与预览边界
 

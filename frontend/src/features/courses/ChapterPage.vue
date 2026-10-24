@@ -9,6 +9,7 @@ import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import { usePageQuery } from './use-page-query'
 import { useCourseActions } from './use-course-actions'
 import { isUuid, statusLabel } from './format'
+import { trackLearningEvent } from '../analytics/reporter'
 const route = useRoute(), api = coursesApi(), actions = useCourseActions()
 const confirmedProgress = shallowRef<ProgressDTO | null>(null)
 const query = usePageQuery(async signal => {
@@ -17,6 +18,10 @@ const query = usePageQuery(async signal => {
   const [offering, chapter] = await Promise.all([api.getOffering(offeringId, { signal }), api.getChapter(chapterId, { signal })])
   if (chapter.data.offeringId !== offeringId) throw new Error('章节不属于当前课程，请返回课程目录。')
   return { offering: offering.data, chapter: chapter.data }
+})
+// 学习事件：章节打开（DEVELOPMENT §8.1 客户端来源）；上报失败静默，不影响阅读。
+watch(() => query.data.value, data => {
+  if (data) trackLearningEvent({ type: 'chapter_opened', offeringId: data.offering.id, chapterId: data.chapter.id })
 })
 const readonly = computed(() => query.data.value?.offering.status !== 'active' || !query.data.value.chapter.studentProgress)
 async function loadChapter() {
