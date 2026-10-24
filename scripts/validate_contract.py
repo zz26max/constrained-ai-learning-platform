@@ -75,8 +75,8 @@ def check_links():
     # 现行文档是规范；features/archive 的归档件自 2026-10-24 起同样校验文件可达性——
     # 归档搬迁（frontend/DESIGN.md、V3*-DELIVERY.md 迁入 docs/archive/）曾把旧目录基准的
     # 相对链接留在新位置，形成"提交声称链接全可达、实际校验器根本不扫"的盲区。
-    paths = [ROOT / 'README.md', ROOT / 'AGENTS.md',
-             *[DOCS / n for n in ['README.md', 'DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]
+    paths = [ROOT / 'README.md', ROOT / 'AGENTS.md', ROOT / 'frontend' / 'README.md',
+             *[DOCS / n for n in ['README.md', 'DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md', 'DEBUGGING.md']]]
     paths += sorted(DOCS.glob('features/*.md')) + sorted(DOCS.glob('archive/*.md'))
     for path in paths:
         content = path.read_text(encoding='utf-8')
