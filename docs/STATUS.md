@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：工作分支 `frontend/ui-audit-p1` 基线 `c5ec604`（含 1.1.1 未决收口与文档整理）；`master` 与 `origin/master` 同步于 `37620a0`（已推送，**未部署**）。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`；更早基线与各候选版本的提交见 §1 会话日志。
+- **代码基线**：`master` 与工作分支 `frontend/ui-audit-p1` 均在 `9be3cbb`（2026-10-24 合流并推送，单一基线，**未部署**）。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`；更早基线与各候选版本的提交见 §1 会话日志。本块第一个哈希为当前基线，须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。
 
-- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导）、P3（学习行为分析）尚未开始**，契约中对应操作仍为 `planned`。
+- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导、学习行为分析，契约 17 个操作）与 P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始**，契约中对应操作仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
 - **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
 
-- **门禁现状**（2026-10-24 实测）：前端 `npm --prefix frontend run verify` 通过（31 个测试文件 / 286 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、121 链接）。
+- **门禁现状**（2026-10-24 实测）：前端 `npm --prefix frontend run verify` 通过（31 个测试文件 / 286 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、顶层/features/archive 三目录登记与链接全可达）。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -31,7 +31,7 @@
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
 
-> **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；判断某条缺陷是否已修，先看 §0 与 §3，再对照本节是否有更晚的条目。
+> **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；§4 已知限制是被 §0 引用的现行清单，同样不属日志；判断某条缺陷是否已修，先看 §0、§3 与 §4，再对照本节是否有更晚的条目。历史条目中的旧文件路径按 2026-10-24 归档迁移对照：`frontend/DESIGN.md` → `docs/archive/frontend-DESIGN.md`、`frontend/V3*-DELIVERY.md` 等报告 → `docs/archive/`、`frontend/scripts` 一次性验收脚本 → `frontend/scripts/archive/`。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **文档审计第 2 轮处置**（2026-10-24，`master` 单一基线，基于 `9be3cbb`）：依据第 2 轮外部文档审计（已归档为 [DOC_AUDIT_R2_2026-10-24.md](archive/DOC_AUDIT_R2_2026-10-24.md)）修复全部新发现——N1 §0 代码基线块由已漂移 4 个提交的 `c5ec604`/`37620a0` 更正为合流后的 `9be3cbb`；N2 阶段块"P3（学习行为分析）"按契约 `x-phase`（P2 含 17 个操作含 recordLearningEvents/tutoring/help，P3 仅 createCheck/getCheck）更正为"P2（受限式 AI 辅导、学习行为分析）、P3（独立运行检查）"；N3 FRONTEND §9 删除被 M1 取代的旧字号 bullet（27/24/14）并改写 zhixue.css 与 tokens 的表述；N4 修复归档搬迁留下的 4 条死链（V3.1/V3.2 的 .cache 相对链接改为本机目录说明、V3.4 的 DESIGN.md 改指同目录 frontend-DESIGN.md）；N5 门禁块去掉随登记数漂移的链接计数。工具侧：`validate_contract.py` 的 `check_links` 扫描范围扩至 features/ 与 archive/（消除"提交声称链接全可达、校验器实际不扫"的盲区），`check_status_baseline` 新增"§0 第一个基线 commit 必须是 HEAD 祖先且落后不超过 3 个提交"拦截基线漂移（N1 案例）。顺手项：N6 docs/README 校验器描述同步三目录与新基线规则、N7 student-ui-convergence.md 头部声明指向现行规范、N8 frontend/README 删除已失效的 V3/B+ 预览入口两段（design 参数路由已移除）、N9 §1 引言补归档路径迁移对照、N10 §1 引言明确 §4 已知限制为现行清单。检查：`validate_contract.py` 通过（三目录登记 32 份、链接扩展扫描 248 条全可达、基线 9be3cbb 为 HEAD 祖先；扩展扫描另发现并修复 2026-10-08_HANDOFF_AUDIT.md 一条指向根 README 已不存在锚点的历史死链）。未做：N9 所列历史日志内旧路径按"日志不改写"保留，仅靠 §1 引言对照说明。
 
 - **仓库整理第 4 步：frontend 历史产物归档与分支合流**（2026-10-24，分支 `frontend/ui-audit-p1`，基于 `d894e54`）：frontend/ 根 12 份历史交付报告（V3～V3.6.1、CONTENT-POLISH、STUDENT-RELEASE、V3.3-STUDENT-TEST）移入 docs/archive/ 并逐份登记于归档清单，报告间唯一互链（V3.3-DELIVERY→STUDENT-TEST）同目录仍有效；15 个一次性验收脚本（verify-student-v3 系列 11 个、content-interactions/content-polish/release 3 个、explore-student-v36）移入 frontend/scripts/archive/，scripts/ 根保留 package.json 引用的 6 个与 campus 配套 3 个、shim 1 个；frontend/README.md 中"见本目录 DESIGN.md"改为指向 docs/FRONTEND.md 第 9 节（上轮移动造成的失实指向）。随后 `frontend/ui-audit-p1` fast-forward 合回 `master` 并推送，恢复单一基线。检查：移动后 `npm --prefix frontend run verify` 通过（31 文件 286 用例——报告与脚本不被 src/tests 引用，此为复验）；`validate_contract.py` 通过（登记 31 份、链接全可达）。未做：frontend/README.md 中"首页 V3 视觉探索/B+ 候选"两段描述仍写"尚未选择"，与正式已采用 V3.6.1 的现状不符，属该文件自身的过时内容，待前端维护任务修订；CLAUDE.md 无关规则未动。
 
