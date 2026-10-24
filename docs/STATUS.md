@@ -10,7 +10,7 @@
 
 - **代码基线**：本块第一个哈希 `2c5329e` 为最近一次基线回填（2026-10-24 UI 打磨第二轮收口），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。开发分支 `frontend/p2`（P2 前端，2026-10-24 起，自 `2c5329e` 切出）；主干 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交与两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互，未触契约与后端），逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
-- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支开工（2026-10-24）：P2-A 学生端受限 AI 辅导主链路完成 mock 并行开发（`65a37d6`），后端实现、求助/教师端 UI 与真实联调均未开始**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
+- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支开工（2026-10-24）：P2-A 学生端完成 mock 并行开发——AI 辅导主链路（`65a37d6`）与教师求助流（`be9519e`）；后端实现、教师端求助处理 UI 与真实联调均未开始**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
 - **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **P2-A 续：学生端教师求助流（mock 并行开发）**（2026-10-24，`frontend/p2`，`be9519e`）：mock 新增求助存储与种子（已回复：教师回复+工作区共享快照+AI 片段；待处理各一条；被共享的种子 AI 请求补终态记录避免 SharedTutoringResult 契约自违反）；create/list/get 处理器实现契约校验——studentAttempt 必填、issueTags 限班级词表且去重、共享片段限本人本作业且已终态、摘要不含共享快照。UI 三页：发起页（`/student/assignments/:id/help`，词表多选/共享工作区版本/共享已交付 AI 片段，成功跳详情）、列表页（`/student/help-requests`，状态筛选+作业标题解析）、详情页（`/student/help-requests/:id`，快照代码/AI 片段/教师回复/过期态）；侧边栏新增"我的求助"（AppIcon 增 help 图标）；作业详情头部新增"教师求助"；targetRoute 补 `help_request`→详情（p1d-ui.test.ts 断言同步）；FRONTEND §4 两行登记并去重旧预留行。检查：`npm run verify` 通过（34 文件 308 用例，新增 help-requests 8 例）；mock 4175 实测列表筛选/已回复详情/创建提交跳转闭环。未做：教师端求助处理（回复/关闭与 help_reply 消息生成，下一包）；真实后端。
 
 - **P2-A 开工：学生端受限 AI 辅导主链路（mock 并行开发）**（2026-10-24，分支 `frontend/p2` 自 `2c5329e` 切出，提交 `65a37d6`）：用户决定停止 UI 打磨、进入 P2，前端单端先行。范围：契约 17 个 P2 操作全部在 `src/api/tutoring.ts` 声明并注册；mock 状态机覆盖 DEVELOPMENT §7 核心约束——政策（引导模式 v1，仅已发布演示作业启用）、会话/消息/请求（发送 202 queued，轮询 queued→running→终态，跨会话共享提示层次）、索答固定 fallback 模板（不伪装模型回复、不升层）、next_hint 第 2 层起强制 studentAttempt（422）、超 maxHintLevel（409 HINT_LIMIT_REACHED）、在途重复发送（409 AI_REQUEST_IN_PROGRESS 带 pendingRequestId，客户端自动转轮询）；`use-tutoring-poll` 按 FRONTEND §6 实现 1s 起步退避至 5s、终态即停、卸载即停；TutoringPanel + 路由 `/student/assignments/:id/tutoring` + 作业详情入口；FRONTEND §4 登记路由。检查：`npm run verify` 通过（33 文件 300 用例，新增 tutoring 11 例）；mock 4175 浏览器实测发送→轮询占位→助手回复落地（ask 不升层）。未做：后端实现（操作仍 planned，mock 不证明权限/事务）；求助流与教师端 UI（下一包，词表与 API 已就绪）；预算/频率限制未进 mock；恢复轮询的挂载路径已实现但无浏览器断言。
 
