@@ -72,8 +72,13 @@ def slug(text):
 
 def check_links():
     count = 0
-    # Historical snapshots retain historical coordinates; only current documents are normative.
-    for path in [ROOT / 'README.md', ROOT / 'AGENTS.md', *[DOCS / n for n in ['README.md', 'DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]:
+    # 现行文档是规范；features/archive 的归档件自 2026-10-24 起同样校验文件可达性——
+    # 归档搬迁（frontend/DESIGN.md、V3*-DELIVERY.md 迁入 docs/archive/）曾把旧目录基准的
+    # 相对链接留在新位置，形成"提交声称链接全可达、实际校验器根本不扫"的盲区。
+    paths = [ROOT / 'README.md', ROOT / 'AGENTS.md',
+             *[DOCS / n for n in ['README.md', 'DEVELOPMENT.md', 'FRONTEND.md', 'BACKEND.md', 'STATUS.md']]]
+    paths += sorted(DOCS.glob('features/*.md')) + sorted(DOCS.glob('archive/*.md'))
+    for path in paths:
         content = path.read_text(encoding='utf-8')
         for target in re.findall(r'\[[^\]\n]+\]\(([^)\n]+)\)', content):
             if re.match(r'^[a-z]+://', target, re.I):
@@ -167,6 +172,20 @@ def check_status_baseline():
         result = subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', value + '^{commit}'],
                                 capture_output=True)
         check(result.returncode == 0, f'STATUS.md §0: 基线 commit {value} 不存在或不是提交')
+    # 2026-10-24 N1 案例：§0 基线哈希真实存在，但合流推送后漂移了 4 个提交未被发现——
+    # "结构正确"不等于"内容正确"。约定 §0 第一个哈希为当前基线：必须是 HEAD 祖先，
+    # 且 HEAD 领先它不超过 3 个提交（容忍批内最后一个未回填基线的提交本身）。
+    if hashes:
+        current = hashes[0]
+        ancestor = subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', current, 'HEAD'],
+                                  capture_output=True)
+        if ancestor.returncode != 0:
+            check(False, f'STATUS.md §0: 当前基线 {current} 不是 HEAD 的祖先，基线指向了被抛弃的历史')
+        else:
+            ahead = subprocess.run(['git', '-C', str(ROOT), 'rev-list', '--count', f'{current}..HEAD'],
+                                   capture_output=True, text=True).stdout.strip()
+            check(ahead.isdigit() and int(ahead) <= 3,
+                  f'STATUS.md §0: 当前基线 {current} 落后 HEAD {ahead} 个提交；交付收口时须回填 §0 基线')
     return len(hashes)
 
 
