@@ -250,9 +250,6 @@ SELECT EXISTS(SELECT 1 FROM resources WHERE id=#{id} AND offering_id=#{offeringI
 <select id="existsAssignmentInOffering" resultType="boolean">
 SELECT EXISTS(SELECT 1 FROM assignments WHERE id=#{id} AND offering_id=#{offeringId})
 </select>
-<select id="existsPublishedFeedbackInOffering" resultType="boolean">
-SELECT EXISTS(SELECT 1 FROM feedback WHERE id=#{id} AND offering_id=#{offeringId} AND status='published')
-</select>
 
 <select id="listKnowledgePointRefs" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$KnowledgePointRef">
 SELECT id,chapter_id FROM knowledge_points WHERE offering_id=#{offeringId} AND id IN
@@ -456,15 +453,18 @@ FROM notifications WHERE id=#{id}
 <arg column="offering_id" javaType="java.lang.String"/>
 <arg column="assignment_id" javaType="java.lang.String"/>
 <arg column="feedback_id" javaType="java.lang.String"/>
+<arg column="target_type" javaType="java.lang.String"/>
+<arg column="target_id" javaType="java.lang.String"/>
 <arg column="sender_id" javaType="java.lang.String"/>
 <arg column="sender_display_name" javaType="java.lang.String"/>
 <arg column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 <arg column="read_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 </constructor></resultMap>
 
-<!-- 发送者仅评价发布消息可推出（评价教师）；其余类型 sender 为 null。 -->
+<!-- 发送者仅评价发布消息可推出（评价教师）；其余类型 sender 为 null。target 两列仅 notice_published 继承公告目标时非空。 -->
 <sql id="messageColumns">
 n.id,n.type,n.title,n.content,n.related_offering_id AS offering_id,n.related_assignment_id AS assignment_id,n.related_feedback_id AS feedback_id,
+n.target_type,n.target_id,
 fb.teacher_id AS sender_id,tu.display_name AS sender_display_name,n.created_at,n.read_at
 </sql>
 <sql id="messageJoins">
@@ -499,8 +499,8 @@ AND n.is_read=0
 </select>
 
 <insert id="insertNotification">
-INSERT INTO notifications (id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,is_read,read_at,created_at)
-VALUES (#{id},#{recipientId},#{type},#{title},#{content},#{relatedOfferingId},#{relatedAssignmentId},#{relatedFeedbackId},0,NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
+INSERT INTO notifications (id,recipient_id,type,title,content,related_offering_id,related_assignment_id,related_feedback_id,target_type,target_id,is_read,read_at,created_at)
+VALUES (#{id},#{recipientId},#{type},#{title},#{content},#{relatedOfferingId},#{relatedAssignmentId},#{relatedFeedbackId},#{targetType},#{targetId},0,NULL,#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
 </insert>
 
 <update id="markNotificationRead">

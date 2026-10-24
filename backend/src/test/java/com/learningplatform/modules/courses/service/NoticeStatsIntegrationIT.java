@@ -125,6 +125,33 @@ class NoticeStatsIntegrationIT {
     }
 
     @Test
+    void noticeTargetIsInheritedByCourseNoticeMessages() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = publishAssignment(offering.id(), "目标作业");
+        Map<String, Object> body = body("看作业", "内容");
+        body.put("target", Map.of("type", "assignment", "id", assignment.id(), "offeringId", offering.id()));
+        notices.createNotice(offering.id(), TEACHER, body, "notice-target-1");
+        AssignmentService.NotificationListResponse messages = assignmentService.listMessages(STUDENT, null, "course_notice", "all", 1, 20);
+        assertThat(messages.items()).hasSize(1);
+        assertThat(messages.items().get(0).type()).isEqualTo("course_notice");
+        assertThat(messages.items().get(0).target()).isEqualTo(new TargetDTO("assignment", assignment.id(), offering.id()));
+        // 目标列只随公告继承，不污染既有 feedback/assignment 类消息的关联列语义
+        assertThat(jdbc.queryForObject("SELECT target_type FROM notifications WHERE type='notice_published'", String.class)).isEqualTo("assignment");
+    }
+
+    @Test
+    void wholeClassNoticeRejectsFeedbackTarget() {
+        OfferingDTO offering = createOffering();
+        Map<String, Object> body = body("指向评价", "内容");
+        body.put("target", Map.of("type", "feedback", "id", "00000000-0000-4000-8000-0000000000f1", "offeringId", offering.id()));
+        assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, body, "notice-feedback-1"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(t -> assertCode(t, 422, "VALIDATION_ERROR"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notices", Integer.class)).isEqualTo(0);
+    }
+
+    @Test
     void noticeNotificationsOnlyGoToActiveStudents() {
         OfferingDTO offering = createOffering();
         enrollStudent(offering.id(), STUDENT);
@@ -281,7 +308,7 @@ class NoticeStatsIntegrationIT {
         String feedbackId = jdbc.queryForObject("SELECT id FROM feedback WHERE submission_id=?", String.class, feedbackSubmission);
         List<String[]> targets = List.of(
                 new String[]{"assignment", assignmentId}, new String[]{"chapter", chapterId},
-                new String[]{"resource", resourceId}, new String[]{"feedback", feedbackId},
+                new String[]{"resource", resourceId},
                 new String[]{"offering", offering.id()});
         int i = 0;
         for (String[] t : targets) {
@@ -296,6 +323,9 @@ class NoticeStatsIntegrationIT {
                 assertThat(listed.target()).isEqualTo(created.target());
             }
         }
+        // feedback 目标全班公告一律 422（契约 1.1.1），即使指向本班已发布评价
+        assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, targetBody("feedback", feedbackId, offering.id()), "tg-feedback"))
+                .satisfies(t -> assertField(t, "target.type"));
         NoticeDTO plain = notices.createNotice(offering.id(), TEACHER, body("无目标", "c"), "tg-plain");
         assertThat(plain.target()).isNull();
         assertThat(notices.getNotice(plain.id(), STUDENT).target()).isNull();
@@ -346,13 +376,13 @@ class NoticeStatsIntegrationIT {
                 .satisfies(t -> assertField(t, "target.id"));
         assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("offering", other.id(), mine), "r5"))
                 .satisfies(t -> assertField(t, "target.id"));
-        for (String type : List.of("chapter", "resource", "assignment", "feedback", "offering")) {
+        for (String type : List.of("chapter", "resource", "assignment", "offering")) {
             assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody(type, uuid, mine), "r6-" + type))
                     .satisfies(t -> assertField(t, "target.id"));
         }
-        // 草稿评价不可作为目标
+        // feedback 目标全班公告一律拒绝（契约 1.1.1），不再区分草稿与已发布
         assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("feedback", draftFeedbackId, mine), "r7"))
-                .satisfies(t -> assertField(t, "target.id"));
+                .satisfies(t -> assertField(t, "target.type"));
         // help_request：P1 不支持
         assertThatThrownBy(() -> notices.createNotice(mine, TEACHER, targetBody("help_request", uuid, mine), "r8"))
                 .satisfies(t -> assertField(t, "target.type"));

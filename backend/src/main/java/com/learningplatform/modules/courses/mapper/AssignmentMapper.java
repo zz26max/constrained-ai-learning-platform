@@ -69,11 +69,10 @@ public interface AssignmentMapper {
     int countTeacherAssignments(@Param("offeringId") String offeringId,@Param("publicationState") String publicationState);
     /** 章节在本班内的状态；章节不存在或不属于本班返回 null。 */
     String findChapterStatus(@Param("chapterId") String chapterId,@Param("offeringId") String offeringId);
-    /** 公告跳转目标存在性：目标必须属于本班；feedback 必须已发布。 */
+    /** 公告跳转目标存在性：目标必须属于本班。feedback 目标全班公告禁用（Service 层拒绝），无需存在性查询。 */
     boolean existsChapterInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
     boolean existsResourceInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
     boolean existsAssignmentInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
-    boolean existsPublishedFeedbackInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
     /** 本班内存在的知识点及其关联章节（可为 null）。 */
     List<KnowledgePointRef> listKnowledgePointRefs(@Param("offeringId") String offeringId,@Param("ids") List<String> ids);
     List<String> listActiveStudentIds(String offeringId);
@@ -142,7 +141,8 @@ public interface AssignmentMapper {
             @Param("type") String type);
     int insertNotification(@Param("id") String id,@Param("recipientId") String recipientId,@Param("type") String type,
             @Param("title") String title,@Param("content") String content,@Param("relatedOfferingId") String relatedOfferingId,
-            @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,@Param("now") Instant now);
+            @Param("relatedAssignmentId") String relatedAssignmentId,@Param("relatedFeedbackId") String relatedFeedbackId,
+            @Param("targetType") String targetType,@Param("targetId") String targetId,@Param("now") Instant now);
     /** 仅当本人且尚未已读时写入；已读不更新，保留首次 readAt。返回受影响行数。 */
     int markNotificationRead(@Param("id") String id,@Param("recipientId") String recipientId,@Param("now") Instant now);
 

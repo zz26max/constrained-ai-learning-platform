@@ -48,7 +48,7 @@ public class NoticeService {
         int notified=0;
         for(String studentId:mapper.listActiveStudentIds(offeringId)) {
             mapper.insertNotification(UUID.randomUUID().toString(),studentId,"notice_published",title,
-                    notificationContent,offeringId,null,null,now);
+                    notificationContent,offeringId,null,null,target==null?null:target.type(),target==null?null:target.id(),now);
             notified++;
         }
         audit.record(author.id(),"NOTICE_CREATED","notice",noticeId,Map.of("notified",notified),requestId);
@@ -78,6 +78,7 @@ public class NoticeService {
     private static final String UUID_PATTERN="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
     /**
      * 校验公告跳转目标：键恰为 type/id/offeringId，offeringId 等于路径班级，目标存在且属于本班；
+     * feedback 目标仅定向公告可用，P1 createNotice 均为全班公告，一律 422；
      * 任何失败均为 422（不用 404，避免暴露他班资源是否存在）。target 为 null 时返回 null。
      */
     private TargetDTO parseTarget(String offeringId,Object raw) {
@@ -101,7 +102,8 @@ public class NoticeService {
             case "chapter" -> mapper.existsChapterInOffering(id,offeringId);
             case "resource" -> mapper.existsResourceInOffering(id,offeringId);
             case "assignment" -> mapper.existsAssignmentInOffering(id,offeringId);
-            case "feedback" -> mapper.existsPublishedFeedbackInOffering(id,offeringId);
+            // 全班公告人人都收到，而 feedback 仅评价归属学生可读，全班分发必产生死链（契约 1.1.1）。
+            case "feedback" -> throw AssignmentInput.invalidField("target.type","全班公告不能指向单个学生的评价；feedback 目标仅定向公告可用。");
             default -> throw AssignmentInput.invalidField("target.type","P1 暂不支持 help_request 类型的跳转目标。");
         };
         if(!belongs) throw AssignmentInput.invalidField("target.id","目标不存在或不属于本教学班。");

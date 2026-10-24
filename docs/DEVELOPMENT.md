@@ -484,5 +484,6 @@ validate_contract 静态检查 OpenAPI 结构、引用、示例、正反例与�
 | 2026-10-11 / 1.0.1 | 补齐恢复、外发边界与工程约定，移除未引用的通用反馈类型 | 路由、mock、工具链及学生/教师视图明确；schema 生成类型须基于新版本；业务端点无新增或删除 |
 | 2026-10-13 / 1.1.0 | 按课程演示规模简化：并发只用唯一约束、乐观锁、条件更新；删除通用幂等键改为业务自然幂等；CSRF 恢复简化为共用一次刷新、失败提示重新登录；AI 在同一应用内异步执行，预算计数判断；删除活跃心跳；P2/P3 契约改为 draft；P2-A 提前到 P1-C 之后 | 降低每个接口的实现与测试成本，让项目特色尽早可演示；放弃的竞态防护列入 STATUS 已知限制；仅影响 planned 操作 |
 | 2026-10-16 / 1.1.0 | 执行顺序改为先完成 P1 闭环（联调、P1-D 最小 UI、验收标 verified）再做 P2-A；前端路由沿用已实现的 `/student/...`、`/teacher/...`，课程类路由保持 `/course...` | 核对发现 P1-B/C/D 与契约不符，先让产品闭环再叠加 AI；路由以已上线代码为准，避免迁移成本；契约字段不变 |
+| 2026-10-24 / 1.1.1 | 公告消息 target 继承公告跳转目标（notifications 通用目标列，V10）；全班公告 target 禁止 feedback（422）；submitAssignment 归档后自然幂等与 publishFeedback 重复发布幂等窗口写入契约描述 | P2 求助/辅导的消息入口复用 notifications 与 TargetDTO，先定跳转语义避免返工；feedback 链接仅评价归属学生可读，全班分发必产生死链 |
 
 技术依据：[Vue](https://vuejs.org/guide/introduction.html)、[Vue TypeScript](https://vuejs.org/guide/typescript/overview.html)、[OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html)。项目边界、阶段与规则属于本项目设计决定，不是外部文档给定的结果。

@@ -284,7 +284,7 @@ public class AssignmentService {
                     mapper.insertNotification(UUID.randomUUID().toString(),studentId,"assignment_published",
                             "新作业：".concat(assignment.title()),
                             "教师发布了新作业《".concat(assignment.title()).concat("》，请在截止前完成并提交。"),
-                            assignment.offeringId(),assignment.id(),null,now);
+                            assignment.offeringId(),assignment.id(),null,null,null,now);
                     notified++;
                 }
                 audit.record(user.id(),"ASSIGNMENT_PUBLISHED","assignment",assignment.id(),Map.of("notified",notified),requestId);
@@ -471,7 +471,7 @@ public class AssignmentService {
             messageId=UUID.randomUUID().toString();
             mapper.insertNotification(messageId,feedback.studentId(),"feedback_published",
                     "作业《"+submission.assignmentTitleSnapshot()+"》已获批阅","教师已发布对您提交的评价，请查看反馈详情。",
-                    feedback.offeringId(),feedback.assignmentId(),feedback.id(),now);
+                    feedback.offeringId(),feedback.assignmentId(),feedback.id(),null,null,now);
         }
         audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("messageId",messageId),requestId);
         return teacherFeedbackView(mapper.findFeedback(feedback.id()),submission);
@@ -510,7 +510,7 @@ public class AssignmentService {
             default->dbType;
         };
     }
-    /** 消息行 → 契约 NotificationDTO；关联对象被删除（外键置空）时 target 为 null。 */
+    /** 消息行 → 契约 NotificationDTO；notice_published 继承公告 target（V10 列），其余类型按既有关联列；关联被删（外键置空）时 target 为 null。 */
     static NotificationDTO notification(AssignmentRows.MessageRow r) {
         CourseDTOs.TeacherBrief sender=r.senderId()==null?null
                 :new CourseDTOs.TeacherBrief(r.senderId(),r.senderDisplayName()==null||r.senderDisplayName().isEmpty()?"教师":r.senderDisplayName());
@@ -520,6 +520,7 @@ public class AssignmentService {
                 case "feedback_published"->{ if(r.feedbackId()!=null) target=new TargetDTO("feedback",r.feedbackId(),r.offeringId()); }
                 case "assignment_published"->{ if(r.assignmentId()!=null) target=new TargetDTO("assignment",r.assignmentId(),r.offeringId()); }
                 case "offering_archived"->target=new TargetDTO("offering",r.offeringId(),r.offeringId());
+                case "notice_published"->{ if(r.targetType()!=null) target=new TargetDTO(r.targetType(),r.targetId(),r.offeringId()); }
                 default->{}
             }
         }

@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 个性化学习平台接口契约
-  version: 1.1.0
+  version: 1.1.1
   description: 设计基线 2026-10-11。实现状态以各 operation 的 x-implementation-status 为准，并由后端生产路由测试双向核对；本段不重复维护接口状态数量。
     x-contract-status：reviewed 表示静态契约审计（P0/P1），draft 表示草案（P2/P3，进入对应工作包时再审定），均不等于运行验收；implemented 不表示联调环境已部署。字段以此文件为唯一结构源；运行规则见 DEVELOPMENT.md，存储见 BACKEND.md。
 servers:
@@ -785,7 +785,7 @@ paths:
     post:
       operationId: submitAssignment
       summary: submitAssignment
-      description: 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision,reflection}`。结果约定：新建 201 `SubmissionSummaryDTO`，创建代码与评价标准不可变快照；同一学生同一作业的该 `workspaceRevision` 已提交过时 200 返回原提交，不新建、不占次数（自然幂等，请求中的 reflection 不覆盖原值）。业务规则以
+      description: 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision,reflection}`。结果约定：新建 201 `SubmissionSummaryDTO`，创建代码与评价标准不可变快照；同一学生同一作业的该 `workspaceRevision` 已提交过时 200 返回原提交，不新建、不占次数（自然幂等，请求中的 reflection 不覆盖原值；班级归档后同 revision 重发同样按此幂等返回原提交，新建提交才受归档阻断）。业务规则以
         DEVELOPMENT.md 为准。
       tags:
       - student
@@ -982,7 +982,7 @@ paths:
       operationId: listMessages
       summary: listMessages
       description: 权限：学生或教师本人。请求约定：可选 `offeringId,type,read=all\|unread\|read`；`page,pageSize`。结果约定：200 `List<NotificationDTO>`；`summary:{unreadCount}`；按
-        `createdAt` 降序。业务规则以 DEVELOPMENT.md 为准。
+        `createdAt` 降序。course_notice 消息的 target 继承公告跳转目标（公告无目标时为 null）。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - student
       x-phase: P1
@@ -2455,7 +2455,7 @@ paths:
     post:
       operationId: publishFeedback
       summary: publishFeedback
-      description: 权限：本班授课教师。请求约定：`{baseVersion}`。结果约定：200 `TeacherFeedbackDTO`，version加1；同事务写公开评价、站内消息和接收记录，学生转REVIEWED。业务规则以 DEVELOPMENT.md
+      description: 权限：本班授课教师。请求约定：`{baseVersion}`。结果约定：200 `TeacherFeedbackDTO`，version加1；同事务写公开评价、站内消息和接收记录，学生转REVIEWED。已发布评价的重复发布：baseVersion 等于发布前版本或当前版本时幂等返回 200 原视图，不重复加版本或通知；其余 baseVersion 409。业务规则以 DEVELOPMENT.md
         为准。
       tags:
       - teacher
@@ -2464,7 +2464,7 @@ paths:
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: true
-      x-idempotency: none
+      x-idempotency: natural
       parameters:
       - name: submissionId
         in: path
@@ -2615,7 +2615,7 @@ paths:
     post:
       operationId: createNotice
       summary: createNotice
-      description: 权限：本班授课教师。请求约定：`{title,content,target?}`。结果约定：201 `{id,offeringId,title,content,createdAt,recipientCount}`，向当前班学生生成通知。业务规则以
+      description: 权限：本班授课教师。请求约定：`{title,content,target?}`。结果约定：201 `{id,offeringId,title,content,createdAt,recipientCount}`，向当前班学生生成通知；公告带 target 时生成的 course_notice 消息继承该 target（无目标时为 null）。全班公告 target 不能为 feedback（feedback 仅定向公告可用，422 VALIDATION_ERROR）。业务规则以
         DEVELOPMENT.md 为准。
       tags:
       - teacher
@@ -10192,3 +10192,4 @@ x-change-log:
       target；P3 检查仍仅设计。]}
 - {version: 1.0.1, date: '2026-10-11', changes: [移除未引用的通用反馈结构并明确学生与教师视图；HTTP 字段不变。, 补充 CSRF 恢复及事件接收时间说明；当前 schema 数减少一项。]}
 - {version: 1.1.0, date: '2026-10-13', changes: ['按课程演示规模简化：删除通用 Idempotency-Key 机制（submitAssignment、sendTutoringMessage、createCheck 改为 x-idempotency: natural，submitAssignment 同 revision 重复提交返回 200 原提交），删除 IDEMPOTENCY_KEY_REUSED、REQUEST_IN_PROGRESS 与 Idempotency-Replayed 头。', '删除 active_heartbeat 事件。', 'P2/P3 操作 x-contract-status 改为 draft。', '均为 planned 操作，已实现的 P0-A 操作不受影响。']}
+- {version: 1.1.1, date: '2026-10-24', changes: ['course_notice 消息继承公告跳转目标（notifications 新增通用目标列，后端迁移 V10）；公告无目标时消息 target 为 null。', '全班公告 target 禁止 feedback（feedback 仅定向公告可用，422 VALIDATION_ERROR）。', 'submitAssignment 写明班级归档后同 revision 重发仍按自然幂等返回 200 原提交；publishFeedback 写明重复发布在 baseVersion 等于发布前或当前版本时幂等返回 200（x-idempotency 改 natural）。']}
