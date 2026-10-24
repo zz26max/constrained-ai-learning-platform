@@ -1,6 +1,7 @@
 import type { components } from '../api/generated/schema'
 import type { AiPolicyDTO, HelpRequestDTO, TutoringMessageDTO, TutoringRequestDTO, TutoringResult } from '../api/tutoring'
 import { mockSession } from './auth'
+import { addMockMessage } from './feedback'
 import { MOCK_STUDENT, MOCK_TEACHER, fail, guard, invalid, missing, ok, paginate, pageWindow, searchParams, segment } from './envelope'
 import { mockAssignmentStore, P1B_IDS } from './assignments'
 import { P1A_IDS } from './courses'
@@ -395,6 +396,74 @@ const handleGetHelpRequest: MockHandler = context => {
   return ok(context, helpDetail(stored))
 }
 
+/** 教师视图在学生摘要之上补提问学生身份；演示规模下求助均来自同一位演示学生。 */
+function teacherDetail(stored: StoredHelpRequest): components['schemas']['TeacherHelpRequestDetailDTO'] {
+  const student = stored.studentId === MOCK_STUDENT.id
+    ? { id: MOCK_STUDENT.id, username: MOCK_STUDENT.username, displayName: MOCK_STUDENT.displayName }
+    : { id: stored.studentId, username: 'student', displayName: '学生' }
+  return { ...helpDetail(stored), student }
+}
+
+const handleListTeacherHelpRequests: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const window = pageWindow(searchParams(context))
+  if (window === null) return invalid(context, '分页参数不合法。', 'page')
+  const status = searchParams(context).get('status')
+  const scoped = [...helpRequests.values()]
+    .filter(item => item.offeringId === segment(context, 4) && (status === null || item.status === status))
+    .map(item => ({ ...helpSummary(item), student: teacherDetail(item).student }))
+  return ok(context, paginate(scoped, window))
+}
+
+const handleGetTeacherHelpRequest: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const stored = helpRequests.get(segment(context, 4))
+  if (stored === undefined) return missing(context)
+  return ok(context, teacherDetail(stored))
+}
+
+const handleReplyToHelpRequest: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const stored = helpRequests.get(segment(context, 4))
+  if (stored === undefined) return missing(context)
+  const body = bodyJson(context)
+  const content = typeof body.content === 'string' ? body.content : ''
+  if (content.trim() === '' || content.length > 8000) return invalid(context, '回复内容必填，最长 8000 字。', 'content')
+  if (stored.status === 'closed') {
+    return { status: 409, bodyJson: { error: { code: 'HELP_REQUEST_CLOSED', message: '求助已关闭，不再接受教师回复。', details: {} }, requestId: randomUUID() } }
+  }
+  const teacher = { id: MOCK_TEACHER.id, displayName: MOCK_TEACHER.displayName }
+  const createdAt = now()
+  const reply: StoredHelpReply = { id: randomUUID(), content, teacher, createdAt }
+  stored.replies.push(reply)
+  stored.status = 'answered'
+  stored.updatedAt = createdAt
+  addMockMessage({
+    offeringId: stored.offeringId, type: 'help_reply',
+    title: `你的求助「${stored.title}」已有教师回复`,
+    content: '教师回复了你的求助，请查看详情。', sender: teacher, createdAt,
+    target: { type: 'help_request', id: stored.id, offeringId: stored.offeringId },
+  }, stored.studentId)
+  return ok(context, { id: reply.id, content, teacher, createdAt, status: 'answered' }, 201)
+}
+
+const handleCloseHelpRequest: MockHandler = context => {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  const stored = helpRequests.get(segment(context, 4))
+  if (stored === undefined) return missing(context)
+  const body = bodyJson(context)
+  if (body.status !== 'closed') return invalid(context, 'status 只能是 closed。', 'status')
+  if (stored.status !== 'closed') {
+    stored.status = 'closed'
+    stored.updatedAt = now()
+  }
+  return ok(context, { id: stored.id, status: stored.status, updatedAt: stored.updatedAt })
+}
+
 export const tutoringHandlers: Record<string, MockHandler> = {
   getAiPolicy: handleGetAiPolicy,
   getIssueTags: handleGetIssueTags,
@@ -406,6 +475,10 @@ export const tutoringHandlers: Record<string, MockHandler> = {
   createHelpRequest: handleCreateHelpRequest,
   listHelpRequests: handleListHelpRequests,
   getHelpRequest: handleGetHelpRequest,
+  listTeacherHelpRequests: handleListTeacherHelpRequests,
+  getTeacherHelpRequest: handleGetTeacherHelpRequest,
+  replyToHelpRequest: handleReplyToHelpRequest,
+  closeHelpRequest: handleCloseHelpRequest,
 }
 
 resetMockTutoringState()

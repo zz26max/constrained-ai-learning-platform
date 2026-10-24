@@ -94,7 +94,7 @@ frontend/
 | `/teacher/offerings/{offeringId}/assignments/new` | 布置作业，P1 | 班级章节/知识点；建立草稿后进入草稿详情 |
 | `/teacher/assignments/{id}` | 作业编辑与提交列表，P1 | `/teacher/assignments/{id}`、提交列表 |
 | `/teacher/submissions/{submissionId}/feedback` | 批阅，P1 | 提交快照、学生信息、草稿评价；保存 draft 后显式发布 |
-| `/teacher/help-requests/{id}` | 求助处理，P2 | 教师求助详情、回复和关闭；包含提问学生身份 |
+| `/teacher/help-requests/{id}` | 求助处理，P2（mock 先行） | 教师求助详情（含学生身份、共享快照与 AI 片段）、回复（生成 help_reply 消息）与关闭（重复关闭幂等）；列表入口在教学班工作台"学生求助"页签（`/teacher/offerings/{offeringId}/help-requests`，状态筛选/分页） |
 | `/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2 | `/teacher/offerings/{id}/students/{studentId}/learning-records` |
 
 `/student/progress` 等无上下文入口先提供教学班选择，不能隐式固定 Web 课程。章节恢复采用服务器持久化指针和回退规则；浏览器缓存只改善加载速度，不成为唯一恢复来源。
