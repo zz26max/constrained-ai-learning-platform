@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：本块第一个哈希 `8b47536` 为最近一次基线回填（2026-10-24 分支清理同步），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除，本地与远端无其他分支）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后均为文档、校验脚本与死规则清理提交，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
+- **代码基线**：本块第一个哈希 `d120a81` 为最近一次基线回填（2026-10-24 三轮文档审计收口后），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除，本地与远端无其他分支）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后均为文档、校验脚本与死规则清理提交，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导、学习行为分析，契约 17 个操作）与 P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始**，契约中对应操作仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **前端 UI 打磨第一轮（本地组件库复用评估与 ARIA tabs）**（2026-10-24，`master`，基于 `d120a81`）：按用户指派对本地组件库（四个 MIT React 库快照：shadcn-ui/motion-primitives/kibo-ui/magic-ui，`curated/` 为空模板）做只读评估后实施。① 移植 shadcn tabs 的 WAI-ARIA 键盘模式为零依赖纯函数 `frontend/src/components/tabs.ts`（roving tabindex、方向键/Home/End、激活即聚焦），工作区文件切换由 nav+aria-current 升级为 role=tablist/tab/tabpanel 并以 aria-labelledby 关联编辑面板，视觉零变化（teacher.css 选中态选择器同步 aria-selected）；新增 `tests/tab-keyboard.test.ts` 3 项。② Toast（sonner 模式）经逐场景核查**不引入**：公告发布走 ActionNotice 常驻、归档以页面只读态变化为反馈、批阅队列发布后界面切换即反馈且跳过/失败有 queueMessage、保存为行内 role=status——行内反馈体系完整，强行引入违背"先找真问题"原则（React 库亦无法直接复用，仅可移植模式）。③ 会话消息流（shadcn v4 message-scroller 模式）推迟至 P2 辅导界面开工时移植。④ 管理端确认无独立 UI（设计如此：无接口支持的管理功能不提供入口），本轮壳层改进对全部角色生效。检查：`npm --prefix frontend run verify` 通过（32 文件 289 用例，含 typecheck/build/no-mock）。未做：组件来源记录未沉淀到用户个人 curated/ 库（属用户库，待用户操作）；FRONTEND §9"实验室以页签切换任务、代码和预览"与当前实现（文件 tabs + 手动预览按钮）的对应关系待下次前端维护确认。
 
 - **文档审计第 3 轮处置**（2026-10-24，`master`，基于 `8b47536`）：依据第 3 轮外部审计（已归档为 [DOC_AUDIT_R3_2026-10-24.md](archive/DOC_AUDIT_R3_2026-10-24.md)）——R1 §0 基线块"均在/当前"式零滞后绝对措辞改为两段式（回填哈希 + "其后均为治理提交，见 §1"），与校验器 ≤3 容忍度匹配，此后正文不再随每次提交失实；R3 落后分支 `frontend/ui-audit-p1` 已在报告时点后删除（`8b47536`）。**R2 复核为误判**：报告断言 `HomeExploration.vue` 是生产首页渲染器，实测 `router.ts:22,69` 的 `/student/home` 指向 `features/student/visual/StudentHome.vue`（V3.6.1 独立实现，不消费 design 参数），`dashboard/StudentHomePage.vue` 仅被 campus 演示与 `p1d-ui.test.ts` 引用——`140ec78` 的 N8 理由与 README 改写均成立，本注记防止后人据 R2 误删生产无关但被引用的演示组件。R2 附带暴露的真实残留已清理：`router.ts` 登录回跳白名单仍放行已无组件消费的 `/student/home?design=…` 参数（该残留正是误导审计的原因），删除该分支并同步改写 `router.test.ts` 断言（design 参数样本移入拒绝清单）。nit：`check_links` 扫描范围补入 `DEBUGGING.md` 与 `frontend/README.md`；nit2 复核为误报（§4 恰为 5 个竞态：归档 2 + AI 2 + 死锁 1，§0"5 个"准确）。检查：`npm --prefix frontend run verify` 通过；`validate_contract.py` 通过。未做：CLAUDE.md 用户层规则仍未动。
 

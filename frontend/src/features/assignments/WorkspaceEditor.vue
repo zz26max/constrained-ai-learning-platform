@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/auth'
 import { isUuid } from './format'
 import { pageError } from '../courses/page-error'
 import { retainWorkspace, takeWorkspace } from './workspace-recovery'
+import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
 
 const route = useRoute()
@@ -40,6 +41,11 @@ const assignmentQuery = usePageQuery(async signal => {
 })
 
 const activeTab = ref<string>('index.html')
+const activeTabIndex = computed(() => query.data.value?.files.findIndex(f => f.path === activeTab.value) ?? -1)
+function activateFileTab(index: number) {
+  const file = query.data.value?.files[index]
+  if (file) activeTab.value = file.path
+}
 const fileContents = ref<Record<string, string>>({})
 const submitDialog = ref<HTMLDialogElement | null>(null)
 const reflection = ref('')
@@ -308,19 +314,23 @@ onBeforeUnmount(() => {
     </p>
 
     <template v-if="query.status.value === 'success' && query.data.value">
-      <nav class="teacher-tabs" aria-label="文件切换">
+      <div class="teacher-tabs" role="tablist" aria-label="文件切换">
         <button
-          v-for="file in query.data.value.files"
+          v-for="(file, index) in query.data.value.files"
+          :id="`workspace-file-tab-${index}`"
           :key="file.path"
           type="button"
-          :aria-current="activeTab === file.path ? 'page' : undefined"
+          role="tab"
+          :aria-selected="activeTab === file.path"
+          :tabindex="activeTab === file.path ? 0 : -1"
           @click="activeTab = file.path"
+          @keydown="onTablistKeydown($event, activateFileTab)"
         >
           {{ file.path }}
         </button>
-      </nav>
+      </div>
 
-      <section class="surface">
+      <section class="surface" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
         <header class="section-heading">
           <h2>{{ activeTab }}</h2>
         </header>
