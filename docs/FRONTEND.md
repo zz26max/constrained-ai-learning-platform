@@ -182,7 +182,7 @@ API 字符串均为不可信输入。Vue 普通文本插值可用于文字显示
 - 复用原生 dialog 和 details；保留 Escape 关闭、对话框关闭后返回焦点、切页聚焦标题、跳到主要内容、减少动效与清晰键盘焦点。
 - 空课程、无待办和加载失败分别说明原因与下一步；长标题自然换行，页面不横向溢出，教师表格在自己的容器内滚动。
 - 正式界面沿用 `zhixue.css` 等既有样式表组织主题，色值、字号与圆角一律引用 tokens 变量；日历独立样式，不直接加载React原型CSS或运行时。素材按需放入正式工程 `src/assets/`。
-- 样式分层冻结（2026-10-24 起）：`features/student/visual/` 下的历史叠层（student/content/craft/integration/polish/refinement/secondary/visual）只维护不再新增；学生端新页面与新组件的样式只进 `tokens.css`、`release.css` 与页面自身样式，禁止新增第 9 个叠层文件。
+- 样式分层冻结（2026-10-24 起）：`features/student/visual/` 下的历史叠层（student/content/craft/integration/polish/refinement/secondary/visual）只维护不再新增；学生端新页面与新组件的样式只进 `tokens.css`、`release.css`、`styles/motion.css` 与页面自身样式，禁止新增第 9 个叠层文件。
 
 ### 视觉令牌基线（M1，2026-10-23）
 
@@ -194,18 +194,20 @@ API 字符串均为不可信输入。Vue 普通文本插值可用于文字显示
 | 文字 | `--ink #1c2d49` `--muted #52627a` `--line #dde3ec` `--line-strong #c5cfdd` `--line-control #8993a0` |
 | 品牌 | `--blue #2853bc` `--blue-hover #2147a3` `--blue-soft #eef2fb` `--focus-ring #1f3b84` |
 | 语义 | `--green/--green-soft` `--orange/--orange-soft` `--red/--red-soft` |
+| 学科 | `--subject-code/data/systems/explore/neutral`（含各自 `-soft`），只用于学科身份，不表示操作 |
 | 字体 | `--font-sans` 系统中文栈 `--font-serif` 仅日期与分数 `--font-mono` 代码 |
 | 字号 | `--fs-h1 28` `--fs-h1-sm 25` `--fs-title 20` `--fs-control 14` `--fs-body 15` `--fs-meta 13` `--fs-micro 12` |
 | 间距 | `--space-1..7`（4/8/12/16/24/32/48） |
 | 形状 | `--radius-control 6` `--radius-panel 10` `--radius-hero 14`；`--radius-button` 为控件别名 |
-| 动效 | `--ease 120ms ease`，只用于颜色与边框 |
+| 动效 | `--ease 120ms ease` 颜色与边框；`--ease-out` 与 `--dur-fast/move/enter`（120/200/280ms）只供 motion.css 白名单使用 |
+| 阴影 | `--shadow-lift` 卡片悬停浮起、`--shadow-card` 登录表单卡静置；其余 surface 仍无阴影 |
 
 规则：
 
 - 正文 15px、控件文字 14px、辅助 13px、微 12px；h1 28 / 手机 25，全站一致，旧页不再各自定义标题字号。
 - 品牌蓝只有一个：外壳、旧页、学生页、消息页都用 `--blue`；不再出现 #3768e5 / #244eae / #0066cc。
 - 圆角只三档，不再出现 7/8/9/12px 字面量。
-- 阴影只留给对话框等浮层；surface、品牌标、卡片不带装饰阴影。
+- 阴影只留给对话框等浮层；surface、品牌标、卡片静置不带装饰阴影（悬停浮起的 `--shadow-lift` 与登录表单卡的 `--shadow-card` 是 M6 唯一例外）。
 - 表单控件边框用 `--line-control`（对白底 ≥3:1），分隔线用 `--line`。
 - 焦点环 `--focus-ring` 3px；路由聚焦的 h1 不显示浏览器默认焦点框。
 - 新增页面或组件需要新颜色时，先加 token 再引用。
@@ -222,6 +224,17 @@ API 字符串均为不可信输入。Vue 普通文本插值可用于文字显示
 - **教师端**：授课教学班为单一面板内的列表行（信息 / 学期与状态 / 操作），1050px 以下两列重排；其余旧层页面后续同法迁移。
 - **登录**：品牌块（“知”标识 + 知学 + 一句话）与表单卡垂直居中；表单结构与校验未变。
 - **密度档位**：任务行 68–82px、课程卡 ≤220px、消息行 100–130px、月格 92px、教师行约 105px。超过这些值先检查是否多了重复信息，而不是加内边距。
+
+### 动效白名单（M6，2026-10-24）
+
+`styles/motion.css` 是位移/透明度微动效的唯一实现，整层包在 `prefers-reduced-motion: no-preference` 内（减少动效时零位移、零循环）；颜色与边框过渡仍由各页 `--ease` 负责。白名单之外不得出现 transform/opacity 动画，也不引入 JS 动画库：
+
+- **页面进入**：路由挂载时 `.workspace-page` 整体 280ms 上浮 8px 淡入；登录页品牌与表单卡依次进入（70ms 步进）。
+- **卡片悬停浮起**：首页任务组/右栏卡与课程卡悬停时 translateY(-2px) + 学科色描边 + `--shadow-lift`；静置卡片仍无阴影。
+- **列表入场级联**：任务组、课程网格、教师教学班行、消息行按 40ms 步进级联，第 6 项起统一 120ms，不逐条延迟。
+- **按压与 CTA**：按钮 `:active` 下沉 1px；首页主 CTA 悬停/聚焦时箭头右移 3px。
+- **未读呼吸点**：全站唯一循环动效，“未读”标记 2.4s 透明度脉动（1 → .55）。
+- 循环动效只有未读呼吸一种；列表不自动滚动、无无限动画、无视差。
 
 历次视觉调整、Git 提交及截图检查记录保存在[视觉历史](archive/UI_DESIGN_HISTORY.md)，其中旧课程网格、旧深色首页和旧字号仅属于当时版本。那些检查记录说明静态原型的历史验证，不能代替真实前后端联调验收。
 

@@ -1,0 +1,86 @@
+/* 全站微交互层：FRONTEND §9「动效白名单（M6）」的唯一实现。
+   只允许 transform ≤2px 与 opacity 的微动效，颜色/边框过渡仍由各页 --ease 负责；
+   整层包在 prefers-reduced-motion:no-preference 内，减少动效时零位移零循环。 */
+@media (prefers-reduced-motion: no-preference) {
+  /* 页面进入：路由挂载时整体轻微上浮淡入；登录页品牌与表单卡依次进入 */
+  .workspace-page { animation: m6-page-enter var(--dur-enter) var(--ease-out) backwards; }
+  .auth-page > * { animation: m6-item-enter var(--dur-enter) var(--ease-out) backwards; }
+  .auth-page > .auth-panel { animation-delay: 70ms; }
+
+  /* 卡片悬停浮起：位移 ≤2px + 学科色描边 + 浮起投影（静置卡片仍无阴影） */
+  .student-release .sr-home .bplus-task-group,
+  .student-release .sr-home .explore-courses,
+  .student-release .sr-home .explore-notes,
+  .student-release .sr-courses .vx-course-sheet {
+    transition: transform var(--dur-move) var(--ease-out),
+      box-shadow var(--dur-move) var(--ease-out),
+      border-color var(--dur-move) var(--ease-out),
+      background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+  }
+  .student-release .sr-home .bplus-task-group:hover,
+  .student-release .sr-home .explore-courses:hover,
+  .student-release .sr-home .explore-notes:hover,
+  .student-release .sr-courses .vx-course-sheet:hover {
+    transform: translateY(-2px);
+    border-color: var(--acc, var(--blue));
+    box-shadow: var(--shadow-lift);
+  }
+
+  /* 列表入场级联：前 6 项 40ms 步进，之后不再延迟 */
+  .student-release .sr-home .bplus-task-group,
+  .student-release .sr-courses .vx-course-grid > li,
+  .teacher-offering-list > li,
+  .student-release .vc-inbox .notification-list > .notification-item {
+    animation: m6-item-enter var(--dur-enter) var(--ease-out) backwards;
+  }
+  .student-release .sr-home .bplus-task-group:nth-child(2),
+  .student-release .sr-courses .vx-course-grid > li:nth-child(2),
+  .teacher-offering-list > li:nth-child(2),
+  .student-release .vc-inbox .notification-list > .notification-item:nth-child(2),
+  .student-release .sr-home .bplus-task-group:nth-child(3),
+  .student-release .sr-courses .vx-course-grid > li:nth-child(3),
+  .teacher-offering-list > li:nth-child(3),
+  .student-release .vc-inbox .notification-list > .notification-item:nth-child(3) { animation-delay: 40ms; }
+  .student-release .sr-home .bplus-task-group:nth-child(4),
+  .student-release .sr-courses .vx-course-grid > li:nth-child(4),
+  .teacher-offering-list > li:nth-child(4),
+  .student-release .vc-inbox .notification-list > .notification-item:nth-child(4),
+  .student-release .sr-home .bplus-task-group:nth-child(5),
+  .student-release .sr-courses .vx-course-grid > li:nth-child(5),
+  .teacher-offering-list > li:nth-child(5),
+  .student-release .vc-inbox .notification-list > .notification-item:nth-child(5) { animation-delay: 80ms; }
+  .student-release .sr-home .bplus-task-group:nth-child(n + 6),
+  .student-release .sr-courses .vx-course-grid > li:nth-child(n + 6),
+  .teacher-offering-list > li:nth-child(n + 6),
+  .student-release .vc-inbox .notification-list > .notification-item:nth-child(n + 6) { animation-delay: 120ms; }
+
+  /* 按压反馈与主 CTA 箭头：操作即时可感，键盘焦点同样推动箭头 */
+  .button:not(:disabled):active { transform: translateY(1px); }
+  .student-release .sr-home .focus-actions .button.primary span[aria-hidden='true'] {
+    display: inline-block;
+    transition: transform var(--dur-move) var(--ease-out);
+  }
+  .student-release .sr-home .focus-actions .button.primary:hover span[aria-hidden='true'],
+  .student-release .sr-home .focus-actions .button.primary:focus-visible span[aria-hidden='true'] {
+    transform: translateX(3px);
+  }
+
+  /* 未读呼吸点：全站唯一循环动效，只动透明度 */
+  .student-release .vc-inbox .notification-item.unread .notification-header .tag,
+  .student-release .sr-home .notice-read[data-unread='true'] {
+    animation: m6-breathe 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes m6-page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes m6-item-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes m6-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}

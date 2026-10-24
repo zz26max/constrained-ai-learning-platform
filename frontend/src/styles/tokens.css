@@ -24,6 +24,12 @@
   --red: #a93434;
   --red-soft: #fff2f0;
   --focus-ring: #1f3b84;
+  /* 学科身份：只用于学科徽章、图标与侧轨，不表示操作或链接 */
+  --subject-code: #2853bc; --subject-code-soft: #eef2fb;
+  --subject-data: #1b6b65; --subject-data-soft: #e8f3ef;
+  --subject-systems: #5a527e; --subject-systems-soft: #f0eef7;
+  --subject-explore: #805e1e; --subject-explore-soft: #faf3e4;
+  --subject-neutral: #52627a; --subject-neutral-soft: #edf1f5;
   /* 字体与字号 */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
@@ -50,6 +56,13 @@
   --radius-hero: 14px;
   --radius-button: var(--radius-control);
   --min-touch: 44px;
-  /* 动效：只用于颜色与边框 */
+  /* 动效：--ease 只用于颜色与边框；位移/透明度微动效只允许 motion.css 白名单（M6） */
   --ease: 120ms ease;
+  --ease-out: cubic-bezier(.22,.61,.36,1);
+  --dur-fast: 120ms;
+  --dur-move: 200ms;
+  --dur-enter: 280ms;
+  /* 阴影：浮层之外只有卡片悬停的浅浮起投影 */
+  --shadow-lift: 0 6px 18px #1c2d4914, 0 2px 6px #1c2d4910;
+  --shadow-card: 0 1px 2px #1c2d490d, 0 8px 28px #1c2d4912;
 }
