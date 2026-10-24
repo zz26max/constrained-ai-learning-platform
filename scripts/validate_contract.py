@@ -117,21 +117,22 @@ def check_windows_scripts():
 
 
 def check_document_index():
-    """docs/ 顶层文档必须登记在 docs/README.md 的索引表里。
+    """docs/ 顶层、features/、archive/ 的文档必须登记在 docs/README.md 的索引表或归档清单里。
 
     HANDOFF.md 曾经既不在索引表、也不在任何权限表里，于是无人维护，长期与 STATUS 冲突。
     索引表就是文档的准入清单：没登记的文件不构成权威，也不该被其他文档引用。
+    AGENTS.md 的准入规则覆盖 docs/ 全部文件，因此校验范围与规则保持一致（2026-10-24 扩展）。
     """
     index = (DOCS / 'README.md').read_text(encoding='utf-8')
     listed = {Path(target).name for target in re.findall(r'\[[^\]\n]+\]\(([^)\n#]+)', index)}
     registered = 0
-    for path in sorted(DOCS.glob('*.md')):
+    for path in sorted(list(DOCS.glob('*.md')) + list(DOCS.glob('features/*.md')) + list(DOCS.glob('archive/*.md'))):
         if path.name == 'README.md':
             continue
         check(path.name in listed,
-              f'docs/{path.name}: 未在 docs/README.md 索引表登记；新增文档必须同时登记用途与责任人')
+              f'{path.parent.name}/{path.name}: 未在 docs/README.md 索引表或归档清单登记；新增文档必须同时登记用途与责任人')
         registered += 1
-    check(registered > 0, '未发现 docs 顶层文档，该检查可能已失效')
+    check(registered > 0, '未发现 docs 文档，该检查可能已失效')
     return registered
 
 
