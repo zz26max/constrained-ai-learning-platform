@@ -12,10 +12,20 @@
 | [FRONTEND.md](FRONTEND.md) / [BACKEND.md](BACKEND.md) | 本端工程、状态、存储、事务 | 用户授权的维护任务 |
 | [DEBUGGING.md](DEBUGGING.md) | 后端断点调试与内部实现逐步指引 | 用户授权的维护任务 |
 | [openapi.yaml](openapi.yaml) | 路径、字段、类型、错误与接口实现状态 | 用户授权的维护任务 |
-| [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景；[P1 页面验收清单](features/p1-acceptance-checklist.md) 追踪"契约已实现但未在页面走过"的缺口 | 用户授权的维护任务 |
-| [archive/](archive/ARCHITECTURE_REVIEW.md) | 历史快照，**不是规范**；含已作废的 [2026-10-16 交接说明](archive/HANDOFF-2026-10-16.md) | 不修改 |
+| [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景：[P1-A 课程](features/p1a-courses.md)、[P1-D 前端 UI](features/p1d-frontend-ui.md)、[P1 页面验收清单](features/p1-acceptance-checklist.md)（追踪"契约已实现但未在页面走过"的缺口）、[学生端视觉收敛](features/student-ui-convergence.md) | 用户授权的维护任务 |
+| [archive/](archive/ARCHITECTURE_REVIEW.md) | 历史快照，**不是规范**，逐份见下方归档清单 | 不修改 |
 
-**准入规则**：本表是 `docs/` 的准入清单。新增 `docs/` 下的 Markdown 必须同时在本表登记用途与责任人；未登记的文件视为临时草稿，不构成权威，也不得被其他文档引用。历史上 `HANDOFF.md` 正是因为没进本表而长期无人维护、与 STATUS 冲突。
+**准入规则**：本表是 `docs/` 的准入清单。新增 `docs/` 下的 Markdown（含 `features/` 与 `archive/`）必须同时在本表或归档清单登记用途与责任人；未登记的文件视为临时草稿，不构成权威，也不得被其他文档引用。历史上 `HANDOFF.md` 正是因为没进本表而长期无人维护、与 STATUS 冲突。该规则由 `validate_contract.py` 对顶层、`features/`、`archive/` 三个目录强制执行。
+
+### 归档清单（archive/，历史快照，不是规范）
+
+- [2026-10-08_API.md](archive/2026-10-08_API.md)、[2026-10-08_DATA_MODEL.md](archive/2026-10-08_DATA_MODEL.md)、[2026-10-08_DEVELOPMENT.md](archive/2026-10-08_DEVELOPMENT.md)、[2026-10-08_HANDOFF_AUDIT.md](archive/2026-10-08_HANDOFF_AUDIT.md)：仓库初期的接口、数据模型与文档快照。
+- [ARCHITECTURE_REVIEW.md](archive/ARCHITECTURE_REVIEW.md)：早期架构评审。
+- [HANDOFF-2026-10-16.md](archive/HANDOFF-2026-10-16.md)：已作废的交接说明（写于 P1 尚未闭环时）。
+- [UI_DESIGN_HISTORY.md](archive/UI_DESIGN_HISTORY.md)：历次视觉调整与截图检查记录。
+- [p1d-aggregation.md](archive/p1d-aggregation.md)：已作废的 P1-D 设计稿（与契约 1.1.0 冲突，以契约为准）。
+- [frontend-DESIGN.md](archive/frontend-DESIGN.md)：学生端视觉迭代执行记录（V3.x 候选与 M1/M2 基线，现行规范已并入 FRONTEND §9）。
+- [DOC_AUDIT_2026-10-24.md](archive/DOC_AUDIT_2026-10-24.md)：外部文档只读审计报告（本轮文档治理的依据）。
 
 ## 2. 权威边界
 
