@@ -206,10 +206,8 @@ public final class AssignmentInput {
         if(!(body.get("knowledgeEvaluations") instanceof List<?> knowledge)) {
             throw invalidField("knowledgeEvaluations","必须是数组。");
         }
-        if(!knowledge.isEmpty()) throw invalidField("knowledgeEvaluations","当前版本暂不支持保存知识评价，请提交空数组。");
         if(body.containsKey("issueTags")) {
             if(!(body.get("issueTags") instanceof List<?> tags)) throw invalidField("issueTags","必须是数组。");
-            if(!tags.isEmpty()) throw invalidField("issueTags","P1 阶段问题标签只能省略或为空数组。");
         }
         if(!(body.get("rubricResults") instanceof List<?> list)||list.isEmpty()) {
             throw invalidField("rubricResults","至少包含一项评分。");

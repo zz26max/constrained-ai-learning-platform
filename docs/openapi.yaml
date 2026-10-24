@@ -912,7 +912,7 @@ paths:
       tags:
       - student
       x-phase: P1/P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: reviewed
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -1198,7 +1198,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本人，需 CSRF
       x-csrf-required: true
@@ -2707,7 +2707,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2739,7 +2739,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2787,7 +2787,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2832,7 +2832,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2865,7 +2865,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2912,7 +2912,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班授课教师
       x-csrf-required: true
@@ -2959,7 +2959,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班学生或授课教师
       x-csrf-required: false
@@ -2992,7 +2992,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班成员
       x-csrf-required: false
@@ -3025,7 +3025,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班学生本人
       x-csrf-required: false
@@ -3067,7 +3067,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
@@ -3110,7 +3110,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 会话本人
       x-csrf-required: false
@@ -3151,7 +3151,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 会话本人，需 CSRF
       x-csrf-required: true
@@ -3200,7 +3200,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 请求本人
       x-csrf-required: false
@@ -3233,7 +3233,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本班学生，需 CSRF
       x-csrf-required: true
@@ -3276,7 +3276,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本人
       x-csrf-required: false
@@ -3321,7 +3321,7 @@ paths:
       tags:
       - student
       x-phase: P2
-      x-implementation-status: planned
+      x-implementation-status: implemented
       x-contract-status: draft
       x-permission: 本人
       x-csrf-required: false

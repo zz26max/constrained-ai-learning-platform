@@ -57,7 +57,7 @@ if (-not (Test-Path -LiteralPath $localConfigPath)) {
 
 # 显式解析 KEY=value，不执行文本；保留密码两端的空格，不支持引号或插值语法。
 $accountKeys = @('LOCAL_STUDENT_PASSWORD', 'LOCAL_TEACHER_PASSWORD', 'LOCAL_ADMIN_PASSWORD')
-$optionalKeys = @('AUTH_PRE_LOGIN_SIGNING_KEY', 'AUTH_ALLOWED_ORIGINS', 'AUTH_COOKIE_SECURE', 'AUTH_INVITE_SIGNING_KEY')
+$optionalKeys = @('AUTH_PRE_LOGIN_SIGNING_KEY', 'AUTH_ALLOWED_ORIGINS', 'AUTH_COOKIE_SECURE', 'AUTH_INVITE_SIGNING_KEY', 'AI_EXTERNAL_ENABLED', 'AI_DATA_APPROVED', 'AI_PROVIDER_ENDPOINT', 'AI_PROVIDER_KEY', 'AI_PROVIDER_MODEL', 'AI_WORKER_ENABLED', 'AI_RETENTION_CLEANUP_ENABLED')
 $requiredKeys = @('SPRING_PROFILES_ACTIVE', 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'MYSQL_ROOT_PASSWORD')
 $allowedKeys = $requiredKeys + $accountKeys + $optionalKeys
 $configValues = @{}
@@ -82,7 +82,7 @@ try {
     # 邀请码摘要需要稳定密钥：缺失时只生成一次并保存在忽略的 .env，重启不轮换。
     if ([string]::IsNullOrWhiteSpace($configValues['AUTH_INVITE_SIGNING_KEY'])) {
         $signingKey = New-LocalPassword
-        if ($configValues.ContainsKey('AUTH_INVITE_SIGNING_KEY')) {
+        if ($configValues.ContainsKey('AUTH_INVITE_SIGNING_KEY', 'AI_EXTERNAL_ENABLED', 'AI_DATA_APPROVED', 'AI_PROVIDER_ENDPOINT', 'AI_PROVIDER_KEY', 'AI_PROVIDER_MODEL', 'AI_WORKER_ENABLED', 'AI_RETENTION_CLEANUP_ENABLED')) {
             $configText = $configText -replace '(?m)^AUTH_INVITE_SIGNING_KEY=[^\r\n]*', ('AUTH_INVITE_SIGNING_KEY=' + $signingKey)
         } else {
             $configText = $configText.TrimEnd("`r", "`n") + "`r`nAUTH_INVITE_SIGNING_KEY=" + $signingKey + "`r`n"

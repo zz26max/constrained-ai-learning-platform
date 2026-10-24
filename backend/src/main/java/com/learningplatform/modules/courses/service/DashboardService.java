@@ -34,10 +34,12 @@ public class DashboardService {
     private final CourseLearningQuery learning;
     private final AssignmentService assignments;
     private final Clock clock;
+    private final com.learningplatform.modules.analytics.service.KnowledgeService knowledge;
     public DashboardService(AssignmentMapper mapper,CourseMapper courseMapper,TermMapper termMapper,CourseAccess access,
-            CourseLearningQuery learning,AssignmentService assignments,Clock clock) {
+            CourseLearningQuery learning,AssignmentService assignments,Clock clock,
+            com.learningplatform.modules.analytics.service.KnowledgeService knowledge) {
         this.mapper=mapper;this.courseMapper=courseMapper;this.termMapper=termMapper;this.access=access;
-        this.learning=learning;this.assignments=assignments;this.clock=clock;
+        this.learning=learning;this.assignments=assignments;this.clock=clock;this.knowledge=knowledge;
     }
     private Instant now() { return clock.instant().truncatedTo(ChronoUnit.MICROS); }
     /** 未传 termId 取当前学期；无当前学期时返回空首页（学期为 null）。非法 UUID 422，不存在的学期 404。 */
@@ -123,9 +125,10 @@ public class DashboardService {
         List<String> recentIds=mapper.listPublishedFeedbackIds(studentId,offeringId,null,1);
         StudentFeedbackViewDTO recent=recentIds.isEmpty()?null:assignments.getFeedback(user,recentIds.get(0));
         int total=mapper.countPublishedFeedback(studentId,offeringId,null);
-        LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,null);
+        var analysis=knowledge.analyze(studentId,offeringId);
+        LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,analysis.needsPracticeCount());
         return new LearningRecordsDTO(offeringId,summary,recent,
-                new FeedbackPage(items,page,pageSize,total),List.of(),null);
+                new FeedbackPage(items,page,pageSize,total),analysis.assessments(),analysis.recommendation());
     }
     /** 只更新本人、该班、可选 type 范围内的未读消息；重复调用幂等（已读行不再改写 readAt）。 */
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)

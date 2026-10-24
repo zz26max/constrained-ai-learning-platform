@@ -16,13 +16,16 @@ public class TeacherStatsService {
     private final CourseMapper courseMapper;
     private final CourseAccess access;
     private final AssignmentService assignments;
-    public TeacherStatsService(AssignmentMapper mapper,CourseMapper courseMapper,CourseAccess access,AssignmentService assignments) {
-        this.mapper=mapper;this.courseMapper=courseMapper;this.access=access;this.assignments=assignments;
+    private final com.learningplatform.modules.analytics.service.KnowledgeService knowledge;
+    public TeacherStatsService(AssignmentMapper mapper,CourseMapper courseMapper,CourseAccess access,AssignmentService assignments,
+            com.learningplatform.modules.analytics.service.KnowledgeService knowledge) {
+        this.mapper=mapper;this.courseMapper=courseMapper;this.access=access;this.assignments=assignments;this.knowledge=knowledge;
     }
     @Transactional(readOnly=true)
     public OfferingStatsDTO getOfferingStats(String offeringId,UserDTO user) {
         access.requireTeacher(user,AssignmentInput.uuid(offeringId),false);
-        return mapper.getOfferingStats(offeringId);
+        var row=mapper.getOfferingStats(offeringId);
+        return new OfferingStatsDTO(row.studentCount(),row.activeAssignmentCount(),row.pendingReviewCount(),knowledge.pendingHelp(offeringId));
     }
     /** 作业不存在或不属于本人任教班级统一 404。 */
     @Transactional(readOnly=true)
@@ -34,7 +37,7 @@ public class TeacherStatsService {
         AssignmentStatsRow row=mapper.getAssignmentStats(assignmentId);
         // commonIssues：P1 没有求助/检查数据来源，契约允许空数组。
         return new AssignmentStatsDTO(row.studentCount(),row.submittedStudentCount(),row.pendingReviewCount(),
-                row.reviewedStudentCount(),List.of());
+                row.reviewedStudentCount(),knowledge.commonIssues(assignmentId,assignment.offeringId()));
     }
     /** 目标必须是本班 active 学生，否则 404；评价为已发布评价的教师视图，分页，其余字段与学生端同一份数据。 */
     @Transactional(readOnly=true)
@@ -52,8 +55,9 @@ public class TeacherStatsService {
         TeacherFeedbackDTO recent=page==1?(items.isEmpty()?null:items.get(0))
                 :mapper.listPublishedFeedbackIdsPage(studentId,offeringId,null,0,1).stream()
                         .map(assignments::teacherFeedbackById).findFirst().orElse(null);
-        LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,null);
+        var analysis=knowledge.analyze(studentId,offeringId);
+        LearningSummary summary=new LearningSummary(mapper.countCompletedLabs(offeringId,studentId),total,analysis.needsPracticeCount());
         return new TeacherLearningRecordsDTO(offeringId,summary,recent,new TeacherFeedbackPage(items,page,pageSize,total),
-                List.of(),null,student);
+                analysis.assessments(),analysis.recommendation(),student);
     }
 }
