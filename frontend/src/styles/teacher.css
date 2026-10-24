@@ -17,13 +17,19 @@
 .teacher-offering-list,.teacher-member-list,.teacher-invite-list,.teacher-knowledge-list,.teacher-chapter-list,.teacher-resource-list{list-style:none;margin:0;padding:0}
 .teacher-notice-list{list-style:none;margin:0;padding:0}.teacher-notice-list>li{padding:20px 26px}.teacher-notice-list>li+li{border-top:1px solid var(--line)}.teacher-notice-list h3{font-size:17px;margin:0 0 4px}.teacher-notice-list .teacher-text{margin:12px 0 0}.teacher-notice-composer{padding:22px 26px;margin-bottom:20px}.teacher-notice-composer form{display:grid;gap:16px}.teacher-notice-composer label{display:grid;gap:6px;font-size:13px;color:var(--muted)}.teacher-notice-composer input,.teacher-notice-composer textarea,.teacher-notice-composer select{width:100%;min-height:44px;padding:9px 12px;border:1px solid #8993a0;border-radius:var(--radius-button);background:var(--surface);color:var(--ink);font:inherit;font-size:14px}.teacher-notice-composer textarea{resize:vertical;line-height:1.7}
 .teacher-offering-list>li+li,.teacher-member-list>li+li,.teacher-invite-list>li+li,.teacher-knowledge-list>li+li,.teacher-chapter-list>li+li,.teacher-resource-list>li+li{border-top:1px solid var(--line)}
-.teacher-offering-row{display:grid;grid-template-columns:minmax(0,1fr) 200px 140px;align-items:center;gap:28px;padding:22px 26px}
-.teacher-mark{font:700 11px Consolas,monospace;letter-spacing:.04em;color:var(--muted)}
-.teacher-offering-row h2{font-size:20px;font-weight:600;margin:5px 0 3px;line-height:1.5}
+/* 列表行悬停统一浅沉底，与课堂行密度保持一致；章节列表由其内部按钮自管 */
+.teacher-offering-list>li,.teacher-member-list>li,.teacher-invite-list>li,.teacher-knowledge-list>li{transition:background-color var(--dur-fast) ease}
+.teacher-offering-list>li:hover,.teacher-member-list>li:hover,.teacher-invite-list>li:hover,.teacher-knowledge-list>li:hover{background:var(--sunken)}
+.teacher-offering-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px 24px;padding:22px 26px;transition:background-color var(--dur-fast) ease}
+.teacher-offering-row:hover{background:var(--sunken)}
+/* 课程代码徽章：从裸等宽字改为品牌浅底章，行首即有视觉锚点 */
+.teacher-mark{display:inline-block;padding:1px 8px;border-radius:var(--radius-control);background:var(--blue-soft);color:var(--blue-text);font:700 11px/1.7 Consolas,monospace;letter-spacing:.04em}
+.teacher-offering-row h2{font-size:20px;font-weight:600;margin:6px 0 3px;line-height:1.5}
 .teacher-offering-row h2 a{color:inherit;text-decoration:none}
 .teacher-offering-row h2 a:hover{color:var(--blue-text);text-decoration:underline}
 .teacher-offering-row p{font-size:13px;color:var(--muted);margin:0;overflow-wrap:anywhere}
-.teacher-offering-context{display:flex;flex-direction:column;align-items:flex-start;gap:9px;font-size:13px;color:var(--muted)}
+/* 学期与状态同一行，消除行中部断裂带；学期作为辅助信息弱化 */
+.teacher-offering-context{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .teacher-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;font-size:12px;color:var(--muted)}
 .teacher-pagination>div{display:flex;gap:8px}
 .teacher-pagination .button{font-size:13px;padding:8px 14px}

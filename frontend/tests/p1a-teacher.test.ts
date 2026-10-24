@@ -299,15 +299,16 @@ describe('P1-A 教师写路径', () => {
     expect(postRequests('createChapter')).toHaveLength(2)
   })
 
-  it('分页最后一页与 total=0 正确禁用翻页', async () => {
+  it('多页翻页到最后一页禁用，单页与 total=0 隐藏翻页', async () => {
     invite = { id: createdInviteId, expiresAt: '2099-01-01T00:00:00Z', maxUses: 2, usedCount: 0, revokedAt: null, createdAt: '2026-10-14T02:00:00Z' }
     setHandler(request => request.operationId === 'listInvites'
-      ? okEnvelope({ items: request.path.includes('page=2') ? [] : [invite], page: request.path.includes('page=2') ? 2 : 1, pageSize: 1, total: request.path.includes('page=2') ? 1 : 1 })
+      ? okEnvelope({ items: request.path.includes('page=2') ? [] : [invite], page: request.path.includes('page=2') ? 2 : 1, pageSize: 1, total: 2 })
       : normalResponse(request))
     const rendered = await openOffering()
     await buttonNamed(rendered, '邀请码').trigger('click')
     await flushPromises()
     const next = buttonNamed(rendered, '下一页')
+    expect(next.attributes('disabled')).toBeUndefined()
     await next.trigger('click')
     await flushPromises()
     expect(next.attributes('disabled')).toBeDefined()
@@ -319,7 +320,7 @@ describe('P1-A 教师写路径', () => {
     await flushPromises()
     await buttonNamed(rendered, '邀请码').trigger('click')
     await flushPromises()
-    expect(buttonNamed(rendered, '上一页').attributes('disabled')).toBeDefined()
-    expect(buttonNamed(rendered, '下一页').attributes('disabled')).toBeDefined()
+    expect(rendered.findAll('button').find(item => item.text() === '上一页')).toBeUndefined()
+    expect(rendered.findAll('button').find(item => item.text() === '下一页')).toBeUndefined()
   })
 })
