@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：本块第一个哈希 `d120a81` 为最近一次基线回填（2026-10-24 三轮文档审计收口后），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除，本地与远端无其他分支）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后均为文档、校验脚本与死规则清理提交，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
+- **代码基线**：本块第一个哈希 `7c4a8e6` 为最近一次基线回填（2026-10-24 UI 打磨第二轮收口后），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除，本地与远端无其他分支）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交与两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互，未触契约与后端），逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导、学习行为分析，契约 17 个操作）与 P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始**，契约中对应操作仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
 - **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
 
-- **门禁现状**（2026-10-24 实测）：前端 `npm --prefix frontend run verify` 通过（31 个测试文件 / 286 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、顶层/features/archive 三目录登记与链接全可达）。
+- **门禁现状**（2026-10-24 实测，UI 打磨第二轮后复跑）：前端 `npm --prefix frontend run verify` 通过（32 个测试文件 / 289 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑；本轮仅改前端与文档，未复跑后端）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、顶层/features/archive 三目录登记与链接全可达）。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **前端 UI 打磨第二轮（动效白名单 M6 与全站微交互）**（2026-10-24，`master`，基于 `4a616f6`，三笔提交 `3653c04`/`555a42f`/`7c4a8e6`）：应用户"干净舒适、流畅交互动画、少文字多布局"诉求，基于 8 屏截图的视觉模型审查（登录/首页/课程/作业/消息/记录/教师工作台/班详情）定位三个系统性缺失——色彩单薄（学科色未用足）、信息靠文字硬扛、交互静态化（§9 旧条款"动效只用于颜色与边框"锁死）。① `3653c04`：tokens 新增 `--ease-out`/`--dur-fast/move/enter`、`--shadow-lift/card` 与五组 `--subject-*` 学科色令牌；新建 `styles/motion.css` 作为 M6 动效白名单唯一实现（页面进入 280ms 上浮淡入、卡片悬停 ≤2px 浮起+学科色描边、列表前 6 项 40ms 级联、按钮 :active 下沉、首页 CTA 箭头右移、未读点 2.4s 透明度呼吸——唯一循环动效），整层包在 `prefers-reduced-motion:no-preference` 内，零 JS 依赖；FRONTEND §9 增补 M6 小节并同步 M1 表与分层冻结条款。② `555a42f`：首页概览改三枚指标章（22px 数字）、焦点卡右上光晕、未读胶囊、反馈分数衬线；release.css 学科色迁移令牌；消息页类型色编码（公告蓝/作业橙/评价绿/系统灰）+ 未读三件套（3px 品牌侧线+浅蓝底+白底胶囊）+ 标读 200ms 过渡回收，选择器带 `.vc-page` 压过冻结层 content.css 同特异性规则（实测中被其 #fafbfe/2px#6a8bd0 覆盖后修正）；§9 M5 消息行同步。③ `7c4a8e6`：教师端课程代码徽章化、学期与状态同行消除断裂带、四类列表行悬停浅沉底；TeacherPagination 单页隐藏翻页（`p1a-teacher.test.ts` 改写为多页禁用边界+单页隐藏断言）；登录页品牌光晕+表单卡静置投影（M6 唯一 surface 投影例外）。检查：`npm run test` 32 文件 289 用例全过、`npm run build` 通过；mock 4175 实测——登录/教师/消息三页截图经视觉模型审读正面（无布局破损），首页/课程以计算样式证明（指标章边框 10px 圆角、光晕 radial-gradient、学科色 topline rgb(40,83,188)、卡片 transition+animation 命中、未读行 rgb(238,242,251)+3px rgb(40,83,188)、白底胶囊）。未做：教师端跨班统计带（无聚合接口且会触发 N+1，需后端支持）；消息筛选切换的跨淡入（列表重挂载已有级联，容器级过渡待 P2）；一次"无权访问"截图与会话中断为 mock 会话中间态假象，已用新鲜会话复测排除。
 
 - **前端 UI 打磨第一轮（本地组件库复用评估与 ARIA tabs）**（2026-10-24，`master`，基于 `d120a81`）：按用户指派对本地组件库（四个 MIT React 库快照：shadcn-ui/motion-primitives/kibo-ui/magic-ui，`curated/` 为空模板）做只读评估后实施。① 移植 shadcn tabs 的 WAI-ARIA 键盘模式为零依赖纯函数 `frontend/src/components/tabs.ts`（roving tabindex、方向键/Home/End、激活即聚焦），工作区文件切换由 nav+aria-current 升级为 role=tablist/tab/tabpanel 并以 aria-labelledby 关联编辑面板，视觉零变化（teacher.css 选中态选择器同步 aria-selected）；新增 `tests/tab-keyboard.test.ts` 3 项。② Toast（sonner 模式）经逐场景核查**不引入**：公告发布走 ActionNotice 常驻、归档以页面只读态变化为反馈、批阅队列发布后界面切换即反馈且跳过/失败有 queueMessage、保存为行内 role=status——行内反馈体系完整，强行引入违背"先找真问题"原则（React 库亦无法直接复用，仅可移植模式）。③ 会话消息流（shadcn v4 message-scroller 模式）推迟至 P2 辅导界面开工时移植。④ 管理端确认无独立 UI（设计如此：无接口支持的管理功能不提供入口），本轮壳层改进对全部角色生效。检查：`npm --prefix frontend run verify` 通过（32 文件 289 用例，含 typecheck/build/no-mock）。未做：组件来源记录未沉淀到用户个人 curated/ 库（属用户库，待用户操作）；FRONTEND §9"实验室以页签切换任务、代码和预览"与当前实现（文件 tabs + 手动预览按钮）的对应关系待下次前端维护确认。
 
