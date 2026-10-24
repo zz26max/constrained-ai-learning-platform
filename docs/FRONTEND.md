@@ -96,7 +96,7 @@ frontend/
 | `/teacher/assignments/{id}` | 作业编辑与提交列表，P1；2026-10-24 起已发布作业内嵌 AI 政策配置（P2，mock 先行） | `/teacher/assignments/{id}`、提交列表、`/teacher/assignments/{id}/ai-policy`（乐观锁 baseVersion，平台固定项只读展示） |
 | `/teacher/submissions/{submissionId}/feedback` | 批阅，P1 | 提交快照、学生信息、草稿评价；保存 draft 后显式发布 |
 | `/teacher/help-requests/{id}` | 求助处理，P2（mock 先行） | 教师求助详情（含学生身份、共享快照与 AI 片段）、回复（生成 help_reply 消息）与关闭（重复关闭幂等）；列表入口在教学班工作台"学生求助"页签（`/teacher/offerings/{offeringId}/help-requests`，状态筛选/分页） |
-| `/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2 | `/teacher/offerings/{id}/students/{studentId}/learning-records` |
+| `/teacher/offerings/{id}/students/{studentId}/progress` | 学生学习记录，P2（2026-10-24 起并行开发，mock 先行；接口为 P1 已实现操作） | 概览计数、knowledge-v2 知识点掌握与证据、下一步建议、评价历史分页；入口在教学班工作台"班级成员"页的学生行 |
 
 `/student/progress` 等无上下文入口先提供教学班选择，不能隐式固定 Web 课程。章节恢复采用服务器持久化指针和回退规则；浏览器缓存只改善加载速度，不成为唯一恢复来源。
 
