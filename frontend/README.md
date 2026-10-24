@@ -24,8 +24,6 @@ npm run verify         # typecheck + build + check:no-mock + test
 npm run test:browser:real   # 真实服务已启动时，创建独立验收班走三类作业闭环
 npm run test:browser:boundaries # 主流程脚本成功后，使用其验收班验证冲突/网络/会话/归档等边界
 npm run test:browser:student # 真实学生现有数据：筛选分页、六页面及1440/1024/320/375/430视口，无新增样例
-npm run test:browser:home-design # 首页A/B同源数据、零切换请求、真实主任务跳转和六视口截图
-npm run test:browser:home-bplus # B+日期分组、真实章节语义、首屏操作和滚动遮挡，生成B/B+同数据截图
 ```
 
 ## mock 模式
