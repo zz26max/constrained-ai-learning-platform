@@ -26,6 +26,7 @@
 - [p1d-aggregation.md](archive/p1d-aggregation.md)：已作废的 P1-D 设计稿（与契约 1.1.0 冲突，以契约为准）。
 - [frontend-DESIGN.md](archive/frontend-DESIGN.md)：学生端视觉迭代执行记录（V3.x 候选与 M1/M2 基线，现行规范已并入 FRONTEND §9）。
 - [DOC_AUDIT_2026-10-24.md](archive/DOC_AUDIT_2026-10-24.md)：外部文档只读审计报告（本轮文档治理的依据）。
+- 学生端交付报告：[V3](archive/V3-DELIVERY.md)、[V3.1](archive/V3.1-DELIVERY.md)、[V3.2](archive/V3.2-DELIVERY.md)、[V3.3](archive/V3.3-DELIVERY.md)（含[学生测试模板](archive/V3.3-STUDENT-TEST.md)）、[V3.4](archive/V3.4-DELIVERY.md)、[V3.4.1](archive/V3.4.1-DELIVERY.md)、[V3.5](archive/V3.5-DELIVERY.md)、[V3.6](archive/V3.6-DELIVERY.md)、[V3.6.1](archive/V3.6.1-DELIVERY.md)，以及[内容层次精修](archive/CONTENT-POLISH-DELIVERY.md)与[正式版交付](archive/STUDENT-RELEASE-DELIVERY.md)。
 
 ## 2. 权威边界
 
