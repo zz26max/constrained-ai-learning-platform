@@ -8,9 +8,9 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：本块第一个哈希 `33e1052` 为最近一次基线回填（2026-10-24 P2-A 教师端求助处理收口），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。开发分支 `frontend/p2`（P2 前端，2026-10-24 起，自 `2c5329e` 切出，已含 P2-A 学生端与教师端求助 mock 并行开发）；主干 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交与两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互，未触契约与后端），逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
+- **代码基线**：本块第一个哈希 `3e67bc2` 为最近一次基线回填（2026-10-24 P2-A 教师 AI 政策配置收口），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。开发分支 `frontend/p2`（P2 前端，2026-10-24 起，自 `2c5329e` 切出，已含 P2-A 全部 UI 的 mock 并行开发）；主干 `master`（`frontend/ui-audit-p1` 已于 2026-10-24 合流后删除）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交与两轮纯前端 UI 打磨（`4a616f6` ARIA tabs 键盘模式；`3653c04`/`555a42f`/`7c4a8e6` 动效白名单 M6 与全站微交互，未触契约与后端），逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
 
-- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支开工（2026-10-24）：P2-A 学生端（AI 辅导主链路 `65a37d6`、教师求助流 `be9519e`）与教师端求助处理（`33e1052`）完成 mock 并行开发，求助 help_reply 消息闭环已通；剩余：教师 AI 政策配置 UI、后端实现与真实联调**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
+- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支完成 P2-A 全部 UI（mock 并行开发，用户明确本分支只做 UI）：学生 AI 辅导主链路（`65a37d6`）、学生求助流（`be9519e`）、教师求助处理与 help_reply 消息闭环（`33e1052`）、教师 AI 政策配置（`3e67bc2`，政策按作业可变、教师改动学生侧即时生效）；剩余为后端实现与真实联调**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
 
 - **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
 
@@ -87,6 +87,8 @@
 
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **P2-A 收口：教师 AI 政策配置 UI（mock 并行开发）**（2026-10-24，`frontend/p2`，`3e67bc2`，用户明确该分支只完成 UI）：mock 政策从常量重构为按作业可变 Map，新增 getTeacherAiPolicy/updateAiPolicy——baseVersion 乐观锁（409 AI_POLICY_VERSION_CONFLICT）、平台固定项（restrictCompleteSolution=true/allowCodeBlocks=false）拒改、enabled 需非空动作与模式、班内上限（dailyAssignmentLimit≤12/maxOutputTokens≤800）与平台只读项（dailyUserLimit 30/perMinuteLimit 3 回传校验），成功版本+1；sendTutoringMessage 补政策检查（未启用 409 AI_DISABLED、动作越权 422），层次上限与尝试阈值改读按作业政策，教师改动学生侧即时生效。TeacherAiPolicyPanel 内嵌已发布作业编辑页（草稿显示"发布后配置"），含 409 冲突自动重读；FRONTEND §4 教师作业行注明。检查：`npm run verify` 通过（36 文件 322 用例，新增 teacher-policy 7 例含三个师生联动用例）；mock 4175 实测保存后版本 1→2。未做：超上限前端即时禁写（依赖服务端 422 回显）；真实后端——P2-A 前端 UI 至此全部完成，剩余后端实现与联调。
 
 - **P2-A 续：教师端求助处理（mock 并行开发）**（2026-10-24，`frontend/p2`，`33e1052`）：mock 新增教师四操作——列表（按班过滤+学生身份+status 筛选）、详情（学生身份/共享快照/AI 片段/回复）、回复（1..8000 校验、已关闭 409 HELP_REQUEST_CLOSED、转 answered、复用 feedback mock 的 addMockMessage 向学生生成 help_reply 消息且 target={type:help_request} 指向求助详情）、关闭（重复关闭按契约描述幂等返回原状态与时间）。UI：TeacherHelpPanel（教学班工作台新增"学生求助"页签，状态筛选/待处理计数/分页）、TeacherHelpRequestPage（/teacher/help-requests/:id，回复表单+两步关闭确认，已关闭只读）；FRONTEND §4 教师行更新为 mock 先行并注明列表入口。另：用户询问教师端 AI 助手形态，答复确认契约中教师侧仅有政策读/配（无教师对话入口），"教师 AI 助手"若立项需先改契约，输出侧可宽松、学生数据出系统需显式选择、成绩结论保持人工的三条边界建议已给出，未写入文档（待用户另行决策）。检查：`npm run verify` 通过（35 文件 315 用例，新增 teacher-help 7 例）；mock 4175 实测工作台页签列表与回复落盘。未做：help_reply 消息学生端浏览器截图对照（单元测试已断言消息与 target；实测发现 mock 内存态随整页 reload 重建，属 mock 生命周期预期行为，已在提交说明）；教师 AI 政策配置 UI；真实后端。
 
