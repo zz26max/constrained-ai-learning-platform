@@ -20,7 +20,7 @@
 | [后端调试指引](docs/DEBUGGING.md) | IDEA 断点、JUnit 6 兼容性、认证内部实现逐步调试 |
 | [接口契约](docs/openapi.yaml) | 两端共用的接口结构、错误、权限和实现状态 |
 | [前端工程说明](frontend/README.md) | 前端工具链、命令、mock 模式与代理 |
-| [P1-A 设计](docs/features/p1a-courses.md) / [P1-D 设计](docs/features/p1d-aggregation.md) | 已交付工作包的设计与验收场景 |
+| [P1-A 设计](docs/features/p1a-courses.md) / [P1-D 前端 UI 设计](docs/features/p1d-frontend-ui.md) | 已交付工作包的设计与验收场景 |
 | [历史归档](docs/archive/ARCHITECTURE_REVIEW.md) | 早期文档快照，不是规范 |
 
 ## 快速开始

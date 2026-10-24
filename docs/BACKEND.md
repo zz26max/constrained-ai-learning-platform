@@ -1,6 +1,6 @@
 # 后端开发手册
 
-基线：1.1.0。当前实现进度见 [STATUS](STATUS.md)。
+基线：1.1.1。当前实现进度见 [STATUS](STATUS.md)。
 
 先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、事务和保留约定。当前阶段、未决事项与待修复问题见 [STATUS §0](STATUS.md)。
 

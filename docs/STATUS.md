@@ -23,8 +23,8 @@
 - **学生端内容层次精修**（2026-10-20）：基于`145d26a`，保留主布局/深蓝焦点；近期任务按北京自然日轨道成组且逐项保留时刻，作业日期/状态分层，消息极浅未读与末尾时间操作；课程进度、评价历史、日历日程复用同一正式样式层。31文件284项回归、最终构建/生产隔离通过；修改前后各42个七档视口检查、14个只读交互检查通过，业务写请求0，课程/作业/消息对照字段一致；旧V3.6设计64项通过。未改既有夹具源、演示/真实业务数据、后端/契约/教师页面。额外路径分隔线经截图复核撤回；本地开发服务样式空500经重启恢复。证据frontend/.cache/student-content-polish；报告frontend/CONTENT-POLISH-DELIVERY.md；根目录临时截图_内容层次精修含当前12/重点对照12/局部2/视口交互3及HTML索引，已交付。此条依据实际差异与执行结果更新现状。
 - **学生端视觉收敛**（2026-10-20，未提交）：基于`bf924b5`，首页/课程/作业脱离历史版本样式层，唯一来源`frontend/src/features/student/release/release.css`（根类sr-home/sr-courses/sr-tasks，仅student-release生效）；统一变量、三档圆角、去重复文字与↗、作业固定列宽与过期分组暖色、课程单页不显示分页、手机只留底部“更多”。记录/日历/消息/demo不变，未删文件。p1d-ui第300行`.vc-home`断言改为`.sr-home`。verify 31文件284项通过；模拟数据预览1440/375检查三页，修正旧全局规则`.task-table-row time::before`及日期栅格继承。模拟数据无待办，焦点卡日期与分组任务流未在预览中目视确认。方案docs/features/student-ui-convergence.md，规范DESIGN.md末节。
 - **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2（受限式 AI 辅导）、P3（学习行为分析）尚未开始**，契约中对应操作仍为 `planned`。
-- **契约状态**：83 个业务操作 + 2 个健康检查；截至 2026-10-18 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
-- **门禁现状**（2026-10-20）：本轮前端 `npm --prefix frontend run verify` 通过，31 个测试文件 / 284 个用例，包含类型/构建/生产无mock与独立演示检查；`scripts/validate_contract.py` 通过。后端代码本轮未改，沿用此前完整复跑结果：**BUILD SUCCESS**，384 个单元/HTTP 测试 + 206 个 Testcontainers 真实 MySQL 集成测试，0 failure/error/skipped（4:17），不宣称本轮重跑Maven。
+- **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
+- **门禁现状**（2026-10-24 实测）：前端 `npm --prefix frontend run verify` 通过（31 个测试文件 / 286 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、121 链接）。
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，见本节顶部条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
   2. 此前补充的慢网络、会话失效、作业归档只读真实浏览器证据，不将作业归档证据等同于公告归档验证。
@@ -45,7 +45,7 @@
 
 ### 0.1 接手前必读
 
-- 端口：MySQL 3307（Docker，Flyway V9）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
+- 端口：MySQL 3307（Docker，Flyway 到 V10）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
 - 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
 - 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
 - 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
@@ -107,8 +107,6 @@
 - **P1-D**（master `9e594a6`）：9 个多班聚合操作为 implemented，Flyway V8 建表。包含学生仪表盘、学习记录、批量标记消息已读、公告系统（教师创建与学生查看）、教师统计（班级概览、作业统计、学生学习记录）；前端包含 API 客户端层（dashboard.ts、notices.ts、stats.ts），UI 组件待补充。
 
 契约 83 个业务操作与 2 个健康检查：截至 2026-10-18，53 个为 implemented、10 个为 verified、22 个为 planned。本行只是时间点快照，权威状态以 OpenAPI `x-implementation-status` 为准。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），P1 闭环验收见 §3.8。P2/P3 功能尚未实现。
-
-<a id="handoff"></a>
 
 ## 2. 交接说明（2026-10-15）
 
