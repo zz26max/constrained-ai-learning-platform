@@ -34,18 +34,16 @@ beforeEach(() => {
 })
 
 describe('P1-A 路由守卫', () => {
-  it('仅固定首页方案可带查询恢复，外域与额外参数仍被拒绝',async()=>{
-    expect(isInternalPath('/student/home?design=a')).toBe(true)
-    expect(isInternalPath('/student/home?design=b')).toBe(true)
-    expect(isInternalPath('/student/home?design=bplus')).toBe(true)
-    expect(isInternalPath('/student/home?design=current')).toBe(true)
-    for(const path of ['https://example.com','//example.com','/student/home?design=a&return=//example.com','/student/home?design=https://example.com'])expect(isInternalPath(path)).toBe(false)
+  it('返回路径只接受站内无查询路径，外域与查询参数均被拒绝',async()=>{
+    expect(isInternalPath('/student/home')).toBe(true)
+    expect(isInternalPath('/student/assignments')).toBe(true)
+    for(const path of ['https://example.com','//example.com','/student/home?design=a','/student/home?design=bplus','/student/home?design=a&return=//example.com','/student/home?design=https://example.com'])expect(isInternalPath(path)).toBe(false)
     useAuthStore().$patch({phase:'anonymous',bootStatus:'success'})
-    const router=await newRouter('/student/home?design=b')
+    const router=await newRouter('/student/assignments')
     expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.return).toBe('/student/home?design=b')
+    expect(router.currentRoute.value.query.return).toBe('/student/assignments')
     setAuthenticated('teacher')
-    await router.push('/student/home?design=a')
+    await router.push('/student/home')
     expect(router.currentRoute.value.name).toBe('access-denied')
   })
   it('学生访问教师路由落到 access-denied', async () => {

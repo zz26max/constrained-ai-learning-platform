@@ -37,8 +37,9 @@ declare module 'vue-router' {
 
 /** 站内返回路径只接受同应用内部路由，不把外部输入当跳转目标。 */
 export function isInternalPath(value: string): boolean {
-  // 仅允许固定首页方案恢复；不放宽任意查询参数或外部返回地址。
-  return /^\/(?!\/)[A-Za-z0-9\-._~/]*$/.test(value) || /^\/student\/home\?design=(?:a|b|bplus|current)$/.test(value)
+  // design 首页方案参数已随 V3.6.1 正式采纳从路由移除（正式首页组件不消费该参数），
+  // 返回路径不再放行任何查询参数或外部地址。
+  return /^\/(?!\/)[A-Za-z0-9\-._~/]*$/.test(value)
 }
 
 export function defaultEntry(user: components['schemas']['UserDTO'] | null): string {
