@@ -56,6 +56,9 @@ auth:
     allowed-origins: ${AUTH_ALLOWED_ORIGINS:http://127.0.0.1:4173,http://localhost:4173}
     # 生产 HTTPS 环境设为 true，Cookie 加 Secure；本地 HTTP 保持 false。
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+  invite:
+    # 邀请码 HMAC 签名密钥；缺失或不足 32 字节时启动失败。
+    signing-key: ${AUTH_INVITE_SIGNING_KEY:}
   login-rate-limit:
     # 同一“用户名+IP”组合的失败登录窗口与上限；成功登录清除计数。
     window: PT5M

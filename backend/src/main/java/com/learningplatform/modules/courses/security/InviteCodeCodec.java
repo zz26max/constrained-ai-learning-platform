@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 public class InviteCodeCodec {
     private final byte[] key;
     private final SecureRandom random=new SecureRandom();
-    public InviteCodeCodec(@Value("${AUTH_INVITE_SIGNING_KEY:}") String secret) {
+    public InviteCodeCodec(@Value("${auth.invite.signing-key:}") String secret) {
         key=secret.getBytes(StandardCharsets.UTF_8);
         if(key.length<32) throw new IllegalArgumentException("请配置至少32字节的 AUTH_INVITE_SIGNING_KEY");
     }
