@@ -57,7 +57,7 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 - 数据库基线为 **MySQL 8.4 LTS / InnoDB**；服务端使用 Spring Boot。所有表显式声明 `ENGINE=InnoDB`，正文使用 `utf8mb4`；不混用其他数据库的 SQL 语法。
 - 主键 `id` 使用应用生成的规范小写 UUID；API 用字符串，字段 camelCase；数据库字段 snake_case。首版统一 `CHAR(36) CHARACTER SET ascii COLLATE ascii_bin`，所有 UUID 外键同型、同字符集、同排序规则；不在首版夹杂整数 ID 或二进制 UUID 映射。
-- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 按契约统一使用带 `Z` 的 UTC ISO 8601。预算日 `reserved_day` 为 `DATE`，从锁后采样 UTC 时刻按 `Asia/Shanghai` 转换后取得，不能直接用 UTC 日期代替本地预算日。
+- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 按契约统一使用带 `Z` 的 UTC ISO 8601。AI 预算以请求创建时间计数，自然日边界按 `Asia/Shanghai` 换算为 UTC，不设独立 reserved_day 或预算锁表。
 - 非纯关联表默认包含 `created_at/updated_at`。不可变快照只有创建时间和版本/来源信息。
 - 数据库状态用 `VARCHAR` 加命名 `CHECK` 约束，布尔值用 `TINYINT NOT NULL` 并约束为 0/1，不能写前端中文标签；分数使用 `DECIMAL(6,2)`，满分限定 `0 < max_score <= 9999.99`，得分限定 `0 <= score <= 对应满分`。Java 使用 `BigDecimal`，输入至多两位小数，不依赖数据库静默舍入；启用严格 SQL 模式，不通过 `INSERT IGNORE` 吞掉错误。
 - MySQL `JSON` 用于小型文件集、冻结量表、策略配置和结构化输出；实体归属/核心关系用真实外键，不能全部埋在 JSON 中。JSON 不直接作为普通索引键，需要查询的标量先提取为显式列或生成列；正文/任意 JSON 路径不默认加索引。
@@ -186,9 +186,9 @@ P1 所有 active 基础课程允许 teacher 角色开班；若以后需要逐课
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
-| `assignments` | `id, offering_id, chapter_id, title, description, estimated_minutes, type, status, is_required, due_at, late_until, allow_resubmit, max_attempts, max_score, content_version, requirements, rubric, template_files, knowledge_point_ids, current_ai_policy_id, published_at` | type web_lab/sql_text/text；status draft/published/archived；max_attempts>=1；late_until 空或>due_at；满分范围见第 1 节；rubric 总分与 max_score 相符；API initialFiles 映射 template_files |
-| `workspaces` | `id, offering_id, assignment_id, student_id, files, active_file, revision, updated_at` | UNIQUE(assignment_id,student_id)；revision>=1；文件为 JSON；只表达真正保存过的学生草稿 |
-| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, files_snapshot, reflection, content_version, assignment_title_snapshot, requirements_snapshot, rubric_snapshot, max_score_snapshot, knowledge_points_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | UNIQUE(assignment_id,student_id,attempt_no)；UNIQUE(assignment_id,student_id,workspace_revision) 保证同一版本只提交一次（自然幂等）；每学生每任务仅一个 is_current=1；current_slot 为生成列；快照字段创建后不可修改 |
+| `assignments` | `id, offering_id, chapter_id, title, description, estimated_minutes, type, status, is_required, due_at, late_until, allow_resubmit, max_attempts, max_score, content_version, current_ai_policy_id, published_at` | 要求、量规、初始文件、知识关联分别存 assignment_requirements / assignment_rubric_criteria / assignment_initial_files / assignment_knowledge_points；其余约束见 V6 |
+| `workspaces` | `id, offering_id, assignment_id, student_id, active_file, revision, updated_at` | UNIQUE(assignment_id,student_id)；revision>=1；文件存 workspace_files；只表达真正保存过的学生草稿 |
+| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, reflection, content_version, assignment_title_snapshot, max_score_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | 文件、要求、量规分别存 submission_files / submission_requirements_snapshot / submission_rubric_snapshot；P2 加 submission_knowledge_snapshot；同 revision 自然幂等，current_slot 保证仅一个当前提交 |
 | `feedback` | `id, submission_id, assignment_id, offering_id, student_id, teacher_id, status, base_version, overall_comment, final_score, published_at` | submission_id 唯一；量规存 feedback_rubric_scores；发布后不可再编辑；P2 增加独立知识评价和标签存储 |
 
 `assignmentState` 的合法值以 [AssignmentState](openapi.yaml#/components/schemas/AssignmentState) 为准，不单独存成可随意修改的学生状态列。按以下优先级推导对应契约状态：当前提交有 status=published 的评价 → 已评价；当前提交存在 → 已提交；工作区存在 → 进行中；否则 → 未开始。中文仅解释含义，响应必须使用契约枚举原值。
@@ -207,11 +207,11 @@ ALTER TABLE submissions
 
 提交快照只允许更新受控的 `is_current` 指针状态，不允许覆盖文件、评分规则或提交时间。`due_at_snapshot/is_late` 保留当时事实；教师延长期限不会篡改历史提交时间，展示当前是否待补交时按当前规则另算。
 
-`assignment_title_snapshot` 冻结任务标题；`knowledge_points_snapshot` 是 `{id,title,description}` 数组而非只有 ID。教师批阅 `SubmissionDetailDTO.assignmentSnapshot` 从这些冻结字段提供标题、要求、满分、量规、knowledgePoints、截止时间、contentVersion、aiPolicyVersion，不从当前课程标题或知识点描述回填历史标准。P1 aiPolicyVersion 为 null，P2 从提交的不可变政策记录派生。
+`assignment_title_snapshot` 冻结任务标题；P2 `submission_knowledge_snapshot` 保存知识点 ID、标题、说明。`SubmissionDetailDTO.assignmentSnapshot` 从提交行及冻结子表构造标题、要求、满分、量规、knowledgePoints、截止时间、contentVersion、aiPolicyVersion。旧 P1 提交未冻结知识点定义的限制见 §5.3。P1 aiPolicyVersion 为 null，P2 从提交的不可变政策记录派生。
 
 首次读取未保存工作区时 API 返回模板与 `revision=0`，不插入表。第一次保存由 baseRevision=0 创建 revision=1。P2 提示进度放在独立 `tutoring_progress`，发起 AI 辅导不创建模板工作区、不增加文件 revision，也不使未保存作业伪装为 IN_PROGRESS。
 
-`files` 的 JSON 结构引用契约 FileDTO；数据库 JSON 不改变字段含义。
+对外 files 数组引用契约 FileDTO；正式作品文件使用上述关系子表，AI/求助主动共享的有限副本使用 JSON，不改变对外字段含义。
 
 文件必须完全符合任务模板类型的允许清单；Web 可为空文本但不能遗漏文件字段。默认单文件 100 KiB，总量 256 KiB，按 UTF-8 字节数验证。SQL/文字类型采用对应一个文件，按相同上限。
 
@@ -378,7 +378,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ### 7.2 保存工作区
 
-校验教学班 active、作业 published、本人 active 学生成员 → 校验文件 → baseRevision=0 时插入工作区（唯一约束 1062 返回 409 `WORKSPACE_CONFLICT`）；否则 `UPDATE workspaces SET files=?, revision=revision+1 WHERE assignment_id=? AND student_id=? AND revision=?`，0 行返回 409 → 更新最近学习时间、写 P1 服务端保存事件 → 提交。
+校验教学班 active、作业 published、本人 active 学生成员 → 校验文件 → baseRevision=0 时插入工作区（唯一约束 1062 返回 409 `WORKSPACE_CONFLICT`）；否则以 revision 条件更新并替换 workspace_files，0 行返回 409 → 更新最近学习时间、写 P2 服务端保存事件 → 提交。
 
 草稿在截止、补交到期或已评价后仍可保存用于练习，不改变原提交与状态；是否正式可提交由 canSubmit 及对应错误码决定。作业/教学班归档后只读。提示进度位于独立表，不增加文件 revision，AI 请求不能制造文件保存冲突。
 
