@@ -36,7 +36,7 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 状态核对以 Maven 运行结果作为验收证据。IDE 运行若有路由差异，先检查生产与测试类输出位置：该测试按代码来源位置排除测试 Controller，需要分离输出目录；不能未经复现就排除 MyBatis 或减少生产路由扫描。
 
-反馈只使用 [StudentFeedbackDTO](openapi.yaml#/components/schemas/StudentFeedbackDTO) 与 [TeacherFeedbackDTO](openapi.yaml#/components/schemas/TeacherFeedbackDTO)：学生结构只承载已发布公开快照，并关联本人通知；教师结构可承载草稿，messageId 恒为 null，不借用学生通知 ID。学生读路径从 published_payload 构造，不能把草稿实体序列化后只隐藏按钮。
+反馈只使用 [StudentFeedbackDTO](openapi.yaml#/components/schemas/StudentFeedbackDTO) 与 [TeacherFeedbackDTO](openapi.yaml#/components/schemas/TeacherFeedbackDTO)：学生结构只承载已发布公开结果，并关联本人通知；教师结构可承载草稿，messageId 恒为 null，不借用学生通知 ID。学生读路径从 status=published 的不可变评价及量规记录构造，不能把草稿实体序列化后只隐藏按钮。
 
 测试按责任分层：规则与纯函数用单元测试；HTTP 信封、校验、权限用 MockMvc；迁移、JSON、唯一约束与条件更新用真实 MySQL Testcontainers，不用 H2 替代。已有 Maven test/verify 的职责和运行方式见 README。
 
@@ -57,7 +57,7 @@ Controller 只处理协议适配、输入校验和 DTO；Service 执行业务与
 
 - 数据库基线为 **MySQL 8.4 LTS / InnoDB**；服务端使用 Spring Boot。所有表显式声明 `ENGINE=InnoDB`，正文使用 `utf8mb4`；不混用其他数据库的 SQL 语法。
 - 主键 `id` 使用应用生成的规范小写 UUID；API 用字符串，字段 camelCase；数据库字段 snake_case。首版统一 `CHAR(36) CHARACTER SET ascii COLLATE ascii_bin`，所有 UUID 外键同型、同字符集、同排序规则；不在首版夹杂整数 ID 或二进制 UUID 映射。
-- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 按契约统一使用带 `Z` 的 UTC ISO 8601。预算日 `reserved_day` 为 `DATE`，从锁后采样 UTC 时刻按 `Asia/Shanghai` 转换后取得，不能直接用 UTC 日期代替本地预算日。
+- 时刻使用 `DATETIME(6)`，语义统一为 UTC，Java 使用 `Instant` 并明确转换为 UTC 存取；连接会话 `time_zone='+00:00'`，显示转换至 `Asia/Shanghai`。`DATETIME` 本身不自动转换时区，禁止写入本地墙上时间或无时区 API 字符串；API 按契约统一使用带 `Z` 的 UTC ISO 8601。AI 预算以请求创建时间计数，自然日边界按 `Asia/Shanghai` 换算为 UTC，不设独立 reserved_day 或预算锁表。
 - 非纯关联表默认包含 `created_at/updated_at`。不可变快照只有创建时间和版本/来源信息。
 - 数据库状态用 `VARCHAR` 加命名 `CHECK` 约束，布尔值用 `TINYINT NOT NULL` 并约束为 0/1，不能写前端中文标签；分数使用 `DECIMAL(6,2)`，满分限定 `0 < max_score <= 9999.99`，得分限定 `0 <= score <= 对应满分`。Java 使用 `BigDecimal`，输入至多两位小数，不依赖数据库静默舍入；启用严格 SQL 模式，不通过 `INSERT IGNORE` 吞掉错误。
 - MySQL `JSON` 用于小型文件集、冻结量表、策略配置和结构化输出；实体归属/核心关系用真实外键，不能全部埋在 JSON 中。JSON 不直接作为普通索引键，需要查询的标量先提取为显式列或生成列；正文/任意 JSON 路径不默认加索引。
@@ -115,7 +115,7 @@ erDiagram
 | `audit_logs` | `id, actor_id, action, target_type, target_id, metadata, request_id, created_at` | 不记录口令/凭证/完整正文；用户删除可匿名化 actor；只允许追加 |
 | `terms` | `id, label, starts_at, ends_at, is_current, current_slot` | 学期由管理员维护；ends_at > starts_at；current_slot 为可空 STORED 生成列，唯一索引保证最多一个当前学期；label 为展示文本 |
 
-已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql) 及 [V4__create_audit_logs.sql](../backend/src/main/resources/db/migration/V4__create_audit_logs.sql)，包含 audit_logs。教学内容、作业、评价通知与公告相关表由后续迁移 V5～V8 建立，见本手册第 4 节与第 5 节。V9 为 `notices` 增加公告跳转目标列（`target_type/target_id`，多态无外键）并把量规评语放宽到 8000；V10 为 `notifications` 增加同构的通用跳转目标列（P1 由 `notice_published` 消息继承公告目标写入，其余消息类型为 NULL；`source_event_key` 与收件人表仍按第 5 节 P2 设计执行）。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。`/me/config` 已实现；未初始化学期时 currentTermId=null、terms=[]，不能把此空态当成接口未实现。
+已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql) 及 [V4__create_audit_logs.sql](../backend/src/main/resources/db/migration/V4__create_audit_logs.sql)，包含 audit_logs。教学内容、作业、评价通知与公告相关表由后续迁移 V5～V8 建立，见本手册第 4 节与第 5 节。V9 为 `notices` 增加公告跳转目标列（`target_type/target_id`，多态无外键）并把量规评语放宽到 8000；V10 为 `notifications` 增加同构的通用跳转目标列（P1 由 `notice_published` 消息继承公告目标写入，其余消息类型为 NULL；P2 沿用每收件人一条通知，回复使用唯一来源键）。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。`/me/config` 已实现；未初始化学期时 currentTermId=null、terms=[]，不能把此空态当成接口未实现。
 
 `users` 的具体存储约定如下：
 
@@ -186,12 +186,12 @@ P1 所有 active 基础课程允许 teacher 角色开班；若以后需要逐课
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
-| `assignments` | `id, offering_id, chapter_id, title, description, estimated_minutes, type, status, is_required, due_at, late_until, allow_resubmit, max_attempts, max_score, content_version, requirements, rubric, template_files, knowledge_point_ids, current_ai_policy_id, published_at` | type web_lab/sql_text/text；status draft/published/archived；max_attempts>=1；late_until 空或>due_at；满分范围见第 1 节；rubric 总分与 max_score 相符；API initialFiles 映射 template_files |
-| `workspaces` | `id, offering_id, assignment_id, student_id, files, active_file, revision, updated_at` | UNIQUE(assignment_id,student_id)；revision>=1；文件为 JSON；只表达真正保存过的学生草稿 |
-| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, files_snapshot, reflection, content_version, assignment_title_snapshot, requirements_snapshot, rubric_snapshot, max_score_snapshot, knowledge_points_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | UNIQUE(assignment_id,student_id,attempt_no)；UNIQUE(assignment_id,student_id,workspace_revision) 保证同一版本只提交一次（自然幂等）；每学生每任务仅一个 is_current=1；current_slot 为生成列；快照字段创建后不可修改 |
-| `feedback` | `id, submission_id, teacher_id, draft_payload, published_payload, version, published_version, published_at` | submission_id 唯一；draft/published payload分开；发布后P1不可再编辑；分数/量表/知识结论在payload内 |
+| `assignments` | `id, offering_id, chapter_id, title, description, estimated_minutes, type, status, is_required, due_at, late_until, allow_resubmit, max_attempts, max_score, content_version, current_ai_policy_id, published_at` | 要求、量规、初始文件、知识关联分别存 assignment_requirements / assignment_rubric_criteria / assignment_initial_files / assignment_knowledge_points；其余约束见 V6 |
+| `workspaces` | `id, offering_id, assignment_id, student_id, active_file, revision, updated_at` | UNIQUE(assignment_id,student_id)；revision>=1；文件存 workspace_files；只表达真正保存过的学生草稿 |
+| `submissions` | `id, offering_id, assignment_id, workspace_id, student_id, attempt_no, workspace_revision, reflection, content_version, assignment_title_snapshot, max_score_snapshot, ai_policy_id, due_at_snapshot, submitted_at, is_late, is_current, current_slot` | 文件、要求、量规分别存 submission_files / submission_requirements_snapshot / submission_rubric_snapshot；P2 加 submission_knowledge_snapshot；同 revision 自然幂等，current_slot 保证仅一个当前提交 |
+| `feedback` | `id, submission_id, assignment_id, offering_id, student_id, teacher_id, status, base_version, overall_comment, final_score, published_at` | submission_id 唯一；量规存 feedback_rubric_scores；发布后不可再编辑；P2 增加独立知识评价和标签存储 |
 
-`assignmentState` 的合法值以 [AssignmentState](openapi.yaml#/components/schemas/AssignmentState) 为准，不单独存成可随意修改的学生状态列。按以下优先级推导对应契约状态：当前提交有 published_payload → 已评价；当前提交存在 → 已提交；工作区存在 → 进行中；否则 → 未开始。中文仅解释含义，响应必须使用契约枚举原值。
+`assignmentState` 的合法值以 [AssignmentState](openapi.yaml#/components/schemas/AssignmentState) 为准，不单独存成可随意修改的学生状态列。按以下优先级推导对应契约状态：当前提交有 status=published 的评价 → 已评价；当前提交存在 → 已提交；工作区存在 → 进行中；否则 → 未开始。中文仅解释含义，响应必须使用契约枚举原值。
 
 学生对作业的所有读取、列表、推荐与统计都要求 `published_at IS NOT NULL` 且满足成员权限。公开生命周期仅为 draft→published→archived；归档接口只允许 published→archived，重复归档返回原结果，draft 归档请求拒绝。归档教学班不自动公开任何 draft 子对象，教师仍可读自己的草稿。
 
@@ -207,35 +207,34 @@ ALTER TABLE submissions
 
 提交快照只允许更新受控的 `is_current` 指针状态，不允许覆盖文件、评分规则或提交时间。`due_at_snapshot/is_late` 保留当时事实；教师延长期限不会篡改历史提交时间，展示当前是否待补交时按当前规则另算。
 
-`assignment_title_snapshot` 冻结任务标题；`knowledge_points_snapshot` 是 `{id,title,description}` 数组而非只有 ID。教师批阅 `SubmissionDetailDTO.assignmentSnapshot` 从这些冻结字段提供标题、要求、满分、量规、knowledgePoints、截止时间、contentVersion、aiPolicyVersion，不从当前课程标题或知识点描述回填历史标准。P1 aiPolicyVersion 为 null，P2 从提交的不可变政策记录派生。
+`assignment_title_snapshot` 冻结任务标题；P2 `submission_knowledge_snapshot` 保存知识点 ID、标题、说明。`SubmissionDetailDTO.assignmentSnapshot` 从提交行及冻结子表构造标题、要求、满分、量规、knowledgePoints、截止时间、contentVersion、aiPolicyVersion。旧 P1 提交未冻结知识点定义的限制见 §5.3。P1 aiPolicyVersion 为 null，P2 从提交的不可变政策记录派生。
 
 首次读取未保存工作区时 API 返回模板与 `revision=0`，不插入表。第一次保存由 baseRevision=0 创建 revision=1。P2 提示进度放在独立 `tutoring_progress`，发起 AI 辅导不创建模板工作区、不增加文件 revision，也不使未保存作业伪装为 IN_PROGRESS。
 
-`files` 的 JSON 结构引用契约 FileDTO；数据库 JSON 不改变字段含义。
+对外 files 数组引用契约 FileDTO；正式作品文件使用上述关系子表，AI/求助主动共享的有限副本使用 JSON，不改变对外字段含义。
 
 文件必须完全符合任务模板类型的允许清单；Web 可为空文本但不能遗漏文件字段。默认单文件 100 KiB，总量 256 KiB，按 UTF-8 字节数验证。SQL/文字类型采用对应一个文件，按相同上限。
 
 `rubric` 为不可变 criterionId 的数组：`{criterionId,title,description,maxScore}`；知识点通过任务的 knowledge_point_ids 关联。草稿评分项至少包含 `criterionId,score,comment`，逐项分数范围验证；总分等于评分项得分之和。`knowledgeEvaluations` 不由总分机械转换，教师明确给出每个知识点结论。
 
-feedback_payload的issueTags为P2可选数组，P1为空；每个tag必须属于course_offerings.issue_tags_config当前词表。初始化来自服务端课程配置，包含version和items:[{tag,title,description}]；API提供只读词表。标签历史随公开评价保留词表版本，标签更名不会将旧问题错误合并。
+评价的 issueTags为P2可选数组，P1为空；每个tag必须属于course_offerings.issue_tags_config当前词表。初始化来自服务端课程配置，包含version和items:[{tag,title,description}]；API提供只读词表。标签历史随公开评价保留词表版本，标签更名不会将旧问题错误合并。
 
-P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=null；P2才建立ai_policies并为作业绑定生效版本。P1 feedback_payload可以保留教师明确给出的知识评价，但P2之前不自动产生掌握判断。
+P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=null；P2才建立ai_policies并为作业绑定生效版本。P1 只接受空知识评价；P2 使用 feedback_knowledge_evaluations 和 feedback_issue_tags 持久化教师输入，发布后禁止编辑。
 
 ### 4.3 消息与服务端事件
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
-| `notifications` | `id, offering_id, type, title, content, target_type, target_id, source_event_key, source_version, created_by` | source_event_key 唯一；type course_notice/assignment_published/feedback/system/help_reply；help_reply 于 P2 启用；target 为受控对象 |
-| `notification_recipients` | `id, notification_id, user_id, read_at, superseded_at` | UNIQUE(notification_id,user_id)；按接收者记录阅读状态；旧反馈提醒可置为已替代 |
+| `notifications` | `id, recipient_id, type, title, content, related_offering_id, related_assignment_id, related_feedback_id, target_type, target_id, is_read, read_at, created_at` | 每收件人一条；数据库类型为 feedback_published/assignment_published/offering_archived/notice_published/help_reply，服务映射到契约类型；P2 回复来源唯一键防重 |
 | `learning_events` | `id, user_id, offering_id, assignment_id, chapter_id, client_event_id, source_event_key, session_id, type, source, occurred_at, received_at, payload` | P1 先建最小表并仅写 source=server；P2 开放 client，P3 开放 checker；非空 source_event_key 唯一；非空 client_event_id 有 UNIQUE(user_id,client_event_id) |
 
-课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入 `notifications` 和全部 `notification_recipients`，任一写入失败整体回滚。P1 不引入异步通知或“通知处理中”状态。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notification_recipients.id`，用于 `/me/messages/{messageId}/read`。共享通知实体 `notifications.id` 只用于公告端点及内部关联，不混作个人消息 ID。
+课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入每位收件人的 `notifications`，任一写入失败整体回滚。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notifications.id`，用于 `/me/messages/{messageId}/read`。不引入共享通知实体或独立收件人表；业务状态与来源唯一约束负责防重。
 
 公告和作业发布在同一事务内查询当时 active 学生成员并批量插入收件人，`recipientCount` 来自实际冻结集合；后加入学生不补发旧个人提醒，但可读本班历史公告。自然键例如 `feedback:{id}:published:{version}`、`assignment:{id}:published:{contentVersion}`、`notice:{id}`、`help_reply:{id}`；重复业务请求命中原通知，不生成新的通知 ID，收件人唯一约束作为第二层防重。`target_type` 的合法值引用 [TargetDTO.type](openapi.yaml#/components/schemas/TargetDTO/properties/type)，数据库约束与该集合保持一致；求助回复指向原 help_request，不暴露其他会话。
 
 `learning_events.received_at` 是服务端接收或创建事件的 UTC 微秒时间，不从客户端 occurredAt 复制；当前 HTTP 事件上报不接收也不回传 receivedAt。它是内部存储字段，并未从数据模型删除。
 
-P1 保存、提交、评价、发布与章节访问等可信事件同业务事务落库，事件 `source_event_key` 使用业务对象 ID 与版本，例如 `workspace:{id}:saved:{revision}`，事务重试不重复记数。P1 不开放客户端事件写接口，也不产生掌握分析；这避免 P1 事务依赖尚未迁移的 P2 表。事件 payload 只存白名单元数据，不复制作品、密码或聊天正文。每个事件只能使用对应来源的去重键，客户端不得指定 source 或 source_event_key。
+核对 V1～V10 与生产代码后确认：P1 仅有审计日志，尚无 learning_events。用户于 2026-10-24 确认在 P2 补齐事件底座及后续可信事件，不将历史审计日志回填成学习事件。保存、提交、评价、AI 和求助成功后在原事务写入；`source_event_key` 使用业务对象 ID 与版本，事务重试不重复记数。payload 只存白名单元数据，不复制作品、密码或聊天正文。客户端不得指定 source 或 source_event_key。
 
 事件自然键和去重键均为 ASCII、区分大小写，禁止使用默认的忽略大小写正文排序规则。`source_event_key/dedupe_key` 用 `VARCHAR(192) ascii_bin`。MySQL 中直接 `UNIQUE(source_event_key)` 与 `UNIQUE(user_id,client_event_id)` 允许多条 NULL，无需条件索引；非空去重字段才参与防重。
 
@@ -319,6 +318,8 @@ P2 不建通用任务表与独立 worker 进程。AI 请求在同一 Spring 应�
 
 ### 5.3 行为与证据
 
+P2 新提交通过 submission_knowledge_snapshot 冻结知识点名称和说明。旧 P1 提交未保存这些历史定义，读取仍沿用当前作业关联的已知限制，不能声称恢复了提交当时的定义。P2 评价知识 ID 以可读提交快照校验。首次迁移时 P1 只接受空知识评价，因此没有历史知识结论可回填。
+
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
 | `knowledge_evidence` | `id, student_id, offering_id, knowledge_point_id, assignment_id, submission_id, feedback_id, feedback_published_version, result, note, occurred_at, is_current, current_slot, rule_version` | result meets_expectation/needs_practice/insufficient_evidence；来源必须可追溯；同学生/作业/知识点只一个当前有效版本，current_slot 为生成列 |
@@ -338,7 +339,7 @@ ALTER TABLE knowledge_evidence
     (student_id, offering_id, knowledge_point_id, is_current, occurred_at, id);
 ```
 
-沿用 P1 的 `learning_events`，P2 才开放客户端允许事件最小集：`chapter_opened/resource_opened/editor_opened/preview_opened`。payload 每种有固定字段，不提供任意 JSON 收集个人信息。保存/提交/评价/AI/求助事件由服务端在业务成功事务内产生，客户端不能指定学生、source、score 或可信判定；P1 章节访问的服务端事实与 P2 客户端报告按 source/type 区分，不相加冒充两次访问。
+P2 新建 `learning_events`（P1 实际只有审计日志），并开放客户端允许事件最小集：`chapter_opened/resource_opened/editor_opened/preview_opened`。payload 每种有固定字段，不提供任意 JSON 收集个人信息。保存/提交/评价/AI/求助事件由服务端在业务成功事务内产生，客户端不能指定学生、source、score 或可信判定；P1 章节访问的服务端事实与 P2 客户端报告按 source/type 区分，不相加冒充两次访问。
 
 建议一次批量请求原子校验与写入：未知事件、跨班 ID、非法 payload 返回422/403且整批不写；重复事件返回 acceptedCount=0、duplicateCount 增加；客户端不能重传相同 eventId 改正文，返回409 `EVENT_CONFLICT`。允许 occurredAt 为接收时间之前24小时至之后5分钟范围，超范围拒绝。不计算活跃时长。
 
@@ -364,10 +365,10 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 教学写入使用 A.1 的短事务，不设父级生命周期锁、全局锁顺序或死锁重试协议。正确性只依赖以下手段：
 
-- **唯一约束**：成员 `(offering_id,user_id)`、工作区 `(assignment_id,student_id)`、提交 `(assignment_id,student_id,workspace_revision)` 与当前提交 current_slot、通知 source_event_key、在途 AI pending_slot、当前证据 current_slot。1062 只在明确命中对应约束时转为业务结果（如返回已有对象），其他唯一冲突按各自业务错误处理。
+- **唯一约束**：成员 `(offering_id,user_id)`、工作区 `(assignment_id,student_id)`、提交 `(assignment_id,student_id,workspace_revision)` 与当前提交 current_slot、通知业务来源键、在途 AI pending_slot、当前证据 current_slot。1062 只在明确命中对应约束时转为业务结果（如返回已有对象），其他唯一冲突按各自业务错误处理。
 - **乐观锁**：工作区 revision、评价 version，用 `UPDATE ... WHERE id=? AND revision=?`，影响 0 行返回对应 409。
 - **条件更新**：邀请名额、发布与归档等状态迁移，用 `WHERE status=?` 或计数条件，影响 0 行按当前状态返回业务错误。
-- **唯一保留的行锁**：提交替换与评价发布都对该学生当前 submission 行 `SELECT ... FOR UPDATE`，保证评价不会发到刚被替换的提交。
+- **局部行锁**：提交替换与评价发布协调该学生当前 submission；既有工作区提交协调及 P2 主动共享/辅导冻结使用工作区行锁，保证 revision 与文件一致；求助回复/关闭锁单条求助，避免关闭后插入回复。仅持有短业务事务，不锁父级生命周期，不跨 AI 外部调用持锁。
 
 时钟使用应用层 `Instant.now()`（UTC），每个操作在事务内取一次，同时用于期限判断与写入时间；测试注入可控 `Clock`。死锁或锁等待超时不在服务内重试，整体回滚后按契约服务端错误返回，由用户重试；业务 409、FK 与 CHECK 错误不自动重试。数据库事务内绝不执行 AI 网络调用。未防护的竞态列入 [STATUS 已知限制](STATUS.md#4-已知限制)。
 
@@ -377,7 +378,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ### 7.2 保存工作区
 
-校验教学班 active、作业 published、本人 active 学生成员 → 校验文件 → baseRevision=0 时插入工作区（唯一约束 1062 返回 409 `WORKSPACE_CONFLICT`）；否则 `UPDATE workspaces SET files=?, revision=revision+1 WHERE assignment_id=? AND student_id=? AND revision=?`，0 行返回 409 → 更新最近学习时间、写 P1 服务端保存事件 → 提交。
+校验教学班 active、作业 published、本人 active 学生成员 → 校验文件 → baseRevision=0 时插入工作区（唯一约束 1062 返回 409 `WORKSPACE_CONFLICT`）；否则以 revision 条件更新并替换 workspace_files，0 行返回 409 → 更新最近学习时间、写 P2 服务端保存事件 → 提交。
 
 草稿在截止、补交到期或已评价后仍可保存用于练习，不改变原提交与状态；是否正式可提交由 canSubmit 及对应错误码决定。作业/教学班归档后只读。提示进度位于独立表，不增加文件 revision，AI 请求不能制造文件保存冲突。
 
@@ -387,7 +388,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ### 7.4 发布评价
 
-校验授课关系与作业状态 → 锁目标 submission 行并确认 is_current=1，否则 409 `SUBMISSION_SUPERSEDED` → 以 baseVersion 乐观更新评价，冲突返回 `FEEDBACK_VERSION_CONFLICT` → 校验分数与量表 → 发布快照并增加版本 → P2 创建当前知识证据 → 同步写唯一反馈通知及学生收件人 → 写服务端事件与审计 → 提交。同一次已发布评价的重复 publish 仅在 baseVersion 等于发布前版本或当前 published_version 时按原公开结果返回，不再增加版本、消息和证据。
+校验授课关系与作业状态 → 锁目标 submission 行并确认 is_current=1，否则 409 `SUBMISSION_SUPERSEDED` → 以 baseVersion 乐观更新评价，冲突返回 `FEEDBACK_VERSION_CONFLICT` → 校验分数与量表 → 发布快照并增加版本 → P2 创建当前知识证据 → 同步写唯一反馈通知及学生收件人 → 写服务端事件与审计 → 提交。同一次已发布评价的重复 publish 仅在 baseVersion 等于发布前版本或当前 base_version 时按原公开结果返回，不再增加版本、消息和证据。
 
 评价草稿保存同样锁 submission 行并验证当前提交。P1 已发布评价不可再编辑；不引入成绩更正工作流。归档作业不允许新评价发布。知识状态直接从证据查询计算，不为发布制造重算任务。
 
@@ -414,7 +415,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 | 待办排序 | assignments(offering_id,status,due_at,id) |
 | 当前提交与教师批阅 | submissions(assignment_id,student_id,current_slot) UNIQUE；submissions(assignment_id,student_id,workspace_revision) UNIQUE；submissions(assignment_id,is_current,submitted_at,id) |
 | 学生反馈 | submissions(student_id,submitted_at)，feedback(submission_id) UNIQUE |
-| 未读消息 | notification_recipients(user_id,read_at)，notification_recipients(notification_id,user_id) UNIQUE，notifications(source_event_key) UNIQUE |
+| 未读消息 | notifications(recipient_id,is_read,created_at,id)，notifications(source_event_key) UNIQUE（P2 求助回复） |
 | 行为查询/去重 | learning_events(user_id,offering_id,occurred_at)，非空 user_id/client_event_id 唯一，非空 source_event_key 唯一 |
 | 知识证据 | knowledge_evidence(student_id,offering_id,knowledge_point_id,is_current,occurred_at,id)；(student_id,assignment_id,knowledge_point_id,current_slot) UNIQUE 生成列索引；(feedback_id,feedback_published_version,knowledge_point_id) UNIQUE |
 | AI 预算/历史 | tutoring_requests(student_id,created_at)，tutoring_requests(student_id,assignment_id,created_at)，tutoring_requests(session_id,created_at,id) |
@@ -436,7 +437,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ## 10. 迁移、归档与删除
 
-迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 包括完整站内通知、最小 learning_events 及可信服务端写入；P2 才引入 AI、求助、客户端事件入口和知识证据，P3 增加隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
+迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 已有个人站内通知与审计；P2 补齐 learning_events、后续可信服务端事件，并引入 AI、求助、客户端事件入口和知识证据，P3 增加隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
 
 成员退出/失活后保留作品和评价归属，阻止新写入；作业、教学班用归档保留链路，不级联删除考核作品。管理员按已确认策略清除用户数据时，先撤销会话，再删除/匿名化事件、聊天、求助、证据及关联作品；日志中的身份做匿名化，通知接收者按关联删除。备份过期也应符合保留周期。
 
@@ -451,4 +452,4 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [AGENTS.md](../AGENTS.md) 的提交约定提交，并更新 [STATUS](STATUS.md)。
 
-阶段建立表的数量不作为进度目标，以可验收流程为准。P1 事件与通知同事务落库，P2 才回填知识证据并启用 AI 后台执行；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。
+阶段建立表的数量不作为进度目标，以可验收流程为准。P2 起学习事件与业务同事务落库；P1 仅空知识评价，无可回填知识证据，不伪造历史；P2 启用 AI 后台执行；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。

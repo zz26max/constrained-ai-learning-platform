@@ -72,6 +72,11 @@ class NoticeStatsIntegrationIT {
 
     @BeforeEach
     void reset() {
+        // P2 子记录先于课程、作品与评价清理，保留外键验证。
+        for (String table : List.of("knowledge_evidence", "feedback_knowledge_evaluations", "feedback_issue_tags",
+                "submission_knowledge_snapshot", "learning_events")) {
+            jdbc.update("DELETE FROM " + table);
+        }
         for (String table : List.of("notifications", "notices", "feedback_rubric_scores", "feedback",
                 "submission_rubric_snapshot", "submission_requirements_snapshot", "submission_files", "submissions",
                 "workspace_files", "workspaces", "assignment_knowledge_points", "assignment_initial_files",
@@ -579,7 +584,7 @@ class NoticeStatsIntegrationIT {
         assertThat(r.student().displayName()).isEqualTo(STUDENT.displayName());
         assertThat(r.summary().completedLabCount()).isZero();
         assertThat(r.summary().publishedFeedbackCount()).isZero();
-        assertThat(r.summary().needsPracticeCount()).isNull();
+        assertThat(r.summary().needsPracticeCount()).isZero();
         assertThat(r.recentFeedback()).isNull();
         assertThat(r.feedbackPage().items()).isEmpty();
         assertThat(r.feedbackPage().total()).isZero();

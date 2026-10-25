@@ -28,8 +28,14 @@ public class AssignmentService {
     private final CourseAccess access;
     private final AuditService audit;
     private final Clock clock;
-    public AssignmentService(AssignmentMapper mapper,CourseAccess access,AuditService audit,Clock clock) {
-        this.mapper=mapper;this.access=access;this.audit=audit;this.clock=clock;
+    private final com.learningplatform.modules.analytics.service.KnowledgeService knowledge;
+    private final com.learningplatform.modules.analytics.service.LearningEventService events;
+    private final com.learningplatform.modules.tutoring.service.TutoringQueryService tutoring;
+    public AssignmentService(AssignmentMapper mapper,CourseAccess access,AuditService audit,Clock clock,
+            com.learningplatform.modules.analytics.service.KnowledgeService knowledge,
+            com.learningplatform.modules.analytics.service.LearningEventService events,
+            com.learningplatform.modules.tutoring.service.TutoringQueryService tutoring) {
+        this.mapper=mapper;this.access=access;this.audit=audit;this.clock=clock;this.knowledge=knowledge;this.events=events;this.tutoring=tutoring;
     }
     public AssignmentListResponse listMyAssignments(UserDTO user,String offeringId,String termId,String filter,int page,int pageSize) {
         CourseAccess.role(user,"student");AssignmentInput.page(page,pageSize);
@@ -117,6 +123,7 @@ public class AssignmentService {
             workspace=mapper.findWorkspace(assignment.id(),user.id());
         }
         audit.record(user.id(),"WORKSPACE_SAVED","workspace",workspace.id(),Map.of("revision",workspace.revision()),requestId);
+        events.server(user.id(),assignment.offeringId(),assignment.id(),assignment.chapterId(),"workspace_saved","workspace:"+workspace.id()+":saved:"+workspace.revision(),now);
         List<WorkspaceFile> savedFiles=mapper.getWorkspaceFiles(workspace.id());
         boolean canSave=canSave(assignment,context);
         return new WorkspaceDTO(assignment.id(),workspace.revision(),
@@ -171,6 +178,8 @@ public class AssignmentService {
             mapper.insertSubmissionRubric(submissionId,r.criterionId(),r.title(),r.description(),r.maxScore());
         }
         audit.record(user.id(),"ASSIGNMENT_SUBMITTED","submission",submissionId,Map.of("attemptNo",attemptNo),requestId);
+        knowledge.freeze(submissionId,assignment.id());
+        events.server(user.id(),assignment.offeringId(),assignment.id(),assignment.chapterId(),"assignment_submitted","submission:"+submissionId+":created",now);
         Submission submission=mapper.findSubmission(submissionId);
         return new SubmissionCreatedResponse(submissionSummary(submission),true);
     }
@@ -430,6 +439,7 @@ public class AssignmentService {
         for(RubricResultDTO r:draft.rubricResults()) {
             mapper.insertFeedbackRubricScore(feedbackId,r.criterionId(),r.score(),r.comment());
         }
+        mapper.updateFeedbackIssueTagVersion(feedbackId,knowledge.save(feedbackId,submission,body));
         audit.record(user.id(),created?"FEEDBACK_CREATED":"FEEDBACK_UPDATED","feedback",feedbackId,Map.of(),requestId);
         return new FeedbackSaveResult(teacherFeedbackView(mapper.findFeedback(feedbackId),submission),created);
     }
@@ -465,6 +475,8 @@ public class AssignmentService {
         Instant now=now();
         int updated=mapper.publishFeedback(feedback.id(),baseVersion,user.id(),now);
         if(updated==0) throw feedbackVersionConflict(latestVersion(submission.id()));
+        knowledge.published(feedback.id(),submission,baseVersion+1,now);
+        events.server(submission.studentId(),submission.offeringId(),submission.assignmentId(),null,"feedback_published","feedback:"+feedback.id()+":published:"+(baseVersion+1),now);
         // 通知按评价去重：持有 feedback 行锁，已有本评价的 feedback_published 通知则不再插入。
         String messageId=mapper.findFeedbackMessageId(feedback.studentId(),feedback.id());
         if(messageId==null) {
@@ -499,6 +511,7 @@ public class AssignmentService {
             case "assignment_published"->"assignment_published";
             case "system"->"offering_archived";
             case "course_notice"->"notice_published";
+            case "help_reply"->"help_reply";
             default->null;
         };
     }
@@ -520,7 +533,7 @@ public class AssignmentService {
                 case "feedback_published"->{ if(r.feedbackId()!=null) target=new TargetDTO("feedback",r.feedbackId(),r.offeringId()); }
                 case "assignment_published"->{ if(r.assignmentId()!=null) target=new TargetDTO("assignment",r.assignmentId(),r.offeringId()); }
                 case "offering_archived"->target=new TargetDTO("offering",r.offeringId(),r.offeringId());
-                case "notice_published"->{ if(r.targetType()!=null) target=new TargetDTO(r.targetType(),r.targetId(),r.offeringId()); }
+                case "notice_published","help_reply"->{ if(r.targetType()!=null) target=new TargetDTO(r.targetType(),r.targetId(),r.offeringId()); }
                 default->{}
             }
         }
@@ -596,7 +609,7 @@ public class AssignmentService {
     private TeacherFeedbackDTO teacherFeedbackView(Feedback f,Submission s) {
         return new TeacherFeedbackDTO(f.id(),f.submissionId(),f.offeringId(),f.assignmentId(),s.assignmentTitleSnapshot(),
                 f.baseVersion(),f.status(),f.finalScore(),s.maxScoreSnapshot(),rubricResults(f),f.overallComment(),
-                List.of(),List.of(),null,teacherBrief(f),f.publishedAt(),null);
+                knowledge.evaluations(f.id()),knowledge.issueTags(f.id()),knowledge.issueTagVersion(f.id()),teacherBrief(f),f.publishedAt(),null);
     }
     /** 教师读取学生学习记录用：按评价 ID 生成教师视图（调用方已校验班级与学生归属）。 */
     TeacherFeedbackDTO teacherFeedbackById(String feedbackId) {
@@ -607,7 +620,7 @@ public class AssignmentService {
     private StudentFeedbackViewDTO studentFeedbackView(Feedback f,Submission s) {
         return new StudentFeedbackViewDTO(f.id(),f.submissionId(),f.offeringId(),f.assignmentId(),s.assignmentTitleSnapshot(),
                 f.baseVersion(),f.status(),f.finalScore(),s.maxScoreSnapshot(),rubricResults(f),f.overallComment(),
-                List.of(),List.of(),null,teacherBrief(f),f.publishedAt(),
+                knowledge.evaluations(f.id()),knowledge.issueTags(f.id()),knowledge.issueTagVersion(f.id()),teacherBrief(f),f.publishedAt(),
                 mapper.findFeedbackMessageId(f.studentId(),f.id()));
     }
     private boolean canSave(Assignment assignment,CourseAccess.Context context) {
@@ -664,7 +677,7 @@ public class AssignmentService {
                 a.estimatedMinutes(),a.maxScore(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
                 knowledgePointIds,a.lateUntil(),a.allowResubmit(),a.maxAttempts(),attemptsUsed,
-                blockedReason==null,blockedReason,a.currentAiPolicyId()!=null?1:null);
+                blockedReason==null,blockedReason,tutoring.policyVersion(a.currentAiPolicyId()));
     }
     private TeacherAssignmentViewDTO teacherDetailView(Assignment a,CourseAccess.Context context) {
         List<AssignmentRequirement> requirements=mapper.getRequirements(a.id());
@@ -676,7 +689,7 @@ public class AssignmentService {
                 a.estimatedMinutes(),a.maxScore(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
                 knowledgePointIds,a.lateUntil(),a.allowResubmit(),a.maxAttempts(),null,null,null,
-                a.currentAiPolicyId()!=null?1:null);
+                tutoring.policyVersion(a.currentAiPolicyId()));
     }
     private TeacherAssignmentDTO teacherAssignmentView(Assignment a) {
         List<AssignmentRequirement> requirements=mapper.getRequirements(a.id());
@@ -690,7 +703,7 @@ public class AssignmentService {
                 a.estimatedMinutes(),knowledgePointIds,a.dueAt(),a.lateUntil(),a.allowResubmit(),a.maxAttempts(),
                 a.maxScore(),rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
                 initialFiles.stream().map(f->new FileDTO(f.filePath(),f.content())).toList(),
-                a.currentAiPolicyId()!=null?1:null,a.id(),a.offeringId(),a.status(),a.publishedAt(),
+                tutoring.policyVersion(a.currentAiPolicyId()),a.id(),a.offeringId(),a.status(),a.publishedAt(),
                 submittedCount,pendingReviewCount);
     }
     /** 学生口径摘要：feedbackStatus 只有 none/published，草稿不外露（提交接口只返回学生本人）。 */
@@ -699,14 +712,14 @@ public class AssignmentService {
         return new SubmissionSummaryDTO(s.id(),s.assignmentId(),s.offeringId(),s.attemptNo(),s.workspaceRevision(),
                 s.submittedAt(),s.isLate(),!s.isCurrent(),f!=null&&"published".equals(f.status())?"published":"none");
     }
-    /** 提交冻结的标准快照；知识点没有提交时快照表，按作业当前关联读取；P1 无 AI 政策版本，aiPolicyVersion 恒 null。 */
+    /** P2 使用冻结知识点及不可变政策版本；旧 P1 提交保留已说明的知识定义缺失限制。 */
     private AssignmentSnapshot assignmentSnapshot(Submission s) {
         List<SubmissionRequirementSnapshot> requirements=mapper.getSubmissionRequirements(s.id());
         List<SubmissionRubricSnapshot> rubric=mapper.getSubmissionRubric(s.id());
         return new AssignmentSnapshot(s.assignmentTitleSnapshot(),
                 requirements.stream().map(SubmissionRequirementSnapshot::requirementText).toList(),
                 rubric.stream().map(r->new AssignmentDTOs.RubricCriterion(r.criterionId(),r.title(),r.description(),r.maxScore())).toList(),
-                s.maxScoreSnapshot(),mapper.listKnowledgeSnapshots(s.assignmentId()),s.contentVersion(),s.dueAtSnapshot(),null);
+                s.maxScoreSnapshot(),knowledge.snapshot(s),s.contentVersion(),s.dueAtSnapshot(),tutoring.policyVersion(s.aiPolicyId()));
     }
     private List<FileDTO> submissionFiles(Submission s) {
         return mapper.getSubmissionFiles(s.id()).stream().map(f->new FileDTO(f.filePath(),f.content())).toList();

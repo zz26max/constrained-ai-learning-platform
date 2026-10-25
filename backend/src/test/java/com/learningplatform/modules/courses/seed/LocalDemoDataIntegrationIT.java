@@ -68,6 +68,11 @@ class LocalDemoDataIntegrationIT {
     void clearOwnContainer() {
         reset(mapper);
         jdbc.update("UPDATE offering_members SET last_chapter_id=NULL");
+        // P2 子记录先于课程、作品与评价清理，保留外键验证。
+        for (String table : List.of("knowledge_evidence", "feedback_knowledge_evaluations", "feedback_issue_tags",
+                "submission_knowledge_snapshot", "learning_events")) {
+            jdbc.update("DELETE FROM " + table);
+        }
         for (String table : List.of("chapter_progress", "resources", "knowledge_points", "chapters",
                 "course_invites", "offering_members", "course_offerings", "courses", "terms", "users")) {
             jdbc.update("DELETE FROM " + table);

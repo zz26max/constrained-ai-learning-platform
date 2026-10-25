@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.modules.helprequests.HelpMapper">
+<resultMap id="request" type="com.learningplatform.modules.helprequests.HelpRows$Request"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="offeringId" column="offering_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="title" column="title" javaType="java.lang.String"/>
+<arg name="content" column="content" javaType="java.lang.String"/>
+<arg name="studentAttempt" column="student_attempt" javaType="java.lang.String"/>
+<arg name="workspaceRevision" column="workspace_revision" javaType="java.lang.Integer"/>
+<arg name="sharedSnapshot" column="shared_snapshot" javaType="java.lang.String"/>
+<arg name="sharedSnapshotExpiresAt" column="shared_snapshot_expires_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="sharedSnapshotPurgedAt" column="shared_snapshot_purged_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="sharedTutoringRequestIds" column="shared_tutoring_request_ids" javaType="java.lang.String"/>
+<arg name="issueTags" column="issue_tags" javaType="java.lang.String"/>
+<arg name="issueTagVersion" column="issue_tag_version" javaType="java.lang.Integer"/>
+<arg name="status" column="status" javaType="java.lang.String"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="updatedAt" column="updated_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="username" column="username" javaType="java.lang.String"/>
+<arg name="displayName" column="display_name" javaType="java.lang.String"/>
+</constructor></resultMap>
+<resultMap id="replyRow" type="com.learningplatform.modules.helprequests.HelpRows$Reply"><constructor>
+<arg name="id" column="id" javaType="java.lang.String"/>
+<arg name="helpRequestId" column="help_request_id" javaType="java.lang.String"/>
+<arg name="authorId" column="author_id" javaType="java.lang.String"/>
+<arg name="content" column="content" javaType="java.lang.String"/>
+<arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="displayName" column="display_name" javaType="java.lang.String"/>
+</constructor></resultMap>
+
+<sql id="selectRequest">SELECT h.*,u.username,u.display_name FROM help_requests h JOIN users u ON u.id=h.student_id</sql>
+<select id="find" resultMap="request"><include refid="selectRequest"/> WHERE h.id=#{id}</select>
+<select id="lock" resultMap="request"><include refid="selectRequest"/> WHERE h.id=#{id} FOR UPDATE</select>
+<sql id="scope">JOIN offering_members m ON m.offering_id=h.offering_id AND m.user_id=h.student_id WHERE 1=1 <if test="studentId != null">AND m.status='active' AND m.role='student' AND h.student_id=#{studentId}</if><if test="offeringId != null">AND h.offering_id=#{offeringId}</if><if test="status != null">AND h.status=#{status}</if></sql>
+<select id="list" resultMap="request"><include refid="selectRequest"/><include refid="scope"/> ORDER BY h.created_at DESC,h.id DESC LIMIT #{size} OFFSET #{offset}</select>
+<select id="count" resultType="long">SELECT COUNT(*) FROM help_requests h <include refid="scope"/></select>
+<insert id="insert">INSERT INTO help_requests(id,offering_id,assignment_id,student_id,title,content,student_attempt,workspace_revision,shared_snapshot,shared_snapshot_expires_at,shared_tutoring_request_ids,issue_tags,issue_tag_version,status,created_at,updated_at) VALUES(#{id},#{offeringId},#{assignmentId},#{studentId},#{title},#{content},#{studentAttempt},#{workspaceRevision},CAST(#{sharedSnapshot} AS JSON),#{sharedSnapshotExpiresAt},CAST(#{sharedTutoringRequestIds} AS JSON),CAST(#{issueTags} AS JSON),#{issueTagVersion},#{status},#{createdAt},#{updatedAt})</insert>
+<update id="status">UPDATE help_requests SET status=#{status},updated_at=#{now} WHERE id=#{id}</update>
+<insert id="reply">INSERT INTO help_replies(id,help_request_id,offering_id,author_id,content,created_at) SELECT #{id},#{helpRequestId},offering_id,#{authorId},#{content},#{createdAt} FROM help_requests WHERE id=#{helpRequestId}</insert>
+<select id="replies" resultMap="replyRow">SELECT r.*,u.display_name FROM help_replies r JOIN users u ON u.id=r.author_id WHERE help_request_id=#{id} ORDER BY created_at,id</select>
+<update id="purge">UPDATE help_requests SET shared_snapshot=NULL,shared_snapshot_purged_at=#{now} WHERE shared_snapshot_expires_at &lt;= #{now} AND shared_snapshot_purged_at IS NULL AND workspace_revision IS NOT NULL</update>
+</mapper>

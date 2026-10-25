@@ -11,6 +11,10 @@ import org.apache.ibatis.annotations.Param;
 /** P1-B 作业与工作区持久化；所有值使用 MyBatis 绑定参数。 */
 @Mapper
 public interface AssignmentMapper {
+    @org.apache.ibatis.annotations.Update("UPDATE feedback SET issue_tag_version=#{version} WHERE id=#{id}")
+    void updateFeedbackIssueTagVersion(@Param("id") String id,@Param("version") Integer version);
+    @org.apache.ibatis.annotations.Update("UPDATE assignments SET current_ai_policy_id=#{policy},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} WHERE id=#{id} AND current_ai_policy_id <=> #{expected} AND status<>'archived'")
+    int bindPolicy(@Param("id") String id,@Param("policy") String policy,@Param("expected") String expected,@Param("now") Instant now);
     // 作业查询
     Assignment findAssignment(String id);
     List<AssignmentSummaryDTO> listStudentAssignments(@Param("studentId") String studentId,@Param("offeringId") String offeringId,

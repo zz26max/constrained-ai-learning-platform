@@ -78,6 +78,11 @@ class OfferingIntegrationIT {
     @BeforeEach
     void prepareIndependentDatabase() {
         // 只清理本类自己的测试容器；先移除可空指针，再按依赖顺序删除，不关闭 FK。
+        // P2 子记录先于课程、作品与评价清理，保留外键验证。
+        for (String table : List.of("knowledge_evidence", "feedback_knowledge_evaluations", "feedback_issue_tags",
+                "submission_knowledge_snapshot", "learning_events")) {
+            jdbc.update("DELETE FROM " + table);
+        }
         jdbc.update("DELETE FROM chapter_progress");
         jdbc.update("UPDATE offering_members SET last_chapter_id=NULL");
         jdbc.update("DELETE FROM resources");

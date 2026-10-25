@@ -465,11 +465,12 @@ FROM notifications WHERE id=#{id}
 <sql id="messageColumns">
 n.id,n.type,n.title,n.content,n.related_offering_id AS offering_id,n.related_assignment_id AS assignment_id,n.related_feedback_id AS feedback_id,
 n.target_type,n.target_id,
-fb.teacher_id AS sender_id,tu.display_name AS sender_display_name,n.created_at,n.read_at
+COALESCE(fb.teacher_id,hr.author_id) AS sender_id,tu.display_name AS sender_display_name,n.created_at,n.read_at
 </sql>
 <sql id="messageJoins">
 LEFT JOIN feedback fb ON fb.id=n.related_feedback_id AND n.type='feedback_published'
-LEFT JOIN users tu ON tu.id=fb.teacher_id
+LEFT JOIN help_replies hr ON hr.id=n.related_help_reply_id AND n.type='help_reply'
+LEFT JOIN users tu ON tu.id=COALESCE(fb.teacher_id,hr.author_id)
 </sql>
 <sql id="messageScope">
 WHERE n.recipient_id=#{recipientId}

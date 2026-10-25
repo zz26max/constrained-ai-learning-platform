@@ -159,7 +159,7 @@ public final class AssignmentInput {
     }
     private static final Set<String> FEEDBACK_FIELDS=Set.of("baseVersion","score","rubricResults","comment","knowledgeEvaluations","issueTags");
     private static final Set<String> RUBRIC_RESULT_FIELDS=Set.of("criterionId","score","comment");
-    /** 通过校验的评价写入内容（契约 FeedbackWrite）；knowledgeEvaluations/issueTags 当前仅接受空数组（无存储列）。 */
+    /** 分数与量规输入；P2 知识评价和标签由 KnowledgeService 校验并同事务保存。 */
     public record FeedbackDraft(int baseVersion,BigDecimal score,List<AssignmentDTOs.RubricResultDTO> rubricResults,String comment) {}
     /** VALIDATION_ERROR，details.fields 按契约至少一项。 */
     public static BusinessException invalidField(String field,String message) {
@@ -190,7 +190,7 @@ public final class AssignmentInput {
     }
     /**
      * saveFeedback 请求体（契约 FeedbackWrite）。未知字段 400 INVALID_REQUEST；缺字段或取值非法 422 VALIDATION_ERROR。
-     * knowledgeEvaluations / issueTags 目前没有存储列：只接受空数组（issueTags 亦可省略），非空返回 422，不静默丢弃。
+     * knowledgeEvaluations / issueTags 的对象归属与词表检查由 KnowledgeService 执行。
      */
     public static FeedbackDraft parseFeedbackWrite(Map<String,Object> body) {
         if(body==null) throw invalid();
@@ -206,10 +206,8 @@ public final class AssignmentInput {
         if(!(body.get("knowledgeEvaluations") instanceof List<?> knowledge)) {
             throw invalidField("knowledgeEvaluations","必须是数组。");
         }
-        if(!knowledge.isEmpty()) throw invalidField("knowledgeEvaluations","当前版本暂不支持保存知识评价，请提交空数组。");
         if(body.containsKey("issueTags")) {
             if(!(body.get("issueTags") instanceof List<?> tags)) throw invalidField("issueTags","必须是数组。");
-            if(!tags.isEmpty()) throw invalidField("issueTags","P1 阶段问题标签只能省略或为空数组。");
         }
         if(!(body.get("rubricResults") instanceof List<?> list)||list.isEmpty()) {
             throw invalidField("rubricResults","至少包含一项评分。");

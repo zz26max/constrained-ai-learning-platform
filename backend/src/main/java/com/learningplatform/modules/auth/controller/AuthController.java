@@ -59,10 +59,13 @@ public class AuthController {
     private final TermQueryService termQueryService;
     private final AuthHttpProperties properties;
     private final Clock clock;
+    private final com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider;
 
     public AuthController(DatabaseSessionService sessions, CsrfTokenService csrfTokens,
                           LoginRateLimiter loginRateLimiter, AuditService auditService,
-                          TermQueryService termQueryService, AuthHttpProperties properties, Clock clock) {
+                          TermQueryService termQueryService, AuthHttpProperties properties, Clock clock,
+                          com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider) {
+        this.tutoringProvider=tutoringProvider;
         this.sessions = sessions;
         this.csrfTokens = csrfTokens;
         this.loginRateLimiter = loginRateLimiter;
@@ -151,7 +154,7 @@ public class AuthController {
                 .map(term -> new TermDTO(term.id(), term.label(), term.startsAt(), term.endsAt()))
                 .toList();
         return new ApiResponse<>(new ConfigDTO("v1", clock.instant().truncatedTo(ChronoUnit.MICROS),
-                "Asia/Shanghai", currentTermId, termDtos, new FeaturesDTO(false, false, false)), requestId);
+                "Asia/Shanghai", currentTermId, termDtos, new FeaturesDTO(tutoringProvider.available(), true, false)), requestId);
     }
 
     private void auditLoginFailure(String rawUsername, String requestId) {

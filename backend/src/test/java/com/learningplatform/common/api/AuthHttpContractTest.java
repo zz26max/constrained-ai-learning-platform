@@ -283,7 +283,7 @@ class AuthHttpContractTest {
                 .andExpect(jsonPath("$.data.currentTermId").isEmpty())
                 .andExpect(jsonPath("$.data.terms").isEmpty())
                 .andExpect(jsonPath("$.data.features.aiTutoring").value(false))
-                .andExpect(jsonPath("$.data.features.learningAnalytics").value(false))
+                .andExpect(jsonPath("$.data.features.learningAnalytics").value(true))
                 .andExpect(jsonPath("$.data.features.serverChecks").value(false));
     }
 

@@ -12,6 +12,7 @@
 | [FRONTEND.md](FRONTEND.md) / [BACKEND.md](BACKEND.md) | 本端工程、状态、存储、事务 | 用户授权的维护任务 |
 | [DEBUGGING.md](DEBUGGING.md) | 后端断点调试与内部实现逐步指引 | 用户授权的维护任务 |
 | [openapi.yaml](openapi.yaml) | 路径、字段、类型、错误与接口实现状态 | 用户授权的维护任务 |
+| [P2 后端联调说明](features/p2-backend-integration.md) | P2 后端范围、依赖、配置、请求示例与前端配合事项 | 后端维护任务 |
 | [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景：[P1-A 课程](features/p1a-courses.md)、[P1-D 前端 UI](features/p1d-frontend-ui.md)、[P1 页面验收清单](features/p1-acceptance-checklist.md)（追踪"契约已实现但未在页面走过"的缺口）、[学生端视觉收敛](features/student-ui-convergence.md) | 用户授权的维护任务 |
 | [archive/](archive/ARCHITECTURE_REVIEW.md) | 历史快照，**不是规范**，逐份见下方归档清单 | 不修改 |
 

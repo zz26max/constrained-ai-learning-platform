@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：本块第一个哈希 `420ab59` 为最近一次基线回填（2026-10-25 P2-B 前端两包合入 master），须为 HEAD 祖先且落后不超过 3 个提交（`validate_contract.py` 强制）。单一分支 `master`：P2-B 前端（事件上报 + 教师学生记录页）在 `frontend/p2b` 分支完成（自 `70af2de` 切出，2026-10-25 fast-forward 合入）；`codex/p2-backend` 为后端进行中快照存档分支（`df27a2d`，与 master 分叉点 `70af2de` 同基）。P1 业务与契约 1.1.1 的最后代码提交：`0862ccb`（backend 小修）、`b3183be`（frontend 契约类型）；其后为文档/校验脚本治理提交、两轮纯前端 UI 打磨、P2-A 前端四包与 P2-B 前端两包，逐条见 §1 会话日志。正式学生端代码基线 `2104167`、正式接入 `d6335b8`、UI 审计起点 `c2c38c9`。
+- **代码基线**：`bd3cf67`（2026-10-25，P2 后端实现与验收收口，远端 CI 对该提交默认全量通过），须为 HEAD 祖先且落后不超过 3 个提交。后端在 codex/p2-backend 隔离工作区完成，已通过 `faf14ac` 同步 master `132ef04`；原快照 `df27a2d` 保留。前端相对 master 无本次改动；[PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11) 已创建，尚未合并。
 
-- **阶段**：P1（课程 / 作业 / 评价 / 多班聚合）的契约、前后端与浏览器验收已闭环，见 §3.8。**P2 前端已在 `frontend/p2` 分支完成 P2-A 全部 UI（mock 并行开发，用户明确本分支只做 UI）：学生 AI 辅导主链路（`65a37d6`）、学生求助流（`be9519e`）、教师求助处理与 help_reply 消息闭环（`33e1052`）、教师 AI 政策配置（`3e67bc2`，政策按作业可变、教师改动学生侧即时生效）；剩余为后端实现与真实联调**；P3（独立运行检查 createCheck/getCheck，2 个操作）尚未开始。P2 契约操作在契约中仍为 `planned`；阶段归属以契约 `x-phase` 与 DEVELOPMENT 为准。
+- **阶段**：P1 原有教学闭环证据见 §3.8。本次 P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，后端任务清单及联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端已有 P2-A UI、P2-B 事件上报与教师学生记录页的 mock 成果；正式浏览器联调另留证据，不据本次后端测试标 verified。P3 自动检查未实现。
 
-- **契约状态**：契约 1.1.1（2026-10-24）；83 个业务操作 + 2 个健康检查，截至 2026-10-24 为 53 个 `implemented`、10 个 `verified`、22 个 `planned`。权威值以 `openapi.yaml` 的 `x-implementation-status` 为准，本节只是时间点快照。
+- **契约状态**：1.1.1，83 个业务操作 + 2 个健康检查，2026-10-25 代码现状为 71 implemented、10 verified、4 planned。P2 的 17 个专属操作及 getLearningRecords 查询入口已接入生产路由；本次只变更实现/审定元数据，字段结构未改，未标 verified。
 
-- **门禁现状**（2026-10-24 实测，UI 打磨第二轮后复跑）：前端 `npm --prefix frontend run verify` 通过（32 个测试文件 / 289 个用例，含类型/构建/生产无 mock）；后端 `./mvnw.cmd --batch-mode verify` **BUILD SUCCESS，387 个单测 + 208 个 Testcontainers 真实 MySQL IT**（V10 迁移后全量实跑；本轮仅改前端与文档，未复跑后端）；`scripts/validate_contract.py` 通过（1.1.1、325 schema、顶层/features/archive 三目录登记与链接全可达）。
+- **门禁现状**（2026-10-25）：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对实现提交 bd3cf67 的默认全量验证为 452 单元/HTTP + 245 MySQL 8.4.11 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；契约/文档和自动前端检查均通过。该 CI 未使用本地 30 秒读取参数。本地一次全量曾有 5 个求助 IT 因既有 V6 读取超时未启动，同代码定向复跑通过，原始记录保留在 §1。静态契约、PowerShell AST 与 diff 检查通过；本地未跑前端检查，未动 3307、未部署。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -85,6 +85,25 @@
 
 契约 83 个业务操作与 2 个健康检查：截至 2026-10-18，53 个为 implemented、10 个为 verified、22 个为 planned。本行只是时间点快照，权威状态以 OpenAPI `x-implementation-status` 为准。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），P1 闭环验收见 §3.8。P2/P3 功能尚未实现。
 
+
+
+### 2026-10-25 P2 后端远端全量验证与 PR
+
+- [PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11)：codex/p2-backend → master，后端实现提交 `bd3cf67`，未合并。该分支相对 master 无前端差异。
+- [CI run 40149776199](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对 `bd3cf67e7474bcfabdc0dc010bd7b63e8f99c277` 的 Backend tests 原始汇总：Tests run: 452, Failures: 0, Errors: 0, Skipped: 0；Tests run: 245, Failures: 0, Errors: 0, Skipped: 0；BUILD SUCCESS，Total time: 04:01 min。未加本地 socketTimeout=30000 参数。
+- 同 run 的 Contract and documents 与 Frontend typecheck, build and tests 也为 success。前端由既有 CI 自动运行，主线程未本地运行或修改前端。本条依据远端 run 的 headSha、job conclusion 和日志汇总；补充完整默认环境证据，不抹去下方本地失败/复跑记录。
+- §0 据此把基线回填到已存在的后端实现提交，并将门禁现状更新为远端默认全量通过。后续仅交接文档补充，不改变已验收的后端代码。
+
+### 2026-10-25 P2 后端交付
+
+- **范围与任务**：P2-A 政策/辅导 8 操作、求助 7 操作；P2-B 词表/事件 2 操作，补通既有 getLearningRecords 查询入口，共 18 个 planned→implemented；P2 专属契约审定为 reviewed，结构仍为 1.1.1，未修改前端或生成类型。证据是本分支 backend/、OpenAPI 元数据及规范差异；§0 据此更新分支基线、阶段、契约计数和真实门禁结果。
+- **已完成**：V11–V13；跨会话单在途与预算、政策收紧重验、工作区版本冻结、受限 provider 适配/审核/安全回退、恢复与终态防迟到；主动共享求助、回复/关闭/通知原子性；四类客户端事件去重/冲突整批回滚、后续可信事件；知识评价与标签保存、发布证据、knowledge-v2 与 freshness/解释、建议及共性问题去重。真实供应商默认关闭；自动物理清理均需显式启用。
+- **规范修正**：经用户确认，沿用每收件人一条 notifications 与发布后不可变关系评价；P1 实际无 learning_events，本次补后续可信事件，不从审计日志伪造历史。新提交冻结知识定义，旧 P1 快照限制保留。政策指针和反馈核心元数据由原模块写入，通知以窄服务加入原事务；工作区与求助只使用局部短事务锁，不跨外部调用持锁。
+- **最终执行证据**：`./mvnw.cmd --batch-mode verify`：452 单元/HTTP 全通过，245 IT 中 240 通过、5 错误，均因 HelpIntegrationIT 的 V6 迁移读取超时（SocketTimeoutException: Read timed out）导致上下文未启动，无业务断言失败。随后同代码执行 `./mvnw.cmd --batch-mode -Dit.test=HelpIntegrationIT -Dspring.datasource.hikari.data-source-properties.socketTimeout=30000 verify`：452 单元/HTTP + 5 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；生产 3 秒读取超时未改。这里记录分次覆盖，不宣称一次全量全绿。更早两轮的迁移数量、测试 CSRF 会话 ID 和缺必填参数 422 断言问题已修正，最终相关场景均通过。
+- **其他检查**：validate_contract.py PASS（83 业务 + 2 健康，325 schemas，71 implemented / 10 verified / 4 planned，34 文档登记、267 当前链接）；PowerShell Parser 与 ContainsKey 调用参数数检查 PASS；git diff --check PASS；前端相对 master 的净差异为零。未从旧 surefire 报告累加用例数。
+- **实现选择**：标准库兼容 JSON HTTP 提供商适配；无政策时返回版本 0 且禁用；新班词表为空时使用与初始化迁移一致的默认版本；共性问题仅聚合当前词表版本；物理清理显式启用。上述选择已写入联调说明，不改变契约字段或人工成绩。
+- **实际 SmartFlow**：balanced；p2_scan（sf_scan）只读定位；tutoring_build、help_build（sf_build）分文件实现；p2_review（sf_review）独立审查并复核三项修复与同事务边界。辅导实现代理曾因额度中断，后续由主线程接管，最终测试以上述真实 Maven 输出为准；审查代理未运行测试。
+- **未执行与边界**：未配置或调用真实外部模型；未迁移当前 3307 数据库、未清理真实数据、未部署；正式页面联调和生产迁移须另留证据。独立审查未实测物理清理与并发读取的组合行为；保留期限读取占位及隔离库显式清理已有测试。具体请求例子及前端配合事项见 [P2 后端联调说明](features/p2-backend-integration.md)。
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
 
