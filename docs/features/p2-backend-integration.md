@@ -60,6 +60,31 @@ AI、求助副本和客户端事件的定时清理分别由 `AI_RETENTION_CLEANU
 
 教师评价沿用 saveFeedback/publishFeedback，知识评价只允许提交快照中的知识点，问题标签来自班级词表。草稿不生成知识证据；发布、证据、可信事件、通知同事务。重复发布不增加证据或提醒。学生及教师学习记录沿用既有端点，也可使用 `getLearningRecords` 的 offeringId 查询入口。
 
+### 知识评价联调示例
+
+教师先 GET `/api/v1/submissions/{submissionId}`，从返回的 `assignmentSnapshot.knowledgePoints` 选择知识点；仅创建班级知识点还不够，作业必须在发布前关联知识点，再由学生保存并提交，才能冻结到该次提交中。不要直接改数据库或修改已发布作业来补快照。
+
+例如某份提交快照有单个满分 100 的 `analysis` 量规项，教师 POST `/api/v1/teacher/submissions/{submissionId}/feedback`：
+
+```json
+{
+  "baseVersion":0,
+  "score":80,
+  "rubricResults":[{"criterionId":"analysis","score":80,"comment":"请补充验证过程"}],
+  "comment":"请根据现象说明原因",
+  "knowledgeEvaluations":[{"knowledgePointId":"<快照中的知识点 UUID>","result":"needs_practice","note":"尚未解释可用宽度"}],
+  "issueTags":["box_model"]
+}
+```
+
+实际请求须覆盖该快照的全部量规项，标签须从当前班级词表选择。首次保存返回 201，后续保存以返回的 version 作为 baseVersion；学生此时不可读取草稿。教师再 POST `/api/v1/teacher/submissions/{submissionId}/feedback/publish`，正文为 `{"baseVersion":<保存返回的 version>}`。发布后学生 GET `/api/v1/me/feedback/{feedbackId}` 能读取知识评价及本人 messageId，学习记录反映已发布证据；重复发布不增加证据或通知。
+
+### 自动化验收边界
+
+`TutoringIntegrationIT` 将请求受理、真实配置适配器、本机 HTTP 桩、worker、隔离 MySQL 和 HTTP 轮询串联，覆盖 completed、上游 503 与畸形响应的 failed/PROVIDER_UNAVAILABLE。失败不生成助手正文或提升提示进度，上游诊断和凭据不进入公开错误。测试直接调用 worker.execute，不验证后台扫描/线程池时序，也不代表真实供应商已验收。
+
+`AnalyticsIntegrationIT` 使用真实 Cookie 会话和 CSRF 验证含知识点快照的教师 HTTP 保存/发布、学生读取、学习记录、通知和证据幂等。它证明后端写路径，不代替正式页面操作证据。两组均仅使用 Testcontainers 临时 MySQL 和虚构材料，不访问 3307。外部供应商仍由后续配置启用，本轮保持双开关关闭。
+
 ## 验收与前端配合
 
 本次后端任务清单：

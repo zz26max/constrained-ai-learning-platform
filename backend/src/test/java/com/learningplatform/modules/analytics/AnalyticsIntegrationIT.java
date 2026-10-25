@@ -209,6 +209,55 @@ class AnalyticsIntegrationIT {
 
     private int offeringSeq = 0;
 
+    @Test void knowledgeFeedbackHttpWritePublishesFrozenEvidenceAndStudentView() throws Exception {
+        var o=createOffering();enrollStudent(o.id(),STUDENT);
+        String kp=knowledgePoint(o.id()),sid=submission(o.id(),kp);
+        var teacherGrant=httpLogin(TEACHER);
+        var studentGrant=httpLogin(STUDENT);
+        var teacherCookie=new jakarta.servlet.http.Cookie("lp_session",teacherGrant.token());
+        var studentCookie=new jakarta.servlet.http.Cookie("lp_session",studentGrant.token());
+        var detail=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/submissions/"+sid).cookie(teacherCookie))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        assertThat(JSON.readTree(detail.getResponse().getContentAsString()).path("data").path("assignmentSnapshot").path("knowledgePoints").get(0).path("id").asText()).isEqualTo(kp);
+        // A later catalog edit cannot change the submitted definition used for review.
+        jdbc.update("UPDATE knowledge_points SET title='renamed after submission' WHERE id=?",kp);
+        String path="/api/v1/teacher/submissions/"+sid+"/feedback";
+        var write=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).cookie(teacherCookie).header("Origin","http://127.0.0.1:4173").contentType("application/json").content(JSON.writeValueAsString(feedback(kp,"needs_practice")));
+        mvc.perform(write).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        var saved=mvc.perform(write.header("X-CSRF-Token",csrf.sessionToken(teacherGrant.id(),teacherGrant.csrfSecret())))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated()).andReturn();
+        var draft=JSON.readTree(saved.getResponse().getContentAsString()).path("data");
+        String feedbackId=draft.path("id").asText();int version=draft.path("version").asInt();
+        assertThat(draft.path("knowledgeEvaluations").get(0).path("result").asText()).isEqualTo("needs_practice");
+        assertThat(draft.path("issueTags").get(0).asText()).isEqualTo("box_model");
+        assertThat(draft.path("issueTagVersion").asInt()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_evidence",Integer.class)).isZero();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/me/feedback/"+feedbackId).cookie(studentCookie))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        for(int replay=0;replay<2;replay++) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path+"/publish").cookie(teacherCookie).header("Origin","http://127.0.0.1:4173").header("X-CSRF-Token",csrf.sessionToken(teacherGrant.id(),teacherGrant.csrfSecret())).contentType("application/json").content(JSON.writeValueAsString(Map.of("baseVersion",version))))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        }
+        var visible=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/me/feedback/"+feedbackId).cookie(studentCookie))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        var published=JSON.readTree(visible.getResponse().getContentAsString()).path("data");
+        assertThat(published.path("knowledgeEvaluations").get(0).path("knowledgePointId").asText()).isEqualTo(kp);
+        assertThat(published.path("issueTags").get(0).asText()).isEqualTo("box_model");
+        assertThat(published.path("messageId").asText()).isNotBlank();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM knowledge_evidence WHERE feedback_id=?",Integer.class,feedbackId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE related_feedback_id=?",Integer.class,feedbackId)).isEqualTo(1);
+        var record=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/me/learning-records").param("offeringId",o.id()).cookie(studentCookie))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        assertThat(JSON.readTree(record.getResponse().getContentAsString()).path("data").path("summary").path("needsPracticeCount").asInt()).isEqualTo(1);
+        assertThat(((SubmissionDetailDTO)assignmentService.getSubmission(STUDENT,sid)).assignmentSnapshot().knowledgePoints().getFirst().title()).isEqualTo("fixture");
+    }
+
+    private com.learningplatform.modules.auth.model.SessionGrant httpLogin(UserDTO user) {
+        String password="knowledge-http-test-only-password";
+        jdbc.update("UPDATE users SET password_hash=? WHERE id=?",passwords.encode(password),user.id());
+        return sessions.login(user.username(),password,null,"knowledge-http");
+    }
+
     @Test void allClientEventTypesUseWhitelistedObjectsAndPayloads() {
         var o=createOffering();enrollStudent(o.id(),STUDENT);var a=publishAssignment(o.id(),"Events task");
         String chapter=UUID.randomUUID().toString(),resource=UUID.randomUUID().toString();

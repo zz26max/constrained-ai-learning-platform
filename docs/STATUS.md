@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`1c97cfc`（2026-10-25，P2 后端经 PR #11 合并（merge `9c84632`）+ 前端真实联调修正与登出冻结修复），须为 HEAD 祖先且落后不超过 3 个提交。后端实现在 codex/p2-backend 隔离工作区完成，远端 CI 对 `bd3cf67` 默认全量通过；原快照 `df27a2d` 保留。合并后前端同日完成：契约类型重新生成（字段结构无变化）、真实模式浏览器联调（见 §1）、求助共享复选框契约修正与登出渲染冻结修复。
+- **代码基线**：`ab13914`（2026-10-25，P2 后端经 PR #11 合并；前端知识评价 UI 已交付，本轮补齐后端 HTTP 闭环验收），须为 HEAD 祖先且落后不超过 3 个提交。当前分支 codex/p2-backend-acceptance，生产实现沿用合并后的代码；本轮新增测试与交接文档，不改前端。
 
-- **阶段**：P1 原有教学闭环证据见 §3.8。本次 P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，后端任务清单及联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端已有 P2-A UI、P2-B 事件上报与教师学生记录页的 mock 成果；**2026-10-25 真实模式浏览器联调已通过**（政策 0→1 配置、索答 fallback 异步闭环、求助创建/教师回复/help_reply 受控跳转、chapter_opened 事件落库，见 §1）。前端剩余：教师知识评价/标签输入 UI（P2-B）。P3 自动检查未实现。
+- **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端知识评价/标签 UI 已由 `801c940` 完成（前端交接及 `986d854` 日志为依据）。已有真实模式浏览器证据包括政策配置、索答 fallback、求助回复/消息跳转及 chapter_opened。后端本轮新增配置适配器 completed/failed 与知识评价 HTTP 写入闭环证据，未执行真实供应商或正式页面新一轮联调；外部调用按用户确认保持关闭。P3 自动检查未实现。
 
 - **契约状态**：1.1.1，83 个业务操作 + 2 个健康检查，2026-10-25 代码现状为 71 implemented、10 verified、4 planned。P2 的 17 个专属操作及 getLearningRecords 查询入口已接入生产路由；本次只变更实现/审定元数据，字段结构未改，未标 verified。
 
-- **门禁现状**（2026-10-25）：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对实现提交 bd3cf67 的默认全量验证为 452 单元/HTTP + 245 MySQL 8.4.11 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；契约/文档和自动前端检查均通过。该 CI 未使用本地 30 秒读取参数。本地一次全量曾有 5 个求助 IT 因既有 V6 读取超时未启动，同代码定向复跑通过，原始记录保留在 §1。静态契约、PowerShell AST 与 diff 检查通过。合并后前端实测：`npm --prefix frontend run verify` 通过（37 文件/330 用例）；本地 3307 已于备份（`temp/learning-platform-backup-2026-10-25.sql`，不入库）后应用 V11–V13，后端本地重启联调。
+- **门禁现状**（2026-10-25）：本轮 `ab13914` 定向 verify：452 单元/HTTP + 36 MySQL 8.4.11 IT（Analytics 11、Tutoring 25），0 失败/错误/跳过，BUILD SUCCESS；不是全套 IT。静态契约及 diff 检查通过。本轮不跑前端测试、不操作 3307。此前完整后端门禁：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对 bd3cf67 默认全量通过 452 单元/HTTP + 245 MySQL IT；该轮本地容器超时及定向重跑记录保留在 §1。现有 3307 到 V13，备份在 temp/，来自前一轮获准迁移。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -223,6 +223,15 @@
 
 - 前端退出的“已恢复一次”标记只在退出成功或重新登录后重置；同一页面会话中隔很久再遇到 CSRF 失败会直接要求重新登录。行为偏保守但安全。
 - 后端 `LoginRateLimiter.onSuccess(String key)` 现在只被测试 `AuthHttpContractTest` 用来重置状态，宜改为测试专用方法，避免生产代码误用。
+
+### 2026-10-25 P2 后端剩余路径核对与自动化验收
+
+- **范围核对**：以 master `986d854` 和前端交接为起点，P2 生产实现已经 PR #11 合并。定向扫描未发现交接三条路径的生产缺口；新增验收测试，不重复实现业务。独立分支 codex/p2-backend-acceptance，保留原未跟踪审计文件，前端零修改。
+- **完成清单**：受理 POST→真实 ConfiguredTutoringProvider→本机 HTTP 桩→worker/MySQL→GET 轮询 completed；上游 503/畸形 JSON→failed/PROVIDER_UNAVAILABLE、无助手正文/进度及上游信息泄漏；含知识点提交快照→真实登录/CSRF→教师保存/发布→学生读取→证据/通知幂等与学习记录聚合。新增 4 项 IT；测试直接调用 worker.execute，不覆盖调度器线程时序。
+- **测试**：`ab13914` 执行 `./mvnw.cmd --batch-mode -Dit.test=TutoringIntegrationIT,AnalyticsIntegrationIT verify`：452 单元/HTTP、36 MySQL 8.4.11 IT（Analytics 11、Tutoring 25），0 失败/错误/跳过，BUILD SUCCESS。日志位于被忽略的 backend/target/p2-acceptance-verify.log。不累加旧报告，不宣称本轮全套 IT 已跑。系统 Python 缺少 openapi_spec_validator，使用仓库 .contract-venv 执行 validate_contract.py 后 PASS；git diff --check PASS。
+- **文档与决定**：延续此前授权，将 BACKEND 图表残留的通知收件人表、P1 事件表及历史知识证据回填描述与既有正文/生产迁移统一，无契约或业务规则变化。联调说明增加知识评价请求示例、快照准备条件和自动化边界。§0 同步基线、本轮门禁及前端已交付状态，依据为实际代码和测试输出。用户再次确认外部调用保持关闭。
+- **实际 SmartFlow**：balanced；本轮仅委派 p2_remaining_scan（sf_scan）一次只读定向扫描，已完成，未运行测试或改文件；主线程实施和测试。本轮不改鉴权、权限、迁移或生产配置，不另派独立审查；上一轮 p2_review 不计作本轮执行。
+- **后续与边界**：真实供应商配置后再验证兼容性。正式前端可按联调说明验证 completed、failed 及知识评价写入，页面联调不作为后端实现未完成。本轮未读 .env、未连接/迁移/清理 3307、未部署；生产代码和接口结构保持不变。
 
 ## 2. 交接说明（2026-10-15）
 
