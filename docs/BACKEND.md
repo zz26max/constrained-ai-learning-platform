@@ -90,8 +90,7 @@ erDiagram
   TUTORING_REQUESTS ||--o{ TUTORING_PROVIDER_CALLS : invokes
   TUTORING_REQUESTS ||--o{ TUTORING_MESSAGES : contains
   FEEDBACK ||--o{ KNOWLEDGE_EVIDENCE : supports
-  NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : delivers
-  USERS ||--o{ NOTIFICATION_RECIPIENTS : reads
+  USERS ||--o{ NOTIFICATIONS : receives
 ```
 
 `course_offering` 是权限与学情隔离的基本单元。章节/知识点在教学班实例内维护，避免改一个班影响同课程其他班。
@@ -226,7 +225,7 @@ P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=nul
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
 | `notifications` | `id, recipient_id, type, title, content, related_offering_id, related_assignment_id, related_feedback_id, target_type, target_id, is_read, read_at, created_at` | 每收件人一条；数据库类型为 feedback_published/assignment_published/offering_archived/notice_published/help_reply，服务映射到契约类型；P2 回复来源唯一键防重 |
-| `learning_events` | `id, user_id, offering_id, assignment_id, chapter_id, client_event_id, source_event_key, session_id, type, source, occurred_at, received_at, payload` | P1 先建最小表并仅写 source=server；P2 开放 client，P3 开放 checker；非空 source_event_key 唯一；非空 client_event_id 有 UNIQUE(user_id,client_event_id) |
+| `learning_events` | `id, user_id, offering_id, assignment_id, chapter_id, client_event_id, source_event_key, session_id, type, source, occurred_at, received_at, payload` | P2 新建并记录后续 server/client 事件，P3 开放 checker；非空 source_event_key 唯一；非空 client_event_id 有 UNIQUE(user_id,client_event_id) |
 
 课程项目规模下，评价发布、公告创建、作业发布及 P2 教师回复，均在原业务事务内同步写入每位收件人的 `notifications`，任一写入失败整体回滚。成功返回后本人消息即可查询；`StudentFeedbackDTO.messageId` 与 `NotificationDTO.id` 均对应本人 `notifications.id`，用于 `/me/messages/{messageId}/read`。不引入共享通知实体或独立收件人表；业务状态与来源唯一约束负责防重。
 
@@ -345,7 +344,7 @@ P2 新建 `learning_events`（P1 实际只有审计日志），并开放客户�
 
 P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有效证据查询计算，返回 `ruleVersion/asOf/evidenceIds`；只有确认查询瓶颈后才加入可重建的缓存/物化表，避免让缓存成为唯一事实。
 
-教师已发布知识评价是当前 `knowledge-v2` 的唯一掌握证据；分析不引用草稿评价。学生有关联任务真正进行中可以决定 learning，但不是通过证据；历史只有一次 meets_expectation 且没有进行中任务时仍为 insufficient_evidence，不能无限期称为正在学习。对外状态引用 [KnowledgeAssessment.assessmentState](openapi.yaml#/components/schemas/KnowledgeAssessment/properties/assessmentState)，不与教师单条 result 混用；具体优先级及 freshness 按 DEVELOPMENT 8.2 计算，不添加可任意写入的状态列。P1 不建 knowledge_evidence，P2 启用后从既有已发布评价幂等回填。
+教师已发布知识评价是当前 `knowledge-v2` 的唯一掌握证据；分析不引用草稿评价。学生有关联任务真正进行中可以决定 learning，但不是通过证据；历史只有一次 meets_expectation 且没有进行中任务时仍为 insufficient_evidence，不能无限期称为正在学习。对外状态引用 [KnowledgeAssessment.assessmentState](openapi.yaml#/components/schemas/KnowledgeAssessment/properties/assessmentState)，不与教师单条 result 混用；具体优先级及 freshness 按 DEVELOPMENT 8.2 计算，不添加可任意写入的状态列。P1 未保存知识评价，没有历史知识结论可回填；P2 从后续发布的知识评价生成证据。
 
 ## 6. P3：自动检查
 
