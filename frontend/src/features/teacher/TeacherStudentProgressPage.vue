@@ -78,7 +78,7 @@ const recommendationLink = computed(() => {
 
 <template>
   <div class="workspace-page teacher-page teacher-student-progress">
-    <RouterLink class="teacher-back" :to="{ name: 'teacher-offering', params: { id: offeringId ?? '' } }">返回教学班工作台</RouterLink>
+    <RouterLink v-if="offeringId !== null" class="teacher-back" :to="{ name: 'teacher-offering', params: { id: offeringId } }">返回教学班工作台</RouterLink>
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">{{ records?.student.displayName ?? '学生学习记录' }}</h1>

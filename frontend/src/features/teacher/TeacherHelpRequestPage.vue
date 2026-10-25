@@ -89,7 +89,7 @@ async function close(): Promise<void> {
 
 <template>
   <div class="workspace-page teacher-page teacher-help-detail">
-    <RouterLink class="teacher-back" :to="{ name: 'teacher-offering', params: { id: detail?.offeringId ?? '' } }">返回教学班工作台</RouterLink>
+    <RouterLink v-if="detail !== null" class="teacher-back" :to="{ name: 'teacher-offering', params: { id: detail.offeringId } }">返回教学班工作台</RouterLink>
     <header class="workspace-heading">
       <div>
         <h1 tabindex="-1">{{ detail?.title ?? '求助处理' }}</h1>
