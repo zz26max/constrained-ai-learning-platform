@@ -17,6 +17,7 @@ import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.mysql.MySQLContainer;
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties={"AUTH_INVITE_SIGNING_KEY=test-only-invite-signing-key-at-least-32-characters","AI_WORKER_ENABLED=false"})
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @Testcontainers @Import(TutoringIntegrationIT.Config.class) @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class TutoringIntegrationIT {
  static final Instant NOW=Instant.parse("2026-10-24T08:00:00Z");
@@ -24,7 +25,11 @@ class TutoringIntegrationIT {
  @DynamicPropertySource static void properties(DynamicPropertyRegistry r){r.add("spring.datasource.url",mysql::getJdbcUrl);r.add("spring.datasource.username",mysql::getUsername);r.add("spring.datasource.password",mysql::getPassword);}
  @Autowired TutoringService service;@Autowired TutoringWorker worker;@Autowired TutoringQueryService query;@Autowired JdbcTemplate jdbc;@Autowired CourseService courses;@Autowired AssignmentService assignments;@Autowired FakeProvider provider;@Autowired org.springframework.transaction.PlatformTransactionManager transactions;
  UserDTO student,teacher;String assignment,offering,session;Map<String,Object> assignmentBody;
- @BeforeEach void seed(){provider.calls=0;provider.available=true;provider.bad=false;provider.timeout=false;provider.onCall=null;provider.last=null;
+ @Autowired org.springframework.test.web.servlet.MockMvc mvc;
+ @Autowired com.learningplatform.modules.auth.service.DatabaseSessionService authSessions;
+ @Autowired com.learningplatform.modules.auth.security.CsrfTokenService csrf;
+ @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
+ @BeforeEach void seed(){provider.delegate=null;provider.calls=0;provider.available=true;provider.bad=false;provider.timeout=false;provider.onCall=null;provider.last=null;
   student=user("student");teacher=user("teacher");for(var u:List.of(student,teacher))jdbc.update("INSERT INTO users(id,username,display_name,password_hash,roles,status,created_at,updated_at) VALUES(?,?,?,'TEST_ONLY',CAST(? AS JSON),'active',?,?)",u.id(),u.username(),u.displayName(),"[\""+u.roles().getFirst()+"\"]",ts(NOW),ts(NOW));
   String term=id(),course=id();jdbc.update("INSERT INTO terms(id,label,starts_at,ends_at,is_current,created_at,updated_at) VALUES(?,?,?, ?,0,?,?)",term,"测试学期",ts(NOW.minusSeconds(10000)),ts(NOW.plusSeconds(900000)),ts(NOW),ts(NOW));
   jdbc.update("INSERT INTO courses(id,code,mark,title,description,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,'active',?,?,?)",course,id(),"AI","辅导测试","虚构数据",teacher.id(),ts(NOW),ts(NOW));
@@ -60,8 +65,58 @@ class TutoringIntegrationIT {
  @Test void concurrentEnqueueHasExactlyOneWinner()throws Exception{String second=(String)service.create(student,Map.of("assignmentId",assignment)).get("id");var start=new CountDownLatch(1);try(var pool=Executors.newVirtualThreadPerTaskExecutor()){List<Future<String>> futures=new ArrayList<>();for(String sid:List.of(session,second))futures.add(pool.submit(()->{start.await();try{return (String)service.send(student,sid,Map.of("action","ask","content","如何观察")).get("tutoringRequestId");}catch(BusinessException e){return e.getCode();}}));start.countDown();List<String> outcomes=new ArrayList<>();for(var f:futures)outcomes.add(f.get(8,TimeUnit.SECONDS));assertThat(outcomes.stream().filter("AI_REQUEST_IN_PROGRESS"::equals).count()).isEqualTo(1);assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tutoring_requests WHERE student_id=? AND status IN ('queued','running')",Integer.class,student.id())).isEqualTo(1);}}
  @Test void policyCompositeForeignKeysRejectCrossAssignment(){String second=assignments.createAssignment(teacher,offering,assignmentBody,"it").id();String firstPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,assignment);assertThatThrownBy(()->jdbc.update("UPDATE assignments SET current_ai_policy_id=? WHERE id=?",firstPolicy,second)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);service.updatePolicy(teacher,second,policy(0));String otherPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,second);assignments.saveWorkspace(student,assignment,Map.of("baseRevision",0,"files",List.of(Map.of("path","answer.md","content","reflection")),"activeFile","answer.md"),"it");var submission=assignments.submitAssignment(student,assignment,Map.of("workspaceRevision",1,"reflection","分析空间"),"it").submission();assertThatThrownBy(()->jdbc.update("UPDATE submissions SET ai_policy_id=? WHERE id=?",otherPolicy,submission.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);}
  @Test void expiredQueuedBodyIsNeverTransmitted(){String r=send("ask","如何观察",null);jdbc.update("UPDATE tutoring_requests SET content_expires_at=? WHERE id=?",ts(NOW),r);worker.execute(r);assertThat(provider.calls).isZero();assertThat(service.request(student,r).get("status")).isEqualTo("failed");}
+ @Test void configuredHttpProviderCompletesThroughAuthenticatedPolling() throws Exception {
+  configuredProviderRoundTrip(200,false,"completed",null);
+ }
+ @Test void configuredHttpProviderFailureExposesNoAnswerOrUpstreamBody() throws Exception {
+  configuredProviderRoundTrip(503,false,"failed","PROVIDER_UNAVAILABLE");
+ }
+ @Test void malformedProviderReplyFailsWithoutRetryOrAssistantMessage() throws Exception {
+  configuredProviderRoundTrip(200,true,"failed","PROVIDER_UNAVAILABLE");
+ }
+ private void configuredProviderRoundTrip(int upstreamStatus,boolean malformed,String expectedStatus,String errorCode) throws Exception {
+  var json=tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();
+  var calls=new java.util.concurrent.atomic.AtomicInteger();
+  var received=new java.util.concurrent.atomic.AtomicReference<String>();
+  var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+  String answer="先比较容器可用空间，再记录现象。";
+  String output=json.writeValueAsString(Map.of("mode","concept","hintLevel",1,"content",answer,"nextAction","try_and_report"));
+  String response=upstreamStatus!=200?"UPSTREAM_PRIVATE_DIAGNOSTIC":malformed?"not-json":json.writeValueAsString(Map.of("choices",List.of(Map.of("message",Map.of("content",output))),"usage",Map.of("prompt_tokens",20,"completion_tokens",10)));
+  server.createContext("/chat",exchange->{calls.incrementAndGet();received.set(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));byte[] bytes=response.getBytes(java.nio.charset.StandardCharsets.UTF_8);exchange.getResponseHeaders().add("Content-Type","application/json");exchange.sendResponseHeaders(upstreamStatus,bytes.length);try(var body=exchange.getResponseBody()){body.write(bytes);}exchange.close();});
+  server.start();
+  try {
+   provider.delegate=new com.learningplatform.modules.tutoring.provider.ConfiguredTutoringProvider(json,true,true,"http://127.0.0.1:"+server.getAddress().getPort()+"/chat","test-only-provider-key","test-model");
+   String password="tutoring-http-test-only-password";
+   jdbc.update("UPDATE users SET password_hash=? WHERE id=?",passwords.encode(password),student.id());
+   var grant=authSessions.login(student.username(),password,null,"tutoring-http");
+   var cookie=new jakarta.servlet.http.Cookie("lp_session",grant.token());
+   var accepted=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/tutoring/sessions/"+session+"/messages").cookie(cookie).header("Origin","http://127.0.0.1:4173").header("X-CSRF-Token",csrf.sessionToken(grant.id(),grant.csrfSecret())).contentType("application/json").content("{\"action\":\"ask\",\"content\":\"如何分析布局\"}"))
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isAccepted()).andReturn();
+   String requestId=json.readTree(accepted.getResponse().getContentAsString()).path("data").path("tutoringRequestId").asText();
+   worker.execute(requestId);
+   var polled=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/tutoring/requests/"+requestId).cookie(cookie))
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.status").value(expectedStatus)).andReturn();
+   String body=polled.getResponse().getContentAsString();
+   TutoringSchemaAssertions.response("Response_getTutoringRequest",body);
+   assertThat(body).doesNotContain("UPSTREAM_PRIVATE_DIAGNOSTIC","test-only-provider-key",password);
+   assertThat(calls.get()).isEqualTo(1);
+   assertThat(received.get()).contains("test-model").doesNotContain(student.id(),student.username(),grant.token());
+   assertThat(jdbc.queryForObject("SELECT provider_call_count FROM tutoring_requests WHERE id=?",Integer.class,requestId)).isEqualTo(1);
+   var data=json.readTree(body).path("data");
+   if(errorCode==null){
+    assertThat(data.path("result").path("content").asText()).isEqualTo(answer);
+    assertThat(data.path("error").isNull()).isTrue();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM learning_events WHERE source_event_key=?",Integer.class,"tutoring:"+requestId)).isEqualTo(1);
+   } else {
+    assertThat(data.path("result").isNull()).isTrue();
+    assertThat(data.path("error").path("code").asText()).isEqualTo(errorCode);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tutoring_messages WHERE tutoring_request_id=? AND role='assistant'",Integer.class,requestId)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tutoring_progress WHERE student_id=? AND assignment_id=?",Integer.class,student.id(),assignment)).isZero();
+   }
+  } finally {provider.delegate=null;server.stop(0);}
+ }
  static void assertCode(Runnable r,String code){assertThatThrownBy(r::run).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.getCode()).isEqualTo(code));}
  static String id(){return UUID.randomUUID().toString();}static java.sql.Timestamp ts(Instant i){return java.sql.Timestamp.from(i);}static UserDTO user(String role){String id=id();return new UserDTO(id,role+id.substring(0,8),"虚构测试用户",List.of(role));}
  @TestConfiguration(proxyBeanMethods=false) static class Config {@Bean @Primary Clock clock(){return Clock.fixed(NOW,ZoneOffset.UTC);}@Bean @Primary FakeProvider fake(){return new FakeProvider();}}
- static class FakeProvider implements TutoringProvider {Context last;int calls;boolean available=true,bad,timeout;Runnable onCall;public boolean available(){return available;}public Output generate(Context c)throws Exception{last=c;calls++;if(onCall!=null){var task=onCall;onCall=null;task.run();}if(timeout)throw new java.net.http.HttpTimeoutException("test");return new Output(c.allowedModes().getFirst(),c.hintLevel(),bad?"```js code```":"先比较容器可用空间，再记录现象。","try_and_report",20,10);}}
+ static class FakeProvider implements TutoringProvider {TutoringProvider delegate;Context last;int calls;boolean available=true,bad,timeout;Runnable onCall;public boolean available(){return delegate!=null?delegate.available():available;}public Output generate(Context c)throws Exception{last=c;calls++;if(delegate!=null)return delegate.generate(c);if(onCall!=null){var task=onCall;onCall=null;task.run();}if(timeout)throw new java.net.http.HttpTimeoutException("test");return new Output(c.allowedModes().getFirst(),c.hintLevel(),bad?"```js code```":"先比较容器可用空间，再记录现象。","try_and_report",20,10);}}
 }
