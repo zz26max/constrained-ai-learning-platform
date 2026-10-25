@@ -5,6 +5,7 @@ import { assignmentHandlers, resetMockAssignmentState } from './assignments'
 import { feedbackHandlers, resetMockFeedbackState } from './feedback'
 import { dashboardHandlers, resetMockDashboardState } from './dashboard'
 import { tutoringHandlers, resetMockTutoringState } from './tutoring'
+import { analyticsHandlers, resetMockAnalyticsState } from './analytics'
 import { applySetCookies, currentCookies, resetMockCookies } from './jar'
 import { MockNotImplementedError, toTransportResponse, type MockHandler } from './types'
 
@@ -19,6 +20,7 @@ const handlers: Record<string, MockHandler> = {
   ...feedbackHandlers,
   ...dashboardHandlers,
   ...tutoringHandlers,
+  ...analyticsHandlers,
 }
 
 function findHandler(operationId: string): MockHandler | undefined {
@@ -58,4 +60,4 @@ export const mockTransport: Transport = {
   },
 }
 
-export { resetMockAuthState, resetMockCookies, resetMockCourseState, resetMockAssignmentState, resetMockFeedbackState, resetMockDashboardState, resetMockTutoringState }
+export { resetMockAuthState, resetMockCookies, resetMockCourseState, resetMockAssignmentState, resetMockFeedbackState, resetMockDashboardState, resetMockTutoringState, resetMockAnalyticsState }

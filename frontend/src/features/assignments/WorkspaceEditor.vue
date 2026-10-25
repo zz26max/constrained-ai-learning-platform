@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/auth'
 import { isUuid } from './format'
 import { pageError } from '../courses/page-error'
 import { retainWorkspace, takeWorkspace } from './workspace-recovery'
+import { trackLearningEvent, EDITOR_FILES, type EditorFile } from '../analytics/reporter'
 import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
 
@@ -46,6 +47,11 @@ function activateFileTab(index: number) {
   const file = query.data.value?.files[index]
   if (file) activeTab.value = file.path
 }
+// 学习事件：编辑器/预览打开（DEVELOPMENT §8.1）；activeFile 只在契约白名单内上报。
+watch([() => assignmentQuery.data.value, activeTab], ([assignment, tab]) => {
+  if (assignment === null || tab === null || !EDITOR_FILES.includes(tab as EditorFile)) return
+  trackLearningEvent({ type: 'editor_opened', offeringId: assignment.offeringId, assignmentId: assignment.id, activeFile: tab as EditorFile })
+}, { immediate: true })
 const fileContents = ref<Record<string, string>>({})
 const submitDialog = ref<HTMLDialogElement | null>(null)
 const reflection = ref('')
@@ -344,7 +350,7 @@ onBeforeUnmount(() => {
           @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
         />
       </section>
-      <WebPreview v-if="assignmentQuery.data.value?.type === 'web_lab'" :key="editingAssignmentId" :files="fileContents" />
+      <WebPreview v-if="assignmentQuery.data.value?.type === 'web_lab'" :key="editingAssignmentId" :files="fileContents" :offering-id="assignmentQuery.data.value.offeringId" :assignment-id="editingAssignmentId" />
     </template>
 
     <dialog

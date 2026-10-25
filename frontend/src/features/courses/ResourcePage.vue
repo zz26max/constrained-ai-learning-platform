@@ -6,6 +6,7 @@ import ApiState from '../../components/ApiState.vue'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import { usePageQuery } from './use-page-query'
 import { isUuid } from './format'
+import { trackLearningEvent } from '../analytics/reporter'
 const route = useRoute(), api = coursesApi()
 const query = usePageQuery(async signal => {
   const id = route.params['resourceId']
@@ -14,6 +15,9 @@ const query = usePageQuery(async signal => {
   const [offering, chapter] = await Promise.all([api.getOffering(resource.data.offeringId, { signal }), api.getChapter(resource.data.chapterId, { signal })])
   if (chapter.data.offeringId !== resource.data.offeringId) throw new Error('资料上下文不一致，请返回课程目录。')
   return { resource: resource.data, offering: offering.data, chapter: chapter.data }
+})
+watch(() => query.data.value, data => {
+  if (data) trackLearningEvent({ type: 'resource_opened', offeringId: data.offering.id, resourceId: data.resource.id })
 })
 watch(() => route.fullPath, () => { void query.load() }, { immediate: true })
 </script>

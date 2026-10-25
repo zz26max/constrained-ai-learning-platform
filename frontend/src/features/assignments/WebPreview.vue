@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
 import { buildWebPreview, previewMessage } from './web-preview'
-const props = defineProps<{ files: Record<string, string> }>()
+import { trackLearningEvent } from '../analytics/reporter'
+const props = withDefaults(defineProps<{ files: Record<string, string>; offeringId?: string; assignmentId?: string }>(), { offeringId: undefined, assignmentId: undefined })
 const frame = ref<HTMLIFrameElement | null>(null), source = ref(''), nonce = ref(''), message = ref('')
-function preview(): void { nonce.value = crypto.randomUUID(); source.value = buildWebPreview(props.files, nonce.value); message.value = '正在加载预览…' }
+function preview(): void {
+  nonce.value = crypto.randomUUID(); source.value = buildWebPreview(props.files, nonce.value); message.value = '正在加载预览…'
+  if (props.offeringId !== undefined && props.assignmentId !== undefined) {
+    trackLearningEvent({ type: 'preview_opened', offeringId: props.offeringId, assignmentId: props.assignmentId, viewport: 'desktop' })
+  }
+}
 function reset(): void { source.value = ''; nonce.value = ''; message.value = '' }
 function receive(event: MessageEvent): void {
   if (!source.value || event.source !== frame.value?.contentWindow) return
