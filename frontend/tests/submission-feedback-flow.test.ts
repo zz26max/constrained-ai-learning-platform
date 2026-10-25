@@ -23,7 +23,7 @@ async function open(fail = false, mismatched = false) {
       case 'getAssignment': return okEnvelope({ id: id(1), title: '作业', requirements: [], rubric: [], description: '', publicationState: 'published', offeringStatus: 'active', latestSubmissionId: id(9), canSubmit: false })
       case 'listMySubmissions': return okEnvelope({ items: [{ id: id(2), attemptNumber: 1, workspaceRevision: 2 }], page: 1, pageSize: 10, total: 1 })
       case 'getFeedback': return fail ? failEnvelope(404, 'NOT_FOUND', {}, 'req-missing') : okEnvelope(feedback)
-      case 'getSubmission': return okEnvelope({ id: id(2), assignmentId: id(1), attemptNumber: 1, workspaceRevision: 2, files: [{ path: 'index.html', content: '<script>privateCode()</script>' }], reflection: '提交时的反思', assignmentSnapshot: { rubric: [] }, publishedFeedback: feedback })
+      case 'getSubmission': return okEnvelope({ id: id(2), assignmentId: id(1), attemptNumber: 1, workspaceRevision: 2, files: [{ path: 'index.html', content: '<script>privateCode()</script>' }], reflection: '提交时的反思', assignmentSnapshot: { rubric: [], knowledgePoints: [] }, publishedFeedback: feedback })
       case 'readMessage': return okEnvelope({ id: id(4), readAt: '2026-10-17T01:00:00Z' })
       default: throw new Error(request.operationId)
     }

@@ -81,13 +81,13 @@ function hydrate(data: TeacherSubmissionDetailDTO): void {
   knowledgeEvaluations.value = feedback?.knowledgeEvaluations ?? []
   selectedTags.value = [...(feedback?.issueTags ?? [])]
   const inputs: Record<string, RubricInput> = {}
-  for (const criterion of data.assignmentSnapshot.rubric) {
+  for (const criterion of data.assignmentSnapshot.rubric ?? []) {
     const existing = feedback?.rubricResults.find(item => item.criterionId === criterion.criterionId)
     inputs[criterion.criterionId] = { score: existing?.score ?? 0, comment: existing?.comment ?? '' }
   }
   rubricInputs.value = inputs
   const knowledgeState: Record<string, { result: KnowledgeResult | ''; note: string }> = {}
-  for (const point of data.assignmentSnapshot.knowledgePoints) {
+  for (const point of data.assignmentSnapshot.knowledgePoints ?? []) {
     const existing = feedback?.knowledgeEvaluations.find(item => item.knowledgePointId === point.id)
     knowledgeState[point.id] = { result: existing?.result ?? '', note: existing?.note ?? '' }
   }

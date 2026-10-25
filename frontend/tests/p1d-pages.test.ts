@@ -65,7 +65,7 @@ const teacherSubmission = {
   id: SUBMISSION, assignmentId: ASSIGNMENT, offeringId: OFFERING, attemptNumber: 1, workspaceRevision: 1,
   submittedAt: '2026-10-14T04:00:00Z', late: false, superseded: false, feedbackStatus: 'none',
   files: [{ path: 'script.js', content: '// 学生提交代码\n' }], reflection: '完成了表单校验。',
-  assignmentSnapshot: { title: 'HTML 表单实现', maxScore: 80, rubric },
+  assignmentSnapshot: { title: 'HTML 表单实现', maxScore: 80, rubric, knowledgePoints: [] },
   student: { id: DEMO_USER.id, username: 'student.demo', displayName: '演示学生' },
   draftFeedback: null, publishedFeedback: null,
 }
