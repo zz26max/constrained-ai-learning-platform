@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`bd3cf67`（2026-10-25，P2 后端实现与验收收口，远端 CI 对该提交默认全量通过），须为 HEAD 祖先且落后不超过 3 个提交。后端在 codex/p2-backend 隔离工作区完成，已通过 `faf14ac` 同步 master `132ef04`；原快照 `df27a2d` 保留。前端相对 master 无本次改动；[PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11) 已创建，尚未合并。
+- **代码基线**：`bd3cf67`（2026-10-25，P2 后端实现与验收收口，远端 CI 对该提交默认全量通过），须为 HEAD 祖先且落后不超过 3 个提交。后端在 codex/p2-backend 隔离工作区完成，经 [PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11) 于 2026-10-25 合并（merge commit `9c84632`）；原快照 `df27a2d` 保留。合并后前端同日完成：契约类型重新生成（字段结构无变化）、真实模式浏览器联调（见 §1）与求助共享复选框契约修正。
 
-- **阶段**：P1 原有教学闭环证据见 §3.8。本次 P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，后端任务清单及联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端已有 P2-A UI、P2-B 事件上报与教师学生记录页的 mock 成果；正式浏览器联调另留证据，不据本次后端测试标 verified。P3 自动检查未实现。
+- **阶段**：P1 原有教学闭环证据见 §3.8。本次 P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，后端任务清单及联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端已有 P2-A UI、P2-B 事件上报与教师学生记录页的 mock 成果；**2026-10-25 真实模式浏览器联调已通过**（政策 0→1 配置、索答 fallback 异步闭环、求助创建/教师回复/help_reply 受控跳转、chapter_opened 事件落库，见 §1）。前端剩余：教师知识评价/标签输入 UI（P2-B）。P3 自动检查未实现。
 
 - **契约状态**：1.1.1，83 个业务操作 + 2 个健康检查，2026-10-25 代码现状为 71 implemented、10 verified、4 planned。P2 的 17 个专属操作及 getLearningRecords 查询入口已接入生产路由；本次只变更实现/审定元数据，字段结构未改，未标 verified。
 
-- **门禁现状**（2026-10-25）：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对实现提交 bd3cf67 的默认全量验证为 452 单元/HTTP + 245 MySQL 8.4.11 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；契约/文档和自动前端检查均通过。该 CI 未使用本地 30 秒读取参数。本地一次全量曾有 5 个求助 IT 因既有 V6 读取超时未启动，同代码定向复跑通过，原始记录保留在 §1。静态契约、PowerShell AST 与 diff 检查通过；本地未跑前端检查，未动 3307、未部署。
+- **门禁现状**（2026-10-25）：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对实现提交 bd3cf67 的默认全量验证为 452 单元/HTTP + 245 MySQL 8.4.11 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；契约/文档和自动前端检查均通过。该 CI 未使用本地 30 秒读取参数。本地一次全量曾有 5 个求助 IT 因既有 V6 读取超时未启动，同代码定向复跑通过，原始记录保留在 §1。静态契约、PowerShell AST 与 diff 检查通过。合并后前端实测：`npm --prefix frontend run verify` 通过（37 文件/330 用例）；本地 3307 已于备份（`temp/learning-platform-backup-2026-10-25.sql`，不入库）后应用 V11–V13，后端本地重启联调。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -22,7 +22,7 @@
 
 ### 0.1 接手前必读
 
-- 端口：MySQL 3307（Docker，Flyway 到 V10）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
+- 端口：MySQL 3307（Docker，Flyway 到 V13，2026-10-25 起本地库已迁移且备份在 temp/）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
 - 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
 - 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
 - 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
@@ -106,6 +106,8 @@
 - **未执行与边界**：未配置或调用真实外部模型；未迁移当前 3307 数据库、未清理真实数据、未部署；正式页面联调和生产迁移须另留证据。独立审查未实测物理清理与并发读取的组合行为；保留期限读取占位及隔离库显式清理已有测试。具体请求例子及前端配合事项见 [P2 后端联调说明](features/p2-backend-integration.md)。
 
 ### 会话日志（2026-10-18～10-24，自 §0 迁入，按新→旧）
+
+- **P2 真实模式浏览器联调（2026-10-25，master 合并后）**：PR #11 合并后本地执行——3307 备份（temp/learning-platform-backup-2026-10-25.sql）→ 重启后端（Flyway V11–V13 于本地库应用，flyway_schema_history 确认 success=1）→ `npm run contract:types` 重新生成（无字段结构变化）→ 4173 真实模式浏览器走查（演示口令经脚本从 backend/.env 读取，未入对话）。通过项：① 政策关闭态如实渲染（版本 0/未启用）；② 教师经策略面板以 baseVersion=0 首次保存成功（真实 202 → 版本 1 已启用徽标）；③ 学生见服务端 boundaryText 与启用态，新建会话发送索答消息，真实异步全链路（202 → 轮询 → **fallback 终态**）落盘，UI 渲染"政策回退 · 第 1 层"与服务端固定模板；④ 求助创建（真实班级词表三项、共享刚交付的 AI fallback 片段）→ 教师详情可见学生身份/标签/共享材料 → 回复后状态转已回复；⑤ 学生收到 help_reply 消息（真实标题"教师回复了你的求助"），"查看内容"受控跳转至求助详情且已读闭环；⑥ `learning_events` 表实测新增 `chapter_opened`（客户端上报器 10 秒冲刷落库）与后端可信事件 `help_request_created`。随包修正：求助共享工作区复选框在工作区版本 <1（从未保存）时禁用并注明（契约 workspaceRevision ≥1，实测版本 0 共享被服务端忽略）。检查：`npm run verify` 37 文件/330 用例通过。已知问题（待修）：真实模式下在教师求助详情页点击"退出"，DOM 冻结在旧页面且无侧栏（URL 已到 /login、登录表单不渲染，硬重载恢复；章节页等其余页面登出正常；确定性复现于该页，疑与该页在登出时的渲染/卸载错误有关，未定位根因）。未做：教师知识评价/标签输入 UI；普通 ask（外部模型关闭）的 failed/PROVIDER_UNAVAILABLE 展示对照；未标任何 verified。
 
 - **P2-B 续：教师查看学生学习记录页 + P2-1 清理**（2026-10-24，`frontend/p2b`，`0de5a86`/`7c52ac2`）：① 新增 TeacherStudentProgressPage（/teacher/offerings/:offeringId/students/:studentId/progress）——概览三项计数、knowledge-v2 知识点掌握列表（状态/新鲜度/证据/解释）、下一步建议（targetRoute 受控跳转）、最近反馈高亮与评价历史分页（链接指向教师作业页）；入口为工作台"班级成员"页学生行的"学习记录"按钮（教师行不加），成员行网格改 4 列并适配断点。接口复用 P1 已实现操作 getStudentLearningRecords（TeacherLearningRecordsDTO），mock 处理器与 API 声明此前已存在。② 退役 verify-home-exploration/verify-home-bplus 两脚本及其 package.json/README 登记（design 参数路由 019baae 移除后其一损坏，最终审计 P2-1）。检查：`npm run verify` 通过（37 文件 330 用例）；vue-tsc 零错误；mock 4175 实测成员入口与详情页三段（概览/知识点空态/反馈空态）如实渲染。未做：知识证据非空态对照（依赖后端 P2-B 数据）；真实模式验证（该接口 P1 已实现，待确认 8080 现役后端包含后可直接真验）。
 
