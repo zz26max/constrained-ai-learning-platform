@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class HelpServiceTest {
  private final HelpMapper mapper=mock(HelpMapper.class);private final CourseAccess access=mock(CourseAccess.class);private final TutoringQueryService tutoring=mock(TutoringQueryService.class);
- private final HelpService service=new HelpService(mapper,mock(AssignmentMapper.class),access,tutoring,mock(LearningEventService.class),Clock.fixed(Instant.parse("2026-10-24T00:00:00Z"),ZoneOffset.UTC),mock(IssueTagService.class));
+ private final HelpService service=new HelpService(mapper,mock(AssignmentMapper.class),access,tutoring,mock(LearningEventService.class),Clock.fixed(Instant.parse("2026-10-24T00:00:00Z"),ZoneOffset.UTC),mock(IssueTagService.class),mock(com.learningplatform.modules.notifications.NotificationWriter.class));
  private static final String ID="00000000-0000-4000-8000-000000000001";
  private static final UserDTO STUDENT=new UserDTO(ID,"student.test","学生",List.of("student"));
  @Test void teacherCannotUseStudentList(){assertThatThrownBy(()->service.list(new UserDTO(ID,"teacher.test","老师",List.of("teacher")),null,null,1,20,false)).hasMessageContaining("权限");verifyNoInteractions(mapper);}

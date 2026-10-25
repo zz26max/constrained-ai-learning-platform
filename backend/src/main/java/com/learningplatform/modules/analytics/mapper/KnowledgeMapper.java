@@ -18,7 +18,6 @@ public interface KnowledgeMapper {
     @Insert("INSERT INTO feedback_knowledge_evaluations VALUES(#{feedbackId},#{knowledgePointId},#{result},#{note})")
     void evaluation(String feedbackId,String knowledgePointId,String result,String note);
     @Insert("INSERT INTO feedback_issue_tags VALUES(#{feedbackId},#{tag})") void tag(String feedbackId,String tag);
-    @Update("UPDATE feedback SET issue_tag_version=#{version} WHERE id=#{id}") void tagVersionWrite(String id,Integer version);
     @Insert("INSERT INTO submission_knowledge_snapshot SELECT #{submissionId},kp.id,kp.title,kp.description FROM assignment_knowledge_points ak JOIN knowledge_points kp ON kp.id=ak.knowledge_point_id WHERE ak.assignment_id=#{assignmentId}")
     void freeze(String submissionId,String assignmentId);
     @Select("SELECT knowledge_point_id AS id,title,description FROM submission_knowledge_snapshot WHERE submission_id=#{id} ORDER BY knowledge_point_id")

@@ -12,7 +12,7 @@ public final class TutoringSafety {
  public static boolean prohibited(String text){return text!=null&&INTENT.matcher(text).find();}
  public static boolean sensitive(String text){return text!=null&&SECRET.matcher(text).find();}
  public static boolean acceptable(TutoringProvider.Output output,int level,List<String> modes,int maxTokens,List<String> history){
-  if(output==null||output.hintLevel()!=level||!modes.contains(output.mode())||!List.of("try_and_report","review_concept","request_teacher_help","none").contains(output.nextAction()))return false;
+  if(output==null||output.mode()==null||output.nextAction()==null||output.hintLevel()!=level||!modes.contains(output.mode())||!List.of("try_and_report","review_concept","request_teacher_help","none").contains(output.nextAction()))return false;
   String c=output.content();if(c==null||c.isBlank()||c.codePointCount(0,c.length())>maxTokens||c.contains("```")||c.contains("~~~")||prohibited(c)||sensitive(c))return false;
   // Code and implementation fragments remain disallowed even when the model omits fences.
   if(Pattern.compile("(?is)(<script|<!doctype|function\\s*\\(|function\\s+\\w+|(?:SELECT|INSERT INTO|CREATE TABLE)\\s|(?:const|let|var)\\s+\\w+\\s*=|=>|document\\.|def\\s+\\w+\\(|public\\s+class|完整实现)").matcher(c).find())return false;

@@ -54,9 +54,9 @@ public class LearningEventService {
                 case "editor_opened" -> {
                     if(a==null||!payload.keySet().equals(Set.of("activeFile"))) throw AssignmentInput.invalid();
                     Set<String> files=switch(a.type()){case "web_lab"->Set.of("index.html","style.css","script.js");case "sql_text"->Set.of("answer.sql");default->Set.of("answer.md");};
-                    if(!files.contains(payload.get("activeFile"))) throw AssignmentInput.invalid();
+                    if(!(payload.get("activeFile") instanceof String file)||!files.contains(file)) throw AssignmentInput.invalid();
                 }
-                case "preview_opened" -> {if(a==null||!payload.keySet().equals(Set.of("viewport"))||!Set.of("desktop","mobile").contains(payload.get("viewport"))) throw AssignmentInput.invalid();}
+                case "preview_opened" -> {if(a==null||!payload.keySet().equals(Set.of("viewport"))||!(payload.get("viewport") instanceof String viewport)||!Set.of("desktop","mobile").contains(viewport)) throw AssignmentInput.invalid();}
                 default -> throw AssignmentInput.invalid();
             }
             Instant occurred;
@@ -82,6 +82,8 @@ public class LearningEventService {
         if(value instanceof List<?> list) return list.stream().map(LearningEventService::canonical).toList();
         return value;
     }
+    @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
+    public int purgeExpiredClients() {return mapper.purgeClients(clock.instant().minus(90,ChronoUnit.DAYS));}
     private static String uuid(Object value) {if(!(value instanceof String s)) throw AssignmentInput.invalid();return AssignmentInput.uuid(s);}
     private static BusinessException conflict() {return new BusinessException(HttpStatus.CONFLICT,"EVENT_CONFLICT","同一事件 ID 对应不同正文。");}
     private Map<String,Object> row(String user,String offering,String assignment,String chapter,String type,Instant occurred,Instant received,String payload) {

@@ -37,7 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** P1-D fixturelistNotices/getNotice/createNotice/getOfferingStats/getAssignmentStats/getStudentLearningRecordsfixture MySQL fixture */
+/** Real MySQL tests for event ingestion, published evidence, learning queries and HTTP boundaries. */
 @SpringBootTest(properties = {"AI_WORKER_ENABLED=false", "AUTH_INVITE_SIGNING_KEY=test-only-invite-signing-key-at-least-32-characters"})
 @Testcontainers
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -162,8 +162,12 @@ class AnalyticsIntegrationIT {
         var o=createOffering();enrollStudent(o.id(),STUDENT);String kp=knowledgePoint(o.id());
         for(int i=0;i<2;i++) {String sid=submission(o.id(),kp);var save=assignmentService.saveFeedback(TEACHER,sid,feedback(kp,"meets_expectation"),"save");assignmentService.publishFeedback(TEACHER,sid,Map.of("baseVersion",save.feedback().version()),"publish");}
         var analysis=knowledge.analyze(STUDENT.id(),o.id());assertThat(analysis.assessments().toString()).contains("basically_mastered");
-        jdbc.update("UPDATE knowledge_points SET title='renamed' WHERE id=?",kp);
+        jdbc.update("UPDATE knowledge_points SET title='renamed',description='changed description' WHERE id=?",kp);
         assertThat(jdbc.queryForList("SELECT title FROM submission_knowledge_snapshot",String.class)).containsOnly("fixture");
+        String first=jdbc.queryForList("SELECT id FROM submissions ORDER BY id",String.class).get(0);
+        var detail=(SubmissionDetailDTO)assignmentService.getSubmission(STUDENT,first);
+        assertThat(detail.assignmentSnapshot().knowledgePoints().get(0).title()).isEqualTo("fixture");
+        assertThat(detail.assignmentSnapshot().knowledgePoints().get(0).description()).isEqualTo("fixture");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM learning_events WHERE type='assignment_submitted'",Integer.class)).isEqualTo(2);
     }
     @Test void notificationFailureRollsBackEvidenceAndPublishedState() {
@@ -185,7 +189,7 @@ class AnalyticsIntegrationIT {
         String body=JSON.writeValueAsString(Map.of("events",List.of(event(o.id(),a.id()))));
         var post=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/me/learning-events").cookie(cookie).contentType("application/json").header("Origin","http://127.0.0.1:4173").content(body);
         mvc.perform(post).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
-        var result=mvc.perform(post.header("X-CSRF-Token",csrf.sessionToken(grant.token(),grant.csrfSecret())))
+        var result=mvc.perform(post.header("X-CSRF-Token",csrf.sessionToken(grant.id(),grant.csrfSecret())))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
         var accepted=JSON.readTree(result.getResponse().getContentAsString());
         assertThat(accepted.path("data").propertyNames()).containsExactlyInAnyOrder("acceptedCount","duplicateCount");
@@ -196,13 +200,57 @@ class AnalyticsIntegrationIT {
             assertThat(JSON.readTree(response.getResponse().getContentAsString()).path("data").propertyNames()).containsExactlyInAnyOrder("offeringId","summary","recentFeedback","feedbackPage","knowledgeEvidence","nextRecommendation");
         }
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/me/learning-records").cookie(cookie))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(422))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.error.code").value("VALIDATION_ERROR"));
         var foreign=createOffering();
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/me/learning-records?offeringId="+foreign.id()).cookie(cookie))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
 
     private int offeringSeq = 0;
+
+    @Test void allClientEventTypesUseWhitelistedObjectsAndPayloads() {
+        var o=createOffering();enrollStudent(o.id(),STUDENT);var a=publishAssignment(o.id(),"Events task");
+        String chapter=UUID.randomUUID().toString(),resource=UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO chapters(id,offering_id,position,title,summary,status,is_required,content_version,published_at,created_at,updated_at) VALUES(?,?,1,'Chapter','Summary','published',1,1,?,?,?)",chapter,o.id(),ts(NOW),ts(NOW),ts(NOW));
+        jdbc.update("INSERT INTO resources(id,offering_id,chapter_id,title,content_markdown,position,status,created_at,updated_at) VALUES(?,?,?,'Resource','Text',1,'active',?,?)",resource,o.id(),chapter,ts(NOW),ts(NOW));
+        var opened=event(o.id(),a.id());opened.remove("assignmentId");opened.put("chapterId",chapter);opened.put("type","chapter_opened");opened.put("payload",Map.of());
+        var material=new HashMap<>(opened);material.put("eventId",UUID.randomUUID().toString());material.put("type","resource_opened");material.put("payload",Map.of("resourceId",resource));
+        var preview=event(o.id(),a.id());preview.put("type","preview_opened");preview.put("payload",Map.of("viewport","mobile"));
+        assertThat(events.record(STUDENT,Map.of("events",List.of(opened,material,event(o.id(),a.id()),preview)))).containsEntry("acceptedCount",4);
+        material.put("eventId",UUID.randomUUID().toString());material.put("payload",Map.of("resourceId",UUID.randomUUID().toString()));
+        assertThatThrownBy(()->events.record(STUDENT,Map.of("events",List.of(material)))).satisfies(t->assertCode(t,404,"NOT_FOUND"));
+    }
+
+    @Test void staleEvidenceStillShowsTeacherFindingAndClientRetentionKeepsTrustedFacts() {
+        var o=createOffering();enrollStudent(o.id(),STUDENT);String kp=knowledgePoint(o.id()),sid=submission(o.id(),kp);
+        var save=assignmentService.saveFeedback(TEACHER,sid,feedback(kp,"needs_practice"),"save");
+        assignmentService.publishFeedback(TEACHER,sid,Map.of("baseVersion",save.feedback().version()),"publish");
+        jdbc.update("UPDATE knowledge_evidence SET occurred_at=?",ts(NOW.minus(Duration.ofDays(91))));
+        assertThat(knowledge.analyze(STUDENT.id(),o.id()).assessments().toString()).contains("stale","needs_practice","knowledge-v2");
+        events.record(STUDENT,Map.of("events",List.of(event(o.id(),save.feedback().assignmentId()))));
+        jdbc.update("UPDATE learning_events SET received_at=? WHERE source='client'",ts(NOW.minus(Duration.ofDays(91))));
+        assertThat(events.purgeExpiredClients()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM learning_events WHERE source='server'",Integer.class)).isGreaterThanOrEqualTo(3);
+    }
+    @Test void commonIssueUnionCountsSelfReportSeparatelyFromConfirmation() {
+        var o=createOffering();enrollStudent(o.id(),STUDENT);enrollStudent(o.id(),OTHER_STUDENT);
+        String kp=knowledgePoint(o.id()),sid=submission(o.id(),kp);
+        var save=assignmentService.saveFeedback(TEACHER,sid,feedback(kp,"needs_practice"),"save");
+        assignmentService.publishFeedback(TEACHER,sid,Map.of("baseVersion",save.feedback().version()),"publish");
+        String assignment=save.feedback().assignmentId();
+        for(var student:List.of(STUDENT,OTHER_STUDENT)) {
+            jdbc.update("INSERT INTO help_requests(id,offering_id,assignment_id,student_id,title,content,student_attempt,shared_tutoring_request_ids,issue_tags,issue_tag_version,status,created_at,updated_at) VALUES(?,?,?,?,'Question','Content','Attempt',JSON_ARRAY(),JSON_ARRAY('box_model'),1,'open',?,?)",UUID.randomUUID().toString(),o.id(),assignment,student.id(),ts(NOW),ts(NOW));
+        }
+        var result=stats.getAssignmentStats(assignment,TEACHER).commonIssues();
+        assertThat(result).hasSize(1);
+        var issue=(Map<?,?>)result.get(0);
+        assertThat(issue.get("reportedStudentCount")).isEqualTo(2);
+        assertThat(issue.get("confirmedStudentCount")).isEqualTo(1);
+        assertThat(issue.get("distinctStudentCount")).isEqualTo(2);
+        assertThat(issue.get("knowledgePointId")).isNull();
+        assertThat(stats.getOfferingStats(o.id(),TEACHER).pendingHelpCount()).isEqualTo(2);
+    }
 
     private OfferingDTO createOffering() {
         return courseService.createOffering(TEACHER, Map.of("courseId", COURSE, "termId", TERM,

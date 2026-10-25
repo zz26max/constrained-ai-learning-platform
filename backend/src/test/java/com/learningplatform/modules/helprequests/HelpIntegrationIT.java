@@ -165,7 +165,7 @@ class HelpIntegrationIT {
     private Map<String,Object> http(HttpMethod method,String path,SessionGrant grant,Map<String,Object> body,int expected) throws Exception {
         MockHttpServletRequestBuilder builder=MockMvcRequestBuilders.request(method,path).cookie(new Cookie("lp_session",grant.token())).accept(MediaType.APPLICATION_JSON);
         if(body!=null) builder.contentType(MediaType.APPLICATION_JSON).header("Origin","http://127.0.0.1:4173")
-                .header("X-CSRF-Token",csrf.sessionToken(grant.token(),grant.csrfSecret())).content(JSON.writeValueAsString(body));
+                .header("X-CSRF-Token",csrf.sessionToken(grant.id(),grant.csrfSecret())).content(JSON.writeValueAsString(body));
         String raw=mvc.perform(builder).andExpect(status().is(expected)).andReturn().getResponse().getContentAsString();
         Map<String,Object> envelope=JSON.readValue(raw,Map.class);
         assertThat(envelope.keySet()).containsExactlyInAnyOrder("data","requestId");

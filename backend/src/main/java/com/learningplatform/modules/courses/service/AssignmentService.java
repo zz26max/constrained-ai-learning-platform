@@ -439,7 +439,7 @@ public class AssignmentService {
         for(RubricResultDTO r:draft.rubricResults()) {
             mapper.insertFeedbackRubricScore(feedbackId,r.criterionId(),r.score(),r.comment());
         }
-        knowledge.save(feedbackId,submission,body);
+        mapper.updateFeedbackIssueTagVersion(feedbackId,knowledge.save(feedbackId,submission,body));
         audit.record(user.id(),created?"FEEDBACK_CREATED":"FEEDBACK_UPDATED","feedback",feedbackId,Map.of(),requestId);
         return new FeedbackSaveResult(teacherFeedbackView(mapper.findFeedback(feedbackId),submission),created);
     }
@@ -712,7 +712,7 @@ public class AssignmentService {
         return new SubmissionSummaryDTO(s.id(),s.assignmentId(),s.offeringId(),s.attemptNo(),s.workspaceRevision(),
                 s.submittedAt(),s.isLate(),!s.isCurrent(),f!=null&&"published".equals(f.status())?"published":"none");
     }
-    /** 提交冻结的标准快照；知识点没有提交时快照表，按作业当前关联读取；P1 无 AI 政策版本，aiPolicyVersion 恒 null。 */
+    /** P2 使用冻结知识点及不可变政策版本；旧 P1 提交保留已说明的知识定义缺失限制。 */
     private AssignmentSnapshot assignmentSnapshot(Submission s) {
         List<SubmissionRequirementSnapshot> requirements=mapper.getSubmissionRequirements(s.id());
         List<SubmissionRubricSnapshot> rubric=mapper.getSubmissionRubric(s.id());

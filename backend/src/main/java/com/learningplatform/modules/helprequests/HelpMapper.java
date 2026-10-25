@@ -13,6 +13,5 @@ public interface HelpMapper {
  int status(@Param("id") String id,@Param("status") String status,@Param("now") Instant now);
  int reply(HelpRows.Reply row);
  List<HelpRows.Reply> replies(String id);
- int notify(@Param("id") String id,@Param("recipient") String recipient,@Param("offering") String offering,@Param("assignment") String assignment,@Param("help") String help,@Param("reply") String reply,@Param("content") String content,@Param("now") Instant now);
  int purge(Instant now);
 }

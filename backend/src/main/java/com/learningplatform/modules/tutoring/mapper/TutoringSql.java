@@ -6,7 +6,6 @@ public enum TutoringSql {
  FIND_OWNED_DELIVERED_REQUEST("SELECT * FROM tutoring_requests WHERE id=? AND student_id=? AND assignment_id=? AND status IN ('completed','fallback')"),
  FIND_POLICY("SELECT * FROM ai_policies WHERE id=?"),
  INSERT_POLICY("INSERT INTO ai_policies(id,assignment_id,version,config,created_by,created_at) VALUES(?,?,?,?,?,?)"),
- ACTIVATE_POLICY("UPDATE assignments SET current_ai_policy_id=?,updated_at=? WHERE id=? AND current_ai_policy_id <=> ? AND status<>'archived'"),
  LIST_SESSIONS("SELECT s.*, (SELECT r.id FROM tutoring_requests r WHERE r.session_id=s.id AND r.status IN ('queued','running') LIMIT 1) pending_request_id,(SELECT MAX(m.created_at) FROM tutoring_messages m WHERE m.session_id=s.id) last_message_at FROM tutoring_sessions s WHERE s.assignment_id=? AND s.student_id=? ORDER BY COALESCE((SELECT MAX(m.created_at) FROM tutoring_messages m WHERE m.session_id=s.id),s.created_at) DESC,s.id DESC LIMIT ? OFFSET ?"),
  COUNT_SESSIONS("SELECT COUNT(*) FROM tutoring_sessions WHERE assignment_id=? AND student_id=?"),
  INSERT_SESSION("INSERT INTO tutoring_sessions(id,assignment_id,student_id,created_at,updated_at) VALUES(?,?,?,?,?)"),

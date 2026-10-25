@@ -14,4 +14,6 @@ public interface LearningEventMapper {
     int sourceExists(String key);
     @Select("SELECT issue_tags_config FROM course_offerings WHERE id=#{offeringId}")
     String tags(String offeringId);
+    @Delete("DELETE FROM learning_events WHERE source='client' AND received_at < #{before}")
+    int purgeClients(Instant before);
 }

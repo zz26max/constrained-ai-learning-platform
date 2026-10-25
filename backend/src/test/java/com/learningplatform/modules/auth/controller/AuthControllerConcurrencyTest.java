@@ -47,7 +47,8 @@ class AuthControllerConcurrencyTest {
                 new LoginRateLimitProperties(Duration.ofMinutes(5), 5), clock);
         AuthController controller = new AuthController(sessions, mock(CsrfTokenService.class), limiter,
                 mock(AuditService.class), mock(TermQueryService.class),
-                new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock);
+                new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock,
+                mock(com.learningplatform.modules.tutoring.provider.TutoringProvider.class));
         when(sessions.login(anyString(), anyString(), any(), anyString()))
                 .thenThrow(new DataAccessResourceFailureException("Test-only database failure"));
 
@@ -71,7 +72,8 @@ class AuthControllerConcurrencyTest {
                 new LoginRateLimitProperties(Duration.ofMinutes(5), 5), clock);
         AuthController controller = new AuthController(sessions, mock(CsrfTokenService.class), limiter,
                 mock(AuditService.class), mock(TermQueryService.class),
-                new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock);
+                new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock,
+                mock(com.learningplatform.modules.tutoring.provider.TutoringProvider.class));
 
         CountDownLatch ready = new CountDownLatch(requests);
         CountDownLatch start = new CountDownLatch(1);

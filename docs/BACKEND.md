@@ -368,7 +368,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 - **唯一约束**：成员 `(offering_id,user_id)`、工作区 `(assignment_id,student_id)`、提交 `(assignment_id,student_id,workspace_revision)` 与当前提交 current_slot、通知业务来源键、在途 AI pending_slot、当前证据 current_slot。1062 只在明确命中对应约束时转为业务结果（如返回已有对象），其他唯一冲突按各自业务错误处理。
 - **乐观锁**：工作区 revision、评价 version，用 `UPDATE ... WHERE id=? AND revision=?`，影响 0 行返回对应 409。
 - **条件更新**：邀请名额、发布与归档等状态迁移，用 `WHERE status=?` 或计数条件，影响 0 行按当前状态返回业务错误。
-- **唯一保留的行锁**：提交替换与评价发布都对该学生当前 submission 行 `SELECT ... FOR UPDATE`，保证评价不会发到刚被替换的提交。
+- **局部行锁**：提交替换与评价发布协调该学生当前 submission；既有工作区提交协调及 P2 主动共享/辅导冻结使用工作区行锁，保证 revision 与文件一致；求助回复/关闭锁单条求助，避免关闭后插入回复。仅持有短业务事务，不锁父级生命周期，不跨 AI 外部调用持锁。
 
 时钟使用应用层 `Instant.now()`（UTC），每个操作在事务内取一次，同时用于期限判断与写入时间；测试注入可控 `Clock`。死锁或锁等待超时不在服务内重试，整体回滚后按契约服务端错误返回，由用户重试；业务 409、FK 与 CHECK 错误不自动重试。数据库事务内绝不执行 AI 网络调用。未防护的竞态列入 [STATUS 已知限制](STATUS.md#4-已知限制)。
 

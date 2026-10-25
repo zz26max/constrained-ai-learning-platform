@@ -7,6 +7,16 @@ import com.learningplatform.modules.tutoring.provider.TutoringProvider;
 import com.learningplatform.common.exception.BusinessException;
 import static org.assertj.core.api.Assertions.*;
 class TutoringRulesTest {
+ @Test void missingOrNullActionsAndNullPolicyItemsAreValidationErrors(){
+  for(var body:List.of(Map.<String,Object>of("content","question"),new HashMap<String,Object>(){{put("action",null);put("content","question");}})){
+   assertThatThrownBy(()->TutoringService.validateWrite(body)).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.getCode()).isEqualTo("VALIDATION_ERROR"));
+  }
+  var invalid=policy();invalid.put("allowedModes",Arrays.asList((String)null));
+  assertThatThrownBy(()->TutoringService.validatePolicy(invalid)).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.getCode()).isEqualTo("VALIDATION_ERROR"));
+ }
+ @Test void unknownTutoringFieldsUseInvalidRequest(){
+  assertThatThrownBy(()->TutoringService.validateWrite(Map.of("action","ask","content","question","systemPrompt","override"))).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.getCode()).isEqualTo("INVALID_REQUEST"));
+ }
  static Map<String,Object> policy(){var p=TutoringService.defaults(UUID.randomUUID().toString());p.remove("assignmentId");p.remove("version");p.remove("boundaryText");p.put("baseVersion",0);p.put("enabled",true);return p;}
  @Test void acceptsSafePolicyAndBlankConcept(){TutoringService.validatePolicy(policy());TutoringService.validateWrite(Map.of("action","concept","content",""));}
  @ParameterizedTest @ValueSource(strings={"allowCodeBlocks","restrictCompleteSolution","maxHintLevel","requireAttemptFromLevel","dailyUserLimit","dailyAssignmentLimit","perMinuteLimit","maxOutputTokens"})

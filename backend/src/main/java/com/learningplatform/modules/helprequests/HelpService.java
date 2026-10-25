@@ -14,15 +14,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
-@Transactional(rollbackFor=Exception.class)
+@Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
 public class HelpService {
  private static final JsonMapper JSON=JsonMapper.builder().findAndAddModules().build();
  private final HelpMapper mapper; private final AssignmentMapper assignments; private final CourseAccess access;
  private final TutoringQueryService tutoring; private final LearningEventService events; private final Clock clock; private final IssueTagService issueTags;
- public HelpService(HelpMapper mapper,AssignmentMapper assignments,CourseAccess access,TutoringQueryService tutoring,LearningEventService events,Clock clock,IssueTagService issueTags) {this.mapper=mapper;this.assignments=assignments;this.access=access;this.tutoring=tutoring;this.events=events;this.clock=clock;this.issueTags=issueTags;}
+ private final com.learningplatform.modules.notifications.NotificationWriter notifications;
+ public HelpService(HelpMapper mapper,AssignmentMapper assignments,CourseAccess access,TutoringQueryService tutoring,LearningEventService events,Clock clock,IssueTagService issueTags,com.learningplatform.modules.notifications.NotificationWriter notifications) {this.mapper=mapper;this.assignments=assignments;this.access=access;this.tutoring=tutoring;this.events=events;this.clock=clock;this.issueTags=issueTags;this.notifications=notifications;}
  private Instant now(){return clock.instant().truncatedTo(ChronoUnit.MICROS);}
  public Map<String,Object> create(UserDTO user,Map<String,Object> body){
   CourseAccess.role(user,"student"); keys(body,Set.of("assignmentId","title","content","studentAttempt","workspaceRevision","sharedTutoringRequestIds","issueTags"));
@@ -57,7 +59,7 @@ public class HelpService {
  public Map<String,Object> reply(UserDTO user,String id,Map<String,Object> body){var r=authorized(user,id,true,true,true);keys(body,Set.of("content"));String content=AssignmentInput.text(body,"content",8000);if("closed".equals(r.status()))throw new BusinessException(HttpStatus.CONFLICT,"HELP_REQUEST_CLOSED","求助已关闭。");
   String rid=UUID.randomUUID().toString();Instant time=now();mapper.reply(new HelpRows.Reply(rid,id,user.id(),content,time,user.displayName()));mapper.status(id,"answered",time);
   String message=content.codePointCount(0,content.length())>2000?content.substring(0,content.offsetByCodePoints(0,2000)):content;
-  mapper.notify(UUID.randomUUID().toString(),r.studentId(),r.offeringId(),r.assignmentId(),id,rid,message,time);
+  notifications.helpReply(UUID.randomUUID().toString(),r.studentId(),r.offeringId(),r.assignmentId(),id,rid,message,time);
   return Map.of("id",rid,"content",content,"teacher",Map.of("id",user.id(),"displayName",user.displayName()),"createdAt",time,"status","answered");
  }
  public Map<String,Object> close(UserDTO user,String id,Map<String,Object> body){keys(body,Set.of("status"));if(!"closed".equals(body.get("status")))throw AssignmentInput.invalid();var r=authorized(user,id,true,true,true);if("closed".equals(r.status()))return Map.of("id",id,"status","closed","updatedAt",r.updatedAt());Instant time=now();mapper.status(id,"closed",time);return Map.of("id",id,"status","closed","updatedAt",time);}

@@ -34,7 +34,7 @@ public class KnowledgeService {
     public List<String> issueTags(String feedback) {return mapper.tags(feedback);}
     public Integer issueTagVersion(String feedback) {return mapper.tagVersion(feedback);}
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
-    public void save(String feedback,Submission s,Map<String,Object> body) {
+    public Integer save(String feedback,Submission s,Map<String,Object> body) {
         var allowed=new HashSet<String>();snapshot(s).forEach(k->allowed.add(k.id()));
         var evaluations=new ArrayList<Evaluation>();var seen=new HashSet<String>();
         for(Object item:(List<?>)body.get("knowledgeEvaluations")) {
@@ -52,7 +52,7 @@ public class KnowledgeService {
         mapper.deleteEvaluations(feedback);mapper.deleteTags(feedback);
         for(var e:evaluations) mapper.evaluation(feedback,e.knowledgePointId(),e.result(),e.note());
         for(String tag:issueTags) mapper.tag(feedback,tag);
-        mapper.tagVersionWrite(feedback,version);
+        return version;
     }
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public void published(String feedback,Submission s,int version,Instant now) {

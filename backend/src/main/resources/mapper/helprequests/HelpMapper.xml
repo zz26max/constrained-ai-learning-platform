@@ -41,6 +41,5 @@
 <update id="status">UPDATE help_requests SET status=#{status},updated_at=#{now} WHERE id=#{id}</update>
 <insert id="reply">INSERT INTO help_replies(id,help_request_id,offering_id,author_id,content,created_at) SELECT #{id},#{helpRequestId},offering_id,#{authorId},#{content},#{createdAt} FROM help_requests WHERE id=#{helpRequestId}</insert>
 <select id="replies" resultMap="replyRow">SELECT r.*,u.display_name FROM help_replies r JOIN users u ON u.id=r.author_id WHERE help_request_id=#{id} ORDER BY created_at,id</select>
-<insert id="notify">INSERT INTO notifications(id,recipient_id,type,title,content,related_offering_id,related_assignment_id,target_type,target_id,related_help_reply_id,source_event_key,created_at) VALUES(#{id},#{recipient},'help_reply','教师回复了你的求助',#{content},#{offering},#{assignment},'help_request',#{help},#{reply},CONCAT('help_reply:',#{reply}),#{now})</insert>
 <update id="purge">UPDATE help_requests SET shared_snapshot=NULL,shared_snapshot_purged_at=#{now} WHERE shared_snapshot_expires_at &lt;= #{now} AND shared_snapshot_purged_at IS NULL AND workspace_revision IS NOT NULL</update>
 </mapper>

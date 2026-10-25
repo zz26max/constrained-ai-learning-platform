@@ -81,9 +81,9 @@ Controller → 本模块应用 Service → 领域规则 / Mapper。跨模块调�
 | AI 入队 / 结果完成 | tutoring | courses / assignments 校验、最小事件 |
 | 教师回复 | helprequests | notifications、审计 |
 
-同事务协作者复用同一 DataSource，以 REQUIRED 参与，不在发布链中使用 REQUIRES_NEW 或异步事件投递来绕过原子性。为避免 submissions 与 feedback 的循环 Bean 依赖，将“锁当前提交/读取评价发布状态”提取为只读或锁定窄接口，禁止两个工作流 Service 相互调用。notifications、事件与证据写入服务不回调发布服务。
+同事务协作者复用同一 DataSource，以 REQUIRED 参与；只供既有业务事务调用的窄写接口可用 MANDATORY 强制加入，均不允许提前独立提交。不在发布链中使用 REQUIRES_NEW 或异步事件投递来绕过原子性。为避免 submissions 与 feedback 的循环 Bean 依赖，将“锁当前提交/读取评价发布状态”提取为只读或锁定窄接口，禁止两个工作流 Service 相互调用。notifications、事件与证据写入服务不回调发布服务。
 
-并发与一致性按课程演示规模设计，只用三类手段：**唯一约束**（成员、工作区、同 revision 提交、通知来源键、在途 AI 请求）、**乐观锁**（工作区 revision、评价 baseVersion）、**条件更新**（邀请名额、状态迁移）。唯一保留的行锁是提交替换与评价发布对同一 submission 行加锁，避免评价发到已被替换的提交。不设全局锁顺序和死锁重试协议；具体规则见 [BACKEND 核心事务](BACKEND.md#db-transactions)，未覆盖的竞态列入 [STATUS 已知限制](STATUS.md#4-已知限制)。会话鉴权先完成再进入教学事务；AI 外部调用和审核不持数据库事务，交付前另开短事务重新核对授权与政策。
+并发与一致性按课程演示规模设计，只用三类手段：**唯一约束**（成员、工作区、同 revision 提交、通知来源键、在途 AI 请求）、**乐观锁**（工作区 revision、评价 baseVersion）、**条件更新**（邀请名额、状态迁移）。提交替换与评价发布协调同一 submission 行；沿用工作区局部锁冻结 revision 与文件，求助回复/关闭只锁单条求助。局部锁限于短事务，不锁父级生命周期，也不跨外部调用持锁。不设全局锁顺序和死锁重试协议；具体规则见 [BACKEND 核心事务](BACKEND.md#db-transactions)，未覆盖的竞态列入 [STATUS 已知限制](STATUS.md#4-已知限制)。会话鉴权先完成再进入教学事务；AI 外部调用和审核不持数据库事务，交付前另开短事务重新核对授权与政策。
 
 
 ### 3.4 前后端边界
