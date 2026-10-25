@@ -78,6 +78,14 @@ const offerings = new Map<string, StoredOffering>()
 const chapters = new Map<string, TeacherChapterSummaryDTO>()
 const resources = new Map<string, ResourceDTO>()
 const knowledgePoints = new Map<string, KnowledgePointDTO>()
+
+/** 供作业快照冻结知识点定义（P2 知识评价）：只保留已登记的 ID，顺序随入参。 */
+export function mockKnowledgeSnapshot(ids: readonly string[]): Array<{ id: string; title: string; description: string }> {
+  return ids.filter(id => knowledgePoints.has(id)).map(id => {
+    const point = knowledgePoints.get(id)!
+    return { id: point.id, title: point.title, description: point.description }
+  })
+}
 const members = new Map<string, MemberDTO[]>()
 const invites = new Map<string, StoredInvite>()
 const chapterProgress = new Map<string, ChapterProgress>()

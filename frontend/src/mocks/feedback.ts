@@ -3,9 +3,10 @@ import type {
   TeacherFeedbackDTO, TeacherSubmissionDetailDTO,
 } from '../api/assignments'
 import { mockSession } from './auth'
-import { P1A_IDS } from './courses'
+import { P1A_IDS, mockKnowledgeSnapshot } from './courses'
 import { mockAssignmentStore, P1B_IDS } from './assignments'
 import { fail, guard, invalid, isEmptyObject, isUuid, MOCK_STUDENT, MOCK_TEACHER, missing, ok, pageWindow, paginate, searchParams, segment } from './envelope'
+import { ISSUE_TAGS } from './tutoring'
 import { randomUUID } from './random'
 import type { MockHandler, MockRequestContext, MockResult } from './types'
 
@@ -71,11 +72,13 @@ function snapshot(assignmentId: string): AssignmentSnapshot | null {
   const dto = stored.dto
   return {
     title: dto.title, requirements: dto.requirements, rubric: dto.rubric, maxScore: dto.maxScore,
-    knowledgePoints: [], contentVersion: 1, dueAt: dto.dueAt, aiPolicyVersion: dto.aiPolicyVersion,
+    knowledgePoints: mockKnowledgeSnapshot(dto.knowledgePointIds), contentVersion: 1, dueAt: dto.dueAt, aiPolicyVersion: dto.aiPolicyVersion,
   }
 }
 
 const isBody = (value: unknown): value is Body => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const KNOWLEDGE_RESULTS = ['meets_expectation', 'needs_practice', 'insufficient_evidence'] as const
 
 function feedbackWrite(value: unknown, maxScore: number): value is FeedbackWrite {
   if (!isBody(value)) return false
@@ -85,6 +88,12 @@ function feedbackWrite(value: unknown, maxScore: number): value is FeedbackWrite
   if (typeof value['score'] !== 'number' || value['score'] < 0 || value['score'] > maxScore) return false
   if (typeof value['comment'] !== 'string' || value['comment'].length > 8000) return false
   if (!Array.isArray(value['knowledgeEvaluations'])) return false
+  if (!(value['knowledgeEvaluations'] as unknown[]).every(item => isBody(item)
+    && typeof item['knowledgePointId'] === 'string' && isUuid(item['knowledgePointId'])
+    && KNOWLEDGE_RESULTS.includes(item['result'] as never)
+    && typeof item['note'] === 'string' && item['note'].length <= 8000)) return false
+  const tags = value['issueTags']
+  if (tags !== undefined && (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string' && tag.length >= 1 && tag.length <= 64))) return false
   const rubric = value['rubricResults']
   return Array.isArray(rubric) && rubric.length >= 1 && rubric.every(item => isBody(item)
     && typeof item['criterionId'] === 'string' && typeof item['score'] === 'number' && typeof item['comment'] === 'string')
@@ -131,6 +140,16 @@ function handleSaveFeedback(context: MockRequestContext): MockResult {
   if (submission === undefined || assignment === undefined) return missing(context)
   if (!feedbackWrite(context.bodyJson, assignment.dto.maxScore)) return invalid(context)
   const body = context.bodyJson
+  // P2 约束：知识评价 ID 不重复且属于提交快照的知识点；问题标签来自班级词表且不重复。
+  const snapshotPoints = mockKnowledgeSnapshot(assignment.dto.knowledgePointIds)
+  const pointIds = new Set(snapshotPoints.map(point => point.id))
+  const evaluationIds = body.knowledgeEvaluations.map(item => item.knowledgePointId)
+  if (new Set(evaluationIds).size !== evaluationIds.length) return invalid(context, '知识点评价不能重复。', 'knowledgeEvaluations')
+  if (evaluationIds.some(pointId => !pointIds.has(pointId))) return invalid(context, '知识点评价只能针对提交快照中的知识点。', 'knowledgeEvaluations')
+  const vocabulary = ISSUE_TAGS.items.map(item => item.tag as string)
+  const tags = body.issueTags ?? []
+  if (new Set(tags).size !== tags.length) return invalid(context, '问题标签不能重复。', 'issueTags')
+  if (tags.some(tag => !vocabulary.includes(tag))) return invalid(context, '问题标签只能选择本班词表中的选项。', 'issueTags')
   if (submission.dto.superseded) return fail(context, 409, 'SUBMISSION_SUPERSEDED', '该提交已被新提交替代。')
   const existing = feedbacks.get(id)
   if (existing !== undefined && existing.status === 'published') return fail(context, 409, 'FEEDBACK_ALREADY_PUBLISHED', '反馈已发布，不能再修改。')
@@ -141,7 +160,8 @@ function handleSaveFeedback(context: MockRequestContext): MockResult {
     assignmentId: submission.dto.assignmentId, assignmentTitle: assignment.dto.title, version: currentVersion + 1,
     status: 'draft', score: body.score, maxScore: assignment.dto.maxScore, rubricResults: body.rubricResults,
     comment: body.comment, knowledgeEvaluations: body.knowledgeEvaluations, issueTags: body.issueTags ?? [],
-    issueTagVersion: null, teacher: teacherBrief, publishedAt: null, messageId: null,
+    issueTagVersion: body.issueTags !== undefined && body.issueTags.length > 0 ? ISSUE_TAGS.version : existing?.issueTagVersion ?? null,
+    teacher: teacherBrief, publishedAt: null, messageId: null,
   }
   feedbacks.set(id, feedback)
   return ok(context, feedback, existing === undefined ? 201 : 200)

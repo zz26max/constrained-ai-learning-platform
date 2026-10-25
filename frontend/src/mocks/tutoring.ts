@@ -36,7 +36,7 @@ const PLATFORM_CAPS = { dailyUserLimit: 30, dailyAssignmentLimit: 12, perMinuteL
 /** 按作业存储的可变政策：教师 updateAiPolicy 写入后学生侧立即生效。 */
 const policies = new Map<string, AiPolicyDTO>()
 
-const ISSUE_TAGS = {
+export const ISSUE_TAGS = {
   version: 1,
   items: [
     { tag: 'layout_overflow', title: '布局溢出', description: '容器在窄屏或内容变化时溢出' },

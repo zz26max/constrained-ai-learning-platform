@@ -6,11 +6,30 @@ import SafeMarkdown from '../../components/SafeMarkdown.vue'
 interface Props {
   feedback: StudentFeedbackDTO | null
   rubric: Array<{ criterionId: string; title: string; description: string; maxScore: number }>
+  knowledgePoints?: Array<{ id: string; title: string; description: string }>
+  issueTags?: Array<{ tag: string; title: string; description: string }>
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { knowledgePoints: () => [], issueTags: () => [] })
 
 const isPublished = computed(() => props.feedback?.status === 'published')
+
+const RESULT_LABELS: Record<string, string> = {
+  meets_expectation: '符合要求',
+  needs_practice: '需要练习',
+  insufficient_evidence: '证据不足',
+}
+
+// 知识结论按教师评价展示，标题取自提交快照冻结的知识点定义
+const knowledgeRows = computed(() => (props.feedback?.knowledgeEvaluations ?? []).map(evaluation => ({
+  ...evaluation,
+  title: props.knowledgePoints.find(point => point.id === evaluation.knowledgePointId)?.title ?? '知识点',
+})))
+
+const tagTitles = computed(() => (props.feedback?.issueTags ?? []).map(tag => ({
+  tag,
+  title: props.issueTags.find(item => item.tag === tag)?.title ?? tag,
+})))
 
 const getRubricScore = (criterionId: string) => {
   return props.feedback?.rubricResults.find((s: { criterionId: string }) => s.criterionId === criterionId)
@@ -55,6 +74,23 @@ const formatDate = (date: string | null | undefined) => {
           {{ getRubricScore(criterion.criterionId)?.comment }}
         </p>
       </div>
+    </div>
+
+    <div v-if="knowledgeRows.length > 0" class="knowledge-results">
+      <h4>知识点结论</h4>
+      <div v-for="row in knowledgeRows" :key="row.knowledgePointId" class="rubric-item">
+        <div class="rubric-header">
+          <strong>{{ row.title }}</strong>
+          <span class="tag">{{ RESULT_LABELS[row.result] ?? row.result }}</span>
+        </div>
+        <p class="rubric-comment">{{ row.note }}</p>
+      </div>
+      <p class="muted knowledge-note">结论由教师评价生成，作为知识点掌握的证据之一，不直接等于成绩。</p>
+    </div>
+
+    <div v-if="tagTitles.length > 0" class="issue-tags">
+      <h4>问题标签</h4>
+      <span v-for="item in tagTitles" :key="item.tag" class="tag" :title="props.issueTags.find(i => i.tag === item.tag)?.description">{{ item.title }}</span>
     </div>
   </section>
 
@@ -128,5 +164,27 @@ const formatDate = (date: string | null | undefined) => {
 .rubric-comment {
   margin-top: var(--space-2);
   color: var(--muted);
+}
+
+.knowledge-results {
+  margin-top: var(--space-5);
+}
+
+.knowledge-note {
+  font-size: var(--fs-meta);
+  margin-top: var(--space-2);
+}
+
+.issue-tags {
+  margin-top: var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.issue-tags h4 {
+  width: 100%;
+  margin: 0;
 }
 </style>

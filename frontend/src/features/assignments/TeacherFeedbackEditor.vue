@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
-import { assignmentsApi } from '../../api'
+import { assignmentsApi, tutoringApi } from '../../api'
 import type { FeedbackWrite, TeacherFeedbackDTO, TeacherSubmissionDetailDTO } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
@@ -9,6 +9,14 @@ import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { isUuid } from './format'
+
+type KnowledgeResult = 'meets_expectation' | 'needs_practice' | 'insufficient_evidence'
+const KNOWLEDGE_RESULTS: Array<{ value: KnowledgeResult | ''; label: string }> = [
+  { value: '', label: '暂不评价' },
+  { value: 'meets_expectation', label: '符合要求' },
+  { value: 'needs_practice', label: '需要练习' },
+  { value: 'insufficient_evidence', label: '证据不足' },
+]
 
 const route = useRoute()
 const props=withDefaults(defineProps<{submissionId?:string;embedded?:boolean;queue?:string[];queueTotal?:number;queueBusy?:boolean;queueMessage?:string}>(),{embedded:false,queue:()=>[],queueTotal:0,queueBusy:false,queueMessage:''})
@@ -35,12 +43,14 @@ const comment = ref('')
 const score = ref(0)
 const rubricInputs = ref<Record<string, RubricInput>>({})
 const knowledgeEvaluations = ref<TeacherFeedbackDTO['knowledgeEvaluations']>([])
+const knowledgeInputs = ref<Record<string, { result: KnowledgeResult | ''; note: string }>>({})
+const selectedTags = ref<string[]>([])
 const baseVersion = ref(0)
 const published = ref(false)
 const publishDialog = ref<HTMLDialogElement | null>(null)
 const publishNext=ref(false), baseline=ref('')
-const dirty=computed(()=>!!baseline.value && baseline.value!==JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value}))
-function rememberSaved() {baseline.value=JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value})}
+const dirty=computed(()=>!!baseline.value && baseline.value!==JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value,knowledge:knowledgeInputs.value,tags:selectedTags.value}))
+function rememberSaved() {baseline.value=JSON.stringify({score:score.value,comment:comment.value,rubric:rubricInputs.value,knowledge:knowledgeInputs.value,tags:selectedTags.value})}
 function canLeave() {return (!actions.pending.value && (!dirty.value || window.confirm('评分与反馈尚未保存，确定放弃并离开？')))}
 function requestClose() {if(canLeave()) emit('close')}
 defineExpose({canLeave,requestClose})
@@ -51,7 +61,16 @@ window.addEventListener('beforeunload',beforeUnload)
 
 const rubric = computed(() => query.data.value?.assignmentSnapshot.rubric ?? [])
 const maxScore = computed(() => query.data.value?.assignmentSnapshot.maxScore ?? 0)
+const knowledgePoints = computed(() => query.data.value?.assignmentSnapshot.knowledgePoints ?? [])
+const offeringId = computed(() => query.data.value?.offeringId ?? null)
 const readOnly = computed(() => published.value || query.data.value?.superseded === true)
+
+// P2 问题标签来自班级词表；快照知识点驱动知识评价行。
+const tagsQuery = usePageQuery(async signal => {
+  if (offeringId.value === null) throw new Error('尚未读取到提交')
+  return (await tutoringApi().getIssueTags(offeringId.value, { signal })).data
+})
+watch(offeringId, () => { if (offeringId.value !== null) void tagsQuery.load() })
 
 function hydrate(data: TeacherSubmissionDetailDTO): void {
   const feedback = data.draftFeedback ?? data.publishedFeedback
@@ -60,12 +79,19 @@ function hydrate(data: TeacherSubmissionDetailDTO): void {
   comment.value = feedback?.comment ?? ''
   score.value = feedback?.score ?? 0
   knowledgeEvaluations.value = feedback?.knowledgeEvaluations ?? []
+  selectedTags.value = [...(feedback?.issueTags ?? [])]
   const inputs: Record<string, RubricInput> = {}
   for (const criterion of data.assignmentSnapshot.rubric) {
     const existing = feedback?.rubricResults.find(item => item.criterionId === criterion.criterionId)
     inputs[criterion.criterionId] = { score: existing?.score ?? 0, comment: existing?.comment ?? '' }
   }
   rubricInputs.value = inputs
+  const knowledgeState: Record<string, { result: KnowledgeResult | ''; note: string }> = {}
+  for (const point of data.assignmentSnapshot.knowledgePoints) {
+    const existing = feedback?.knowledgeEvaluations.find(item => item.knowledgePointId === point.id)
+    knowledgeState[point.id] = { result: existing?.result ?? '', note: existing?.note ?? '' }
+  }
+  knowledgeInputs.value = knowledgeState
   rememberSaved()
 }
 
@@ -96,8 +122,17 @@ function buildWrite(): FeedbackWrite {
       score: rubricInputs.value[criterion.criterionId]?.score ?? 0,
       comment: rubricInputs.value[criterion.criterionId]?.comment ?? '',
     })),
-    knowledgeEvaluations: knowledgeEvaluations.value,
+    knowledgeEvaluations: Object.entries(knowledgeInputs.value)
+      .filter(([, input]) => input.result !== '')
+      .map(([knowledgePointId, input]) => ({ knowledgePointId, result: input.result as KnowledgeResult, note: input.note })),
+    issueTags: [...selectedTags.value],
   }
+}
+
+function toggleTag(tag: string): void {
+  const index = selectedTags.value.indexOf(tag)
+  if (index >= 0) selectedTags.value.splice(index, 1)
+  else selectedTags.value.push(tag)
 }
 
 async function saveDraft(): Promise<void> {
@@ -218,6 +253,43 @@ onBeforeUnmount(()=>{closePublishDialog();window.removeEventListener('beforeunlo
           </div>
         </fieldset>
 
+        <h3>知识点评价</h3>
+        <p class="muted">发布后作为知识点证据参与学生掌握状态计算；可只评价其中部分知识点。</p>
+        <fieldset v-for="point in knowledgePoints" :key="point.id" class="rubric-item">
+          <legend>{{ point.title }}</legend>
+          <p class="muted">{{ point.description }}</p>
+          <div v-if="knowledgeInputs[point.id]" class="form-group">
+            <label :for="`knowledge-result-${point.id}`">结论</label>
+            <select :id="`knowledge-result-${point.id}`" v-model="knowledgeInputs[point.id]!.result" :disabled="!canEdit">
+              <option v-for="option in KNOWLEDGE_RESULTS" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
+            <label :for="`knowledge-note-${point.id}`">说明</label>
+            <textarea
+              :id="`knowledge-note-${point.id}`"
+              v-model="knowledgeInputs[point.id]!.note"
+              rows="2" maxlength="8000" :disabled="!canEdit || knowledgeInputs[point.id]!.result === ''"
+              :placeholder="knowledgeInputs[point.id]!.result === '' ? '选择结论后填写' : '说明判断依据'"
+            />
+          </div>
+        </fieldset>
+
+        <h3>问题标签</h3>
+        <p class="muted">来自班级词表，用于归纳共性问题；只能选择，不能自造。</p>
+        <div v-if="tagsQuery.status.value === 'success' && tagsQuery.data.value" class="feedback-tags">
+          <label v-for="tag in tagsQuery.data.value.items" :key="tag.tag" class="feedback-tag" :aria-pressed="selectedTags.includes(tag.tag)" :title="tag.description">
+            <input
+              type="checkbox"
+              :value="tag.tag"
+              :checked="selectedTags.includes(tag.tag)"
+              :disabled="!canEdit"
+              @change="toggleTag(tag.tag)"
+            />
+            <span>{{ tag.title }}</span>
+          </label>
+        </div>
+        <p v-else-if="tagsQuery.status.value === 'error'" class="muted">问题标签读取失败，可重试或保存不含标签的反馈。</p>
+        <p v-else class="muted">正在读取问题标签…</p>
+
         <p v-if="!scoresValid && !readOnly" class="notice notice-warning" role="status">分数需在 0 到对应满分之间。</p>
 
       </form>
@@ -244,4 +316,9 @@ onBeforeUnmount(()=>{closePublishDialog();window.removeEventListener('beforeunlo
 .rubric-item { margin-bottom: var(--space-5); padding: var(--space-4); background: var(--canvas); border-radius: var(--radius-control); }
 .button-group { display: flex; gap: var(--space-4); margin-top: var(--space-5); }
 pre { overflow: auto; max-height: 320px; }
+.feedback-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); font-size: 13px; cursor: pointer; }
+.feedback-tag:has(input:checked) { border-color: var(--blue); background: var(--blue-soft); color: var(--blue-text); }
+.feedback-tag input { margin: 0; accent-color: var(--blue); }
+select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-control); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
 </style>

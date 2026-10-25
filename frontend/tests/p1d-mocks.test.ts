@@ -39,6 +39,14 @@ const validFeedback = (baseVersion: number) => ({
   knowledgeEvaluations: [],
 })
 
+// P2 知识评价/标签用例依赖提交快照中的知识点（种子作业 knowledgePointIds 指向知识Web）。
+const KNOWLEDGE_WEB = '00000000-0000-4000-8000-000000000501'
+const feedbackWithEvaluations = (baseVersion: number) => ({
+  ...validFeedback(baseVersion),
+  knowledgeEvaluations: [{ knowledgePointId: KNOWLEDGE_WEB, result: 'needs_practice', note: '断点依据需要说明。' }],
+  issueTags: ['box_model'],
+})
+
 const feedbackPath = `/api/v1/teacher/submissions/${P1B_IDS.submissionWeb1}/feedback`
 
 beforeEach(() => {
@@ -192,6 +200,51 @@ describe('P1-D mock：教师批阅链路', () => {
 
   it('saveFeedback：分数超过满分返回 422', async () => {
     const result = await call('saveFeedback', 'POST', feedbackPath, { body: { ...validFeedback(0), score: 999 } })
+    expect(result.status).toBe(422)
+  })
+
+  it('saveFeedback：P2 知识评价与词表标签随草稿保存，issueTagVersion 记录词表版本', async () => {
+    const saved = await call('saveFeedback', 'POST', feedbackPath, { body: feedbackWithEvaluations(0) })
+    expect(saved.status).toBe(201)
+    expect(saved.body.data.knowledgeEvaluations).toEqual([
+      { knowledgePointId: KNOWLEDGE_WEB, result: 'needs_practice', note: '断点依据需要说明。' },
+    ])
+    expect(saved.body.data.issueTags).toEqual(['box_model'])
+    expect(saved.body.data.issueTagVersion).toBe(1)
+
+    // 提交快照现在带知识点定义，教师视图可见
+    const detail = await call('getSubmission', 'GET', `/api/v1/submissions/${P1B_IDS.submissionWeb1}`)
+    expect(detail.body.data.assignmentSnapshot.knowledgePoints).toEqual([
+      { id: KNOWLEDGE_WEB, title: 'HTML 语义结构', description: '解释标签与内容结构的关系。' },
+    ])
+  })
+
+  it('saveFeedback：知识点越权、重复与词表外标签、重复标签分别 422', async () => {
+    const foreign = await call('saveFeedback', 'POST', feedbackPath, {
+      body: { ...feedbackWithEvaluations(0), knowledgeEvaluations: [{ knowledgePointId: '00000000-0000-4000-8000-000000000999', result: 'needs_practice', note: 'x' }] },
+    })
+    expect(foreign.status).toBe(422)
+    const duplicated = await call('saveFeedback', 'POST', feedbackPath, {
+      body: { ...feedbackWithEvaluations(0), knowledgeEvaluations: [
+        { knowledgePointId: KNOWLEDGE_WEB, result: 'needs_practice', note: 'a' },
+        { knowledgePointId: KNOWLEDGE_WEB, result: 'meets_expectation', note: 'b' },
+      ] },
+    })
+    expect(duplicated.status).toBe(422)
+    const badTag = await call('saveFeedback', 'POST', feedbackPath, {
+      body: { ...feedbackWithEvaluations(0), issueTags: ['made_up_tag'] },
+    })
+    expect(badTag.status).toBe(422)
+    const duplicateTag = await call('saveFeedback', 'POST', feedbackPath, {
+      body: { ...feedbackWithEvaluations(0), issueTags: ['box_model', 'box_model'] },
+    })
+    expect(duplicateTag.status).toBe(422)
+  })
+
+  it('saveFeedback：非法 result 枚举返回 422', async () => {
+    const result = await call('saveFeedback', 'POST', feedbackPath, {
+      body: { ...feedbackWithEvaluations(0), knowledgeEvaluations: [{ knowledgePointId: KNOWLEDGE_WEB, result: 'excellent', note: '' }] },
+    })
     expect(result.status).toBe(422)
   })
 

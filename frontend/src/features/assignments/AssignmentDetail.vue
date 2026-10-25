@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { assignmentsApi } from '../../api'
+import { assignmentsApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import { useAssignmentActions } from './use-assignment-actions'
@@ -29,6 +29,14 @@ const query = usePageQuery(async signal => {
   const result = await api.getAssignment(id, { signal })
   return result.data
 })
+
+// 反馈里的知识点标题与问题标签标题来自快照与班级词表；词表为可选增强，读取失败时按原始标识展示。
+const issueTagsQuery = usePageQuery(async signal => {
+  const offeringId = query.data.value?.offeringId
+  if (!offeringId) throw new Error('作业尚未加载')
+  return (await tutoringApi().getIssueTags(offeringId, { signal })).data
+})
+watch(() => query.data.value?.offeringId, () => { if (query.data.value?.offeringId) void issueTagsQuery.load() })
 
 const feedbackQuery = usePageQuery(async signal => {
   const feedbackId = route.query.feedbackId ?? (route.query.submissionId ? undefined : query.data.value?.publishedFeedbackId ?? undefined)
@@ -186,6 +194,8 @@ const canStartWork = computed(() => {
           v-if="feedbackQuery.status.value === 'success' && feedbackQuery.data.value?.feedback"
           :feedback="feedbackQuery.data.value.feedback"
           :rubric="feedbackQuery.data.value.submission.assignmentSnapshot.rubric"
+          :knowledge-points="feedbackQuery.data.value.submission.assignmentSnapshot.knowledgePoints"
+          :issue-tags="issueTagsQuery.data.value?.items ?? []"
         />
         <ActionNotice :error="readActions.error.value" :message="readActions.message.value" />
         <button v-if="readActions.error.value" type="button" class="button secondary" :disabled="readActions.pending.value" @click="markFeedbackRead">重试标记已读</button>
