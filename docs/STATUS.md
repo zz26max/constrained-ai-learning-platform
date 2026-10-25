@@ -8,13 +8,13 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`39c79fe`（2026-10-25，P2 规范与联调约定收口），须为 HEAD 祖先且落后不超过 3 个提交。后端在 codex/p2-backend 隔离工作区完成，已通过 `faf14ac` 同步 master `132ef04`；原后端快照 `df27a2d` 保留。master 的 P2-A/P2-B 前端成果保留，前端相对 master 无本次改动；本分支尚未合并 master。
+- **代码基线**：`bd3cf67`（2026-10-25，P2 后端实现与验收收口，远端 CI 对该提交默认全量通过），须为 HEAD 祖先且落后不超过 3 个提交。后端在 codex/p2-backend 隔离工作区完成，已通过 `faf14ac` 同步 master `132ef04`；原快照 `df27a2d` 保留。前端相对 master 无本次改动；[PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11) 已创建，尚未合并。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。本次 P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，后端任务清单及联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端已有 P2-A UI、P2-B 事件上报与教师学生记录页的 mock 成果；正式浏览器联调另留证据，不据本次后端测试标 verified。P3 自动检查未实现。
 
 - **契约状态**：1.1.1，83 个业务操作 + 2 个健康检查，2026-10-25 代码现状为 71 implemented、10 verified、4 planned。P2 的 17 个专属操作及 getLearningRecords 查询入口已接入生产路由；本次只变更实现/审定元数据，字段结构未改，未标 verified。
 
-- **门禁现状**（2026-10-25）：452 个单元/HTTP 测试通过；245 个 MySQL 8.4.11 场景分次通过。最终全量 `verify` 为 240 IT 通过、5 个求助 IT 在既有 V6 迁移阶段因 3 秒读取超时未启动；同一代码仅以命令参数把测试 socketTimeout 提高到 30000 后，452 单元/HTTP + 5 求助 IT 全通过，BUILD SUCCESS。未在该参数下再次全量重跑，不能声称一次全量全绿。契约静态检查、PowerShell 语法/ContainsKey 参数数及 diff 检查通过；本轮未跑前端检查、未动 3307、未部署。
+- **门禁现状**（2026-10-25）：[远端 CI](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对实现提交 bd3cf67 的默认全量验证为 452 单元/HTTP + 245 MySQL 8.4.11 IT，0 失败、0 错误、0 跳过，BUILD SUCCESS；契约/文档和自动前端检查均通过。该 CI 未使用本地 30 秒读取参数。本地一次全量曾有 5 个求助 IT 因既有 V6 读取超时未启动，同代码定向复跑通过，原始记录保留在 §1。静态契约、PowerShell AST 与 diff 检查通过；本地未跑前端检查，未动 3307、未部署。
 
 - **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
@@ -86,6 +86,13 @@
 契约 83 个业务操作与 2 个健康检查：截至 2026-10-18，53 个为 implemented、10 个为 verified、22 个为 planned。本行只是时间点快照，权威状态以 OpenAPI `x-implementation-status` 为准。P1 阶段后端全部完成，前端 P1-D 最小 UI 已实现（`f4a1e1a`），P1 闭环验收见 §3.8。P2/P3 功能尚未实现。
 
 
+
+### 2026-10-25 P2 后端远端全量验证与 PR
+
+- [PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11)：codex/p2-backend → master，后端实现提交 `bd3cf67`，未合并。该分支相对 master 无前端差异。
+- [CI run 40149776199](https://github.com/zz26max/constrained-ai-learning-platform/actions/runs/40149776199) 对 `bd3cf67e7474bcfabdc0dc010bd7b63e8f99c277` 的 Backend tests 原始汇总：Tests run: 452, Failures: 0, Errors: 0, Skipped: 0；Tests run: 245, Failures: 0, Errors: 0, Skipped: 0；BUILD SUCCESS，Total time: 04:01 min。未加本地 socketTimeout=30000 参数。
+- 同 run 的 Contract and documents 与 Frontend typecheck, build and tests 也为 success。前端由既有 CI 自动运行，主线程未本地运行或修改前端。本条依据远端 run 的 headSha、job conclusion 和日志汇总；补充完整默认环境证据，不抹去下方本地失败/复跑记录。
+- §0 据此把基线回填到已存在的后端实现提交，并将门禁现状更新为远端默认全量通过。后续仅交接文档补充，不改变已验收的后端代码。
 
 ### 2026-10-25 P2 后端交付
 
