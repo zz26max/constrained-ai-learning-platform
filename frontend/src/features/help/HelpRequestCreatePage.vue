@@ -153,8 +153,12 @@ async function submit(): Promise<void> {
         <fieldset class="help-field">
           <legend>共享材料（可选，教师只能看到这里勾选的内容）</legend>
           <label class="help-check">
-            <input v-model="shareWorkspace" type="checkbox" :disabled="workspaceQuery.data.value === null" />
-            <span>当前工作区代码（版本 {{ workspaceQuery.data.value?.revision ?? '—' }}）</span>
+            <input
+              v-model="shareWorkspace"
+              type="checkbox"
+              :disabled="(workspaceQuery.data.value?.revision ?? 0) < 1"
+            />
+            <span>当前工作区代码（版本 {{ workspaceQuery.data.value?.revision ?? '—' }}{{ (workspaceQuery.data.value?.revision ?? 0) < 1 ? '；尚未保存过，无可共享版本' : '' }}）</span>
           </label>
           <div v-if="shareOptions.length > 0" class="help-shares">
             <label v-for="option in shareOptions" :key="option.requestId" class="help-check">
