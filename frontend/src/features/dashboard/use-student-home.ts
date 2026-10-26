@@ -12,12 +12,17 @@ export function useStudentHome() {
 const route = useRoute()
 const api = dashboardApi()
 const target = useOpenTarget()
-const query = usePageQuery(async signal => (await api.getDashboard({}, { signal })).data)
-watch(() => route.path, () => { void query.load() }, { immediate: true })
-// 看板已返回未读消息数：写入外壳徽标，外壳不再单独请求消息接口。
+// 看板已返回未读消息数：作为快照写入外壳徽标。快照携带发起时版本号，
+// 若期间消息页已有更新的服务器确认（refresh），迟到的 dashboard 响应不会回退徽标。
 const badges = useNotificationsStore()
+let dashboardSnapshotSeq = 0
+const query = usePageQuery(async signal => {
+  dashboardSnapshotSeq = badges.snapshotSeq()
+  return (await api.getDashboard({}, { signal })).data
+})
+watch(() => route.path, () => { void query.load() }, { immediate: true })
 watch(() => query.data.value?.unreadMessageCount, value => {
-  if (typeof value === 'number') badges.setUnread(value)
+  if (typeof value === 'number') badges.setUnread(value, dashboardSnapshotSeq)
 })
 
 const TYPE_LABELS = { web_lab: '网页实验', sql_text: 'SQL 作业', text: '文本作业' } as const

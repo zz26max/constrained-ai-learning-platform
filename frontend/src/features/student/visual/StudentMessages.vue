@@ -13,6 +13,7 @@ import { pageError, type PageError } from '../../../features/courses/page-error'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { useAssignmentActions } from '../../../features/assignments/use-assignment-actions'
 import { useAuthStore } from '../../../stores/auth'
+import { useNotificationsStore } from '../../../stores/notifications'
 import { targetRoute } from '../../../features/notifications/target-route'
 import { beijingDay } from '../../../features/calendar/dates'
 import { useMessageOverflow } from '../../../features/notifications/use-message-overflow'
@@ -51,6 +52,16 @@ const { listElement, clippedIds, measureOverflow } = useMessageOverflow(notifica
 const unreadCount = computed(() => query.data.value?.summary.unreadCount ?? 0)
 const totalPages = computed(() => Math.ceil((query.data.value?.total ?? 0) / pageSize))
 
+// 全局徽标与列表页头是两个计数：后端 summary 只受 offeringId/type 筛选影响、不受 read 与分页影响。
+// 未带类型筛选时列表 summary 就是全局值，直接写入；带类型筛选时 summary 是局部值，
+// 只能经去重的 refresh() 以不带筛选的小分页请求确认，禁止把局部计数写进全局徽标。
+const badges = useNotificationsStore()
+const typeFiltered = computed(() => !['all', 'unread'].includes(messageFilter.value))
+watch(() => query.data.value?.summary.unreadCount, value => {
+  if (typeof value === 'number' && !typeFiltered.value) badges.setUnread(value)
+}, { immediate: true })
+watch(typeFiltered, filtered => { if (filtered) void badges.refresh() })
+
 const TYPE_LABELS: Record<NotificationDTO['type'], string> = {
   course_notice: '课程公告',
   assignment_published: '作业发布',
@@ -62,7 +73,10 @@ const TYPE_LABELS: Record<NotificationDTO['type'], string> = {
 async function markRead(notification: NotificationDTO): Promise<void> {
   if (notification.readAt !== null) return
   const result = await actions.run(token => api.readMessage(notification.id, { csrfToken: token }), '已标为已读')
-  if (result !== null) await query.load()
+  if (result !== null) {
+    await query.load()
+    if (typeFiltered.value) void badges.refresh()
+  }
 }
 
 function canOpen(notification: NotificationDTO): boolean {
