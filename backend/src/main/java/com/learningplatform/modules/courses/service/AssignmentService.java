@@ -291,7 +291,7 @@ public class AssignmentService {
                 int notified=0;
                 for(String studentId:mapper.listActiveStudentIds(assignment.offeringId())) {
                     mapper.insertNotification(UUID.randomUUID().toString(),studentId,"assignment_published",
-                            "新作业：".concat(assignment.title()),
+                            notificationTitle("新作业：".concat(assignment.title())),
                             "教师发布了新作业《".concat(assignment.title()).concat("》，请在截止前完成并提交。"),
                             assignment.offeringId(),assignment.id(),null,null,null,now);
                     notified++;
@@ -482,7 +482,7 @@ public class AssignmentService {
         if(messageId==null) {
             messageId=UUID.randomUUID().toString();
             mapper.insertNotification(messageId,feedback.studentId(),"feedback_published",
-                    "作业《"+submission.assignmentTitleSnapshot()+"》已获批阅","教师已发布对您提交的评价，请查看反馈详情。",
+                    notificationTitle("作业《"+submission.assignmentTitleSnapshot()+"》已获批阅"),"教师已发布对您提交的评价，请查看反馈详情。",
                     feedback.offeringId(),feedback.assignmentId(),feedback.id(),null,null,now);
         }
         audit.record(user.id(),"FEEDBACK_PUBLISHED","feedback",feedback.id(),Map.of("messageId",messageId),requestId);
@@ -762,6 +762,10 @@ public class AssignmentService {
                 Map.of("currentRevision",currentRevision));
     }
     private long offset(int page,int size) { return (long)(page-1)*size; }
+    /** 通知列最多 200 个 Unicode 码点；作业和提交快照仍保留完整标题。 */
+    private static String notificationTitle(String title) {
+        return title.codePointCount(0,title.length())<=200 ? title : title.substring(0,title.offsetByCodePoints(0,200));
+    }
     private Instant now() { return clock.instant().truncatedTo(ChronoUnit.MICROS); }
     // 响应包装记录
     public record AssignmentListResponse(List<?> items,int page,int pageSize,int total,Map<String,Integer> summary) {}
