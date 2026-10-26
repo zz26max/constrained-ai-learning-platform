@@ -6,6 +6,7 @@ import type { AssignmentDetailDTO } from '../../api/assignments'
 import { byDeadline, byRecentStudy } from '../assignments/task-presentation'
 import { usePageQuery } from '../courses/use-page-query'
 import { useOpenTarget } from '../notifications/use-open-target'
+import { useNotificationsStore } from '../../stores/notifications'
 
 export function useStudentHome() {
 const route = useRoute()
@@ -13,6 +14,11 @@ const api = dashboardApi()
 const target = useOpenTarget()
 const query = usePageQuery(async signal => (await api.getDashboard({}, { signal })).data)
 watch(() => route.path, () => { void query.load() }, { immediate: true })
+// 看板已返回未读消息数：写入外壳徽标，外壳不再单独请求消息接口。
+const badges = useNotificationsStore()
+watch(() => query.data.value?.unreadMessageCount, value => {
+  if (typeof value === 'number') badges.setUnread(value)
+})
 
 const TYPE_LABELS = { web_lab: '网页实验', sql_text: 'SQL 作业', text: '文本作业' } as const
 

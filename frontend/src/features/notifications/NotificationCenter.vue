@@ -10,6 +10,7 @@ import { pageError, type PageError } from '../courses/page-error'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
+import { useNotificationsStore } from '../../stores/notifications'
 import { targetRoute } from './target-route'
 import { beijingDay } from '../calendar/dates'
 import { useMessageOverflow } from './use-message-overflow'
@@ -42,6 +43,11 @@ watch(() => auth.identity?.id, () => {
 const notifications = computed(() => query.data.value?.items ?? [])
 const { listElement, clippedIds, measureOverflow } = useMessageOverflow(notifications)
 const unreadCount = computed(() => query.data.value?.summary.unreadCount ?? 0)
+// 顶栏徽标只读这份未读数：本页已按契约拿到 summary，不额外发请求。
+const badges = useNotificationsStore()
+watch(() => query.data.value?.summary.unreadCount, value => {
+  if (typeof value === 'number') badges.setUnread(value)
+}, { immediate: true })
 const totalPages = computed(() => Math.ceil((query.data.value?.total ?? 0) / pageSize))
 
 const TYPE_LABELS: Record<NotificationDTO['type'], string> = {

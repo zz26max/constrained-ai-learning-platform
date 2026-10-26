@@ -28,7 +28,8 @@ input:focus-visible {
 }
 
 /* 路由切换后以编程方式聚焦 h1；标题不是可交互控件，不显示浏览器默认焦点框。 */
-main h1:focus {
+main h1:focus,
+main h1:focus-visible {
   outline: none;
 }
 
@@ -96,6 +97,13 @@ main h1:focus {
   align-items: center;
   /* 品牌光晕：唯一使用渐变背景的外壳区域，色值来自 --blue-soft */
   background: radial-gradient(58% 46% at 50% 6%, var(--blue-soft), transparent 72%);
+}
+
+/* 登录页整页两栏：去掉主区默认内边距与居中，栅格由登录页自己管 */
+.app-main:has(.auth-login) {
+  display: block;
+  padding: 0;
+  min-height: 100vh;
 }
 
 .auth-brand {

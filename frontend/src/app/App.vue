@@ -3,11 +3,13 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { API_MODE } from './api-mode'
 import { useAuthStore } from '../stores/auth'
+import { useNotificationsStore } from '../stores/notifications'
 import { defaultEntry, isInternalPath } from './router'
 import AppIcon from '../components/AppIcon.vue'
 
-defineProps<{studentVisual?:boolean}>()
+const props = defineProps<{studentVisual?:boolean}>()
 const auth = useAuthStore(), router = useRouter(), route = useRoute()
+const notifications = useNotificationsStore()
 const loggingOut = ref(false), menuOpen = ref(false), menuTrigger = ref<HTMLButtonElement | null>(null)
 const dualRole = computed(() => auth.identity?.roles.includes('student') && auth.identity.roles.includes('teacher'))
 const role = computed(() => route.path.startsWith('/teacher') ? 'teacher' : auth.identity?.roles.includes('student') ? 'student' : auth.identity?.roles.includes('teacher') ? 'teacher' : 'account')
@@ -28,10 +30,16 @@ const teacherNav = [
 ]
 const nav = computed(() => role.value === 'teacher' ? teacherNav : role.value === 'student' ? studentNav : [])
 const location = computed(() => route.path.includes('/teacher/assignments') || route.path.includes('/teacher/submissions') ? '作业与批阅' : nav.value.find(item => item.active())?.label ?? '账号信息')
+/** 正式学生端外壳：只有它走 .student-release 的 56px 顶栏，教师端保持原有顶栏与面包屑。 */
+const studentShell = computed(() => Boolean(props.studentVisual) && auth.phase === 'authenticated' && role.value === 'student')
+const termLabel = computed(() => auth.config?.terms.find(t => t.id === auth.config?.currentTermId)?.label)
+const unreadMessages = computed(() => notifications.unread)
+const messageEntryLabel = computed(() => unreadMessages.value === null || unreadMessages.value === 0 ? '消息通知' : `消息通知，${unreadMessages.value} 条未读`)
 watch(() => auth.phase, phase => {
+  if (phase === 'anonymous') notifications.reset()
   if (phase === 'anonymous' && route.meta.requiresAuth) void router.replace({ name: 'login', query: isInternalPath(route.fullPath) ? { return: route.fullPath } : {} })
 })
-// 记录打开菜单的按钮：手机端顶栏按钮隐藏，焦点需回到底部"更多"。
+// 记录打开菜单的按钮：顶栏汉堡按钮与手机端底部"更多"共用，关闭后焦点回到触发处。
 let menuOpener: HTMLElement | null = null
 function toggleMenu(e: Event) { menuOpener = e.currentTarget as HTMLElement; menuOpen.value = !menuOpen.value }
 function closeMenu() { if (menuOpen.value) { menuOpen.value = false; void nextTick(() => (menuOpener ?? menuTrigger.value)?.focus()) } }
@@ -50,7 +58,7 @@ async function logout() {
 function skipToMain() { document.getElementById('main-content')?.focus() }
 </script>
 <template>
-  <div class="app-shell" :class="{'student-space':auth.phase==='authenticated' && role==='student','student-release':studentVisual && auth.phase==='authenticated' && role==='student'}">
+  <div class="app-shell" :class="{'student-space':auth.phase==='authenticated' && role==='student','student-release':studentShell}">
     <a class="skip-link" href="#" @click.prevent="skipToMain">跳到主要内容</a>
     <header v-if="API_MODE === 'mock'" class="mock-banner" role="status">模拟模式 · 全部数据为虚构，不访问真实接口</header>
     <div :class="{'authenticated-layout':auth.phase === 'authenticated'}">
@@ -63,7 +71,7 @@ function skipToMain() { document.getElementById('main-content')?.focus() }
         <div class="workspace-user"><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span><div><strong>{{ auth.identity?.displayName }}</strong><small>{{roleLabel}}</small></div><button class="button secondary" :disabled="loggingOut" @click="logout">退出</button><p v-if="auth.logoutFailure" role="alert">{{ auth.logoutFailure }}</p></div>
       </aside>
       <div class="workspace-body">
-        <header v-if="auth.phase === 'authenticated'" class="workspace-topbar"><button ref="menuTrigger" class="menu-toggle" :aria-expanded="menuOpen" aria-label="打开导航" @click="toggleMenu"><AppIcon name="menu" /></button><span>{{roleLabel}}工作空间 <span class="crumb-divider">/</span> {{ location }}</span><div class="topbar-account"><span class="muted">{{ auth.config?.terms.find(t=>t.id === auth.config?.currentTermId)?.label }}</span><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span></div></header>
+        <header v-if="auth.phase === 'authenticated'" class="workspace-topbar"><button ref="menuTrigger" class="menu-toggle" :aria-expanded="menuOpen" aria-label="打开导航" @click="toggleMenu"><AppIcon name="menu" /></button><span v-if="!studentShell">{{roleLabel}}工作空间 <span class="crumb-divider">/</span> {{ location }}</span><div class="topbar-account"><span class="muted">{{ termLabel }}</span><RouterLink v-if="studentShell" class="topbar-messages" to="/student/messages" :aria-label="messageEntryLabel"><AppIcon name="bell" /><span v-if="unreadMessages" class="topbar-unread" aria-hidden="true">{{ unreadMessages > 99 ? '99+' : unreadMessages }}</span></RouterLink><span class="user-avatar">{{ auth.identity?.displayName.slice(0,1) }}</span></div></header>
         <main id="main-content" class="app-main" :class="{'business-main':auth.phase === 'authenticated'}" tabindex="-1"><RouterView /></main>
         <footer v-if="auth.phase === 'authenticated'" class="workspace-footer"><span>知学 · 专注学习，从容成长</span><span>课程、实践与反馈</span></footer>
       </div>
