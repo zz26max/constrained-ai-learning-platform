@@ -546,3 +546,9 @@ c4bc273为回退基线。先保存真实36视口与局部对比并写审计，ed
 - 交付：frontend/V3.4-DELIVERY.md、frontend/DESIGN.md候选规则；.cache/student-v34/comparison仅12张1440/390同状态对照，details为局部/边界；根目录临时截图_V3.4对比仅18张中文分组图。测试和源代码已提交，截图缓存/用户临时文件不入Git。
 - 390px第一课程卡实测344.41→317.13px，只是该场景高度变化，不等同于任务速度提升。未做真实学生/真机/屏幕阅读器验证；不宣称全站无障碍或后端联调通过。等待用户确认，不推广到其他页面。
 - §0基线推进至已存在3322d69，依据上述检查；此基线包含独立候选，不意味着视觉正式采纳。
+
+### 2026-10-26 审计分支合并前复核
+
+- 范围：`review/comprehensive-audit` 合入本地 `master`；联网执行 `git fetch --prune origin` 后，远端 master 仍为 `cd62169`，当前分支领先 3 个提交、无分叉，工作区干净。远端已删除的 `codex/p2-backend-acceptance` 跟踪引用已清理。
+- 检查：`npm --prefix frontend run verify` 全部通过（类型检查、生产构建、生产包无 mock 检查；38 个测试文件、334 项测试通过）；使用现有 `.contract-venv` 执行 `scripts/validate_contract.py` 全部 PASS（83 业务 + 2 健康操作、325 schemas、41 回归检查）；`git diff --check` 通过。系统 Python 缺少 openapi_spec_validator，已改用项目既有环境完成验证。
+- 决定：采用快进方式合并，保留原提交；不修改接口、后端或业务规则。本条不改变 §0 的现状结论。未做：新一轮真实后端浏览器验收、后端测试、远程推送。
