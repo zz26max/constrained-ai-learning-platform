@@ -87,6 +87,11 @@
 
 
 
+### 2026-10-26 学生端视觉收口提交与仓库整理
+
+- **前端提交 `95095f2`**（分支 `review/comprehensive-audit`，基于 `cd62169`）：把此前未提交的学生端视觉收口一次性收口为单一工作包。改动：新增 `frontend/src/stores/notifications.ts`（外壳只读未读数，不单独请求接口）；`App.vue` 抽出 `studentShell`/`termLabel`，学生端顶栏改为「学期 / 消息 / 头像」并渲染未读徽标，匿名态重置；`use-student-home` 用 `getDashboard` 的 `unreadMessageCount`、`NotificationCenter` 用 `listMessages` 的 `summary.unreadCount` 写入徽标；`release.css` 补外壳段（232px 导航轨、56px 顶栏、1240px 内容列、页头模式）；`StudentHome.vue` 首页 CSS-only 重构；`LoginPage.vue` 改两栏并让凭据错误回焦用户名；`tokens.css` 调整表面/文字/品牌色与字号栅格，新增掌握度四档与 `--content-max`/`--aside`/`--gutter`。检查：`npm --prefix frontend run verify` —— typecheck、build、`check:no-mock` 均 PASS，38 测试文件 / 334 用例通过（沙箱内 build 触发 vite 的 `spawn EPERM`，放开沙箱后运行，非代码问题）。未做：未在真实后端上做浏览器走查；教师端外壳与 ≤767px 断点仅静态核对；无接口变更，未改 `openapi.yaml` 与生成类型。
+- **仓库整理**（同日）：删除 `temp/` 下 9 组 V3.x 历史截图共 14.0 MB（2026-10-19～20，属过程产物；`docs/archive/` 中的 V3.x 交付报告与截图检查记录仍在）；根目录汇报材料移入 `temp/汇报材料/`；根目录《文档审计-第4轮-2026-10-24.md》归档为 `docs/archive/DOC_AUDIT_R4_2026-10-24.md` 并在 [docs/README 归档清单](README.md) 登记（第 1～4 轮）。`temp/learning-platform-backup-2026-10-25.sql` 位置不变，§0 与下文对它的引用无需调整。整理后 `git status` 只剩被进程占用的 `学习平台组会汇报.pptx` 一份未入库文件。
+
 ### 2026-10-25 P2 后端远端全量验证与 PR
 
 - [PR #11](https://github.com/zz26max/constrained-ai-learning-platform/pull/11)：codex/p2-backend → master，后端实现提交 `bd3cf67`，未合并。该分支相对 master 无前端差异。
