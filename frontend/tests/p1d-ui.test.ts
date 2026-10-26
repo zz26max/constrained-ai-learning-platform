@@ -564,8 +564,11 @@ describe('P1-D 消息目标映射', () => {
     await view.findAll('.filter-tabs button').find(b=>b.text()==='未读')!.trigger('click');await flushPromises()
     expect(requestsOf('listMessages').at(-1)?.path).toContain('read=unread')
     await view.findAll('.filter-tabs button').find(b=>b.text()==='评价')!.trigger('click');await flushPromises()
-    expect(requestsOf('listMessages').at(-1)?.path).toContain('type=feedback')
-    expect(requestsOf('listMessages').at(-1)?.path).toContain('read=all')
+    // 类型筛选后：列表请求带 type；另有不带筛选的 pageSize=1 请求确认全局未读数（顶栏徽标）。
+    const pageLoad=requestsOf('listMessages').filter(r=>r.path.includes('pageSize=20')).at(-1)?.path ?? ''
+    expect(pageLoad).toContain('type=feedback')
+    expect(pageLoad).toContain('read=all')
+    expect(requestsOf('listMessages').at(-1)?.path).toBe('/api/v1/me/messages?page=1&pageSize=1&read=all')
   })
   it('空 target 的课程公告进入本班公告列表，打开后显式标读', async () => {
     scripted.setHandler(request => request.operationId === 'listMessages'

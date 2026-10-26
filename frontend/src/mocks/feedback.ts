@@ -1,11 +1,12 @@
 import type {
-  AssignmentSnapshot, FeedbackWrite, NotificationDTO, StudentFeedbackDTO, SubmissionDetailDTO,
+  AssignmentSnapshot, FeedbackWrite, StudentFeedbackDTO, SubmissionDetailDTO,
   TeacherFeedbackDTO, TeacherSubmissionDetailDTO,
 } from '../api/assignments'
 import { mockSession } from './auth'
 import { P1A_IDS, mockKnowledgeSnapshot } from './courses'
 import { mockAssignmentStore, P1B_IDS } from './assignments'
 import { fail, guard, invalid, isEmptyObject, isUuid, MOCK_STUDENT, MOCK_TEACHER, missing, ok, pageWindow, paginate, searchParams, segment } from './envelope'
+import { addMockMessage, mockMessages } from './message-store'
 import { ISSUE_TAGS } from './tutoring'
 import { randomUUID } from './random'
 import type { MockHandler, MockRequestContext, MockResult } from './types'
@@ -15,20 +16,10 @@ type Body = Record<string, unknown>
 const fixtureTime = '2026-10-14T02:00:00Z'
 const now = () => new Date().toISOString()
 
-export interface StoredMessage { dto: NotificationDTO; recipientId: string }
-
-/** 通知、公告和反馈发布共用的内存消息表。 */
-export const mockMessages: StoredMessage[] = []
 const feedbacks = new Map<string, TeacherFeedbackDTO>()
 const feedbackMessage = new Map<string, string>()
 
 const teacherBrief = { id: MOCK_TEACHER.id, displayName: MOCK_TEACHER.displayName }
-
-export function addMockMessage(message: Omit<NotificationDTO, 'id' | 'readAt'>, recipientId: string = MOCK_STUDENT.id): NotificationDTO {
-  const dto: NotificationDTO = { ...message, id: randomUUID(), readAt: null }
-  mockMessages.push({ dto, recipientId })
-  return dto
-}
 
 export function resetMockFeedbackState(): void {
   mockMessages.length = 0
@@ -175,7 +166,16 @@ function handlePublishFeedback(context: MockRequestContext): MockResult {
   if (feedback === undefined) return missing(context)
   const body = context.bodyJson
   if (!isBody(body) || Object.keys(body).length !== 1 || typeof body['baseVersion'] !== 'number' || !Number.isInteger(body['baseVersion'])) return invalid(context)
-  if (feedback.status === 'published') return fail(context, 409, 'FEEDBACK_ALREADY_PUBLISHED', '反馈已发布。')
+  const assignment = mockAssignmentStore.assignments.get(feedback.assignmentId)
+  if (assignment !== undefined && assignment.dto.publicationState === 'archived') {
+    return fail(context, 409, 'ASSIGNMENT_ARCHIVED', '归档作业不能继续发布评价。')
+  }
+  // 契约 1.1.1（x-idempotency: natural）：已发布评价在 baseVersion 等于发布前版本
+  // （当前 version-1）或当前版本时幂等返回 200 原视图，不重复加版本、发通知或写知识证据。
+  if (feedback.status === 'published') {
+    if (body['baseVersion'] === feedback.version || body['baseVersion'] === feedback.version - 1) return ok(context, feedback)
+    return fail(context, 409, 'FEEDBACK_VERSION_CONFLICT', '反馈版本已过期，请刷新后重试。')
+  }
   if (body['baseVersion'] !== feedback.version) return fail(context, 409, 'FEEDBACK_VERSION_CONFLICT', '反馈版本已过期，请刷新后重试。')
   const published: TeacherFeedbackDTO = { ...feedback, status: 'published', version: feedback.version + 1, publishedAt: now() }
   feedbacks.set(id, published)
@@ -228,6 +228,34 @@ function handleReadMessage(context: MockRequestContext): MockResult {
   return ok(context, { id, readAt: message.dto.readAt })
 }
 
+function handleListTeacherSubmissions(context: MockRequestContext): MockResult {
+  const denied = guard(context, ['teacher'])
+  if (denied !== null) return denied
+  // /api/v1/teacher/assignments/{assignmentId}/submissions
+  const id = segment(context, 4)
+  if (!isUuid(id) || !mockAssignmentStore.assignments.has(id)) return missing(context)
+  const params = searchParams(context)
+  const window = pageWindow(params)
+  const feedbackStatus = params.get('feedbackStatus')
+  const latestOnly = params.get('latestOnly')
+  if (window === null
+    || (feedbackStatus !== null && !['none', 'draft', 'published'].includes(feedbackStatus))
+    || (latestOnly !== null && !['true', 'false'].includes(latestOnly))) {
+    return invalid(context, '查询参数不合法。', 'query')
+  }
+  const items = [...mockAssignmentStore.submissions.values()]
+    .filter(stored => stored.dto.assignmentId === id)
+    .filter(stored => latestOnly !== 'false' ? !stored.dto.superseded : true)
+    .map(stored => ({
+      ...stored.dto,
+      feedbackStatus: feedbacks.get(stored.dto.id)?.status ?? 'none',
+      student: { id: MOCK_STUDENT.id, username: MOCK_STUDENT.username, displayName: MOCK_STUDENT.displayName },
+    }))
+    .filter(item => feedbackStatus === null || item.feedbackStatus === feedbackStatus)
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+  return ok(context, paginate(items, window))
+}
+
 export const feedbackHandlers: Record<string, MockHandler> = {
   getSubmission: handleSubmission,
   saveFeedback: handleSaveFeedback,
@@ -235,4 +263,5 @@ export const feedbackHandlers: Record<string, MockHandler> = {
   getFeedback: handleGetFeedback,
   listMessages: handleListMessages,
   readMessage: handleReadMessage,
+  listTeacherSubmissions: handleListTeacherSubmissions,
 }
