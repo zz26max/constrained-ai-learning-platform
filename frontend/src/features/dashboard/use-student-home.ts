@@ -3,8 +3,10 @@ import { useRoute } from 'vue-router'
 import { dashboardApi, assignmentsApi, coursesApi } from '../../api'
 import { allPages } from '../../api/pagination'
 import type { AssignmentDetailDTO } from '../../api/assignments'
+import { ApiError } from '../../api/client'
 import { byDeadline, byRecentStudy } from '../assignments/task-presentation'
 import { usePageQuery } from '../courses/use-page-query'
+import { runBounded } from '../courses/worker-pool'
 import { useOpenTarget } from '../notifications/use-open-target'
 import { useNotificationsStore } from '../../stores/notifications'
 
@@ -31,20 +33,30 @@ function excerpt(text: string, max = 80): string {
   return text.length > max ? text.slice(0, max) + '…' : text
 }
 
-/** 首页优先完整待办中经服务端确认仍可提交的任务。 */
+/** 首页优先完整待办中经服务端确认仍可提交的任务：详情请求以 6 并发有界执行，
+    凑满 6 条可处理任务后跳过剩余详情；单个已失效对象降级为未确认计数，
+    401/CSRF 属会话问题则整体失败走统一退出，不当作缺失吞掉。 */
 const tasksApi=assignmentsApi(), courses=coursesApi()
 const tasksQuery=usePageQuery(async signal=>{
   const [tasks,classes]=await Promise.all([
     allPages((page,pageSize,signal)=>tasksApi.listMyAssignments({filter:'todo',page,pageSize},{signal}).then(r=>r.data),signal),
     allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal),
   ])
+  const candidates=tasks.filter(t=>t.publicationState!=='archived'&&t.offeringStatus!=='archived').sort(byDeadline)
   const actionable: AssignmentDetailDTO[]=[]
-  for(const task of tasks.sort(byDeadline)){
-    if(task.publicationState==='archived'||task.offeringStatus==='archived')continue
-    const detail=(await tasksApi.getAssignment(task.id,{signal})).data
-    if(detail.canSubmit){actionable.push(detail);if(actionable.length===6)break}
-  }
-  return {actionable,classes:classes.sort(byRecentStudy)}
+  let unconfirmed=0
+  await runBounded(candidates.map(task=>async()=>{
+    if(actionable.length>=6)return
+    try {
+      const detail=(await tasksApi.getAssignment(task.id,{signal})).data
+      if(detail.canSubmit)actionable.push(detail)
+    } catch(cause) {
+      if(cause instanceof ApiError&&(cause.status===401||(cause.status===403&&cause.code==='CSRF_INVALID')))throw cause
+      unconfirmed+=1
+    }
+  }),6,signal)
+  actionable.sort((a,b)=>byDeadline(a,b))
+  return {actionable:actionable.slice(0,6),classes:classes.sort(byRecentStudy),unconfirmed}
 })
 watch(()=>route.path,()=>{void tasksQuery.load()},{immediate:true})
 const nextTask=computed(()=>tasksQuery.data.value?.actionable[0])

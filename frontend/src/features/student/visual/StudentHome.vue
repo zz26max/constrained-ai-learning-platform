@@ -74,6 +74,7 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
             <p class="explore-label">接下来要做</p>
             <ApiState :status="tasksQuery.status.value" :error="tasksQuery.error.value" @retry="tasksQuery.load" />
             <template v-if="tasksQuery.status.value==='success'">
+              <p v-if="nextTask && tasksQuery.data.value?.unconfirmed" class="explore-muted" role="status">另有 {{ tasksQuery.data.value.unconfirmed }} 项任务状态未能确认，已按可确认结果展示。<button type="button" class="button secondary" @click="tasksQuery.load">重试</button></p>
               <template v-if="nextTask">
                 <h2 id="explore-focus-title" :title="nextTask.title">{{nextTask.title}}</h2>
                 <p class="focus-course"><SubjectIdentity :course="courseById(nextTask.offeringId)" /><span>{{TYPE_LABELS[nextTask.type]}}</span></p>
@@ -82,6 +83,10 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
                 <div class="bplus-deadline"><span>截止（北京时间）</span><CraftDate :value="nextTask.dueAt"/><small>{{deadlineLabel(nextTask.dueAt)}}</small></div>
                 <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="taskEntry(nextTask)">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
                 <p class="polish-task-context">按可提交任务的截止时间先后展示，包含补交任务。</p>
+              </template>
+              <template v-else-if="tasksQuery.data.value?.unconfirmed">
+                <h2 id="explore-focus-title">任务状态未能完全确认</h2><p class="focus-empty-text">另有 {{ tasksQuery.data.value.unconfirmed }} 项待办的提交资格未能确认，确认前不假设其可提交或不可提交。</p>
+                <div class="focus-actions"><button type="button" class="button secondary" @click="tasksQuery.load">重试确认</button><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
               </template>
               <template v-else>
                 <h2 id="explore-focus-title">当前没有可提交的待办</h2><p class="focus-empty-text">把时间留给课程学习。已截止任务与历史提交仍可查看。</p>
