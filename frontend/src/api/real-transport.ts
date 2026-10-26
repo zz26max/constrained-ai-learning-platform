@@ -53,6 +53,7 @@ export const realTransport: Transport = {
           credentials: 'include',
           cache: 'no-store',
           signal: deadline.controller.signal,
+          ...(request.keepalive === true ? { keepalive: true } : {}),
         })
       } catch (error) {
         if (signal?.aborted === true) throw error
