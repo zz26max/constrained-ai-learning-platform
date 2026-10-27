@@ -231,6 +231,8 @@ P1 current_ai_policy_id / 提交 ai_policy_id 为空，对外aiPolicyVersion=nul
 
 公告和作业发布在同一事务内查询当时 active 学生成员并批量插入收件人，`recipientCount` 来自实际冻结集合；后加入学生不补发旧个人提醒，但可读本班历史公告。自然键例如 `feedback:{id}:published:{version}`、`assignment:{id}:published:{contentVersion}`、`notice:{id}`、`help_reply:{id}`；重复业务请求命中原通知，不生成新的通知 ID，收件人唯一约束作为第二层防重。`target_type` 的合法值引用 [TargetDTO.type](openapi.yaml#/components/schemas/TargetDTO/properties/type)，数据库约束与该集合保持一致；求助回复指向原 help_request，不暴露其他会话。
 
+2026-10-26 用户确认公告计数修复：[V14](../backend/src/main/resources/db/migration/V14__notice_recipient_counts.sql) 为 `notices` 增加可空的 `recipient_count`，非空时必须为非负整数。新公告在通知写入成功后、原事务提交前保存实际收件人数；创建、列表和详情统一读取该冻结数，不再依赖时间与标题匹配。任何通知或审计写入失败仍整体回滚。迁移只从恰有一条 `NOTICE_CREATED`、`target_type=notice`、`target_id=公告ID` 的创建审计恢复有效整数 `metadata.notified`；缺失、重复或非法审计不生成估计的冻结值，字段保留 NULL。历史 NULL 行继续沿用原时间/标题匹配估算，这是明确保留的历史精度限制；不能将这些行声称为精确计数。迁移不改变对外字段或回填学习事件，不修改 V1–V13，也不自动操作已有环境数据库。
+
 `learning_events.received_at` 是服务端接收或创建事件的 UTC 微秒时间，不从客户端 occurredAt 复制；当前 HTTP 事件上报不接收也不回传 receivedAt。它是内部存储字段，并未从数据模型删除。
 
 核对 V1～V10 与生产代码后确认：P1 仅有审计日志，尚无 learning_events。用户于 2026-10-24 确认在 P2 补齐事件底座及后续可信事件，不将历史审计日志回填成学习事件。保存、提交、评价、AI 和求助成功后在原事务写入；`source_event_key` 使用业务对象 ID 与版本，事务重试不重复记数。payload 只存白名单元数据，不复制作品、密码或聊天正文。客户端不得指定 source 或 source_event_key。
