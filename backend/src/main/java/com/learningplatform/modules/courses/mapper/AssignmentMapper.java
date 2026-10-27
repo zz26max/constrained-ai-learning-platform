@@ -179,6 +179,7 @@ public interface AssignmentMapper {
 
     // P1-D 公告系统；studentId 非 null 时只返回全班公告与定向给该学生的公告，null（教师）返回全部。
     int insertNotice(@Param("notice") NoticeRow notice);
+    int setNoticeRecipientCount(@Param("id") String id,@Param("count") int count);
     NoticeView findNoticeView(@Param("id") String id);
     List<NoticeView> listNotices(@Param("offeringId") String offeringId,@Param("studentId") String studentId,
             @Param("offset") long offset,@Param("limit") int limit);

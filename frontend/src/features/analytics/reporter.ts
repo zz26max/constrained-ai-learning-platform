@@ -19,6 +19,8 @@ const FLUSH_DELAY_MS = 10_000
 const RETRY_DELAY_MS = 30_000
 const MAX_BATCH = 50
 const MAX_ATTEMPTS = 3
+/** fetch keepalive 的浏览器在途总预算为 64KB；留出余量，退出批次按条数与 UTF-8 字节共同切分。 */
+const KEEPALIVE_BYTE_BUDGET = 60_000
 const SESSION_KEY = 'lp_learning_session'
 
 interface Pending { readonly event: LearningEvent; attempts: number }
@@ -28,7 +30,26 @@ const state = {
   keys: new Set<string>(),
   timer: null as ReturnType<typeof setTimeout> | null,
   flushing: false,
+  /** 退出冲刷请求在普通冲刷在途时置位：当前批次结束后，剩余队列以 keepalive 继续发送。 */
+  exitRequested: false,
   listening: false,
+}
+
+/** 按条数上限与 UTF-8 字节预算切出一批；byteBudget 为 null 时不计字节。
+    至少取一条，避免单事件超预算造成永久阻塞。纯函数，供测试。 */
+export function takeEvents(queue: readonly Pending[], maxCount: number, byteBudget: number | null): { taken: Pending[]; rest: Pending[] } {
+  const encoder = new TextEncoder()
+  const taken: Pending[] = []
+  let bytes = 0
+  let index = 0
+  while (index < queue.length && taken.length < maxCount) {
+    const size = encoder.encode(JSON.stringify(queue[index]!.event)).length + 2
+    if (taken.length > 0 && byteBudget !== null && bytes + size > byteBudget) break
+    taken.push(queue[index]!)
+    bytes += size
+    index += 1
+  }
+  return { taken, rest: queue.slice(index) }
 }
 
 function schedule(delay: number): void {
@@ -93,7 +114,7 @@ export function trackLearningEvent(input: TrackInput): void {
   else schedule(FLUSH_DELAY_MS)
 }
 
-async function flush(): Promise<void> {
+async function flush(keepalive = false): Promise<void> {
   if (state.flushing || state.queue.length === 0) return
   const auth = useAuthStore()
   if (auth.phase !== 'authenticated') {
@@ -104,11 +125,20 @@ async function flush(): Promise<void> {
   try {
     const csrfToken = auth.csrfToken ?? await auth.ensureCsrfToken()
     while (state.queue.length > 0) {
-      const batch = state.queue.splice(0, MAX_BATCH)
+      // 队列唯一所有权在 flush 循环：普通与退出冲刷都从这里切批，
+      // 事件按原 eventId 重试，不因同时发送而更换标识。
+      const exitMode = keepalive || state.exitRequested
+      const { taken, rest } = takeEvents(state.queue, MAX_BATCH, exitMode ? KEEPALIVE_BYTE_BUDGET : null)
+      if (taken.length === 0) break
+      state.queue = rest
       try {
-        await tutoringApi().recordLearningEvents({ events: batch.map(item => item.event) }, { csrfToken })
+        await tutoringApi().recordLearningEvents(
+          { events: taken.map(item => item.event) },
+          exitMode ? { csrfToken, keepalive: true } : { csrfToken },
+        )
       } catch {
-        const keep = batch.filter(item => {
+        // 失败按既有上限重试：保留原 eventId，放回队首；退出窗口无法等待，交给后续活跃时段。
+        const keep = taken.filter(item => {
           item.attempts += 1
           return item.attempts < MAX_ATTEMPTS
         })
@@ -119,18 +149,31 @@ async function flush(): Promise<void> {
     }
   } finally {
     state.flushing = false
+    state.exitRequested = false
     if (state.queue.length > 0) schedule(FLUSH_DELAY_MS)
   }
+}
+
+function exitFlush(): void {
+  const auth = useAuthStore()
+  // 卸载窗口尽力而为：仅在有缓存令牌时发起，不等待异步取令牌错过窗口。
+  if (auth.phase !== 'authenticated' || auth.csrfToken === null) return
+  if (state.flushing) {
+    // 在途批次结束后由同一循环接管剩余队列，不并发发送、不丢弃。
+    state.exitRequested = true
+    return
+  }
+  void flush(true)
 }
 
 function ensureListeners(): void {
   if (state.listening || typeof window === 'undefined') return
   state.listening = true
-  window.addEventListener('pagehide', () => {
-    const auth = useAuthStore()
-    // 卸载时尽力冲刷：仅在有缓存令牌时发起，避免异步取令牌错过卸载窗口。
-    if (auth.phase === 'authenticated' && auth.csrfToken !== null) void flush()
+  // 优先 visibilitychange 进入 hidden（切后台/收起更可靠），pagehide 兜底（直接关闭标签页）。
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') exitFlush()
   })
+  window.addEventListener('pagehide', exitFlush)
 }
 
 /** 测试专用：清空队列、去重集与计时器；不影响 sessionStorage。 */
@@ -142,4 +185,5 @@ export function resetLearningEventReporter(): void {
     state.timer = null
   }
   state.flushing = false
+  state.exitRequested = false
 }

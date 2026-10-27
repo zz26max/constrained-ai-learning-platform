@@ -29,7 +29,7 @@ export type LearningEventsWrite = Schemas['LearningEventsWrite']
 export type LearningEventsDTO = Schemas['LearningEventsDTO']
 export type HintAction = Schemas['HintAction']
 
-export type TutoringRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToken'>
+export type TutoringRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToken' | 'keepalive'>
 
 export type TutoringOperationId = keyof Pick<operations,
   | 'getAiPolicy'

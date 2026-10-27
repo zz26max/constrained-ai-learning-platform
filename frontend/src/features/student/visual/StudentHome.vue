@@ -74,6 +74,7 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
             <p class="explore-label">接下来要做</p>
             <ApiState :status="tasksQuery.status.value" :error="tasksQuery.error.value" @retry="tasksQuery.load" />
             <template v-if="tasksQuery.status.value==='success'">
+              <p v-if="nextTask && tasksQuery.data.value?.unconfirmed" class="explore-muted" role="status">另有 {{ tasksQuery.data.value.unconfirmed }} 项任务状态未能确认，已按可确认结果展示。<button type="button" class="button secondary" @click="tasksQuery.load">重试</button></p>
               <template v-if="nextTask">
                 <h2 id="explore-focus-title" :title="nextTask.title">{{nextTask.title}}</h2>
                 <p class="focus-course"><SubjectIdentity :course="courseById(nextTask.offeringId)" /><span>{{TYPE_LABELS[nextTask.type]}}</span></p>
@@ -82,6 +83,10 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
                 <div class="bplus-deadline"><span>截止（北京时间）</span><CraftDate :value="nextTask.dueAt"/><small>{{deadlineLabel(nextTask.dueAt)}}</small></div>
                 <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="taskEntry(nextTask)">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
                 <p class="polish-task-context">按可提交任务的截止时间先后展示，包含补交任务。</p>
+              </template>
+              <template v-else-if="tasksQuery.data.value?.unconfirmed">
+                <h2 id="explore-focus-title">任务状态未能完全确认</h2><p class="focus-empty-text">另有 {{ tasksQuery.data.value.unconfirmed }} 项待办的提交资格未能确认，确认前不假设其可提交或不可提交。</p>
+                <div class="focus-actions"><button type="button" class="button secondary" @click="tasksQuery.load">重试确认</button><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
               </template>
               <template v-else>
                 <h2 id="explore-focus-title">当前没有可提交的待办</h2><p class="focus-empty-text">把时间留给课程学习。已截止任务与历史提交仍可查看。</p>
@@ -125,3 +130,67 @@ const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
     </template>
   </div>
 </template>
+
+<style scoped>
+/* ===== 首页：冷中性工作台（CSS-only 重构，所有选择器以 .sr-home 限定） ===== */
+.student-release .sr-home .explore-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.student-release .sr-home .explore-heading h1 { font-size: var(--fs-h1); line-height: var(--lh-tight); font-weight: 600; }
+.student-release .sr-home .sr-overview { display: block; margin: var(--space-2) 0 0; font-size: 15px; line-height: var(--lh-body); color: var(--muted); }
+.student-release .sr-home .sr-overview > a { display: inline; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 15px; text-decoration: none; }
+.student-release .sr-home .sr-overview > a + a::before { content: '，'; color: var(--muted); }
+.student-release .sr-home .sr-overview > a strong { margin-right: 4px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.student-release .sr-home .sr-overview > a:hover { color: var(--blue); }
+.student-release .sr-home .explore-composition { display: grid; grid-template-columns: minmax(0, 1fr) var(--aside); gap: var(--space-6); align-items: start; }
+@media (max-width: 1199px) { .student-release .sr-home .explore-composition { grid-template-columns: minmax(0, 1fr); } }
+.student-release .sr-home .explore-primary-column { display: grid; gap: var(--space-5); min-width: 0; }
+/* 下一步：白底面板替代深蓝色块 */
+.student-release .sr-home .explore-focus { padding: var(--space-5); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-panel); box-shadow: var(--shadow-hairline); }
+.student-release .sr-home .explore-focus .explore-label { margin: 0 0 var(--space-2); color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.student-release .sr-home .explore-focus h2, .student-release .sr-home .explore-focus #explore-focus-title { margin: 0; color: var(--ink); font-size: var(--fs-h2); line-height: var(--lh-tight); font-weight: 600; overflow-wrap: anywhere; }
+.student-release .sr-home .explore-focus .focus-course, .student-release .sr-home .explore-focus .focus-course span { color: var(--muted); font-size: 13px; }
+.student-release .sr-home .explore-focus .focus-data-warning { color: var(--red); font-size: 13px; }
+.student-release .sr-home .explore-focus .bplus-deadline { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .explore-focus .bplus-deadline time { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.student-release .sr-home .explore-focus .focus-actions { margin-top: var(--space-4); display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.student-release .sr-home .explore-focus .focus-actions > a:not(.button) { color: var(--blue); font-size: 14px; }
+.student-release .sr-home .explore-focus .focus-empty-text, .student-release .sr-home .explore-focus .polish-task-context { color: var(--muted); font-size: 13px; line-height: var(--lh-body); }
+/* 近期任务：类表格 */
+.student-release .sr-home .explore-tasks, .student-release .sr-home .explore-courses { padding: var(--space-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.student-release .sr-home .explore-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.student-release .sr-home .explore-section-heading h2 { font-size: var(--fs-h3); font-weight: 600; }
+.student-release .sr-home .bplus-task-group + .bplus-task-group { margin-top: var(--space-4); }
+.student-release .sr-home .bplus-group-heading { display: flex; align-items: baseline; gap: var(--space-2); min-height: 36px; padding: 6px var(--space-3); background: var(--sunken); border-radius: var(--radius-control); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .bplus-group-heading small { margin-left: auto; color: var(--muted); }
+.student-release .sr-home .bplus-task-list { margin: 0; padding: 0; list-style: none; }
+.student-release .sr-home .bplus-task-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 60px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.student-release .sr-home .bplus-task-list > li:last-child { border-bottom: 0; }
+.student-release .sr-home .bplus-task-list > li:hover { background: var(--sunken); }
+.student-release .sr-home .task-line-content { display: grid; gap: 2px; min-width: 0; }
+.student-release .sr-home .explore-task-name { color: var(--ink); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.student-release .sr-home .content-task-meta { display: flex; align-items: center; gap: var(--space-3); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .content-task-meta .content-task-time { font-variant-numeric: tabular-nums; }
+.student-release .sr-home .task-line-action { color: var(--blue); font-size: 13px; white-space: nowrap; }
+/* 右栏：课程卡 + 无框列表 */
+.student-release .sr-home .explore-secondary-column { display: grid; gap: var(--space-5); min-width: 0; }
+.student-release .sr-home .explore-notes { display: grid; gap: var(--space-5); }
+.student-release .sr-home .explore-feedback, .student-release .sr-home .explore-notice { padding: 0; background: none; border: 0; box-shadow: none; }
+.student-release .sr-home .explore-feedback h2, .student-release .sr-home .explore-notice h2 { font-size: var(--fs-h3); font-weight: 600; }
+.student-release .sr-home .explore-feedback time, .student-release .sr-home .explore-notice .notice-read { color: var(--muted); font-size: 13px; }
+/* 空态：左对齐、无外框、不占满高度 */
+.student-release .sr-home .explore-empty { padding: var(--space-4) 0; background: none; border: 0; color: var(--muted); font-size: 13px; line-height: var(--lh-body); text-align: left; }
+.student-release .sr-home .explore-muted { color: var(--muted); font-size: 13px; }
+@media (max-width: 767px) {
+  .student-release .sr-home .explore-heading { flex-direction: column; align-items: stretch; }
+  .student-release .sr-home .explore-focus, .student-release .sr-home .explore-tasks, .student-release .sr-home .explore-courses { padding: var(--space-4); }
+  .student-release .sr-home .explore-focus h2, .student-release .sr-home .explore-focus #explore-focus-title { font-size: var(--fs-h3); }
+  .student-release .sr-home .bplus-task-list > li { grid-template-columns: minmax(0, 1fr); }
+  .student-release .sr-home .task-line-action { justify-self: start; }
+}
+/* 修正：覆盖旧层遗留的卡片描边/投影，并恢复白底面板上的主操作按钮外观 */
+.student-release .sr-home .explore-courses { border: 1px solid var(--line); box-shadow: none; }
+.student-release .sr-home .explore-notes { padding: 0; background: none; border: 0; box-shadow: none; }
+.student-release .sr-home .explore-feedback h2, .student-release .sr-home .explore-notice h2 { padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
+.student-release .sr-home .explore-focus .button.primary { background: var(--blue); border: 1px solid var(--blue); color: var(--surface); }
+.student-release .sr-home .explore-focus .button.primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); color: var(--surface); }
+.student-release .sr-home .explore-focus .button.primary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+</style>

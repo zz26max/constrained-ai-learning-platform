@@ -116,6 +116,46 @@ class AssignmentIntegrationIT {
                 COURSE, "assignment-course", "ASG", "作业测试课程", "测试", TEACHER.id(), ts(NOW), ts(NOW));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"作", "😀"})
+    void maximumLengthAssignmentTitlePublishesBothNotificationTypes(String character) {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String title = character.repeat(200);
+        Map<String, Object> body = assignmentBody();
+        body.put("title", title);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), body, "create");
+        assertThat(assignmentService.publishAssignment(TEACHER, assignment.id(), "publish").publicationState())
+                .isEqualTo("published");
+        var submission = saveAndSubmit(assignment.id(), 0, "V1", "完成").submission();
+        assignmentService.saveFeedback(TEACHER, submission.id(), feedbackBody(0, "50", "30"), "save-feedback");
+        assertThat(assignmentService.publishFeedback(TEACHER, submission.id(), Map.of("baseVersion", 1), "publish-feedback").status())
+                .isEqualTo("published");
+        List<String> titles = jdbc.queryForList("SELECT title FROM notifications WHERE related_assignment_id=? ORDER BY type", String.class, assignment.id());
+        assertThat(titles).hasSize(2);
+        String publishedTitle = "新作业：" + title;
+        String feedbackTitle = "作业《" + title + "》已获批阅";
+        assertThat(titles).containsExactly(publishedTitle.substring(0, publishedTitle.offsetByCodePoints(0, 200)),
+                feedbackTitle.substring(0, feedbackTitle.offsetByCodePoints(0, 200)));
+        assertThat(jdbc.queryForList("SELECT CHAR_LENGTH(title) FROM notifications WHERE related_assignment_id=?", Integer.class, assignment.id()))
+                .containsExactly(200, 200);
+        assertThat(submission.assignmentId()).isEqualTo(assignment.id());
+        assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).title()).isEqualTo(title);
+        assertThat(jdbc.queryForObject("SELECT assignment_title_snapshot FROM submissions WHERE id=?", String.class, submission.id())).isEqualTo(title);
+    }
+
+    @Test
+    void unknownSubmissionFieldIsRejectedEvenForAnIdempotentRetry() {
+        Ctx c = submittedAssignment();
+        assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, c.assignment().id(),
+                Map.of("workspaceRevision", 1, "reflection", "完成", "unexpected", true), "unknown"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("INVALID_REQUEST");
+                    assertThat(e.getStatus().value()).isEqualTo(400);
+                });
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM submissions WHERE assignment_id=?", Integer.class, c.assignment().id())).isEqualTo(1);
+    }
+
     @Test
     void completeLifecycleCreatePublishSaveSubmitArchive() {
         OfferingDTO offering = createOffering();

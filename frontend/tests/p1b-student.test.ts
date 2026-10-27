@@ -129,9 +129,9 @@ describe('P1-B 学生作业路径', () => {
     expect(body.files[0].content).toContain('新代码')
   })
 
-  it('工作区保存 409 VERSION_CONFLICT：显示错误提示', async () => {
+  it('工作区保存 409 WORKSPACE_CONFLICT：显示错误提示', async () => {
     setHandler(request => request.operationId === 'saveWorkspace'
-      ? failEnvelope(409, 'VERSION_CONFLICT', {}, 'req-conflict')
+      ? failEnvelope(409, 'WORKSPACE_CONFLICT', { currentRevision: 2 }, 'req-conflict')
       : normalResponse(request))
     const rendered = await openWorkspace()
     const textarea = rendered.find('textarea.workspace-editor')
@@ -167,9 +167,9 @@ describe('P1-B 学生作业路径', () => {
     expect(submitRequest?.headers['X-Request-ID']).toBeDefined()
   })
 
-  it('重复提交 409 DUPLICATE_SUBMISSION：显示错误', async () => {
+  it('提交被拒 409 ATTEMPT_LIMIT_REACHED：显示错误', async () => {
     setHandler(request => request.operationId === 'submitAssignment'
-      ? failEnvelope(409, 'DUPLICATE_SUBMISSION', {}, 'req-duplicate')
+      ? failEnvelope(409, 'ATTEMPT_LIMIT_REACHED', {}, 'req-attempt-limit')
       : normalResponse(request))
     const rendered = await openWorkspace()
     const submitButton = rendered.findAll('button').find(btn => btn.text().includes('提交'))

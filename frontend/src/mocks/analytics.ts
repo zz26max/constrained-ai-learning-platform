@@ -1,13 +1,13 @@
 import type { LearningEventsWrite } from '../api/tutoring'
-import { guard, invalid, ok } from './envelope'
+import { fail, guard, invalid, ok } from './envelope'
 import type { MockHandler, MockRequestContext, MockResult } from './types'
 
 const EVENT_TYPES = ['chapter_opened', 'resource_opened', 'editor_opened', 'preview_opened'] as const
 const EDITOR_FILES = ['index.html', 'style.css', 'script.js', 'answer.sql', 'answer.md'] as const
 const VIEWPORTS = ['desktop', 'mobile'] as const
 
-/** mock 事件去重表：按 eventId 幂等（契约描述），随模块生命周期重置。 */
-const seenEventIds = new Set<string>()
+/** mock 事件去重表：eventId → canonical 正文（键排序 JSON，与后端 canonical 语义一致）。 */
+const seenEventIds = new Map<string, string>()
 
 export function resetMockAnalyticsState(): void {
   seenEventIds.clear()
@@ -18,6 +18,17 @@ const isUuid = (value: unknown): value is string =>
 
 const isTimestamp = (value: unknown): value is string =>
   typeof value === 'string' && !Number.isNaN(Date.parse(value))
+
+/** 键排序的 canonical JSON：同一事件的不同键序正文视为相同。 */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']'
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return '{' + Object.keys(record).sort()
+      .map(key => JSON.stringify(key) + ':' + canonicalJson(record[key])).join(',') + '}'
+  }
+  return JSON.stringify(value)
+}
 
 function validateEvent(raw: unknown): string | null {
   if (raw === null || typeof raw !== 'object') return '事件必须是对象。'
@@ -67,16 +78,25 @@ const handleRecordLearningEvents: MockHandler = (context: MockRequestContext): M
     const problem = validateEvent(event)
     if (problem !== null) return invalid(context, problem, 'events')
   }
+  // 契约：同 eventId 同正文计 duplicate；同 eventId 不同正文 409 EVENT_CONFLICT。
+  // 先整批比对（含批内重复），全部通过才提交，冲突时整批回滚不留部分写入。
+  const canonicals = events.map(event => canonicalJson(event))
+  const batch = new Map<string, string>()
   let acceptedCount = 0
   let duplicateCount = 0
-  for (const event of events) {
-    const eventId = (event as { eventId: string }).eventId
-    if (seenEventIds.has(eventId)) duplicateCount += 1
-    else {
-      seenEventIds.add(eventId)
+  for (let index = 0; index < events.length; index += 1) {
+    const eventId = (events[index] as { eventId: string }).eventId
+    const canonical = canonicals[index]!
+    const existing = seenEventIds.get(eventId) ?? batch.get(eventId)
+    if (existing !== undefined) {
+      if (existing !== canonical) return fail(context, 409, 'EVENT_CONFLICT', '同一事件 ID 对应不同正文。')
+      duplicateCount += 1
+    } else {
+      batch.set(eventId, canonical)
       acceptedCount += 1
     }
   }
+  for (const [eventId, canonical] of batch) seenEventIds.set(eventId, canonical)
   return ok(context, { acceptedCount, duplicateCount })
 }
 

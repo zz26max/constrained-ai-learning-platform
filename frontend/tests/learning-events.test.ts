@@ -9,7 +9,7 @@ import { AuthApi } from '../src/api/auth'
 import { TutoringApi } from '../src/api/tutoring'
 import { registerAuthApi, registerTutoringApi, tutoringApi } from '../src/api'
 import type { TransportRequest } from '../src/api/transport'
-import { resetLearningEventReporter, trackLearningEvent } from '../src/features/analytics/reporter'
+import { resetLearningEventReporter, takeEvents, trackLearningEvent } from '../src/features/analytics/reporter'
 import { useAuthStore } from '../src/stores/auth'
 
 interface Call { status: number; body: any }
@@ -167,5 +167,108 @@ describe('P2-B 上报器：批量冲刷、会话去重与失败重试', () => {
     trackLearningEvent({ type: 'chapter_opened', offeringId: OFFERING, chapterId: CHAPTER })
     await vi.advanceTimersByTimeAsync(30_000)
     expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe('P2-B 上报器：退出冲刷与 keepalive（F5）', () => {
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    setActivePinia(createPinia())
+    registerAuthApi(new AuthApi(new ApiClient(mockTransport)))
+    const auth = useAuthStore()
+    auth.phase = 'authenticated'
+    auth.csrfToken = 'test-csrf-token'
+    resetLearningEventReporter()
+    sessionStorage.clear()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  })
+
+  function spyRecord() {
+    return vi.spyOn(tutoringApi(), 'recordLearningEvents').mockResolvedValue({ data: { acceptedCount: 1, duplicateCount: 0 }, requestId: 'req-1' })
+  }
+
+  function goHidden(): void {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  it('页面进入 hidden 时立即冲刷并携带 keepalive 标记', async () => {
+    const spy = spyRecord()
+    trackLearningEvent({ type: 'chapter_opened', offeringId: OFFERING, chapterId: CHAPTER })
+    goHidden()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0]![1]?.keepalive).toBe(true)
+    expect(spy.mock.calls[0]![1]?.csrfToken).toBe('test-csrf-token')
+  })
+
+  it('pagehide 兜底冲刷同样携带 keepalive', async () => {
+    const spy = spyRecord()
+    trackLearningEvent({ type: 'chapter_opened', offeringId: OFFERING, chapterId: CHAPTER })
+    window.dispatchEvent(new Event('pagehide'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0]![1]?.keepalive).toBe(true)
+  })
+
+  it('退出时普通冲刷在途：剩余队列由同一循环以 keepalive 续发，事件标识不重复', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const spy = spyRecord()
+    spy.mockImplementationOnce(async () => { await gate; return { data: { acceptedCount: 1, duplicateCount: 0 }, requestId: 'req-gate' } })
+    for (let index = 0; index < 60; index += 1) {
+      trackLearningEvent({ type: 'chapter_opened', offeringId: OFFERING, chapterId: uuid(300 + index) })
+    }
+    expect(spy).toHaveBeenCalledTimes(1)
+    goHidden()
+    release()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(spy.mock.calls[1]![1]?.keepalive).toBe(true)
+    const firstIds = (spy.mock.calls[0]![0] as { events: Array<{ eventId: string }> }).events.map(event => event.eventId)
+    const secondIds = (spy.mock.calls[1]![0] as { events: Array<{ eventId: string }> }).events.map(event => event.eventId)
+    expect(firstIds).toHaveLength(10)
+    expect(secondIds).toHaveLength(50)
+    expect(new Set([...firstIds, ...secondIds]).size).toBe(60)
+  })
+
+  it('重试沿用原 eventId，不更换标识', async () => {
+    const spy = spyRecord()
+    spy.mockRejectedValueOnce(new Error('网络不可用'))
+    trackLearningEvent({ type: 'chapter_opened', offeringId: OFFERING, chapterId: CHAPTER })
+    await vi.advanceTimersByTimeAsync(10_000 + 30_000 + 1)
+    expect(spy).toHaveBeenCalledTimes(2)
+    const firstId = (spy.mock.calls[0]![0] as { events: Array<{ eventId: string }> }).events[0]!.eventId
+    const retryId = (spy.mock.calls[1]![0] as { events: Array<{ eventId: string }> }).events[0]!.eventId
+    expect(retryId).toBe(firstId)
+  })
+
+  it('takeEvents 按条数与字节预算共同切批，至少保留一条', () => {
+    const event = (index: number) => ({
+      event: { eventId: `id-${index}`, sessionId: 's', occurredAt: '2026-10-24T10:00:00Z', offeringId: OFFERING, chapterId: CHAPTER, type: 'chapter_opened' as const, payload: {} },
+      attempts: 0,
+    })
+    const queue = Array.from({ length: 5 }, (_, index) => event(index))
+    const all = takeEvents(queue, 50, null)
+    expect(all.taken).toHaveLength(5)
+    expect(all.rest).toHaveLength(0)
+
+    const limited = takeEvents(queue, 3, null)
+    expect(limited.taken).toHaveLength(3)
+    expect(limited.rest).toHaveLength(2)
+
+    // 字节预算切分：每个事件约 200 字节，400 字节预算装不下三条。
+    const budgeted = takeEvents(queue, 50, 400)
+    expect(budgeted.taken.length).toBeGreaterThanOrEqual(1)
+    expect(budgeted.taken.length).toBeLessThanOrEqual(2)
+    expect(budgeted.taken.length + budgeted.rest.length).toBe(5)
+
+    const oversize = [event(99)]
+    const single = takeEvents(oversize, 50, 1)
+    expect(single.taken).toHaveLength(1)
   })
 })

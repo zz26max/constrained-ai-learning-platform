@@ -188,10 +188,14 @@ describe('P1-D 路由与首页', () => {
   it('正式首页资格失败不能展示成功空态，课程章节失败可重试',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-permission'):r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
     const view=await open('/student/home')
-    expect(view.get('.explore-focus').text()).toContain('req-permission')
-    expect(view.get('.explore-focus').text()).not.toContain('当前没有可提交的待办')
+    // F6：资格详情单项失败按业务降级——以未确认计数加重试入口呈现，而非整页错误。
+    expect(view.get('.explore-focus').text()).toContain('任务状态未能完全确认')
+    expect(view.get('.explore-focus').text()).toContain('重试确认')
+    expect(view.get('.explore-focus').text()).toContain('重试')
     expect(view.find('[data-home-action=primary]').exists()).toBe(false)
-    expect(view.get('.explore-courses').text()).toContain('课程未完整加载')
+    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在课程卡内呈现。
+    expect(view.get('.explore-courses').text()).toContain('req-chapters')
+    expect(view.get('.explore-courses').text()).toContain('重新加载')
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
     const chapters=await open('/student/home')
@@ -335,8 +339,9 @@ describe('P1-D 路由与首页', () => {
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE'):normalResponse(r))
     const failed=await openLegacy('/student/home?design=current')
-    expect(failed.find('.current-task').text()).not.toContain('当前没有可提交的待办')
-    expect(failed.find('.current-task').text()).toContain('重新加载')
+    expect(failed.find('.current-task').text()).toContain('任务状态未能确认')
+    expect(failed.find('.current-task').text()).toContain('重试')
+    expect(failed.find('.current-task').text()).toContain('重试')
   })
 
   it('3. termId 为 null 显示无学期提示；notConfigured 不显示 0%', async () => {
@@ -564,8 +569,11 @@ describe('P1-D 消息目标映射', () => {
     await view.findAll('.filter-tabs button').find(b=>b.text()==='未读')!.trigger('click');await flushPromises()
     expect(requestsOf('listMessages').at(-1)?.path).toContain('read=unread')
     await view.findAll('.filter-tabs button').find(b=>b.text()==='评价')!.trigger('click');await flushPromises()
-    expect(requestsOf('listMessages').at(-1)?.path).toContain('type=feedback')
-    expect(requestsOf('listMessages').at(-1)?.path).toContain('read=all')
+    // 类型筛选后：列表请求带 type；另有不带筛选的 pageSize=1 请求确认全局未读数（顶栏徽标）。
+    const pageLoad=requestsOf('listMessages').filter(r=>r.path.includes('pageSize=20')).at(-1)?.path ?? ''
+    expect(pageLoad).toContain('type=feedback')
+    expect(pageLoad).toContain('read=all')
+    expect(requestsOf('listMessages').at(-1)?.path).toBe('/api/v1/me/messages?page=1&pageSize=1&read=all')
   })
   it('空 target 的课程公告进入本班公告列表，打开后显式标读', async () => {
     scripted.setHandler(request => request.operationId === 'listMessages'

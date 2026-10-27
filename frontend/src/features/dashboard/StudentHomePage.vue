@@ -43,6 +43,7 @@ const choices=[{key:'current',label:'现有首页'},{key:'a',label:'A · 编辑�
         <h2 id="dash-current">接下来要做</h2>
         <ApiState :status="tasksQuery.status.value" :error="tasksQuery.error.value" @retry="tasksQuery.load" />
         <template v-if="tasksQuery.status.value==='success'">
+          <p v-if="tasksQuery.data.value?.unconfirmed" class="muted" role="status">另有 {{ tasksQuery.data.value.unconfirmed }} 项任务状态未能确认，已按可确认结果展示。<button type="button" class="button secondary" @click="tasksQuery.load">重试</button></p>
           <template v-if="nextTask">
             <h3 class="dash-wrap">{{ nextTask.title }}</h3>
             <p v-if="nextTask.title.includes('�')" class="notice-error">原始标题存在乱码，请联系教师修正；作业仍可按原链接访问。</p>

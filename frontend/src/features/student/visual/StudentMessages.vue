@@ -1,109 +1,23 @@
 <script setup lang="ts">
 
-import { computed, ref, shallowRef, watch } from 'vue'
-import { useRouter,useRoute } from 'vue-router'
-import { assignmentsApi, coursesApi } from '../../../api'
-import type { NotificationDTO } from '../../../api/assignments'
 import MessageTypeGlyph from './MessageTypeGlyph.vue'
 import SubjectIdentity from './SubjectIdentity.vue'
-import {allPages} from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
-import { pageError, type PageError } from '../../../features/courses/page-error'
-import { usePageQuery } from '../../../features/courses/use-page-query'
-import { useAssignmentActions } from '../../../features/assignments/use-assignment-actions'
-import { useAuthStore } from '../../../stores/auth'
-import { targetRoute } from '../../../features/notifications/target-route'
 import { beijingDay } from '../../../features/calendar/dates'
-import { useMessageOverflow } from '../../../features/notifications/use-message-overflow'
 import { formatTime } from '../../../features/courses/format'
-import { isUuid } from '../../../features/assignments/format'
+import { MESSAGE_FILTERS, MESSAGE_TYPE_LABELS, useMessageInbox } from '../../notifications/use-message-inbox'
+import type { NotificationDTO } from '../../../api/assignments'
 
-const router = useRouter(),route=useRoute()
 const direction='a'
-const api = assignmentsApi()
-const classes=usePageQuery(async signal=>allPages((page,pageSize,signal)=>coursesApi().listMyCourses({page,pageSize,status:'all'},{signal}).then(r=>r.data),signal))
-void classes.load()
-function courseById(id:string|null){return classes.data.value?.find(c=>c.offeringId===id)}
-const auth = useAuthStore()
-const actions = useAssignmentActions()
-
-const currentPage = ref(1)
-const messageFilter=ref<'all'|'unread'|'assignment_published'|'feedback'|'course_notice'>('all')
-const messageFilters=[{key:'all',label:'全部'},{key:'unread',label:'未读'},{key:'assignment_published',label:'作业'},{key:'feedback',label:'评价'},{key:'course_notice',label:'公告'}] as const
-const pageSize = 20
-const navigateError = shallowRef<PageError | null>(null)
-
-const query = usePageQuery(async signal => {
-  const result = await api.listMessages({ page: currentPage.value, pageSize, read:messageFilter.value==='unread'?'unread':'all', ...(['all','unread'].includes(messageFilter.value)?{}:{type:messageFilter.value as 'assignment_published'|'feedback'|'course_notice'}) }, { signal })
-  return result.data
-})
-
-watch(currentPage, () => { void query.load() })
-watch(messageFilter,()=>{if(currentPage.value!==1)currentPage.value=1;else void query.load()})
-watch(() => auth.identity?.id, () => {
-  currentPage.value = 1
-  void query.load()
-}, { immediate: true })
-
-const notifications = computed(() => query.data.value?.items ?? [])
-const { listElement, clippedIds, measureOverflow } = useMessageOverflow(notifications)
-const unreadCount = computed(() => query.data.value?.summary.unreadCount ?? 0)
-const totalPages = computed(() => Math.ceil((query.data.value?.total ?? 0) / pageSize))
-
-const TYPE_LABELS: Record<NotificationDTO['type'], string> = {
-  course_notice: '课程公告',
-  assignment_published: '作业发布',
-  feedback: '教师反馈',
-  system: '系统通知',
-  help_reply: '求助回复',
-}
-
-async function markRead(notification: NotificationDTO): Promise<void> {
-  if (notification.readAt !== null) return
-  const result = await actions.run(token => api.readMessage(notification.id, { csrfToken: token }), '已标为已读')
-  if (result !== null) await query.load()
-}
-
-function canOpen(notification: NotificationDTO): boolean {
-  return notification.target !== null ? targetRoute(notification.target) !== null : isCourseNotice(notification)
-}
-
-function isCourseNotice(notification: NotificationDTO): boolean {
-  return notification.type === 'course_notice' && isUuid(notification.offeringId)
-}
-
-async function open(notification: NotificationDTO): Promise<void> {
-  const target = notification.target
-  if (target === null) {
-    if (isCourseNotice(notification)) {
-      await router.push({ name: 'student-notices', params: { offeringId: notification.offeringId } })
-      await markRead(notification)
-    }
-    return
-  }
-  const route = targetRoute(target)
-  if (route === null) return
-  navigateError.value = null
-  try {
-    if (route === 'needs-feedback-lookup') {
-      const feedback = await api.getFeedback(target.id)
-      await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId }, query: { feedbackId: target.id } })
-    } else {
-      await router.push(route)
-    }
-    await markRead(notification)
-  } catch (cause) {
-    const failure = await pageError(cause)
-    navigateError.value = failure.kind === 'not-found' || failure.kind === 'forbidden'
-      ? { ...failure, message: '该内容已不可访问' }
-      : failure
-  }
-}
-
-function goToPage(page: number): void {
-  if (page >= 1 && page <= totalPages.value) currentPage.value = page
-}
+// 消息行为（列表/筛选/分页/标读/跳转/徽标）由 useMessageInbox 共享，本组件只保留视觉壳。
+const {
+  currentPage, messageFilter, query, notifications, unreadCount, totalPages,
+  listElement, clippedIds, measureOverflow, actions, navigateError, courseById,
+  markRead, canOpen, open, goToPage,
+} = useMessageInbox({ withCourses: true })
+const messageFilters = MESSAGE_FILTERS
+const TYPE_LABELS = MESSAGE_TYPE_LABELS as Record<NotificationDTO['type'], string>
 </script>
 
 <template>

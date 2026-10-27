@@ -256,8 +256,17 @@ describe('P1-D mock：教师批阅链路', () => {
     expect(published.status).toBe(200)
     expect(published.body.data).toMatchObject({ status: 'published', version: 2, messageId: null })
     expect(published.body.data.publishedAt).toBeTruthy()
-    const again = await call('publishFeedback', 'POST', `${feedbackPath}/publish`, { body: { baseVersion: 2 } })
-    expect(again.body.error.code).toBe('FEEDBACK_ALREADY_PUBLISHED')
+    // 契约 1.1.1（x-idempotency: natural）：发布后以发布前版本或当前版本重放均幂等返回
+    // 200 原视图，不重复加版本、不发通知；其余版本 409 FEEDBACK_VERSION_CONFLICT。
+    const replayPrePublish = await call('publishFeedback', 'POST', `${feedbackPath}/publish`, { body: { baseVersion: 1 } })
+    expect(replayPrePublish.status).toBe(200)
+    expect(replayPrePublish.body.data).toMatchObject({ status: 'published', version: 2 })
+    const replayCurrent = await call('publishFeedback', 'POST', `${feedbackPath}/publish`, { body: { baseVersion: 2 } })
+    expect(replayCurrent.status).toBe(200)
+    expect(replayCurrent.body.data).toMatchObject({ status: 'published', version: 2 })
+    const wrongVersion = await call('publishFeedback', 'POST', `${feedbackPath}/publish`, { body: { baseVersion: 5 } })
+    expect(wrongVersion.status).toBe(409)
+    expect(wrongVersion.body.error.code).toBe('FEEDBACK_VERSION_CONFLICT')
 
     resetMockAuthState(); resetMockCookies()
     await loginAs('student.demo')

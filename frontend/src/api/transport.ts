@@ -11,6 +11,8 @@ export interface TransportRequest {
   headers: Record<string, string>
   /** 已序列化的 JSON 请求正文；GET 时为空。 */
   body?: string
+  /** 是否以 fetch keepalive 发送：仅学习事件上传的退出冲刷使用，其他路径不得开启。 */
+  keepalive?: boolean
 }
 
 export interface TransportResponse {

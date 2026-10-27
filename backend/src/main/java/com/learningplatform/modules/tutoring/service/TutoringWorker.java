@@ -19,13 +19,14 @@ import static com.learningplatform.modules.tutoring.service.TutoringJson.map;
 @Component
 @EnableScheduling
 public class TutoringWorker {
+ private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger(TutoringWorker.class);
  private final com.learningplatform.modules.courses.mapper.AssignmentMapper assignments;private final TutoringService service;private final TutoringMapper db;private final TutoringJson json;private final Clock clock;private final TutoringProvider provider;private final TransactionTemplate tx;private final boolean cleanup;
  private final ThreadPoolExecutor pool=new ThreadPoolExecutor(2,2,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16),r->{Thread t=new Thread(r,"tutoring-worker");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
  private volatile boolean ready;
  @Value("${AI_WORKER_ENABLED:true}") private boolean enabled=true;
  private final com.learningplatform.modules.analytics.service.LearningEventService events;
  public TutoringWorker(TutoringService service,TutoringMapper db,TutoringJson json,Clock clock,com.learningplatform.modules.courses.mapper.AssignmentMapper assignments,TutoringProvider provider,PlatformTransactionManager manager,com.learningplatform.modules.analytics.service.LearningEventService events,@Value("${AI_RETENTION_CLEANUP_ENABLED:false}") boolean cleanup){this.assignments=assignments;this.events=events;this.service=service;this.db=db;this.json=json;this.clock=clock;this.provider=provider;this.cleanup=cleanup;tx=new TransactionTemplate(manager);tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);}
- @EventListener(ApplicationReadyEvent.class) public synchronized void recover(){if(!enabled||ready)return;try{recoverRunning();ready=true;}catch(RuntimeException unavailable){ready=false;org.slf4j.LoggerFactory.getLogger(getClass()).warn("Tutoring startup recovery unavailable; dispatcher remains stopped.");}}
+ @EventListener(ApplicationReadyEvent.class) public synchronized void recover(){if(!enabled||ready)return;try{recoverRunning();ready=true;}catch(RuntimeException unavailable){ready=false;logFailure(null,"startup_recovery","INTERNAL_ERROR",unavailable);}}
  public int recoverRunning(){return db.update(RECOVER_RUNNING,clock.instant(),clock.instant());}
  @Scheduled(fixedDelayString="${AI_QUEUE_SCAN_MS:1000}") public void scan(){if(!enabled)return;if(!ready){recover();if(!ready)return;}for(var r:db.list(LIST_QUEUED)){try{pool.execute(()->execute((String)r.get("id")));}catch(RejectedExecutionException full){break;}}}
  @PreDestroy public void close(){ready=false;pool.shutdownNow();}
@@ -57,12 +58,12 @@ public class TutoringWorker {
     if(TutoringSafety.sensitive(all)||TutoringSafety.prohibited(all)){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
     if(db.update(RESERVE_PROVIDER_CALL,pid,clock.instant(),id)!=1)return;
     TutoringProvider.Output output;
-    try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){fail(id,"PROVIDER_UNAVAILABLE");return;}
+    try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){logFailure(id,"provider_generate","PROVIDER_RESULT_UNKNOWN",e);fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){logFailure(id,"provider_generate","PROVIDER_UNAVAILABLE",e);fail(id,"PROVIDER_UNAVAILABLE");return;}
     if(output!=null)db.update(ACCUMULATE_USAGE,output.inputTokens(),output.inputTokens(),output.inputTokens(),output.outputTokens(),output.outputTokens(),output.outputTokens(),id);
     if(TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null);return;}
    }
    deliver(id,pid,policy,null,"OUTPUT_REJECTED");
-  }catch(Exception e){fail(id,"INTERNAL_ERROR");}
+  }catch(Exception e){logFailure(id,"execute","INTERNAL_ERROR",e);fail(id,"INTERNAL_ERROR");}
  }
  private String deliveryBlocked(Map<String,Object> r,com.learningplatform.modules.courses.model.AssignmentRows.Assignment a){
   var membership=db.one(FIND_DELIVERY_MEMBERSHIP,r.get("student_id"),a.offeringId());
@@ -86,6 +87,10 @@ public class TutoringWorker {
    service.addMessage((String)r.get("session_id"),id,"assistant",content,mode,level,a.currentAiPolicyId(),now);
    if(!fallback){db.update(ADVANCE_PROGRESS,TutoringService.uuid(),r.get("assignment_id"),r.get("student_id"),level,now,now,level,now);events.server((String)r.get("student_id"),a.offeringId(),a.id(),a.chapterId(),"tutoring_completed","tutoring:"+id,now);}
   });
+ }
+ /** Exception messages, causes and stack traces may contain provider bodies or credentials. */
+ private static void logFailure(String id,String stage,String code,Exception error){
+  LOG.warn("Tutoring failure requestId={} stage={} code={} exceptionType={}",id,stage,code,error.getClass().getName());
  }
  private void fail(String id,String code){db.update(FAIL_REQUEST,code,clock.instant(),clock.instant(),id);}
 }

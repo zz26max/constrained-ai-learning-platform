@@ -13,6 +13,7 @@
 | [DEBUGGING.md](DEBUGGING.md) | 后端断点调试与内部实现逐步指引 | 用户授权的维护任务 |
 | [openapi.yaml](openapi.yaml) | 路径、字段、类型、错误与接口实现状态 | 用户授权的维护任务 |
 | [P2 后端联调说明](features/p2-backend-integration.md) | P2 后端范围、依赖、配置、请求示例与前端配合事项 | 后端维护任务 |
+| [前端审查修复方案](features/frontend-audit-repair-plan.md) | 全面审查后前端修复的分包顺序、实现边界与验收要求 | 前端维护任务，集成负责人协调共享文档 |
 | [features/](features/p1a-courses.md) | 已交付工作包的设计与验收场景：[P1-A 课程](features/p1a-courses.md)、[P1-D 前端 UI](features/p1d-frontend-ui.md)、[P1 页面验收清单](features/p1-acceptance-checklist.md)（追踪"契约已实现但未在页面走过"的缺口）、[学生端视觉收敛](features/student-ui-convergence.md) | 用户授权的维护任务 |
 | [archive/](archive/ARCHITECTURE_REVIEW.md) | 历史快照，**不是规范**，逐份见下方归档清单 | 不修改 |
 
@@ -26,7 +27,7 @@
 - [UI_DESIGN_HISTORY.md](archive/UI_DESIGN_HISTORY.md)：历次视觉调整与截图检查记录。
 - [p1d-aggregation.md](archive/p1d-aggregation.md)：已作废的 P1-D 设计稿（与契约 1.1.0 冲突，以契约为准）。
 - [frontend-DESIGN.md](archive/frontend-DESIGN.md)：学生端视觉迭代执行记录（V3.x 候选与 M1/M2 基线，现行规范已并入 FRONTEND §9）。
-- [DOC_AUDIT_2026-10-24.md](archive/DOC_AUDIT_2026-10-24.md)、[R2](archive/DOC_AUDIT_R2_2026-10-24.md) 与 [R3](archive/DOC_AUDIT_R3_2026-10-24.md)：外部文档只读审计第 1～3 轮报告（历轮文档治理的依据）。
+- [DOC_AUDIT_2026-10-24.md](archive/DOC_AUDIT_2026-10-24.md)、[R2](archive/DOC_AUDIT_R2_2026-10-24.md)、[R3](archive/DOC_AUDIT_R3_2026-10-24.md) 与 [R4](archive/DOC_AUDIT_R4_2026-10-24.md)：外部文档只读审计第 1～4 轮报告（历轮文档治理的依据；R4 于 2026-10-26 由仓库根目录归档并入本清单）。
 - 学生端交付报告：[V3](archive/V3-DELIVERY.md)、[V3.1](archive/V3.1-DELIVERY.md)、[V3.2](archive/V3.2-DELIVERY.md)、[V3.3](archive/V3.3-DELIVERY.md)（含[学生测试模板](archive/V3.3-STUDENT-TEST.md)）、[V3.4](archive/V3.4-DELIVERY.md)、[V3.4.1](archive/V3.4.1-DELIVERY.md)、[V3.5](archive/V3.5-DELIVERY.md)、[V3.6](archive/V3.6-DELIVERY.md)、[V3.6.1](archive/V3.6.1-DELIVERY.md)，以及[内容层次精修](archive/CONTENT-POLISH-DELIVERY.md)与[正式版交付](archive/STUDENT-RELEASE-DELIVERY.md)。
 
 ## 2. 权威边界

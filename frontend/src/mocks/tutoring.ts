@@ -1,7 +1,7 @@
 import type { components } from '../api/generated/schema'
 import type { AiPolicyDTO, HelpRequestDTO, TutoringMessageDTO, TutoringRequestDTO, TutoringResult } from '../api/tutoring'
 import { mockSession } from './auth'
-import { addMockMessage } from './feedback'
+import { addMockMessage } from './message-store'
 import { MOCK_STUDENT, MOCK_TEACHER, fail, guard, invalid, missing, ok, paginate, pageWindow, searchParams, segment } from './envelope'
 import { mockAssignmentStore, P1B_IDS } from './assignments'
 import { P1A_IDS } from './courses'

@@ -613,12 +613,16 @@ INSERT INTO notices (id,offering_id,author_id,target_student_id,target_type,targ
 VALUES (#{notice.id},#{notice.offeringId},#{notice.authorId},#{notice.targetStudentId},#{notice.targetType},#{notice.targetId},#{notice.title},#{notice.content},#{notice.createdAt,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler})
 </insert>
 
-<!-- notifications 没有公告 ID 列：同一次发布写入的通知与公告共用 created_at、title、offering，据此计数。个人公告恒为 1。 -->
+<update id="setNoticeRecipientCount">
+UPDATE notices SET recipient_count=#{count} WHERE id=#{id}
+</update>
+
+<!-- New notices and uniquely audited legacy notices use frozen counts. Unknown legacy rows retain their former estimate. -->
 <sql id="noticeColumns">
 n.id,n.offering_id,n.target_student_id,n.target_type,n.target_id,n.title,n.content,n.created_at,
-CASE WHEN n.target_student_id IS NOT NULL THEN 1 ELSE
+COALESCE(n.recipient_count,CASE WHEN n.target_student_id IS NOT NULL THEN 1 ELSE
 (SELECT COUNT(*) FROM notifications x WHERE x.type='notice_published' AND x.related_offering_id=n.offering_id
- AND x.created_at=n.created_at AND x.title=n.title) END AS recipient_count
+ AND x.created_at=n.created_at AND x.title=n.title) END) AS recipient_count
 </sql>
 <sql id="noticeVisible">
 n.offering_id=#{offeringId}

@@ -62,7 +62,15 @@ const details=usePageQuery(async signal=>{
   }))
   return result
 })
-watch(eligibilityCandidates,()=>{if(query.status.value==='success')void details.load()})
+// 资格详情以"任务列表快照 + 待办 ID 集合"为加载键：todo 全量预取下，仅页码/排序变化
+// 不改变集合与列表时不再重复发起全量 getAssignment；列表重载或集合变化才重新加载。
+const eligibilityKey=computed(()=>eligibilityCandidates.value.map(t=>t.id).join('|'))
+watch([query.data,eligibilityKey],([data,key],[prevData,prevKey])=>{
+  if(query.status.value!=='success')return
+  if(data===prevData&&key===prevKey)return
+  console.log('[DEBUG] details.load key-changed', key.slice(0,40), 'prev', prevKey?.slice(0,40))
+  void details.load()
+})
 function groupLabel(id:string):string {
   const detail=details.status.value==='success'?details.data.value?.[id]:undefined
   return detail?todoGroupLabel(detail):''

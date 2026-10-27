@@ -9,10 +9,10 @@
   --sr-serif:Georgia,"Times New Roman",serif;
   background:var(--sr-canvas);
 }
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:1280px}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) a {text-decoration:none}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
-.student-release :is(.sr-home,.sr-courses,.sr-tasks) h1 {font-size:28px;font-weight:650;line-height:1.35;margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-tasks) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-tasks) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
 
@@ -295,7 +295,6 @@
 
 /* ===== ≤760px：手机 ===== */
 @media (max-width:760px) {
-  .student-release .menu-toggle {display:none}
   .student-release :is(.sr-home,.sr-courses,.sr-tasks) h1 {font-size:25px}
   .student-release .sr-home .explore-heading {margin-bottom:18px}
   .student-release .sr-home .explore-calendar {padding:0 12px}
@@ -328,4 +327,69 @@
   .student-release .sr-tasks .task-table-row {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"copy copy" "date date" "state action";gap:10px 12px;padding:16px}
   .student-release .sr-tasks .task-table-row>.button {justify-self:end}
   .student-release .sr-tasks .task-group-heading {padding:10px 16px}
+}
+
+/* ===== 外壳（第 1 段）：顶栏 / 侧栏 / 主区 / 页脚 / 页头模式 =====
+   「可核查的教学系统」：冷中性表面、56px 顶栏、232px 墨色导航轨、1240px 内容列。
+   本段全部以 .student-release 开头：教师端外壳（72px 顶栏、238px 侧栏、面包屑文字）保持原样。 */
+
+/* 栅格：侧栏 232px，≤1250px 收窄到 218px（与既有断点一致） */
+.student-release .authenticated-layout {grid-template-columns:232px minmax(0,1fr)}
+
+/* 侧栏：沉浸灰底、无右边框，靠导航项的白色当前态分层；宽度由栅格列决定（232/218） */
+.student-release .workspace-sidebar {padding:0 12px 20px;background:var(--sr-sunken);border-right:0;overflow-y:auto}
+.student-release .workspace-brand {height:72px;margin:0 0 6px;padding:0 8px;gap:10px;align-items:center}
+.student-release .workspace-brand>span {width:34px;height:34px;border-radius:var(--radius-control);font-size:20px}
+.student-release .workspace-brand strong {font-size:19px;line-height:1.35}
+.student-release .workspace-brand small {font-size:11px;margin-top:1px}
+.student-release .sidebar-role,.student-release .role-select {margin:0 8px 18px}
+.student-release .workspace-sidebar nav {gap:2px}
+.student-release .workspace-sidebar nav .nav-item {height:44px;min-height:44px;padding:0 12px;border-radius:var(--radius-control);color:var(--sr-muted)}
+.student-release .workspace-sidebar nav .nav-item:hover {background:var(--sr-canvas);color:var(--sr-ink)}
+/* 当前项：白底 + 墨色文字 + 600 字重 + 左侧 3px 品牌蓝竖条（inset 阴影，不加伪元素） */
+.student-release .workspace-sidebar nav .nav-item.is-active {background:var(--sr-surface);color:var(--sr-ink);font-weight:600;box-shadow:inset 3px 0 0 var(--sr-brand)}
+.student-release .workspace-user {border-top-color:var(--sr-line);padding:16px 4px 0}
+
+/* 顶栏：桌面与手机统一 56px；无面包屑，右侧固定「学期 / 消息 / 头像」 */
+.student-release .workspace-topbar {height:56px;min-height:56px;padding:0 var(--gutter);gap:12px;background:var(--sr-surface);border-bottom:1px solid var(--sr-line);font-size:13px}
+.student-release .topbar-account {gap:16px}
+.student-release .topbar-account>.muted {display:inline}
+.student-release .topbar-messages {position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius-control);color:var(--sr-muted);text-decoration:none}
+.student-release .topbar-messages:hover {background:var(--sr-sunken);color:var(--sr-ink)}
+.student-release .topbar-messages:focus-visible {outline:2px solid var(--sr-brand);outline-offset:2px}
+/* 未读数：品牌蓝小方块，只做事实提示，不做强调动画 */
+.student-release .topbar-unread {position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:var(--radius-control);background:var(--sr-brand);color:#fff;font-size:11px;font-weight:600;line-height:16px;text-align:center;font-variant-numeric:tabular-nums}
+
+/* 主区：画布底色，内容列 1240px 居中，页边距走 --gutter，顶部内边距 32px */
+.student-release .app-main.business-main {padding:32px var(--gutter) 0;background:var(--sr-canvas)}
+.student-release .app-main.business-main>* {width:100%;max-width:var(--content-max);margin-inline:auto}
+
+/* 页脚：两段并作一行，13px 次级文字；细分隔线只画在内容列宽度以内 */
+.student-release .workspace-footer {position:relative;display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;justify-content:flex-start;gap:2px 16px;width:100%;max-width:calc(var(--content-max) + var(--gutter)*2);margin:16px auto 0;padding:14px var(--gutter) 22px;border-top:0;font-size:13px;color:var(--sr-muted)}
+.student-release .workspace-footer::before {content:'';position:absolute;top:0;left:var(--gutter);right:var(--gutter);height:1px;background:var(--sr-line)}
+
+/* 页头模式（后续页面复用）：.page-head 容器 + 眉标 / 标题 / 摘要 / 右侧操作区 */
+.student-release .page-head {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 24px;margin:0 0 24px}
+.student-release .page-head>* {grid-column:1;min-width:0;margin:0}
+.student-release .page-eyebrow {font-size:13px;color:var(--sr-muted)}
+.student-release .page-title {font-size:var(--fs-h1);line-height:var(--lh-tight);font-weight:600;color:var(--sr-ink);overflow-wrap:anywhere}
+.student-release .page-summary {font-size:15px;line-height:var(--lh-body);color:var(--sr-muted);max-width:75ch}
+.student-release .page-actions {grid-column:2;grid-row:1/span 4;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px 12px;margin:0}
+
+/* ≤1250px：侧栏 218px，顶栏/主区页边距随 --gutter 收缩 */
+@media (max-width:1250px) {
+  .student-release .authenticated-layout {grid-template-columns:218px minmax(0,1fr)}
+}
+
+/* ≤767px：页头单列，操作区落到标题下方；手机顶栏仍是 56px */
+@media (max-width:767px) {
+  .student-release .page-head {grid-template-columns:minmax(0,1fr)}
+  .student-release .page-head>.page-actions {grid-column:1;grid-row:auto;justify-content:flex-start;margin-top:4px}
+  .student-release .page-title {font-size:25px}
+  .student-release .topbar-messages {width:32px;height:32px}
+  .student-release .workspace-topbar {gap:8px}
+  /* 保留底部固定导航的避让 90px（student-workbench.css 的取值），否则页脚被压住 */
+  .student-release .workspace-footer {padding-bottom:90px}
+  /* 抽屉是 fixed 定位，需要显式宽度（栅格列此时已失效） */
+  .student-release .workspace-sidebar {width:232px}
 }

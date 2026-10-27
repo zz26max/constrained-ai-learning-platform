@@ -113,9 +113,9 @@ describe('工作区自动保存逻辑', () => {
     expect(state.value.lastSavedRevision).toBe(2)
   })
 
-  it('409 VERSION_CONFLICT：显示错误并停止保存', async () => {
+  it('409 WORKSPACE_CONFLICT：显示错误并停止保存', async () => {
     const saveOperation = vi.fn(async () => {
-      throw new ApiError({ status: 409, code: 'VERSION_CONFLICT', message: '工作区已被修改', requestId: 'req-conflict' })
+      throw new ApiError({ status: 409, code: 'WORKSPACE_CONFLICT', message: '工作区已被修改', requestId: 'req-conflict' })
     })
     const getCsrfToken = vi.fn(async () => 'csrf-test')
 

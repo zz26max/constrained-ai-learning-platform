@@ -110,6 +110,7 @@ const object = (value: unknown): value is Body => value !== null && typeof value
 const text = (value: unknown, maximum: number, minimum = 0): value is string => typeof value === 'string' && value.length >= minimum && value.length <= maximum
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 2147483647
+const revision = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 2147483647
 const timestamp = (value: unknown): value is string => typeof value === 'string' && value.endsWith('Z') && !Number.isNaN(Date.parse(value))
 const optional = (body: Body, key: string, validate: (value: unknown) => boolean) => body[key] === undefined || validate(body[key])
 const allowed = (body: Body, names: string[]) => Object.keys(body).length > 0 && Object.keys(body).every(name => names.includes(name))
@@ -126,17 +127,21 @@ function assignmentPatch(value: unknown): value is AssignmentPatch {
   return object(value) && allowed(value, ['title', 'description', 'requirements', 'estimatedMinutes', 'dueAt', 'lateUntil', 'maxScore', 'rubric'])
 }
 
+const ACTIVE_FILES = ['index.html', 'style.css', 'script.js', 'answer.sql', 'answer.md'] as const
+
 function workspaceWrite(value: unknown): value is WorkspaceWrite {
   if (!object(value)) return false
-  if (!('files' in value) || !Array.isArray(value.files)) return false
-  if (!('baseRevision' in value) || !integer(value.baseRevision)) return false
-  return optional(value, 'activeFile', v => typeof v === 'string')
+  if (!('files' in value) || !Array.isArray(value.files) || value.files.length < 1) return false
+  if (!('baseRevision' in value) || !revision(value.baseRevision)) return false
+  // 契约 WorkspaceWrite：activeFile 必填（五值枚举），空串不代表可省略。
+  return typeof value.activeFile === 'string' && (ACTIVE_FILES as readonly string[]).includes(value.activeFile)
 }
 
 function submissionWrite(value: unknown): value is SubmissionWrite {
   if (!object(value)) return false
   if (!('workspaceRevision' in value) || !integer(value.workspaceRevision)) return false
-  return optional(value, 'reflection', v => typeof v === 'string')
+  // 契约 SubmissionWrite：reflection 必填（可为空串），上限 8000。
+  return typeof value.reflection === 'string' && value.reflection.length <= 8000
 }
 
 export function toSummary(assignment: TeacherAssignmentDTO, userId: string): AssignmentSummaryDTO {
@@ -242,7 +247,7 @@ function handleAssignment(context: MockRequestContext): MockResult {
 
     const currentRevision = stored?.dto.revision || 0
     if (body.baseRevision !== currentRevision) {
-      return fail(context, 409, 'VERSION_CONFLICT', '工作区已被修改，请刷新后重试。')
+      return fail(context, 409, 'WORKSPACE_CONFLICT', '工作区已被修改，请刷新后重试。', { currentRevision })
     }
 
     const updated: WorkspaceDTO = {
@@ -256,22 +261,24 @@ function handleAssignment(context: MockRequestContext): MockResult {
 
   if (operation === 'submitAssignment') {
     if (!submissionWrite(body)) return invalid(context)
-    const workspace = workspaces.get(id)
     const assignment = assignments.get(id)
     if (!assignment || assignment.dto.publicationState !== 'published') return missing(context)
-    if (assignment.dto.offeringId === P1A_IDS.offeringPendingArchive) return archived(context)
-    if (!workspace || workspace.dto.revision !== body.workspaceRevision) {
-      return fail(context, 409, 'VERSION_CONFLICT', '工作区已被修改，请刷新后重试。')
-    }
-
+    const workspace = workspaces.get(id)
     const userSubmissions = [...submissions.values()].filter(s => s.dto.assignmentId === id)
-    if (userSubmissions.length >= assignment.dto.maxAttempts) {
-      return fail(context, 409, 'MAX_ATTEMPTS_REACHED', '已达到最大提交次数。')
+    // 契约 1.1.1（x-idempotency: natural）：同 workspaceRevision 已提交则返回原提交，
+    // 不新建、不占次数、reflection 不覆盖原值；该幂等检查先于归档阻断与次数检查
+    // （班级归档后同 revision 重发仍返回原提交，新建提交才受归档阻断）。
+    if (workspace !== undefined) {
+      const existing = userSubmissions.find(s => s.dto.workspaceRevision === body.workspaceRevision)
+      if (existing !== undefined) return ok(context, existing.dto, 200)
     }
-
-    const existing = userSubmissions.find(s => s.dto.workspaceRevision === body.workspaceRevision)
-    if (existing) {
-      return fail(context, 409, 'DUPLICATE_SUBMISSION', '该工作区版本已提交，不能重复提交。')
+    if (assignment.dto.offeringId === P1A_IDS.offeringPendingArchive) return archived(context)
+    if (userSubmissions.length >= assignment.dto.maxAttempts) {
+      return fail(context, 409, 'ATTEMPT_LIMIT_REACHED', '已达到最大提交次数。')
+    }
+    // 提交的必须是服务器当前已保存的 revision；否则 WORKSPACE_CONFLICT 并带回当前版本。
+    if (!workspace || workspace.dto.revision !== body.workspaceRevision) {
+      return fail(context, 409, 'WORKSPACE_CONFLICT', '工作区已被修改，请刷新后重试。', { currentRevision: workspace?.dto.revision ?? 0 })
     }
 
     const submission: SubmissionSummaryDTO = {
@@ -280,16 +287,20 @@ function handleAssignment(context: MockRequestContext): MockResult {
       submittedAt: now(), late: new Date() > new Date(assignment.dto.dueAt),
       superseded: false, feedbackStatus: 'none',
     }
-    submissions.set(submission.id, { dto: submission, files: workspace.dto.files, reflection: body.reflection || '' })
+    // 与后端一致：新提交使同作业同学生的既有提交全部转为 superseded。
+    for (const previous of userSubmissions) previous.dto.superseded = true
+    submissions.set(submission.id, { dto: submission, files: workspace.dto.files, reflection: body.reflection })
     return ok(context, submission, 201)
   }
 
   if (operation === 'listMySubmissions') {
+    const window = pageWindow(query)
+    if (!window) return invalid(context, '分页参数不合法。')
     const items = [...submissions.values()]
       .filter(s => s.dto.assignmentId === id)
       .map(s => s.dto)
       .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
-    return ok(context, { items })
+    return ok(context, paginate(items, window))
   }
 
   if (operation === 'listTeacherAssignments') {

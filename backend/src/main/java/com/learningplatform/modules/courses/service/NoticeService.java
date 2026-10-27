@@ -51,6 +51,7 @@ public class NoticeService {
                     notificationContent,offeringId,null,null,target==null?null:target.type(),target==null?null:target.id(),now);
             notified++;
         }
+        mapper.setNoticeRecipientCount(noticeId,notified);
         audit.record(author.id(),"NOTICE_CREATED","notice",noticeId,Map.of("notified",notified),requestId);
         return toDto(mapper.findNoticeView(noticeId));
     }

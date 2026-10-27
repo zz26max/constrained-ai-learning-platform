@@ -2,46 +2,54 @@
    页面与组件只用这里的变量，不再各自定义色值或圆角；历史 --radius-button 保留为别名。 */
 :root {
   /* 表面 */
-  --canvas: #f4f6f9;
+  --canvas: #f5f7fa;
   --surface: #fff;
-  --sunken: #f7f9fc;
+  --sunken: #eef1f5;
   /* 文字与线 */
-  --ink: #1c2d49;
-  --muted: #52627a;
-  --line: #dde3ec;
-  --line-strong: #c5cfdd;
+  --ink: #172033;
+  --muted: #5b6576;
+  --line: #e3e7ee;
+  --line-strong: #c9d0db;
   --line-control: #8993a0;
   /* 品牌：全站唯一操作色 */
-  --blue: #2853bc;
-  --blue-hover: #2147a3;
-  --blue-text: #2853bc;
-  --blue-soft: #eef2fb;
-  /* 语义状态 */
-  --green: #247052;
+  --blue: #2f4bb3;
+  --blue-hover: #233b8f;
+  --blue-text: #2f4bb3;
+  --blue-soft: #eaeefb;
+  /* 语义状态：--orange 保持 #8a5208——#a65f00 在 --orange-soft 上仅 4.48:1（tag-open/tag-overdue 用该组合），不达 AA */
+  --green: #1f7a4d;
   --green-soft: #eaf4ee;
   --orange: #8a5208;
   --orange-soft: #fbf3e6;
-  --red: #a93434;
+  --red: #c0352b;
   --red-soft: #fff2f0;
-  --focus-ring: #1f3b84;
+  --focus-ring: #2f4bb3;
   /* 学科身份：只用于学科徽章、图标与侧轨，不表示操作或链接 */
   --subject-code: #2853bc; --subject-code-soft: #eef2fb;
   --subject-data: #1b6b65; --subject-data-soft: #e8f3ef;
   --subject-systems: #5a527e; --subject-systems-soft: #f0eef7;
   --subject-explore: #805e1e; --subject-explore-soft: #faf3e4;
   --subject-neutral: #52627a; --subject-neutral-soft: #edf1f5;
+  /* 掌握度四档：单一墨色阶，只表示掌握程度，不用红绿表达成败；用于掌握度矩阵与图例 */
+  --mastery-1: #c7cfdb;
+  --mastery-2: #8e9bb0;
+  --mastery-3: #4d5d78;
+  --mastery-4: #172033;
   /* 字体与字号 */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
   --font-mono: Consolas, 'Cascadia Code', 'Courier New', monospace;
-  --fs-h1: 28px;
+  --fs-h1: 30px;
   --fs-h1-sm: 25px;
+  --fs-h2: 22px;
+  --fs-h3: 17px;
   --fs-title: 20px;
   --fs-control: 14px;
   --fs-body: 15px;
   --fs-meta: 13px;
   --fs-micro: 12px;
-  --lh-body: 1.6;
+  --lh-body: 1.65;
+  --lh-tight: 1.3;
   /* 间距阶梯 */
   --space-1: 4px;
   --space-2: 8px;
@@ -50,6 +58,11 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
+  --space-8: 64px;
+  /* 栅格：内容区最大宽、详情页侧栏宽、页边距（窄屏由文件末尾媒体查询收窄） */
+  --content-max: 1240px;
+  --aside: 352px;
+  --gutter: 40px;
   /* 形状：控件 / 面板 / 焦点卡，只此三档 */
   --radius-control: 6px;
   --radius-panel: 10px;
@@ -62,7 +75,11 @@
   --dur-fast: 120ms;
   --dur-move: 200ms;
   --dur-enter: 280ms;
-  /* 阴影：浮层之外只有卡片悬停的浅浮起投影 */
+  /* 阴影：浮层之外只有卡片悬停的浅浮起投影；细分隔线用 hairline 而不是边框加阴影 */
+  --shadow-hairline: 0 1px 0 rgba(23,32,51,.05);
   --shadow-lift: 0 6px 18px #1c2d4914, 0 2px 6px #1c2d4910;
   --shadow-card: 0 1px 2px #1c2d490d, 0 8px 28px #1c2d4912;
 }
+/* 页边距随断点收缩：内容区最大宽保持不变，窄屏靠 gutter 让出空间 */
+@media (max-width:1199px) { :root { --gutter:24px } }
+@media (max-width:767px) { :root { --gutter:16px } }

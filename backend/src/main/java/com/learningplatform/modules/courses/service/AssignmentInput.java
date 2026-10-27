@@ -152,6 +152,7 @@ public final class AssignmentInput {
         return new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_FILE_PATH","文件名不在该作业类型允许的范围内。");
     }
     public static void validateSubmissionWrite(Map<String,Object> body) {
+        if(!Set.of("workspaceRevision","reflection").containsAll(body.keySet())) throw invalidRequest();
         requireKeys(body,"workspaceRevision","reflection");
         int revision=integer(body,"workspaceRevision");
         if(revision<1) throw invalid();

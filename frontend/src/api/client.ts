@@ -52,6 +52,8 @@ export interface RequestOptions {
   csrfToken?: string
   query?: Record<string, string>
   signal?: AbortSignal
+  /** fetch keepalive：仅学习事件上报的退出冲刷使用（页面卸载窗口保送），默认不开启。 */
+  keepalive?: boolean
 }
 
 interface EnvelopeOk<T> {
@@ -99,7 +101,10 @@ export class ApiClient {
       if (query !== '') path = `${path}?${query}`
     }
     const response = await this.transport.request(
-      { operationId: spec.id, method: spec.method, path, headers, body },
+      {
+        operationId: spec.id, method: spec.method, path, headers, body,
+        ...(options.keepalive === true ? { keepalive: true } : {}),
+      },
       options.signal,
     )
     return this.unwrap<T>(spec, response, sentRequestId)

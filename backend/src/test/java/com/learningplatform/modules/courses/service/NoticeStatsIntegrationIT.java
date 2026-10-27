@@ -55,7 +55,8 @@ class NoticeStatsIntegrationIT {
             .withDatabaseName("learning_platform_notice_stats_test")
             .withUsername("ns_test").withPassword(UUID.randomUUID().toString())
             .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci",
-                    "--default-time-zone=+00:00", "--transaction-isolation=READ-COMMITTED");
+                    "--default-time-zone=+00:00", "--transaction-isolation=READ-COMMITTED",
+                    "--log-bin-trust-function-creators=1");
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry r) {
@@ -99,6 +100,52 @@ class NoticeStatsIntegrationIT {
     }
 
     // ---------- createNotice / listNotices / getNotice ----------
+
+    @Test
+    void sameInstantAndTitleKeepEachNoticeFanOutCount() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        NoticeDTO first = notices.createNotice(offering.id(), TEACHER, body("相同标题", "第一条"), "notice-first");
+        enrollStudent(offering.id(), OTHER_STUDENT);
+        NoticeDTO second = notices.createNotice(offering.id(), TEACHER, body("相同标题", "第二条"), "notice-second");
+        assertThat(first.createdAt()).isEqualTo(second.createdAt());
+        assertThat(notices.getNotice(first.id(), TEACHER).recipientCount()).isEqualTo(1);
+        assertThat(notices.getNotice(second.id(), TEACHER).recipientCount()).isEqualTo(2);
+        assertThat(notices.listNotices(offering.id(), TEACHER, 1, 20).items())
+                .extracting(NoticeDTO::recipientCount).containsExactlyInAnyOrder(1, 2);
+    }
+
+    @Test
+    void unknownLegacyCountKeepsPreviousEstimate() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        NoticeDTO notice = notices.createNotice(offering.id(), TEACHER, body("历史公告", "内容"), "notice-legacy");
+        jdbc.update("UPDATE notices SET recipient_count=NULL WHERE id=?", notice.id());
+        assertThat(notices.getNotice(notice.id(), TEACHER).recipientCount()).isEqualTo(1);
+    }
+
+    @Test
+    void notificationFailureRollsBackNoticeCountAndAudit() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        enrollStudent(offering.id(), OTHER_STUDENT);
+        // The first fan-out insert must succeed; fail only once that insert is visible
+        // inside the same transaction, proving rollback after a partial fan-out.
+        jdbc.execute("CREATE TRIGGER notice_test_failure BEFORE INSERT ON notifications FOR EACH ROW "
+                + "BEGIN IF NEW.type='notice_published' AND (SELECT COUNT(*) FROM notifications "
+                + "WHERE type='notice_published' AND related_offering_id=NEW.related_offering_id)=1 THEN "
+                + "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test-only-second-notification-failure'; END IF; END");
+        try {
+            assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, body("回滚公告", "内容"), "notice-rollback"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                    .hasStackTraceContaining("test-only-second-notification-failure");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notices", Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications", Integer.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_logs WHERE action='NOTICE_CREATED'", Integer.class)).isZero();
+        } finally {
+            jdbc.execute("DROP TRIGGER notice_test_failure");
+        }
+    }
 
     @Test
     void wholeClassNoticeIsVisibleToEveryMemberAndNotifiesEveryActiveStudent() {
