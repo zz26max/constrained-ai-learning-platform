@@ -1,205 +1,196 @@
 <script setup lang="ts">
+
+import SubjectGlyph from './SubjectGlyph.vue'
+import SubjectIdentity from './SubjectIdentity.vue'
+import CountProgress from './CountProgress.vue'
+import IntegratedTaskStatus from './CraftTaskState.vue'
+import {subject,beijingTime} from './presentation'
+import {taskDayGroups,taskContentTone} from './content-presentation'
+import {chapterEntry} from './refinement'
+
 import { computed, watch } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
-import { dashboardApi } from '../../../api'
-import type { DashboardDTO } from '../../../api/dashboard'
+import CraftDate from './CraftDate.vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { coursesApi } from '../../../api'
+import { useStudentHome } from '../../../features/dashboard/use-student-home'
+import { taskAction, deadlineLabel, canEnterWorkspace } from '../../../features/assignments/task-presentation'
+import type { AssignmentDetailDTO } from '../../../api/assignments'
+import { formatTime } from '../../../features/courses/format'
+
 import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
-import { usePageQuery } from '../../courses/use-page-query'
-import { useOpenTarget } from '../../notifications/use-open-target'
-import { useAuthStore } from '../../../stores/auth'
-import { useNotificationsStore } from '../../../stores/notifications'
-import HomeCurrentTask from './HomeCurrentTask.vue'
-import { beijingAt, beijingHM, beijingMonthDay, greetingOf, HOME_TASK_STATES, homeStateKey, relDue } from './home-state'
-
-// v4 首页：数据全部来自 getDashboard（currentLearning / otherPendingAssignments / courses /
-// recentFeedback / recentNotice），首页不再逐项请求作业详情；能否提交由作业详情页判定。
-const auth = useAuthStore()
-const route = useRoute()
-const target = useOpenTarget()
-// 看板未读数作为快照写入外壳徽标：携带发起时版本号，迟到的看板响应不回退已被确认的值。
-const badges = useNotificationsStore()
-let dashboardSnapshotSeq = 0
-const query = usePageQuery(async signal => {
-  dashboardSnapshotSeq = badges.snapshotSeq()
-  return (await dashboardApi().getDashboard({}, { signal })).data
+import AppIcon from '../../../components/AppIcon.vue'
+import { usePageQuery } from '../../../features/courses/use-page-query'
+import { chapterOverview } from '../../../features/dashboard/bplus-presentation'
+const home=useStudentHome()
+const {query,tasksQuery,target,nextTask,recentTasks,TYPE_LABELS,excerpt}=home
+const selectedCourse=computed(()=>tasksQuery.data.value?.classes[0])
+const displayedCourses=computed(()=>tasksQuery.data.value?.classes.slice(0,1)??[])
+const deadlineGroups=computed(()=>taskDayGroups(recentTasks.value))
+// 组标题只显示一次相对截止；"截止安排"这类占位语不展示。
+function groupContext(group:{context:string;dueAt:string}){return group.context==='截止安排'?deadlineLabel(group.dueAt):group.context}
+function courseById(id:string|null|undefined){return tasksQuery.data.value?.classes.find(c=>c.offeringId===id)}
+// 主操作直达工作区；资格未确认或不可提交时退回说明页，让标签与实际去向一致。
+function taskEntry(task:AssignmentDetailDTO|null|undefined){
+  if(!task)return {name:'student-assignments'} as const
+  return canEnterWorkspace(task,task)
+    ? {name:'student-workspace',params:{id:task.id}}
+    : {name:'student-assignment',params:{id:task.id}}
+}
+const courses=coursesApi()
+const chaptersQuery=usePageQuery(async signal=>{
+  const id=selectedCourse.value?.offeringId
+  if(!id)throw new Error('没有可读取章节的课程')
+  const data=(await courses.listChapters(id,{signal})).data
+  if(data.offeringId!==id)throw new Error('章节与当前课程不一致，请重新加载')
+  return data
 })
-watch(() => route.path, () => { void query.load() }, { immediate: true })
-watch(() => query.data.value?.unreadMessageCount, value => {
-  if (typeof value === 'number') badges.setUnread(value, dashboardSnapshotSeq)
-})
-
-const data = computed(() => query.data.value)
-const greeting = computed(() => data.value ? greetingOf(data.value.serverTime) : '')
-const displayName = computed(() => auth.identity?.displayName ?? '')
-const current = computed(() => data.value?.currentLearning ?? null)
-const others = computed(() => data.value?.otherPendingAssignments ?? [])
-const courses = computed(() => data.value?.courses ?? [])
-const termCourses = computed(() => {
-  const termId = data.value?.termId
-  const scoped = termId ? courses.value.filter(c => c.termId === termId) : courses.value
-  return scoped.length > 0 ? scoped : courses.value
-})
-// 待办总数超过首页可见数（当前 1 + 其他 2）时给「全部 N 项」入口。
-const showAllLink = computed(() => (data.value?.pendingAssignmentCount ?? 0) > others.value.length + (current.value !== null ? 1 : 0))
-const courseTitleOf = (offeringId: string | null) => courses.value.find(c => c.offeringId === offeringId)?.title ?? ''
-const otherRows = computed(() => {
-  const now = data.value?.serverTime ?? ''
-  return others.value.map(task => {
-    const state = HOME_TASK_STATES[homeStateKey(task)]
-    return { task, stateLabel: state.label, stateTone: state.tone, rel: relDue(task.dueAt, now) }
-  })
+watch(()=>selectedCourse.value?.offeringId,()=>{if(selectedCourse.value&&chaptersQuery.data.value?.offeringId!==selectedCourse.value.offeringId)void chaptersQuery.load()},{immediate:true})
+const chapterProgress=computed(()=>chapterOverview(chaptersQuery.data.value?.items??[]))
+const bplusCourseAction=computed<{label:string;to:RouteLocationRaw}>(()=>{
+  const c=selectedCourse.value
+  const fallback={label:'查看课程',to:c?{name:'course',params:{offeringId:c.offeringId}}:{name:'courses'}}
+  if(!c || c.status==='archived' || chaptersQuery.status.value!=='success')return fallback
+  const progress=chapterProgress.value
+  const chapter=progress.next??(progress.allRead?(progress.chapters.find(ch=>ch.id===c.currentChapter?.id)??progress.chapters[0]):undefined)
+  return chapter?{label:chapterEntry(chapter).label,to:{name:'chapter',params:{offeringId:c.offeringId,chapterId:chapter.id}}}:fallback
 })
 </script>
-
 <template>
-  <div class="workspace-page sr-home" data-design="v4">
-    <header class="page-head">
-      <div>
-        <h1 tabindex="-1">{{ greeting }}，{{ displayName }}</h1>
-        <p v-if="query.status.value === 'success' && data?.termId === null" class="sr-intro">当前没有进行中的学期</p>
-        <p v-else-if="query.status.value === 'success' && data" class="counts" aria-label="本学期概览">
-          <RouterLink to="/student/assignments"><b>{{ data.pendingAssignmentCount }}</b> 项待完成</RouterLink>
-          <RouterLink to="/course"><b>{{ data.courseCount }}</b> 门课程</RouterLink>
-          <RouterLink to="/student/messages"><b>{{ data.unreadMessageCount }}</b> 条未读消息</RouterLink>
-        </p>
+  <div class="workspace-page sr-home" data-design="bplus">
+    <header class="explore-heading">
+      <div><h1 tabindex="-1">学习首页</h1>
+        <p v-if="query.status.value==='success' && query.data.value?.termId===null" class="sr-intro">当前没有进行中的学期</p>
+        <p v-else-if="query.status.value==='success' && query.data.value" class="sr-overview" aria-label="本学期概览"><RouterLink to="/student/assignments"><strong>{{query.data.value.pendingAssignmentCount}}</strong> 项待完成</RouterLink><RouterLink to="/course"><strong>{{query.data.value.courseCount}}</strong> 门课程</RouterLink><RouterLink to="/student/messages"><strong>{{query.data.value.unreadMessageCount}}</strong> 条未读消息</RouterLink></p>
       </div>
+      <RouterLink class="explore-calendar" to="/student/calendar"><AppIcon name="calendar" /><span>学习日历</span></RouterLink>
     </header>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
-    <template v-if="query.status.value === 'success' && data">
-      <div class="home-grid">
-        <div class="col">
-          <section class="sec" aria-labelledby="home-current-title">
-            <div class="sec-h"><h2 id="home-current-title">当前任务</h2></div>
-            <HomeCurrentTask :current="current" :courses="courses" :server-time="data.serverTime" />
-          </section>
+    <template v-if="query.status.value==='success' && query.data.value">
+      <div class="explore-composition">
+        <div class="explore-primary-column">
+        <section class="explore-focus" aria-labelledby="explore-focus-title">
+          <div class="focus-main">
+            <p class="explore-label">接下来要做</p>
+            <ApiState :status="tasksQuery.status.value" :error="tasksQuery.error.value" @retry="tasksQuery.load" />
+            <template v-if="tasksQuery.status.value==='success'">
+              <p v-if="nextTask && tasksQuery.data.value?.unconfirmed" class="explore-muted" role="status">另有 {{ tasksQuery.data.value.unconfirmed }} 项任务状态未能确认，已按可确认结果展示。<button type="button" class="button secondary" @click="tasksQuery.load">重试</button></p>
+              <template v-if="nextTask">
+                <h2 id="explore-focus-title" :title="nextTask.title">{{nextTask.title}}</h2>
+                <p class="focus-course"><SubjectIdentity :course="courseById(nextTask.offeringId)" /><span>{{TYPE_LABELS[nextTask.type]}}</span></p>
+                <p v-if="nextTask.title.includes('�')" role="alert" class="focus-data-warning">原始标题存在乱码，请联系教师修正。</p>
+                <IntegratedTaskStatus :task="nextTask" :detail="nextTask" :show-deadline="false" />
+                <div class="bplus-deadline"><span>截止（北京时间）</span><CraftDate :value="nextTask.dueAt"/><small>{{deadlineLabel(nextTask.dueAt)}}</small></div>
+                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :data-task-id="nextTask.id" :to="taskEntry(nextTask)">{{taskAction(nextTask,nextTask)}}<span aria-hidden="true"> →</span></RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
+                <p class="polish-task-context">按可提交任务的截止时间先后展示，包含补交任务。</p>
+              </template>
+              <template v-else-if="tasksQuery.data.value?.unconfirmed">
+                <h2 id="explore-focus-title">任务状态未能完全确认</h2><p class="focus-empty-text">另有 {{ tasksQuery.data.value.unconfirmed }} 项待办的提交资格未能确认，确认前不假设其可提交或不可提交。</p>
+                <div class="focus-actions"><button type="button" class="button secondary" @click="tasksQuery.load">重试确认</button><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
+              </template>
+              <template v-else>
+                <h2 id="explore-focus-title">当前没有可提交的待办</h2><p class="focus-empty-text">把时间留给课程学习。已截止任务与历史提交仍可查看。</p>
+                <div class="focus-actions"><RouterLink class="button primary" data-home-action="primary" :to="bplusCourseAction.to">{{selectedCourse?bplusCourseAction.label:'查看我的课程'}} →</RouterLink><RouterLink to="/student/assignments">查看全部待办</RouterLink></div>
+              </template>
+            </template>
+          </div>
+        </section>
 
-          <section class="sec" aria-labelledby="home-others-title">
-            <div class="sec-h"><h2 id="home-others-title">其他待办</h2><RouterLink v-if="showAllLink" to="/student/assignments">全部 {{ data.pendingAssignmentCount }} 项</RouterLink></div>
-            <ul v-if="otherRows.length" class="rows">
-              <li v-for="row in otherRows" :key="row.task.id">
-                <RouterLink class="row" :to="{ name: 'student-assignment', params: { id: row.task.id } }">
-                  <div class="grow">
-                    <b>{{ row.task.title }}</b>
-                    <span class="meta">{{ courseTitleOf(row.task.offeringId) ? courseTitleOf(row.task.offeringId) + ' · ' : '' }}{{ beijingMonthDay(row.task.dueAt) }} {{ beijingHM(row.task.dueAt) }} 截止</span>
-                  </div>
-                  <span class="chip" :class="'st-' + row.stateTone">{{ row.stateLabel }}</span>
-                  <span class="rel" :class="row.rel.tone">{{ row.rel.text }}</span>
-                </RouterLink>
-              </li>
-            </ul>
-            <p v-else class="meta">没有其他待办。</p>
-          </section>
+        <section class="explore-tasks" aria-labelledby="explore-tasks-title">
+          <header class="explore-section-heading"><h2 id="explore-tasks-title">近期任务</h2><RouterLink to="/student/assignments">全部作业</RouterLink></header>
+          <p v-if="tasksQuery.status.value==='loading'" class="explore-muted" role="status">正在读取近期任务…</p>
+          <p v-else-if="tasksQuery.status.value==='error'" class="explore-muted">任务未完整加载，请在上方重试。</p>
+          <div v-else-if="recentTasks.length" class="bplus-task-groups"><section v-for="group in deadlineGroups" :key="group.key" class="bplus-task-group" :data-day="group.key" :aria-label="group.key+'截止任务'"><header class="bplus-group-heading"><CraftDate :value="group.dueAt" day-only/><span>{{group.tasks.length}} 项任务</span><small>{{groupContext(group)}}</small></header><ul class="bplus-task-list"><li v-for="task in group.tasks" :key="task.id" :data-task-id="task.id" :data-tone="taskContentTone(task,task)"><div class="task-line-content"><RouterLink class="explore-task-name" :title="task.title" :to="{name:'student-assignment',params:{id:task.id}}">{{task.title}}</RouterLink><p class="explore-muted"><SubjectIdentity :course="courseById(task.offeringId)" /></p><div class="content-task-meta"><IntegratedTaskStatus :task="task" :detail="task" :show-deadline="false" /><span class="content-task-time">{{beijingTime(task.dueAt)}} 截止</span></div></div><RouterLink class="task-line-action" :to="taskEntry(task)">{{taskAction(task,task)}}</RouterLink></li></ul></section></div>
+          <p v-else class="explore-empty">没有更多可提交的近期任务。已截止任务可在全部作业中查看。</p>
+        </section>
 
-          <section class="sec" aria-labelledby="home-courses-title">
-            <div class="sec-h"><h2 id="home-courses-title">课程</h2><RouterLink to="/course">全部课程</RouterLink></div>
-            <ul v-if="termCourses.length" class="rows">
-              <li v-for="c in termCourses" :key="c.offeringId">
-                <RouterLink class="row" :to="{ name: 'course', params: { offeringId: c.offeringId } }">
-                  <span class="mark" aria-hidden="true">{{ c.mark }}</span>
-                  <div class="grow">
-                    <b>{{ c.title }}</b>
-                    <span class="meta">{{ c.currentChapter ? `第 ${c.currentChapter.number} 章 · ${c.currentChapter.title}` : '尚未开始' }}{{ c.pendingAssignmentCount ? ` · ${c.pendingAssignmentCount} 项待办` : '' }}{{ c.status === 'archived' ? ' · 已归档' : '' }}</span>
-                  </div>
-                  <div class="prog">
-                    <div v-if="!c.progress.notConfigured" class="bar" role="progressbar" :aria-label="`${c.title} 章节进度`" :aria-valuenow="c.progress.percent" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: c.progress.percent + '%' }"></i></div>
-                    <span class="meta num">{{ c.progress.notConfigured ? '未配置章节' : `${c.progress.completed}/${c.progress.total} 章` }}</span>
-                  </div>
-                </RouterLink>
-              </li>
-            </ul>
-            <p v-else class="meta">本学期还没有课程。</p>
-          </section>
-        </div>
-
-        <aside class="col side">
-          <section class="sec" aria-labelledby="home-feedback-title">
-            <div class="sec-h"><h2 id="home-feedback-title">最新评价</h2><RouterLink v-if="data.recentFeedback" :to="{ name: 'student-progress', params: { offeringId: data.recentFeedback.offeringId } }">学习记录</RouterLink></div>
-            <RouterLink v-if="data.recentFeedback" class="fb" :to="{ name: 'student-assignment', params: { id: data.recentFeedback.assignmentId }, query: { feedbackId: data.recentFeedback.id } }">
-              <div class="fb-top">
-                <span class="score num">{{ data.recentFeedback.score }}<small>/{{ data.recentFeedback.maxScore }}</small></span>
-                <div><b>{{ data.recentFeedback.assignmentTitle }}</b><span class="meta">{{ data.recentFeedback.teacher.displayName }} · {{ beijingAt(data.recentFeedback.publishedAt) }}</span></div>
+        </div><div class="explore-secondary-column">
+        <section class="explore-courses" aria-labelledby="explore-courses-title">
+          <header class="explore-section-heading"><h2 id="explore-courses-title">最近课程</h2><RouterLink to="/course">全部课程</RouterLink></header>
+          <p v-if="tasksQuery.status.value==='loading'" class="explore-muted">正在读取课程…</p>
+          <p v-else-if="tasksQuery.status.value==='error'" class="explore-muted">课程未完整加载，请在上方重试。</p>
+          <ul v-else-if="tasksQuery.data.value?.classes.length" class="explore-course-list">
+            <li v-for="course in displayedCourses" :key="course.offeringId" :data-course-id="course.offeringId" :data-family="subject(course.mark).family">
+              <div class="v35-recent-course-heading"><SubjectGlyph :mark="course.mark"/><div><span class="vx-muted">{{subject(course.mark).label}}</span><h3><RouterLink :to="{name:'course',params:{offeringId:course.offeringId}}">{{course.title}}</RouterLink></h3><span class="vx-muted">{{course.status==='archived'?'已归档，':''}}{{course.groupName}}</span></div></div>
+              <div class="explore-course-info"><p class="v35-teachers">{{course.teachers.map(t=>t.displayName).join('、')}}</p>
+                <ApiState :status="chaptersQuery.status.value" :error="chaptersQuery.error.value" @retry="chaptersQuery.load" /><template v-if="chaptersQuery.status.value==='success'"><template v-if="chapterProgress.total"><CountProgress refined :completed="chapterProgress.completed" :total="chapterProgress.total" :title="course.title"/><p v-if="chapterProgress.unknown" class="vx-muted">部分阅读状态未提供</p><p v-if="chapterProgress.allRead" class="bplus-course-hint">已开放章节已全部阅读，后续内容以教师发布为准。</p><p v-else-if="chapterProgress.next" class="bplus-course-hint">下一章节：{{chapterProgress.next.title}}</p></template><p v-else class="explore-muted">暂无已开放章节</p></template>
+                <p v-if="course.currentChapter && course.currentChapter.id!==chapterProgress.next?.id" class="explore-chapter">最近阅读：{{course.currentChapter.title}}</p><p v-else-if="!course.currentChapter" class="explore-muted">暂无最近阅读记录</p>
+                <p v-if="course.pendingAssignmentCount || course.unreadFeedbackCount" class="explore-course-counts">{{course.pendingAssignmentCount}} 项待办，{{course.unreadFeedbackCount}} 条未读反馈</p>
+                <div class="explore-course-actions"><RouterLink class="bplus-course-action" :to="bplusCourseAction.to">{{bplusCourseAction.label}}</RouterLink><RouterLink v-if="bplusCourseAction.label!=='查看课程'" :to="{name:'course',params:{offeringId:course.offeringId}}">查看课程</RouterLink><RouterLink :to="{name:'student-progress',params:{offeringId:course.offeringId}}">学习记录</RouterLink><RouterLink :to="{name:'student-notices',params:{offeringId:course.offeringId}}">公告</RouterLink></div>
               </div>
-              <p>{{ data.recentFeedback.comment }}</p>
-            </RouterLink>
-            <p v-else class="meta">还没有已发布的评价。</p>
-          </section>
+            </li>
+          </ul><p v-else class="explore-empty">本学期暂无课程。<RouterLink to="/course">前往我的课程</RouterLink></p>
+        </section>
 
-          <section class="sec" aria-labelledby="home-notice-title">
-            <div class="sec-h"><h2 id="home-notice-title">课程公告</h2><RouterLink to="/student/messages">全部消息</RouterLink></div>
-            <ActionNotice :error="target.error.value" :message="null" />
-            <div v-if="data.recentNotice" class="notice">
-              <span class="meta">{{ courseTitleOf(data.recentNotice.offeringId) ? courseTitleOf(data.recentNotice.offeringId) + ' · ' : '' }}{{ beijingAt(data.recentNotice.createdAt) }}</span>
-              <button v-if="data.recentNotice.target && target.canOpen(data.recentNotice.target)" class="notice-open" type="button" @click="target.open(data.recentNotice.target)">{{ data.recentNotice.title }}</button>
-              <RouterLink v-else class="notice-open" to="/student/messages">{{ data.recentNotice.title }}</RouterLink>
-              <p>{{ data.recentNotice.content }}</p>
-            </div>
-            <p v-else class="meta">暂无公告。</p>
-          </section>
-        </aside>
+        <aside class="explore-notes" aria-label="反馈与公告">
+          <section class="explore-feedback" aria-labelledby="explore-feedback-title"><h2 id="explore-feedback-title">最近反馈</h2><template v-if="query.data.value.recentFeedback"><p class="v35-feedback-course"><SubjectIdentity :course="courseById(query.data.value.recentFeedback.offeringId)" /></p><div class="feedback-score"><strong>{{query.data.value.recentFeedback.score}}</strong><span>/ {{query.data.value.recentFeedback.maxScore}}</span><small>本次作业评价</small></div><RouterLink class="feedback-title" :to="{name:'student-assignment',params:{id:query.data.value.recentFeedback.assignmentId},query:{feedbackId:query.data.value.recentFeedback.id}}">{{query.data.value.recentFeedback.assignmentTitle}}</RouterLink><p class="feedback-quote">{{excerpt(query.data.value.recentFeedback.comment,120)}}</p><details v-if="query.data.value.recentFeedback.comment.length>120"><summary>展开完整反馈</summary><p>{{query.data.value.recentFeedback.comment}}</p></details><time class="explore-muted">{{formatTime(query.data.value.recentFeedback.publishedAt)}}</time></template><p v-else class="explore-empty">暂无已发布的评价。教师发布后会在这里显示。</p></section>
+          <section class="explore-notice" aria-labelledby="explore-notice-title"><h2 id="explore-notice-title">最新公告</h2><ActionNotice :error="target.error.value" :message="null" /><template v-if="query.data.value.recentNotice"><button v-if="target.canOpen(query.data.value.recentNotice.target)" class="notice-open" @click="target.open(query.data.value.recentNotice.target)">{{query.data.value.recentNotice.title}}</button><RouterLink v-else class="notice-open" to="/student/messages">{{query.data.value.recentNotice.title}}</RouterLink><p class="explore-muted">{{query.data.value.recentNotice.sender?.displayName??'系统'}}，{{formatTime(query.data.value.recentNotice.createdAt)}}</p><span class="notice-read" :data-unread="query.data.value.recentNotice.readAt===null">{{query.data.value.recentNotice.readAt===null?'未读':'已读'}}</span></template><p v-else class="explore-empty">暂无课程公告。新通知会在这里显示。</p></section>
+        </aside></div>
       </div>
     </template>
   </div>
 </template>
 
-<style>
-/* v4 首页：页头 + 分区标题 + 分隔线 + 行列表；只有空态框带边框。选择器以 .student-release .sr-home 限定。 */
-.student-release .sr-home .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
-.student-release .sr-home .page-head h1 { font-size: var(--fs-h1); line-height: 1.3; font-weight: 700; }
-.student-release .sr-home .sr-intro { margin-top: 4px; color: var(--muted); font-size: var(--fs-control); }
-.student-release .sr-home .counts { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 4px; }
-.student-release .sr-home .counts a { color: var(--muted); }
-.student-release .sr-home .counts a:hover { color: var(--blue); text-decoration: none; }
-.student-release .sr-home .counts b { margin-right: 3px; color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
-.student-release .sr-home .home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 40px; align-items: start; }
-.student-release .sr-home .col { display: grid; gap: var(--space-6); align-content: start; min-width: 0; }
-.student-release .sr-home .col.side { gap: var(--space-5); }
-.student-release .sr-home .sec-h { display: flex; align-items: baseline; gap: 12px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
-.student-release .sr-home .sec-h h2 { flex: 1; font-size: var(--fs-control); font-weight: 600; }
-.student-release .sr-home .sec-h a { font-size: var(--fs-meta); }
-.student-release .sr-home .rows { display: grid; list-style: none; margin: 0; padding: 0; }
-.student-release .sr-home .row { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 4px; border-bottom: 1px solid var(--line); color: var(--ink); }
-.student-release .sr-home .rows > li:last-child .row { border-bottom: 0; }
-.student-release .sr-home a.row:hover { background: var(--surface); text-decoration: none; }
-.student-release .sr-home .row b { display: block; font-size: var(--fs-control); font-weight: 600; overflow-wrap: anywhere; }
-.student-release .sr-home .row .grow { flex: 1; min-width: 0; }
-.student-release .sr-home .row .meta { display: block; }
-.student-release .sr-home .meta { font-size: var(--fs-meta); color: var(--muted); }
-.student-release .sr-home .num { font-variant-numeric: tabular-nums; }
-/* 状态 chip：一个状态一个名字，颜色只是伴随 */
-.student-release .sr-home .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px; font-size: var(--fs-micro); font-weight: 600; white-space: nowrap; }
-.student-release .sr-home .chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.student-release .sr-home .st-todo { background: var(--blue-soft); color: var(--blue); }
-.student-release .sr-home .st-late { background: var(--orange-soft); color: var(--orange); }
-.student-release .sr-home .st-closed { background: var(--red-soft); color: var(--red); }
-.student-release .sr-home .st-wait { background: var(--sunken); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
-.student-release .sr-home .st-done { background: var(--green-soft); color: var(--green); }
-.student-release .sr-home .rel { font-size: var(--fs-meta); color: var(--muted); white-space: nowrap; }
-.student-release .sr-home .rel.urgent { color: var(--orange); font-weight: 600; }
-.student-release .sr-home .rel.late { color: var(--orange); }
-/* 课程行 */
-.student-release .sr-home .mark { width: 40px; height: 40px; flex: none; border-radius: var(--radius-control); background: var(--sunken); border: 1px solid var(--line); display: grid; place-items: center; font: 600 var(--fs-micro) var(--font-mono); color: var(--muted); letter-spacing: .5px; }
-.student-release .sr-home .prog { display: grid; gap: 4px; justify-items: end; width: 140px; flex: none; }
-.student-release .sr-home .bar { width: 100%; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.student-release .sr-home .bar i { display: block; height: 100%; background: var(--blue); }
-/* 侧栏：评价与公告 */
-.student-release .sr-home .fb { display: block; color: var(--ink); padding-top: 12px; }
-.student-release .sr-home .fb:hover { text-decoration: none; }
-.student-release .sr-home .fb:hover b { color: var(--blue); }
-.student-release .sr-home .fb-top { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
-.student-release .sr-home .fb-top b { display: block; font-size: var(--fs-control); }
-.student-release .sr-home .fb p, .student-release .sr-home .notice p { font-size: var(--fs-control); color: var(--muted); }
-.student-release .sr-home .score { font: 600 22px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-.student-release .sr-home .score small { font-size: var(--fs-meta); color: var(--muted); font-weight: 400; }
-.student-release .sr-home .notice { display: grid; gap: 4px; padding-top: 12px; font-size: var(--fs-control); }
-.student-release .sr-home .notice-open { padding: 0; border: 0; background: none; color: var(--ink); font: 600 var(--fs-control) var(--font-sans); text-align: left; cursor: pointer; }
-.student-release .sr-home .notice-open:hover { color: var(--blue); }
-@media (max-width: 1100px) {
-  .student-release .sr-home .home-grid { grid-template-columns: 1fr; gap: 32px; }
+<style scoped>
+/* ===== 首页：冷中性工作台（CSS-only 重构，所有选择器以 .sr-home 限定） ===== */
+.student-release .sr-home .explore-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.student-release .sr-home .explore-heading h1 { font-size: var(--fs-h1); line-height: var(--lh-tight); font-weight: 600; }
+.student-release .sr-home .sr-overview { display: block; margin: var(--space-2) 0 0; font-size: 15px; line-height: var(--lh-body); color: var(--muted); }
+.student-release .sr-home .sr-overview > a { display: inline; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 15px; text-decoration: none; }
+.student-release .sr-home .sr-overview > a + a::before { content: '，'; color: var(--muted); }
+.student-release .sr-home .sr-overview > a strong { margin-right: 4px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.student-release .sr-home .sr-overview > a:hover { color: var(--blue); }
+.student-release .sr-home .explore-composition { display: grid; grid-template-columns: minmax(0, 1fr) var(--aside); gap: var(--space-6); align-items: start; }
+@media (max-width: 1199px) { .student-release .sr-home .explore-composition { grid-template-columns: minmax(0, 1fr); } }
+.student-release .sr-home .explore-primary-column { display: grid; gap: var(--space-5); min-width: 0; }
+/* 下一步：白底面板替代深蓝色块 */
+.student-release .sr-home .explore-focus { padding: var(--space-5); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-panel); box-shadow: var(--shadow-hairline); }
+.student-release .sr-home .explore-focus .explore-label { margin: 0 0 var(--space-2); color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.student-release .sr-home .explore-focus h2, .student-release .sr-home .explore-focus #explore-focus-title { margin: 0; color: var(--ink); font-size: var(--fs-h2); line-height: var(--lh-tight); font-weight: 600; overflow-wrap: anywhere; }
+.student-release .sr-home .explore-focus .focus-course, .student-release .sr-home .explore-focus .focus-course span { color: var(--muted); font-size: 13px; }
+.student-release .sr-home .explore-focus .focus-data-warning { color: var(--red); font-size: 13px; }
+.student-release .sr-home .explore-focus .bplus-deadline { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .explore-focus .bplus-deadline time { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.student-release .sr-home .explore-focus .focus-actions { margin-top: var(--space-4); display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.student-release .sr-home .explore-focus .focus-actions > a:not(.button) { color: var(--blue); font-size: 14px; }
+.student-release .sr-home .explore-focus .focus-empty-text, .student-release .sr-home .explore-focus .polish-task-context { color: var(--muted); font-size: 13px; line-height: var(--lh-body); }
+/* 近期任务：类表格 */
+.student-release .sr-home .explore-tasks, .student-release .sr-home .explore-courses { padding: var(--space-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.student-release .sr-home .explore-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.student-release .sr-home .explore-section-heading h2 { font-size: var(--fs-h3); font-weight: 600; }
+.student-release .sr-home .bplus-task-group + .bplus-task-group { margin-top: var(--space-4); }
+.student-release .sr-home .bplus-group-heading { display: flex; align-items: baseline; gap: var(--space-2); min-height: 36px; padding: 6px var(--space-3); background: var(--sunken); border-radius: var(--radius-control); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .bplus-group-heading small { margin-left: auto; color: var(--muted); }
+.student-release .sr-home .bplus-task-list { margin: 0; padding: 0; list-style: none; }
+.student-release .sr-home .bplus-task-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 60px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.student-release .sr-home .bplus-task-list > li:last-child { border-bottom: 0; }
+.student-release .sr-home .bplus-task-list > li:hover { background: var(--sunken); }
+.student-release .sr-home .task-line-content { display: grid; gap: 2px; min-width: 0; }
+.student-release .sr-home .explore-task-name { color: var(--ink); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.student-release .sr-home .content-task-meta { display: flex; align-items: center; gap: var(--space-3); color: var(--muted); font-size: 13px; }
+.student-release .sr-home .content-task-meta .content-task-time { font-variant-numeric: tabular-nums; }
+.student-release .sr-home .task-line-action { color: var(--blue); font-size: 13px; white-space: nowrap; }
+/* 右栏：课程卡 + 无框列表 */
+.student-release .sr-home .explore-secondary-column { display: grid; gap: var(--space-5); min-width: 0; }
+.student-release .sr-home .explore-notes { display: grid; gap: var(--space-5); }
+.student-release .sr-home .explore-feedback, .student-release .sr-home .explore-notice { padding: 0; background: none; border: 0; box-shadow: none; }
+.student-release .sr-home .explore-feedback h2, .student-release .sr-home .explore-notice h2 { font-size: var(--fs-h3); font-weight: 600; }
+.student-release .sr-home .explore-feedback time, .student-release .sr-home .explore-notice .notice-read { color: var(--muted); font-size: 13px; }
+/* 空态：左对齐、无外框、不占满高度 */
+.student-release .sr-home .explore-empty { padding: var(--space-4) 0; background: none; border: 0; color: var(--muted); font-size: 13px; line-height: var(--lh-body); text-align: left; }
+.student-release .sr-home .explore-muted { color: var(--muted); font-size: 13px; }
+@media (max-width: 767px) {
+  .student-release .sr-home .explore-heading { flex-direction: column; align-items: stretch; }
+  .student-release .sr-home .explore-focus, .student-release .sr-home .explore-tasks, .student-release .sr-home .explore-courses { padding: var(--space-4); }
+  .student-release .sr-home .explore-focus h2, .student-release .sr-home .explore-focus #explore-focus-title { font-size: var(--fs-h3); }
+  .student-release .sr-home .bplus-task-list > li { grid-template-columns: minmax(0, 1fr); }
+  .student-release .sr-home .task-line-action { justify-self: start; }
 }
-@media (max-width: 860px) {
-  .student-release .sr-home .page-head { flex-direction: column; align-items: stretch; }
-  .student-release .sr-home .page-head h1 { font-size: var(--fs-h1-sm); }
-  .student-release .sr-home .prog { width: 96px; }
-}
+/* 修正：覆盖旧层遗留的卡片描边/投影，并恢复白底面板上的主操作按钮外观 */
+.student-release .sr-home .explore-courses { border: 1px solid var(--line); box-shadow: none; }
+.student-release .sr-home .explore-notes { padding: 0; background: none; border: 0; box-shadow: none; }
+.student-release .sr-home .explore-feedback h2, .student-release .sr-home .explore-notice h2 { padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
+.student-release .sr-home .explore-focus .button.primary { background: var(--blue); border: 1px solid var(--blue); color: var(--surface); }
+.student-release .sr-home .explore-focus .button.primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); color: var(--surface); }
+.student-release .sr-home .explore-focus .button.primary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 </style>

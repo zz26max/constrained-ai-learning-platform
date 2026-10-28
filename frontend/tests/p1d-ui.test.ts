@@ -176,45 +176,38 @@ describe('P1-D 路由与首页', () => {
     expect(page.find('.role-select select').exists()).toBe(true)
   })
 
-  it('v4 首页当前任务来自看板 currentLearning：逾期项不承诺补交，去详情页由服务端判定',async()=>{
-    dashboardOverride={currentLearning:currentAssignment({overdue:true,dueAt:'2026-10-01T15:59:59Z'})}
+  it('正式首页使用服务端资格而非看板旧任务，明确补交及排序依据',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2,{title:'真实补交任务',overdue:true}),canSubmit:true}):normalResponse(r))
     const view=await open('/student/home')
-    expect(view.get('.current h3').text()).toBe('响应式导航栏')
-    expect(view.get('.current .chip').text()).toBe('已逾期')
-    expect(view.get('[data-home-action=primary]').text()).toContain('查看能否补交')
-    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/student/assignments/'+ASSIGNMENT)
-    expect(view.get('.current').text()).toContain('以作业详情页的服务端判定为准')
+    expect(view.get('#explore-focus-title').text()).toBe('真实补交任务')
+    expect(view.get('.explore-focus').text()).toContain('已逾期，可补交')
+    expect(view.get('[data-home-action=primary]').text()).toContain('继续补交')
+    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/student/workspaces/'+ASSIGNMENT_2)
+    expect(view.get('.polish-task-context').text()).toContain('截止时间先后')
   })
-  it('v4 首页未逾期任务直达工作区，resume 决定继续或开始，上次保存来自 resume',async()=>{
-    dashboardOverride={currentLearning:currentAssignment({resume:{activeFile:'style.css',savedAt:'2026-10-13T01:20:00Z',workspaceRevision:2}})}
+  it('正式首页资格失败不能展示成功空态，课程章节失败可重试',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-permission'):r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
     const view=await open('/student/home')
-    expect(view.get('[data-home-action=primary]').text()).toContain('继续作答')
-    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/student/workspaces/'+ASSIGNMENT)
-    expect(view.get('.facts').text()).toContain('style.css')
+    // F6：资格详情单项失败按业务降级——以未确认计数加重试入口呈现，而非整页错误。
+    expect(view.get('.explore-focus').text()).toContain('任务状态未能完全确认')
+    expect(view.get('.explore-focus').text()).toContain('重试确认')
+    expect(view.get('.explore-focus').text()).toContain('重试')
+    expect(view.find('[data-home-action=primary]').exists()).toBe(false)
+    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在课程卡内呈现。
+    expect(view.get('.explore-courses').text()).toContain('req-chapters')
+    expect(view.get('.explore-courses').text()).toContain('重新加载')
     wrapper?.unmount()
-    dashboardOverride={currentLearning:currentAssignment()}
-    const fresh=await open('/student/home')
-    expect(fresh.get('[data-home-action=primary]').text()).toContain('开始作答')
-    expect(fresh.get('.facts').text()).toContain('还没有开始')
+    scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
+    const chapters=await open('/student/home')
+    expect(chapters.get('.explore-courses').text()).toContain('req-chapters')
+    expect(chapters.get('.bplus-course-action').text()).toContain('查看课程')
   })
-  it('v4 首页看板读取失败整页报错并保留重试，不伪装成空态',async()=>{
-    scripted.setHandler(r=>r.operationId==='getDashboard'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-dash'):normalResponse(r))
+  it('正式首页无资格待办时保留课程入口，不虚构学习进度',async()=>{
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
     const view=await open('/student/home')
-    expect(view.find('[role="alert"]').exists()).toBe(true)
-    expect(view.text()).toContain('req-dash')
-    expect(view.text()).not.toContain('没有待完成的作业')
-  })
-  it('v4 首页无待完成任务时给出课程入口，其他待办与课程行如实呈现',async()=>{
-    dashboardOverride={currentLearning:null,
-      otherPendingAssignments:[summary(ASSIGNMENT_2,{title:'逾期实验',overdue:true,dueAt:'2026-10-01T00:00:00Z'})]}
-    const view=await open('/student/home')
-    expect(view.get('.sr-empty').text()).toContain('没有待完成的作业')
-    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/course')
-    const othersSection = view.get('section[aria-labelledby="home-others-title"]')
-    expect(othersSection.findAll('.row')).toHaveLength(1)
-    expect(othersSection.get('.chip').text()).toBe('已逾期')
-    expect(view.get('.sec-h a').text()).toContain('全部 2 项')
-    expect(view.text()).toContain('3/5 章')
+    expect(view.get('#explore-focus-title').text()).toBe('当前没有可提交的待办')
+    expect(view.get('[data-home-action=primary]').attributes('href')).toBe('/course/'+OFFERING)
+    expect(view.find('[role=progressbar]').exists()).toBe(false)
   })
 
   it('正式课程保留真实空态与读取错误，不用空课程掩盖失败',async()=>{
@@ -323,12 +316,11 @@ describe('P1-D 路由与首页', () => {
     expect(view.find('[role="progressbar"]').exists()).toBe(false)
     expect(requestsOf('listChapters')).toHaveLength(0)
   })
-  it('正式首页默认 v4 且不显示探索入口',async()=>{
+  it('正式首页默认采用B+且不显示探索入口',async()=>{
     const view=await open('/student/home')
-    expect(view.find('[data-design="v4"]').exists()).toBe(true)
+    expect(view.find('[data-design="bplus"]').exists()).toBe(true)
     expect(view.find('.home-preview-switch').exists()).toBe(false)
-    // v4：当前任务来自看板 currentLearning（默认夹具为未开始的「响应式导航栏」）
-    expect(view.get('[data-home-action="primary"]').attributes('href')).toBe('/student/workspaces/'+ASSIGNMENT)
+    expect(view.find('[data-home-action="primary"]').attributes('href')).toContain(ASSIGNMENT_2)
   })
   it('2. 首屏优先可提交任务，不能用看板旧任务覆盖资格检查', async () => {
     const page=await openLegacy('/student/home?design=current')
