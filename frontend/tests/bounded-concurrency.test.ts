@@ -120,45 +120,60 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('F6 首页待办的有界并发与单项降级', () => {
-  it('10 项待办的详情请求以有界并发执行，单项失败降级为未确认计数而非整体报错', async () => {
-    const ids = Array.from({ length: 10 }, (_, index) => uuid(1000 + index))
+describe('v4 首页：单请求看板驱动', () => {
+  const dashboard = {
+    termId: '00000000-0000-4000-8000-000000000011', termLabel: '2026 秋季学期', serverTime: '2026-10-28T01:30:00Z',
+    courseCount: 1, pendingAssignmentCount: 4, unreadMessageCount: 2,
+    currentLearning: {
+      type: 'assignment', offeringId: OFFERING, chapterId: CHAPTER, assignmentId: ASSIGNMENT,
+      title: '响应式导航栏实现', description: '宽屏横向排列，窄于 768px 折叠。', assignmentType: 'web_lab',
+      assignmentState: 'IN_PROGRESS', dueAt: '2026-10-30T15:59:59Z', overdue: false,
+      resume: { activeFile: 'style.css', savedAt: '2026-10-27T13:40:00Z', workspaceRevision: 7 },
+    },
+    otherPendingAssignments: [
+      { id: '00000000-0000-4000-8000-00000000a002', offeringId: OFFERING, offeringStatus: 'active', chapterId: CHAPTER,
+        title: '多表连接查询练习', type: 'sql_text', isRequired: true, publicationState: 'published', description: '',
+        dueAt: '2026-10-31T14:00:00Z', assignmentState: 'NOT_STARTED', overdue: false, latestSubmissionId: null,
+        publishedFeedbackId: null, unreadFeedback: false },
+      { id: '00000000-0000-4000-8000-00000000a003', offeringId: OFFERING, offeringStatus: 'active', chapterId: CHAPTER,
+        title: '索引与执行计划', type: 'sql_text', isRequired: true, publicationState: 'published', description: '',
+        dueAt: '2026-10-24T14:00:00Z', assignmentState: 'NOT_STARTED', overdue: true, latestSubmissionId: null,
+        publishedFeedbackId: null, unreadFeedback: false },
+    ],
+    recentFeedback: null,
+    courses: [{ offeringId: OFFERING, courseId: '00000000-0000-4000-8000-000000000101', title: 'Web 前端开发技术', mark: 'WEB',
+      groupName: '计算机 2301 班', termId: '00000000-0000-4000-8000-000000000011', termLabel: '2026 秋季学期', status: 'active',
+      teachers: [{ id: DEMO_USER.id, displayName: '李老师' }], currentChapter: { id: CHAPTER, number: 5, title: 'Flex 与 Grid 布局' },
+      progress: { unit: 'chapter', completed: 4, total: 6, percent: 67, notConfigured: false, asOf: '2026-10-28T01:30:00Z' },
+      lastStudiedAt: '2026-10-27T13:12:00Z', pendingAssignmentCount: 2, unreadFeedbackCount: 0 }],
+    recentNotice: null,
+  }
+
+  it('首页由单次 getDashboard 驱动：不再逐项请求作业详情，请求数以计数为证据', async () => {
     handler = request => {
       switch (request.operationId) {
-        case 'getDashboard': return okEnvelope(dashboardFixture)
-        case 'listMyAssignments': return okEnvelope(taskList(ids, '任务'))
-        case 'listMyCourses': return okEnvelope(courseFixture)
-        case 'getAssignment': {
-          const id = request.path.split('/').filter(Boolean).at(-1)!
-          if (id === uuid(1007)) return failEnvelope(500, 'INTERNAL_ERROR')
-          const canSubmit = id === uuid(1001) || id === uuid(1002)
-          return okEnvelope(detailFixture(id, canSubmit))
-        }
+        case 'getDashboard': return okEnvelope(dashboard)
         default: return failEnvelope(404, 'NOT_FOUND')
       }
     }
     const page = await open('/student/home')
-    // 优化前为串行瀑布：这里以最大并发与请求数为证据——并发不超过 6，全部 10 项都被确认。
-    expect(maxInflight).toBeGreaterThan(1)
-    expect(maxInflight).toBeLessThanOrEqual(6)
-    expect(counts.getAssignment).toBe(10)
-    // 可处理任务照常渲染（焦点卡给出“开始作答”），失败项以提示说明。
-    expect(page.find('#explore-focus-title').exists()).toBe(true)
-    expect(page.text()).toContain('开始作答')
-    expect(page.text()).toContain('另有 1 项任务状态未能确认')
+    expect(counts.getDashboard).toBe(1)
+    // v4：当前任务与其他待办直接来自看板，首页没有 getAssignment 详情请求。
+    expect(counts.getAssignment).toBeUndefined()
+    expect(page.get('.current h3').text()).toBe('响应式导航栏实现')
+    expect(page.get('.facts').text()).toContain('style.css')
+    const othersSection = page.get('section[aria-labelledby="home-others-title"]')
+    expect(othersSection.findAll('.row')).toHaveLength(2)
+    expect(othersSection.findAll('.chip').map(c => c.text())).toEqual(['未开始', '已逾期'])
+    expect(page.text()).toContain('全部 4 项')
+    expect(page.text()).toContain('4/6 章')
   })
 
-  it('详情请求遇到 401 时不当作缺失吞掉：整体错误走会话恢复提示', async () => {
-    const ids = Array.from({ length: 3 }, (_, index) => uuid(1010 + index))
+  it('看板 401 时不当作缺失吞掉：整页错误走会话恢复提示', async () => {
     handler = request => {
-      switch (request.operationId) {
-        case 'getDashboard': return okEnvelope(dashboardFixture)
-        case 'listMyAssignments': return okEnvelope(taskList(ids, '任务'))
-        case 'listMyCourses': return okEnvelope(courseFixture)
-        case 'getAssignment': return failEnvelope(401, 'UNAUTHENTICATED')
-        case 'getMe': return okEnvelope({ ...DEMO_USER, roles: ['student'] })
-        default: return failEnvelope(404, 'NOT_FOUND')
-      }
+      if (request.operationId === 'getDashboard') return failEnvelope(401, 'UNAUTHENTICATED')
+      if (request.operationId === 'getMe') return okEnvelope({ ...DEMO_USER, roles: ['student'] })
+      return failEnvelope(404, 'NOT_FOUND')
     }
     const page = await open('/student/home')
     await flushPromises()
