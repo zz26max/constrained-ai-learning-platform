@@ -286,13 +286,13 @@ function courses() {
   return `<header class="page-head"><div><h1 tabindex="-1">我的课程</h1><p>按最近学习排序。</p></div><button class="btn" data-action="enroll">${icon('plus')}加入课程</button></header>
   <div class="filters"><label class="field">学期${sel('cTerm', [...D.terms.map(t => [t.id, t.label]), ['all', '全部学期']])}</label>
     <label class="field">状态${sel('cStatus', [['active', '进行中'], ['archived', '已归档'], ['all', '全部']])}</label><span class="meta">共 ${list.length} 门</span></div>
-  ${list.length ? `<div class="course-list"${op('listMyCourses')}>${list.map(c => `<article class="course">
-      <div class="course-main">${mark(c)}<div class="grow"><h2><a href="${R.course(c.offeringId)}">${esc(c.title)}</a></h2>
+  ${list.length ? `<div class="course-list"${op('listMyCourses')}>${list.map(c => `<a class="course" href="${R.course(c.offeringId)}">
+      <div class="course-main">${mark(c)}<div class="grow"><h2>${esc(c.title)}</h2>
         <span class="meta">${esc(c.groupName)} · ${esc(teacherName(c))} · ${esc(c.termLabel)}${c.status === 'archived' ? ' · <span class="tag">已归档</span>' : ''}</span></div></div>
       <div class="course-prog">${progressBar(c.progress)}<span class="meta num">已完成 ${c.progress.completed}/${c.progress.total} 章</span></div>
-      <div class="course-now"><span class="meta">${c.currentChapter ? `${c.status === 'archived' ? '最后学习' : '当前'}：第 ${c.currentChapter.number} 章 · ${esc(c.currentChapter.title)}` : '尚未开始'}${c.lastStudiedAt ? ` · ${at(c.lastStudiedAt)}` : ''}</span>
-        <span class="meta">${c.pendingAssignmentCount ? `<b>${c.pendingAssignmentCount}</b> 项待办` : '无待办'}${c.unreadFeedbackCount ? ` · <b>${c.unreadFeedbackCount}</b> 条新评价` : ''}</span></div>
-      <a class="btn sm" href="${R.course(c.offeringId)}">${c.status === 'archived' ? '查看' : '进入课程'}</a></article>`).join('')}</div>`
+      <div class="course-now"><span class="course-chapter">${c.currentChapter ? `${c.status === 'archived' ? '最后学习' : '当前'}：第 ${c.currentChapter.number} 章 · ${esc(c.currentChapter.title)}` : '尚未开始'}</span>
+        <span class="meta">${c.pendingAssignmentCount ? `<b>${c.pendingAssignmentCount}</b> 项待办` : '无待办'}${c.unreadFeedbackCount ? ` · <b>${c.unreadFeedbackCount}</b> 条新评价` : ''}${c.lastStudiedAt ? ` · ${at(c.lastStudiedAt)}` : ''}</span></div>
+      <span class="course-go">${c.status === 'archived' ? '查看' : '进入课程'} →</span></a>`).join('')}</div>`
     : empty('没有符合条件的课程', '切换学期或状态，或用教师给的邀请码加入课程。')}
   <dialog id="enroll-dlg" aria-labelledby="enroll-t"><form method="dialog">
     <div class="dlg-head"><h2 id="enroll-t">加入课程</h2><p class="meta">输入任课教师提供的邀请码。</p></div>
@@ -369,7 +369,7 @@ function assignments() {
   <div class="filters"><label class="field">课程<select class="select" data-model="aCourse"><option value="all">全部课程</option>${courseOpts.map(c => `<option value="${c.offeringId}" ${state.aCourse === c.offeringId ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select></label>
     ${ctx ? `<span class="meta">只看 ${esc(ctx.title)} · <a href="${R.asgs}?offering=all">全部课程</a></span>` : ''}
     ${summary.archivedIncompleteCount ? `<span class="meta">另有 ${summary.archivedIncompleteCount} 项已归档未完成，只在“全部”中显示</span>` : ''}</div>
-  ${items.length ? `<div class="table"${op('listMyAssignments')}><div class="thead" aria-hidden="true"><span>截止</span><span>作业</span><span>状态</span><span></span></div>${pageItems.map(row).join('')}</div>
+  ${items.length ? `<div class="tlist"${op('listMyAssignments')}>${pageItems.map(row).join('')}</div>
     <div class="pagination"><span class="meta">第 ${state.aPage} / ${pages} 页 · 共 ${items.length} 项</span><span class="pager-btns">
       <button class="btn sm" data-action="apage" data-v="${state.aPage - 1}" ${state.aPage <= 1 ? 'disabled' : ''}>上一页</button>
       <button class="btn sm" data-action="apage" data-v="${state.aPage + 1}" ${state.aPage >= pages ? 'disabled' : ''}>下一页</button></span></div>`
@@ -553,10 +553,10 @@ function progress(oid) {
     <div><dt>已完成实验</dt><dd><b class="num">${rec.summary.completedLabCount ?? 0}</b></dd></div>
     <div><dt>已发布评价</dt><dd><b class="num">${rec.summary.publishedFeedbackCount ?? 0}</b></dd></div>
     <div><dt>需要练习的知识点</dt><dd>${rec.summary.needsPracticeCount == null ? '<span class="meta">未配置知识点</span>' : `<b class="num">${rec.summary.needsPracticeCount}</b>`}</dd></div></dl>
-  ${rc ? `<div class="reco"${op('nextRecommendation')}><div class="grow"><span class="eyebrow">下一步</span><b>${esc(rc.title)}</b><p>${esc(rc.reason)}</p></div><a class="btn" href="${targetHref(rc.target)}">去复习</a></div>` : ''}
+  ${rc ? `<div class="reco"${op('nextRecommendation')}><div class="grow"><span class="eyebrow">下一步</span><b>${esc(rc.title)}</b><p>${esc(rc.reason)}</p></div><a class="btn primary" href="${targetHref(rc.target)}">去复习</a></div>` : ''}
   ${sec('最近 7 天', '<span class="meta">提交 · 求助 · AI 提问 · 保存版本</span>', `<div class="rhythm">${rh.map(r => { const n = r.sub + r.help + r.ask + r.save, w = parts(`${r.k}T12:00:00+08:00`).weekday;
       return `<div class="rday"><span class="rbar" aria-hidden="true"><i class="${n ? '' : 'none'}" style="height:${Math.round(n / rmax * 100)}%"></i></span>
-        <b class="num">${n || '·'}</b><span class="meta">${w.replace('周', '')} ${+r.k.slice(5, 7)}/${+r.k.slice(8)}</span>
+        <b class="num${n ? '' : ' zero'}">${n}</b><span class="meta">${w.replace('周', '')} ${+r.k.slice(5, 7)}/${+r.k.slice(8)}</span>
         <span class="sr">提交 ${r.sub}，求助 ${r.help}，AI 提问 ${r.ask}，保存 ${r.save}</span></div>`; }).join('')}</div>
     <p class="meta">近 7 天合计：提交 ${rt.sub} · 求助 ${rt.help} · AI 提问 ${rt.ask} · 保存 ${rt.save}</p>
     <p class="meta note api-note">没有学习行为分析接口；这张图是前端把提交记录、求助、辅导消息和工作区保存时间按天聚合得到的，不是服务端统计。</p>`)}
@@ -607,7 +607,7 @@ function messages(q) {
       <div class="grow"><span class="kind">${MTYPE[m.type]}${c ? ` · ${esc(c.title)}` : ''}${m.sender ? ` · ${esc(m.sender.displayName)}` : ''}</span>
         <h4>${m.readAt ? '' : '<span class="sr">未读：</span>'}${esc(m.title)}</h4><p>${esc(m.content)}</p></div>
       <div class="m-side"><span class="meta num">${hm(m.createdAt)}</span>${m.readAt ? '' : '<span class="unread-tag">未读</span>'}
-        ${href ? `<a class="btn sm" href="${href}" data-action="mopen" data-v="${m.id}">查看</a>` : ''}${m.readAt ? '' : `<button class="btn ghost sm" data-action="mread" data-v="${m.id}"${op('readMessage')}>标为已读</button>`}</div></article>`; }).join('')}`).join('')}</div>`
+        ${href ? `<a class="quiet-link" href="${href}" data-action="mopen" data-v="${m.id}">查看 →</a>` : ''}${m.readAt ? '' : `<button class="quiet-btn" data-action="mread" data-v="${m.id}"${op('readMessage')}>标为已读</button>`}</div></article>`; }).join('')}`).join('')}</div>`
     : empty('没有符合条件的消息', '切换筛选条件查看其他消息。')}
   <p class="meta note api-note">消息类型只有课程公告、作业发布、教师评价、求助回复和系统五种。作业逾期没有消息提醒，逾期作业只在“我的作业”里标出。</p>`;
 }
@@ -618,7 +618,7 @@ function helps() {
   const list = D.help.filter(h => state.hStatus === 'all' || h.status === state.hStatus).sort((x, y) => new Date(y.updatedAt) - new Date(x.updatedAt));
   return `<header class="page-head"><div><h1 tabindex="-1">我的求助</h1><p>求助都关联到具体作业，从作业详情的“问老师”发起。</p></div></header>
   <div class="tabs" role="tablist">${[['all', '全部'], ...Object.entries(HST).map(([k, v]) => [k, v[0]])].map(([k, l]) => `<button role="tab" aria-selected="${state.hStatus === k}" class="${state.hStatus === k ? 'on' : ''}" data-action="hstatus" data-v="${k}">${l}<span class="n">${k === 'all' ? D.help.length : D.help.filter(h => h.status === k).length}</span></button>`).join('')}</div>
-  ${list.length ? `<div class="rows boxed"${op('listHelpRequests')}>${list.map(h => { const a = asg(h.assignmentId);
+  ${list.length ? `<div class="rows"${op('listHelpRequests')}>${list.map(h => { const a = asg(h.assignmentId);
       const unread = D.messages.some(m => m.type === 'help_reply' && m.target?.id === h.id && !m.readAt); return `<a class="row" href="${R.help(h.id)}">
       <div class="grow"><b>${esc(h.title)}${unread ? ' <span class="new">新回复</span>' : ''}</b><span class="meta">${esc(a.title)} · ${esc(course(h.offeringId).title)} · ${at(h.createdAt)}</span></div>
       <span class="chip ${HST[h.status][1]}">${HST[h.status][0]}</span><span class="chev">${icon('chev')}</span></a>`; }).join('')}</div>`
@@ -693,12 +693,13 @@ function spec() {
     <li>我的作业按 10 条分页，课程筛选跨页保留；从课程主页进作业列表、再点开作业，返回时不会丢掉课程上下文。</li>
     <li>求助详情能直接看发起时附上的工作区快照；列表对未读的教师回复标“新回复”，打开详情后未读计数同步减少。</li>
     <li>状态词统一为“未开始 / 进行中 / 已逾期 / 已截止 / 待批阅 / 已批阅”，相对时间只作副信息；窄屏顶栏补“退出”，同路由切换 tab 不再跳回页首。</li>
+    <li>全站按同一套语言收尾：课程、作业、章节、消息、求助与评价历史一律去框，靠行距和列对齐分组；辅助动作收为文字链接，每屏只留一个主按钮；只有三类焦点块保留细线边框——首页当前任务、学习记录“下一步”、作业详情的状态卡。消息未读不再铺底色，改用加粗标题和“未读”标记。</li>
     <li>登录页按 6:4 左右分栏：左侧深色品牌栏占六成，用一条逐段画出的学习路径（读要求 → 问 AI → 自己写 → 看反馈）交代平台怎么帮学生；右侧四成是常规可读的登录卡——标签在上、48px 输入框、主按钮通栏。进入时路径从左到右画出，节点和步骤依次出现，减少动态时直接给终态。</li></ul>`)}
   ${sec('更早的版面调整', '', `<ul class="plain rules"><li>接口判定类的说明文字默认收起，只在顶栏“显示接口”打开时出现；页面上不再出现 operationId、错误码和字段名。</li><li>首页只回答两个问题：现在做什么、接下来有什么。课程列表从首页移除（入口在侧栏），腾出的空间改成 56px 分区间距与 72px 行高——密度降下来，页面不是变空。</li><li>首页减线：去掉分区横线，分组改由空白加 13px 灰色标签承担；问候语压到 20px 让位，任务标题升到 26px——一屏只有一个焦点。</li><li>“最近动态”每条从三行压成两行；“当前任务”只在真的保存过工作区时才显示“上次保存”。</li><li>首页“近期安排”的时间窗由四张卡片改成一行文字筛选；“当前任务”把状态并入标题行，事实收成一条行内事实。</li><li>登录页把常驻的七行调参面板收进“效果设置”，画面之上补品牌与一句定位。</li><li>“原型说明”从侧栏主导航移到顶栏，与“显示接口”一起作为原型工具，不占学生的学习路径。</li><li>按钮尺寸与规范对齐：主要操作 44px、次要按钮 36px、分段控件 40px；窄屏图标导航补上可访问名。</li></ul>`)}
   ${sec('与接口对齐的判定', '', `<table class="grid-table"><tbody>${fixes.map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join('')}</tbody></table>`)}
   ${sec('状态与颜色', '', `<p class="kp-line">${Object.keys(LIST_STATE).map(chip).join('')}<span class="chip st-late">已逾期 · 可补交</span><span class="chip st-closed">已截止</span></p>
     <p class="meta">蓝色只表示操作、选中和进度；绿色完成；橙色临近截止、逾期或需要练习；红色错误或已截止。状态都带文字，不只靠颜色。登录页左侧品牌栏用墨蓝底和白色透明度分层，不额外引入颜色。</p>`)}
-  ${sec('布局规则', '', `<ul class="plain rules"><li>页面是“页头 + 分区标签 + 列表或表格”，不在面板里再套面板。</li><li>分组靠空白和字号，横线只分隔同一组里的条目；分区标签用 13px 灰字，不与内容争字号。</li><li>每屏只有一个焦点：首页的焦点是“当前任务”，标题 32px，倒计时 28px 作第二层；其余正文 15px、辅助 13px，中间不留半档字号。</li><li>只有表格、对话框、工作区编辑器，以及首页的当前任务卡带边框；其余页面不使用渐变、装饰阴影和插画，阴影只给对话框与提示条；登录页例外：品牌栏可用深色底，登录卡带边框。</li><li>主要操作 44px，次要按钮 36px，其他可点击控件不低于 40px。</li><li>窄于 860px 时侧栏变为顶部菜单，表格改为单列，右侧栏移到主内容下方。</li><li>接口判定类的说明默认不出现，只在“显示接口”打开时显示；界面上不出现 operationId、错误码和字段名。</li></ul>`)}`;
+  ${sec('布局规则', '', `<ul class="plain rules"><li>页面是“页头 + 分区标签 + 列表或表格”，不在面板里再套面板。</li><li>分组靠空白和字号，横线只分隔同一组里的条目；分区标签用 13px 灰字，不与内容争字号。</li><li>每屏只有一个焦点：首页的焦点是“当前任务”，标题 32px，倒计时 28px 作第二层；学习记录的“下一步”与作业详情的状态卡沿用同一套细线卡片，其余列表不争视觉重量。正文 15px、辅助 13px，中间不留半档字号。</li><li>带边框的只有表格、日历、工作区编辑器、对话框与输入分组，以及三类焦点块；其余页面不使用渐变、装饰阴影和插画，阴影只给对话框与提示条；登录页例外：品牌栏可用深色底，登录卡带边框。列表、消息与帮助入口不套框，悬停只让标题变蓝。</li><li>主要操作 44px，次要按钮 36px，其他可点击控件不低于 40px；列表里的次级动作用文字链接，同一区域不并排两个实心按钮。</li><li>窄于 860px 时侧栏变为顶部菜单，表格改为单列，右侧栏移到主内容下方；窄屏登录页品牌栏只占内容高度。</li><li>接口判定类的说明默认不出现，只在“显示接口”打开时显示；界面上不出现 operationId、错误码和字段名。</li></ul>`)}`;
 }
 
 /* ---------- 路由 ---------- */
