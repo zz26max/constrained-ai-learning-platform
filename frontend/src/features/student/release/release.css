@@ -147,44 +147,132 @@
 .student-release :is(.sr-courses,.sr-tasks) .button.secondary {background:var(--sr-surface);border:1px solid var(--sr-line-strong);color:var(--sr-brand)}
 .student-release :is(.sr-courses,.sr-tasks) .button.secondary:not(:disabled):hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
 
-/* ===== 我的作业 ===== */
-.student-release .sr-tasks .workspace-heading {margin:0 0 20px}
-.student-release .sr-tasks .workspace-heading p {margin:6px 0 0;font-size:14px;color:var(--sr-muted)}
-.student-release .sr-tasks .filter-tabs {display:inline-flex;gap:2px;padding:4px;margin:0 0 20px;background:#e9edf3;border-radius:var(--sr-r-m);max-width:100%;overflow-x:auto}
-.student-release .sr-tasks .filter-tabs button {min-height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--sr-r-s);background:transparent;color:var(--sr-muted);font-size:14px;white-space:nowrap}
-.student-release .sr-tasks .filter-tabs button:hover:not([aria-pressed=true]) {color:var(--sr-ink);background:#ffffff80;border-color:transparent}
-.student-release .sr-tasks .filter-tabs button[aria-pressed=true] {background:var(--sr-surface);border-color:var(--sr-line);color:var(--sr-ink);font-weight:650}
-.student-release .sr-tasks .filter-tabs button span {margin-left:4px;color:var(--sr-muted);font-weight:400;font-variant-numeric:tabular-nums}
-.student-release .sr-tasks .task-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;margin:0 0 16px}
-.student-release .sr-tasks .task-toolbar label:first-child select {width:min(360px,100%)}
-.student-release .sr-tasks .task-toolbar label:nth-child(2) select {width:180px}
-.student-release .sr-tasks .task-toolbar>span {margin-left:auto;align-self:center;text-align:right;font-size:13px;color:var(--sr-muted)}
-.student-release .sr-tasks .task-toolbar>span>span {display:block}
-.student-release .sr-tasks section.task-table {padding:0;background:var(--sr-surface);border:1px solid var(--sr-line);border-radius:var(--sr-r-m);box-shadow:none;overflow:hidden}
-.student-release .sr-tasks :is(.task-table-head,.task-table-row) {display:grid;grid-template-columns:128px minmax(0,1fr) 190px 112px;gap:14px;align-items:center;padding:0 20px}
-.student-release .sr-tasks .task-table-head {padding-block:10px;background:var(--sr-sunken);border-bottom:1px solid var(--sr-line);color:var(--sr-muted);font-size:13px;font-weight:600}
-.student-release .sr-tasks .task-table-row {padding-block:12px;border-top:1px solid var(--sr-line)}
-.student-release .sr-tasks .task-table-head+.task-table-row,.student-release .sr-tasks .task-group-heading+.task-table-row {border-top:0}
-.student-release .sr-tasks .task-table-row:hover {background:var(--sr-sunken)}
-.student-release .sr-tasks .vc-task-date {order:-1;display:grid;gap:2px;padding-left:12px;border-left:2px solid var(--sr-line-strong)}
-.student-release .sr-tasks .vc-due-state {font-size:13px;color:var(--sr-muted)}
-.student-release .sr-tasks [data-tone=overdue] .vc-task-date {border-left-color:#d9a65c}
-.student-release .sr-tasks [data-tone=overdue] .vc-due-state {color:var(--sr-warn);font-weight:600}
-.student-release .sr-tasks [data-tone=soon] .vc-task-date {border-left-color:var(--sr-brand)}
-.student-release .sr-tasks [data-tone=soon] .vc-due-state {color:var(--sr-brand);font-weight:600}
-.student-release .sr-tasks .vc-task-copy {display:grid;gap:4px;min-width:0}
-/* 截止列压成两行：月日与时刻同行，相对截止紧随，避免行高被三行日期撑开 */
-.student-release .sr-tasks .vc-task-date .vc-date {display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;width:100%;max-width:100%}
-.student-release .sr-tasks .vc-task-date .vc-date-day {font-size:26px}
-.student-release .sr-tasks .vc-task-date .vc-date-time {grid-column:auto;margin-top:0;font-size:13px}
-.student-release .sr-tasks .task-title {color:var(--sr-ink);font-size:15px;font-weight:650;line-height:1.5;overflow-wrap:anywhere}
+/* ===== 我的作业：无框行，截止 / 作业与课程 / 状态 / 动作 ===== */
+.student-release .sr-tasks .page-head {margin:0 0 8px}
+.student-release .sr-tasks .page-summary {font-size:13px}
+.student-release .sr-tasks .filter-tabs {display:flex;gap:4px;margin:0 0 12px;box-shadow:inset 0 -1px 0 var(--sr-line);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-tasks .filter-tabs button {display:inline-flex;align-items:center;min-height:42px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font-size:14px;white-space:nowrap;flex:none}
+.student-release .sr-tasks .filter-tabs button:hover:not([aria-pressed=true]) {color:var(--sr-ink)}
+.student-release .sr-tasks .filter-tabs button[aria-pressed=true] {color:var(--sr-ink);font-weight:600;border-bottom-color:var(--sr-brand)}
+.student-release .sr-tasks .filter-tabs button span {margin-left:6px;color:var(--sr-muted);font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
+.student-release .sr-tasks .task-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 20px;margin:0 0 4px}
+.student-release .sr-tasks .task-toolbar label {gap:4px}
+.student-release .sr-tasks .task-toolbar label:first-child select {width:min(320px,100%)}
+.student-release .sr-tasks .task-toolbar label:nth-child(2) select {width:172px}
+.student-release .sr-tasks .task-hint {margin:8px 0 0}
+.student-release .sr-tasks section.task-table {padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+.student-release .sr-tasks .task-table-row {display:grid;grid-template-columns:118px minmax(0,1fr) 200px auto;gap:24px;align-items:center;padding:18px 0;border:0;color:var(--sr-ink)}
+.student-release .sr-tasks .task-table-row:hover {background:none}
+.student-release .sr-tasks .t-due {display:grid;gap:1px;min-width:0;font-variant-numeric:tabular-nums}
+.student-release .sr-tasks .t-due b {font-size:14px;font-weight:600;color:var(--sr-ink)}
+.student-release .sr-tasks .t-due .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tasks .rel {font-size:13px;color:var(--sr-muted);white-space:nowrap}
+.student-release .sr-tasks .rel[data-tone=overdue] {color:var(--sr-warn);font-weight:600}
+.student-release .sr-tasks .rel[data-tone=soon] {color:var(--sr-brand);font-weight:600}
+.student-release .sr-tasks .t-main {display:grid;gap:3px;min-width:0}
+.student-release .sr-tasks .task-title {color:var(--sr-ink);font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
 .student-release .sr-tasks .task-title:hover {color:var(--sr-brand)}
-.student-release .sr-tasks .task-table-row>.button {justify-self:end;min-width:96px}
-.student-release .sr-tasks .task-group-heading[data-group=open]+.task-table-row>.button {background:var(--sr-brand);border-color:var(--sr-brand);color:#fff}
-.student-release .sr-tasks .task-group-heading[data-group=open]+.task-table-row>.button:hover {background:var(--sr-brand-hover)}
-.student-release .sr-tasks .task-group-heading {margin:0;padding:10px 20px;font-size:14px;font-weight:650;border-top:1px solid var(--sr-line);border-bottom:1px solid var(--sr-line);box-shadow:inset 3px 0 0 var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-ink)}
-.student-release .sr-tasks .task-group-heading[data-group=closed] {box-shadow:inset 3px 0 0 #d9a65c;background:var(--sr-warn-soft);color:var(--sr-warn)}
-.student-release .sr-tasks .task-table-head+.task-group-heading {border-top:0}
+.student-release .sr-tasks .t-meta {font-size:13px;color:var(--sr-muted);overflow-wrap:anywhere}
+.student-release .sr-tasks .task-table-row .vc-task-state {font-size:13px;gap:2px 10px;align-items:flex-start;min-width:0}
+.student-release .sr-tasks .task-table-row .vc-process {font-size:13px}
+.student-release .sr-tasks .task-table-row .vc-permission {font-size:13px}
+.student-release .sr-tasks .task-table-row>.button {justify-self:end;display:inline-flex;align-items:center;min-height:44px;min-width:0;padding:0 2px;border:0;border-radius:0;background:none;box-shadow:none;color:var(--sr-brand);font-size:14px;font-weight:600;white-space:nowrap}
+.student-release .sr-tasks .task-table-row>.button:hover {background:none;text-decoration:underline;text-underline-offset:3px}
+.student-release .sr-tasks .task-group-heading {margin:0;padding:24px 0 2px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted);background:none;border:0;box-shadow:none}
+.student-release .sr-tasks .task-group-heading[data-group=open] {color:var(--sr-brand)}
+.student-release .sr-tasks .task-group-heading[data-group=closed] {color:var(--sr-warn)}
+.student-release .sr-tasks .task-group-heading+.task-table-row {padding-top:8px}
+.student-release .sr-tasks .empty-state {padding:36px 20px;text-align:center;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m)}
+.student-release .sr-tasks .empty-state h2 {font-size:15px;margin:0 0 4px}
+.student-release .sr-tasks .empty-state p {margin:0 0 14px;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-tasks .pagination {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-tasks .pagination .meta {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-tasks .pager {display:inline-flex;align-items:center;gap:12px}
+.student-release .sr-tasks .pager .button {min-height:36px;padding:0 12px;font-size:13px}
+
+/* ===== 作业详情：左内容 + 右侧状态卡；只有状态卡带细线框 ===== */
+.student-release .sr-assignment .page-head {margin:0 0 12px}
+.student-release .sr-assignment .page-eyebrow a {color:var(--sr-muted)}
+.student-release .sr-assignment .page-eyebrow a:hover {color:var(--sr-brand)}
+.student-release .sr-assignment .page-meta {display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:8px 0 0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .new {color:var(--sr-warn);font-size:12px;font-weight:600}
+.student-release .sr-assignment .detail-grid {display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:48px;align-items:start}
+.student-release .sr-assignment .col.main {min-width:0}
+.student-release .sr-assignment .tabs {display:flex;gap:4px;margin:0 0 20px;box-shadow:inset 0 -1px 0 var(--sr-line);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-assignment .tabs button {display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font-size:14px;white-space:nowrap;flex:none}
+.student-release .sr-assignment .tabs button:hover {color:var(--sr-ink)}
+.student-release .sr-assignment .tabs button.on {color:var(--sr-ink);font-weight:600;border-bottom-color:var(--sr-brand)}
+.student-release .sr-assignment .tabs .n {color:var(--sr-muted);font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
+.student-release .sr-assignment .tab-pane {min-width:0}
+.student-release .sr-assignment .section-label {margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted)}
+.student-release .sr-assignment .tab-pane h3 {margin:24px 0 8px;font-size:15px;font-weight:600;color:var(--sr-ink)}
+.student-release .sr-assignment .tab-pane h3 .meta {margin-left:6px;font-size:13px;font-weight:400;color:var(--sr-muted)}
+.student-release .sr-assignment .req {display:grid;gap:6px;margin:0;padding-left:22px;font-size:15px}
+.student-release .sr-assignment .req .safe-markdown :is(p) {margin:0}
+.student-release .sr-assignment .grid-table {width:100%;margin-top:8px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);border-collapse:separate;border-spacing:0;overflow:hidden;font-size:14px}
+.student-release .sr-assignment .grid-table :is(th,td) {padding:10px 14px;border-bottom:1px solid var(--sr-line);text-align:left;vertical-align:top}
+.student-release .sr-assignment .grid-table thead th {background:var(--sr-sunken);color:var(--sr-muted);font-size:13px;font-weight:600}
+.student-release .sr-assignment .grid-table tbody tr:last-child td {border-bottom:0}
+.student-release .sr-assignment .grid-table .r {text-align:right}
+.student-release .sr-assignment .grid-table .num {font-variant-numeric:tabular-nums}
+.student-release .sr-assignment .crit-desc {display:block;margin-top:2px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .tab-note {margin:24px 0 0;padding-top:14px;border-top:1px solid var(--sr-line);font-size:13px}
+.student-release .sr-assignment .snap {margin:0 0 24px;padding-bottom:20px;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-assignment .snap-head {display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px}
+.student-release .sr-assignment .snap-head h2 {font-size:15px;font-weight:600}
+.student-release .sr-assignment .snap-head .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .snap>p.meta {margin:3px 0 0;font-size:13px}
+.student-release .sr-assignment .snap-label {margin:16px 0 4px;font-size:13px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-assignment .snap-file {margin-top:10px}
+.student-release .sr-assignment .snap-file summary {cursor:pointer;font:13px/1.6 Consolas,'Cascadia Code',monospace;color:var(--sr-brand)}
+.student-release .sr-assignment .snap-file pre {margin:6px 0 0;padding:12px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-sunken);overflow-x:auto;font:12px/1.6 Consolas,'Cascadia Code',monospace;white-space:pre-wrap;word-break:break-word}
+.student-release .sr-assignment .subs {list-style:none;margin:0;padding:0;display:grid}
+.student-release .sr-assignment .sub-row {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0}
+.student-release .sr-assignment .sub-row+.sub-row {border-top:1px solid var(--sr-line)}
+.student-release .sr-assignment .sub-open {display:grid;gap:3px;padding:0;border:0;background:none;color:var(--sr-ink);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.student-release .sr-assignment .sub-open b {font-size:14px;font-weight:600}
+.student-release .sr-assignment .sub-open .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .sub-open:hover b {color:var(--sr-brand)}
+.student-release .sr-assignment .sub-state {display:inline-flex;align-items:center;gap:6px;flex:none}
+.student-release .sr-assignment .tag {display:inline-flex;align-items:center;height:22px;padding:0 7px;border:1px solid var(--sr-line-strong);border-radius:4px;color:var(--sr-muted);font-size:12px;white-space:nowrap}
+.student-release .sr-assignment .tag.t-done {border-color:var(--sr-green);color:var(--sr-green)}
+.student-release .sr-assignment .tag.t-late {border-color:var(--sr-warn);color:var(--sr-warn)}
+.student-release .sr-assignment .pane-empty {padding:32px 16px;text-align:center;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m)}
+.student-release .sr-assignment .pane-empty h2 {font-size:15px;margin:0 0 4px}
+.student-release .sr-assignment .pane-empty p {margin:0;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-assignment .pager {display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:12px}
+.student-release .sr-assignment .quiet-btn {min-height:36px;padding:0 10px;border:0;background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
+.student-release .sr-assignment .quiet-btn:disabled {color:var(--sr-muted);cursor:default}
+.student-release .sr-assignment .status-box {position:sticky;top:72px;padding:18px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-assignment .status-top {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.student-release .sr-assignment .status-chip {display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--sr-blue)}
+.student-release .sr-assignment .status-chip::before {content:'';width:7px;height:7px;border-radius:50%;background:var(--sr-brand)}
+.student-release .sr-assignment .status-chip[data-state=NOT_STARTED]::before {background:var(--sr-line-strong)}
+.student-release .sr-assignment .status-chip:is([data-state=SUBMITTED],[data-state=REVIEWED])::before {background:var(--sr-green)}
+.student-release .sr-assignment .status-chip[data-state=REVIEWED] {color:var(--sr-green)}
+.student-release .sr-assignment .facts {display:grid;gap:10px;margin:14px 0 0;padding-top:14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-assignment .facts>div {display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.student-release .sr-assignment .facts dt {font-size:13px;color:var(--sr-muted);flex:none}
+.student-release .sr-assignment .facts dd {display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;gap:4px 8px;margin:0;font-size:13px;color:var(--sr-ink);text-align:right}
+.student-release .sr-assignment .facts .rel {color:var(--sr-muted)}
+.student-release .sr-assignment .facts .rel[data-tone=late] {color:var(--sr-warn);font-weight:600}
+.student-release .sr-assignment .status-box>p.meta {margin:14px 0 0;padding-top:12px;border-top:1px solid var(--sr-line);font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .status-action {width:100%;margin-top:14px;justify-content:center}
+.student-release .sr-assignment .help-block {margin-top:28px}
+.student-release .sr-assignment .opt {display:grid;gap:3px;padding:12px 0;border-bottom:1px solid var(--sr-line);color:var(--sr-ink)}
+.student-release .sr-assignment .opt:last-child {border-bottom:0}
+.student-release .sr-assignment .opt b {font-size:14px;font-weight:600}
+.student-release .sr-assignment .opt .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-assignment .opt:hover b {color:var(--sr-brand)}
+/* 评价组件原本是独立面板，在详情里并入正文列 */
+.student-release .sr-assignment .feedback-view {margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.student-release .sr-assignment .feedback-view .feedback-summary {padding:0 0 14px;border-bottom:1px solid var(--sr-line);background:none}
+.student-release .sr-assignment .feedback-view .rubric-item {margin:0;padding:14px 0;border-bottom:1px solid var(--sr-line);border-radius:0;background:none}
+.student-release .sr-assignment .feedback-view .rubric-item:last-child {border-bottom:0}
+.student-release .sr-assignment .feedback-view .overall-comment {margin:18px 0}
+.student-release .sr-assignment .feedback-view .score-display .score {font-family:inherit;font-size:28px;font-weight:700}
+.student-release .sr-assignment .feedback-view .section-heading h3 {margin:0;font-size:15px}
+.student-release .sr-assignment .feedback-view h4 {margin:18px 0 6px;font-size:13px;font-weight:600;color:var(--sr-muted)}
 
 /* ===== 学习记录：路径改为连续行，节点轨保留 ===== */
 .student-release .vx-records .vx-path-body {padding:10px 0;background:none;border:0;border-bottom:1px solid var(--sr-line);border-radius:0}
@@ -240,14 +328,15 @@
   .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) :is(a,button,select,li,.task-table-row) {transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease}
 }
 
-/* ===== ≤1100px：作业表头隐藏；课程行两段式；章节侧栏落到正文后 ===== */
+/* ===== ≤1100px：作业行两段式；课程行两段式；章节与作业侧栏落到正文后 ===== */
 @media (max-width:1100px) {
-  .student-release .sr-tasks .task-table-head {display:none}
-  .student-release .sr-tasks .task-table-row {grid-template-columns:132px minmax(0,1fr) auto;grid-template-areas:"date copy action" "date state action"}
-  .student-release .sr-tasks .vc-task-date {grid-area:date}
-  .student-release .sr-tasks .vc-task-copy {grid-area:copy}
+  .student-release .sr-tasks .task-table-row {grid-template-columns:110px minmax(0,1fr) auto;grid-template-areas:"due main action" "due state action";gap:6px 20px}
+  .student-release .sr-tasks .t-due {grid-area:due}
+  .student-release .sr-tasks .t-main {grid-area:main}
   .student-release .sr-tasks .task-table-row>.vc-task-state {grid-area:state}
   .student-release .sr-tasks .task-table-row>.button {grid-area:action}
+  .student-release .sr-assignment .detail-grid {grid-template-columns:minmax(0,1fr);gap:32px}
+  .student-release .sr-assignment .status-box {position:static}
   .student-release .sr-courses .course {grid-template-columns:minmax(0,1fr) 150px auto;gap:16px 24px}
   .student-release .sr-courses .course-main {grid-column:1;grid-row:1}
   .student-release .sr-courses .course-prog {grid-column:2;grid-row:1}
@@ -269,13 +358,16 @@
   .student-release .sr-course-home .toc-row[data-state=in_progress] {padding:16px;margin:0 -16px}
   .student-release .sr-chapter .res-head {align-items:flex-start;flex-direction:column;gap:4px}
   .student-release .sr-chapter .res:last-of-type {margin-bottom:0}
-  .student-release .sr-tasks .filter-tabs {display:flex}
   .student-release .sr-tasks .task-toolbar>label {flex:1 1 140px}
   .student-release .sr-tasks .task-toolbar label:is(:first-child,:nth-child(2)) select {width:100%}
-  .student-release .sr-tasks .task-toolbar>span {margin-left:0;text-align:left;flex-basis:100%}
-  .student-release .sr-tasks .task-table-row {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"copy copy" "date date" "state action";gap:10px 12px;padding:16px}
-  .student-release .sr-tasks .task-table-row>.button {justify-self:end}
-  .student-release .sr-tasks .task-group-heading {padding:10px 16px}
+  .student-release .sr-tasks .task-table-row {grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main main" "due action" "state action";gap:8px 12px;padding:16px 0}
+  .student-release .sr-tasks .task-table-row>.button {justify-self:end;align-self:end}
+  .student-release .sr-tasks .task-group-heading {padding:20px 0 2px}
+  .student-release .sr-tasks .pagination {flex-direction:column;align-items:flex-start;gap:10px}
+  .student-release .sr-assignment .page-meta {gap:4px 12px}
+  .student-release .sr-assignment .tabs {margin-bottom:16px}
+  .student-release .sr-assignment .sub-row {flex-direction:column;align-items:flex-start;gap:8px}
+  .student-release .sr-assignment .grid-table {display:block;overflow-x:auto}
 }
 
 /* ===== 外壳：224px 白色导航轨 / 56px 画布顶栏 / 1040px 内容列 =====
