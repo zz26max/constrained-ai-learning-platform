@@ -73,14 +73,19 @@ function buttonNamed(rendered: VueWrapper, name: string) {
 }
 
 describe('P1-A 课程页面验收', () => {
-  it('知学目录按服务端位置展开，支持全部收起与展开', async () => {
+  it('课程目录按服务端位置标记继续章节，并保留章节、作业、记录与公告入口', async () => {
     const { rendered } = await open(`/course/${P1A_IDS.offeringWeb}`)
     expect(operationIds(scripted.requests)).toContain('listMyCourses')
-    expect(rendered.find('details.chapter-fold').attributes('open')).toBeDefined()
-    await buttonNamed(rendered, '全部收起').trigger('click')
-    expect(rendered.find('details.chapter-fold').attributes('open')).toBeUndefined()
-    await buttonNamed(rendered, '全部展开').trigger('click')
-    expect(rendered.find('details.chapter-fold').attributes('open')).toBeDefined()
+    const rows = rendered.findAll('.toc-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.attributes('data-current')).toBe('true')
+    expect(rows[0]!.text()).toContain(P1A_FIXTURES.chapter.title)
+    expect(rows[0]!.find('a[href*="/chapter/"]').attributes('href')).toBe(`/course/${P1A_IDS.offeringWeb}/chapter/${P1A_IDS.chapterWeb}`)
+    expect(rendered.find('.page-actions .button:not(.secondary)').attributes('href')).toBe(`/course/${P1A_IDS.offeringWeb}/chapter/${P1A_IDS.chapterWeb}`)
+    const subnav = rendered.find('.subnav')
+    expect(subnav.text()).toContain('作业')
+    expect(subnav.text()).toContain('学习记录')
+    expect(subnav.text()).toContain('公告')
   })
   it('从完整章节URL刷新恢复身份与正确章节，不依赖先加载课程列表', async () => {
     const path = `/course/${P1A_IDS.offeringWeb}/chapter/${P1A_IDS.chapterWeb}`
