@@ -193,14 +193,21 @@ describe('P1-D 路由与首页', () => {
     expect(view.get('.explore-focus').text()).toContain('重试确认')
     expect(view.get('.explore-focus').text()).toContain('重试')
     expect(view.find('[data-home-action=primary]').exists()).toBe(false)
-    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在课程卡内呈现。
-    expect(view.get('.explore-courses').text()).toContain('req-chapters')
-    expect(view.get('.explore-courses').text()).toContain('重新加载')
+    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在焦点卡内呈现。
+    expect(view.get('.explore-focus').text()).toContain('req-chapters')
+    expect(view.get('.explore-focus').text()).toContain('重新加载')
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
     const chapters=await open('/student/home')
-    expect(chapters.get('.explore-courses').text()).toContain('req-chapters')
-    expect(chapters.get('.bplus-course-action').text()).toContain('查看课程')
+    // 有可提交任务时，章节预加载失败只影响课程入口回退，不打扰焦点任务。
+    expect(chapters.get('#explore-focus-title').text()).toBe('逾期实验')
+    expect(chapters.find('.focus-unconfirmed').exists()).toBe(false)
+    wrapper?.unmount()
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
+    const fallback=await open('/student/home')
+    expect(fallback.get('.explore-focus').text()).toContain('req-chapters')
+    expect(fallback.get('.explore-focus').text()).toContain('重新加载')
+    expect(fallback.get('.bplus-course-action').text()).toContain('查看课程')
   })
   it('正式首页无资格待办时保留课程入口，不虚构学习进度',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
