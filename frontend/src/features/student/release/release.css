@@ -25,6 +25,12 @@
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
+/* 消息与求助沿用同一套文字层级；页面根只负责字体、内容宽度与焦点，具体排版在各页块。 */
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) a {text-decoration:none}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 
 /* 学科身份：颜色只表示学科（--subject-* 令牌） */
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family] {--acc:var(--subject-neutral);--acc-soft:var(--subject-neutral-soft)}
@@ -405,28 +411,119 @@
 .student-release .sr-calendar .vx-text-action {padding:0;border:0;background:none;color:var(--sr-brand);font-size:12px;cursor:pointer}
 .student-release .sr-calendar .calendar-dialog h2 {overflow-wrap:anywhere}
 
-/* ===== 消息：行密度与操作权重 ===== */
-.student-release .vc-page.vc-inbox .notification-item {padding:14px 14px 14px 56px;gap:0 18px}
-.student-release .vc-page.vc-inbox .notification-item.unread {padding:14px 12px 14px 56px}
-.student-release .vc-page.vc-inbox .notification-item>.notification-title {font-size:16px;margin:6px 0 4px}
-.student-release .vc-page.vc-inbox .notification-item>.notification-content {line-height:1.7}
-.student-release .vc-page.vc-inbox .notification-item>.notification-time {margin-top:6px;font-size:12px}
-.student-release .vc-page.vc-inbox .notification-actions {margin-top:6px}
-.student-release .vc-page.vc-inbox .notification-actions .text-action {min-height:44px;padding:0 8px;border:0;background:none;color:var(--sr-muted);font-size:14px}
-.student-release .vc-page.vc-inbox .notification-actions .text-action:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:4px}
-/* 类型色编码：类型字与图标随消息类型着色，扫读先看颜色再看文字 */
-.student-release .vc-inbox .notification-item[data-notification-type=course_notice] {--msg:var(--subject-code)}
-.student-release .vc-inbox .notification-item[data-notification-type=assignment_published] {--msg:var(--orange)}
-.student-release .vc-inbox .notification-item[data-notification-type=feedback] {--msg:var(--green)}
-.student-release .vc-inbox .notification-item[data-notification-type=system],
-.student-release .vc-inbox .notification-item[data-notification-type=help_reply] {--msg:var(--muted)}
-.student-release .vc-inbox .notification-type {color:var(--msg,var(--blue))}
-.student-release .vc-inbox .v35-message-glyph {color:var(--msg,var(--blue))}
-/* 未读 = 3px 品牌侧线 + 浅蓝底；标记已读时侧线与底色一起过渡回收，形成操作闭环。
-   选择器带 .vc-page 以压过冻结层 content.css 的同特异性未读规则。 */
-.student-release .vc-page.vc-inbox .notification-item {border-radius:var(--sr-r-m);transition:background-color var(--dur-fast) ease,box-shadow var(--dur-move) var(--ease-out)}
-.student-release .vc-page.vc-inbox .notification-item.unread {box-shadow:inset 3px 0 0 var(--blue);background:var(--blue-soft)}
-.student-release .vc-page.vc-inbox .notification-item.unread .tag {color:var(--blue);background:var(--surface)}
+/* ===== 消息：按日分组的无框行，未读只加粗标题与标记 ===== */
+.student-release .sr-messages .filter-tabs {display:flex;gap:4px;margin:0 0 12px;box-shadow:inset 0 -1px 0 var(--sr-line);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-messages .filter-tabs button {display:inline-flex;align-items:center;min-height:42px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font-size:14px;white-space:nowrap;flex:none}
+.student-release .sr-messages .filter-tabs button:hover:not([aria-pressed=true]) {color:var(--sr-ink)}
+.student-release .sr-messages .filter-tabs button[aria-pressed=true] {color:var(--sr-ink);font-weight:600;border-bottom-color:var(--sr-brand)}
+.student-release .sr-messages .msg-list {list-style:none;display:grid;margin:0;padding:0}
+.student-release .sr-messages .notification-date {padding:26px 0 4px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-messages .notification-date:first-child {padding-top:2px}
+.student-release .sr-messages .notification-date h2 {margin:0;font-size:13px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-messages .notification-date h2 small {font-size:12px;font-weight:400}
+.student-release .sr-messages .notification-item {display:flex;gap:24px;align-items:flex-start;padding:16px 0;min-width:0}
+.student-release .sr-messages .notification-item>.grow {flex:1;min-width:0}
+.student-release .sr-messages .kind {display:block;font-size:12px;color:var(--sr-muted);overflow-wrap:anywhere}
+.student-release .sr-messages .notification-title {margin:2px 0;font-size:15px;font-weight:500;line-height:1.5;color:var(--sr-ink);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.student-release .sr-messages .notification-item.unread .notification-title {font-weight:700}
+.student-release .sr-messages .notification-content {margin:0;font-size:13px;line-height:1.7;color:var(--sr-muted);white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.student-release .sr-messages .m-side {display:flex;align-items:center;gap:14px;flex:none;padding-top:2px}
+.student-release .sr-messages .notification-time {font-size:12px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-messages .unread-tag {display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--sr-brand);white-space:nowrap}
+.student-release .sr-messages .unread-tag::before {content:'';width:6px;height:6px;border-radius:50%;background:var(--sr-brand)}
+.student-release .sr-messages :is(.quiet-link,.quiet-btn) {min-height:44px;padding:0 2px;border:0;background:none;font-size:14px;cursor:pointer;white-space:nowrap}
+.student-release .sr-messages .quiet-link {color:var(--sr-brand)}
+.student-release .sr-messages .quiet-btn {color:var(--sr-muted)}
+.student-release .sr-messages :is(.quiet-link,.quiet-btn):hover:not(:disabled) {text-decoration:underline;text-underline-offset:3px}
+.student-release .sr-messages .message-full {margin-top:4px}
+.student-release .sr-messages .message-full summary {display:inline-flex;align-items:center;gap:6px;min-height:36px;cursor:pointer;color:var(--sr-brand);font-size:13px;list-style:none}
+.student-release .sr-messages .message-full summary::-webkit-details-marker {display:none}
+.student-release .sr-messages .message-full .message-collapse,.student-release .sr-messages .message-full[open] .message-expand {display:none}
+.student-release .sr-messages .message-full[open] .message-collapse {display:inline}
+.student-release .sr-messages .message-full p {margin:6px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.student-release .sr-messages .empty-state {margin:0;padding:36px 20px;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m);text-align:center;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-messages .pagination {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-messages .pagination .meta {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-messages .pager {display:inline-flex;align-items:center;gap:12px}
+.student-release .sr-messages .pager .button {min-height:36px;padding:0 12px;font-size:13px}
+
+/* ===== 求助列表 / 详情 / 发起：同一条无框行与表单语言 ===== */
+.student-release :is(.sr-help-list,.sr-help-detail,.sr-help-create) .page-head {margin:0 0 16px}
+.student-release :is(.sr-help-list,.sr-help-create) .page-summary {margin-top:2px;font-size:14px}
+.student-release .sr-help-list .filter-tabs {display:flex;gap:4px;margin:0 0 8px;box-shadow:inset 0 -1px 0 var(--sr-line);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-help-list .filter-tabs button {display:inline-flex;align-items:center;min-height:42px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font-size:14px;white-space:nowrap;flex:none}
+.student-release .sr-help-list .filter-tabs button:hover:not([aria-pressed=true]) {color:var(--sr-ink)}
+.student-release .sr-help-list .filter-tabs button[aria-pressed=true] {color:var(--sr-ink);font-weight:600;border-bottom-color:var(--sr-brand)}
+.student-release .sr-help-list .rows {list-style:none;display:grid;margin:0;padding:0}
+.student-release .sr-help-list .row {display:flex;align-items:center;gap:16px;padding:16px 0;color:var(--sr-ink);min-width:0}
+.student-release .sr-help-list .row:hover b {color:var(--sr-brand)}
+.student-release .sr-help-list .grow {flex:1;min-width:0}
+.student-release .sr-help-list .row b {display:block;font-size:15px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.student-release .sr-help-list .row .meta {display:block;margin-top:2px;font-size:13px;color:var(--sr-muted);overflow-wrap:anywhere}
+.student-release .sr-help-list .chip {flex:none}
+.student-release .sr-help-list .empty-state {margin:0;padding:36px 20px;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m);text-align:center;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-help-list .pagination {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-help-list .pagination .meta {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-help-list .pager {display:inline-flex;align-items:center;gap:12px}
+.student-release .sr-help-list .pager .button {min-height:36px;padding:0 12px;font-size:13px}
+.student-release :is(.sr-help-list,.sr-help-detail) .chip {display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:12px;background:var(--sr-sunken);color:var(--sr-muted);font-size:12px;font-weight:600;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--sr-line)}
+.student-release :is(.sr-help-list,.sr-help-detail) .chip::before {content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.student-release :is(.sr-help-list,.sr-help-detail) .chip[data-status=answered] {background:var(--green-soft);color:var(--green);box-shadow:none}
+.student-release :is(.sr-help-list,.sr-help-detail) .chip[data-status=closed] {background:var(--red-soft);color:var(--red);box-shadow:none}
+
+.student-release .sr-help-detail .page-meta {display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:8px 0 0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-help-detail .page-meta a {color:var(--sr-brand)}
+.student-release .sr-help-detail .tag {display:inline-flex;align-items:center;height:22px;padding:0 7px;border:1px solid var(--sr-line-strong);border-radius:4px;color:var(--sr-muted);font-size:12px;white-space:nowrap}
+.student-release .sr-help-detail .help-body {display:grid;gap:36px;max-width:760px}
+.student-release .sr-help-detail .help-sec {min-width:0}
+.student-release .sr-help-detail .help-sec>h2 {margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted)}
+.student-release .sr-help-detail .sec-head {display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px;margin:0 0 4px}
+.student-release .sr-help-detail .sec-head h2 {margin:0}
+.student-release .sr-help-detail .help-sec h3 {margin:20px 0 6px;font-size:14px;font-weight:600;color:var(--sr-ink)}
+.student-release .sr-help-detail .help-text {margin:0;font-size:15px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.student-release .sr-help-detail .meta {margin:0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-help-detail .snap-file {border-bottom:1px solid var(--sr-line)}
+.student-release .sr-help-detail .snap-file:last-of-type {border-bottom:0}
+.student-release .sr-help-detail .snap-file summary {display:flex;align-items:center;min-height:40px;cursor:pointer;list-style:none;font:13px/1.6 Consolas,'Cascadia Code',monospace;color:var(--sr-brand)}
+.student-release .sr-help-detail .snap-file summary::-webkit-details-marker {display:none}
+.student-release .sr-help-detail .snap-file pre {margin:6px 0 10px;padding:12px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-sunken);overflow-x:auto;font:12px/1.6 Consolas,'Cascadia Code',monospace;white-space:pre-wrap;word-break:break-word}
+.student-release .sr-help-detail .quote {margin:0 0 16px;padding:12px 16px;border-left:3px solid var(--sr-line-strong);font-size:15px;line-height:1.75}
+.student-release .sr-help-detail .quote .meta {margin-top:6px}
+.student-release .sr-help-detail .replies {display:grid}
+.student-release .sr-help-detail .reply {padding:14px 0;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-help-detail .reply:last-child {border-bottom:0}
+.student-release .sr-help-detail .reply .meta {margin-bottom:4px}
+
+.student-release .sr-help-create .help-form {display:grid;gap:20px;max-width:680px}
+.student-release .sr-help-create .field.col {display:grid;gap:8px;font-size:14px;color:var(--sr-ink);margin:0}
+.student-release .sr-help-create .field.col>span {font-weight:600}
+.student-release .sr-help-create .field :is(input,textarea) {width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--sr-line-control);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font:inherit}
+.student-release .sr-help-create .field textarea {line-height:1.55;resize:vertical}
+.student-release .sr-help-create .tags {display:grid;gap:8px;margin:0;padding:0;border:0;min-width:0}
+.student-release .sr-help-create .tags legend,.student-release .sr-help-create .share legend {padding:0;font-size:14px;font-weight:600;color:var(--sr-ink)}
+.student-release .sr-help-create .tag-options {display:flex;flex-wrap:wrap;gap:8px}
+.student-release .sr-help-create .tag-option {display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);font-size:13px;cursor:pointer}
+.student-release .sr-help-create .tag-option:has(input:checked) {border-color:var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-brand)}
+.student-release .sr-help-create .tag-option input {margin:0;accent-color:var(--sr-brand)}
+.student-release .sr-help-create .share {display:grid;gap:10px;margin:0;padding:16px 18px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);min-width:0}
+.student-release .sr-help-create .share legend {padding:0 6px}
+.student-release .sr-help-create .field-note {margin:0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-help-create .check {display:flex;align-items:flex-start;gap:8px;min-height:32px;font-size:14px;cursor:pointer}
+.student-release .sr-help-create .check input {margin-top:4px;accent-color:var(--sr-brand)}
+.student-release .sr-help-create .share .button.secondary {justify-self:start;min-height:36px;padding:0 12px;font-size:13px}
+.student-release .sr-help-create .field-error {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:13px;color:var(--red)}
+.student-release .sr-help-create .form-foot {display:flex;align-items:center;justify-content:flex-end;gap:20px;margin-top:4px}
+.student-release .sr-help-create .quiet-link {display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-help-create .quiet-link:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:3px}
+
+@media (max-width:760px) {
+  .student-release .sr-messages .notification-item {flex-direction:column;gap:8px}
+  .student-release .sr-messages .m-side {width:100%;justify-content:flex-start;gap:14px}
+  .student-release .sr-messages .pagination,
+  .student-release .sr-help-list .pagination {flex-direction:column;align-items:flex-start;gap:10px}
+  .student-release .sr-help-create .share {padding:14px}
+  .student-release .sr-help-create .form-foot {justify-content:space-between}
+}
 
 /* ===== 公共外壳 ===== */
 .student-release .workspace-sidebar {border-right-color:var(--sr-line)}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { tutoringApi } from '../../api'
+import { assignmentsApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { formatTime } from '../courses/format'
@@ -28,23 +28,29 @@ const tagsQuery = usePageQuery(async signal => {
 })
 watch(() => detail.value?.offeringId, () => { if (detail.value !== null) void tagsQuery.load() })
 
+const assignmentQuery = usePageQuery(async signal => {
+  if (detail.value === null) throw new Error('尚未读取到求助')
+  return (await assignmentsApi().getAssignment(detail.value.assignmentId, { signal })).data
+})
+watch(() => detail.value?.assignmentId, () => { if (detail.value !== null) void assignmentQuery.load() })
+
 function tagTitle(tag: string): string {
   return tagsQuery.data.value?.items.find(item => item.tag === tag)?.title ?? tag
 }
 </script>
 
 <template>
-  <div class="workspace-page help-detail-page">
-    <header class="workspace-heading">
+  <div class="workspace-page sr-help-detail">
+    <header class="page-head">
       <div>
-        <h1 tabindex="-1">{{ detail?.title ?? '求助详情' }}</h1>
-        <p v-if="detail">
-          <span class="tag" :class="detail.status === 'open' ? 'tag-open' : detail.status === 'answered' ? 'tag-on' : 'tag-off'">{{ STATUS_LABELS[detail.status] }}</span>
-          {{ formatTime(detail.createdAt) }} 创建
+        <p class="page-eyebrow"><RouterLink to="/student/help-requests">← 我的求助</RouterLink></p>
+        <h1 class="page-title" tabindex="-1">{{ detail?.title ?? '求助详情' }}</h1>
+        <p v-if="detail" class="page-meta">
+          <span class="chip" :data-status="detail.status">{{ STATUS_LABELS[detail.status] }}</span>
+          <span>{{ formatTime(detail.createdAt) }} 发起</span>
+          <RouterLink :to="{ name: 'student-assignment', params: { id: detail.assignmentId } }">{{ assignmentQuery.data.value?.title ?? '查看作业' }}</RouterLink>
+          <span v-for="tag in detail.issueTags" :key="tag" class="tag">{{ tagTitle(tag) }}</span>
         </p>
-      </div>
-      <div class="workspace-heading-actions">
-        <RouterLink class="button secondary" to="/student/help-requests">← 我的求助</RouterLink>
       </div>
     </header>
 
@@ -52,64 +58,46 @@ function tagTitle(tag: string): string {
     <template v-else>
       <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
 
-      <template v-if="query.status.value === 'success' && detail">
-        <section class="surface help-section" aria-labelledby="help-content-title">
-          <h2 id="help-content-title">问题描述</h2>
+      <div v-if="query.status.value === 'success' && detail" class="help-body">
+        <section class="help-sec" aria-labelledby="help-content-title">
+          <h2 id="help-content-title">我的问题</h2>
           <p class="help-text">{{ detail.content }}</p>
-          <h3>实际尝试</h3>
+          <h3>我的尝试</h3>
           <p class="help-text">{{ detail.studentAttempt }}</p>
-          <p v-if="detail.issueTags.length > 0" class="help-tags-row">
-            <span v-for="tag in detail.issueTags" :key="tag" class="tag">{{ tagTitle(tag) }}</span>
-          </p>
         </section>
 
-        <section v-if="detail.sharedSnapshot !== null || detail.sharedTutoringResults.length > 0" class="surface help-section" aria-labelledby="help-shared-title">
-          <h2 id="help-shared-title">共享材料</h2>
-          <template v-if="detail.sharedSnapshot !== null">
-            <h3>工作区代码（版本 {{ detail.workspaceRevision }}）</h3>
-            <p class="muted help-retention">保留至 {{ formatTime(detail.sharedSnapshot.expiresAt) }}</p>
-            <details v-for="file in detail.sharedSnapshot.files" :key="file.path" class="help-file">
-              <summary>{{ file.path }}</summary>
-              <pre>{{ file.content }}</pre>
-            </details>
-          </template>
-          <template v-if="detail.sharedTutoringResults.length > 0">
-            <h3>AI 对话片段</h3>
-            <blockquote v-for="shared in detail.sharedTutoringResults" :key="shared.requestId" class="help-shared-quote">
-              <p v-if="shared.content !== null">{{ shared.content }}</p>
-              <p v-else class="muted">该片段已过保留期限，不可查看。</p>
-            </blockquote>
-          </template>
+        <section v-if="detail.sharedSnapshot" class="help-sec" aria-labelledby="help-snapshot-title">
+          <div class="sec-head">
+            <h2 id="help-snapshot-title">附上的工作区快照</h2>
+            <span class="meta">{{ detail.workspaceRevision ? `r${detail.workspaceRevision} · ` : '' }}保留至 {{ formatTime(detail.sharedSnapshot.expiresAt) }}</span>
+          </div>
+          <details v-for="file in detail.sharedSnapshot.files ?? []" :key="file.path" class="snap-file">
+            <summary><code>{{ file.path }}</code></summary>
+            <pre>{{ file.content }}</pre>
+          </details>
+          <p v-if="detail.sharedSnapshot.contentUnavailableReason" class="meta">快照已过保留期，无法查看。</p>
         </section>
 
-        <section class="surface help-section" aria-labelledby="help-replies-title">
+        <section v-if="detail.sharedTutoringResults.length > 0" class="help-sec" aria-labelledby="help-ai-title">
+          <h2 id="help-ai-title">附上的 AI 提示</h2>
+          <div v-for="shared in detail.sharedTutoringResults" :key="shared.requestId" class="quote">
+            <p v-if="shared.content !== null" class="help-text">{{ shared.content }}</p>
+            <p v-else class="meta">内容已过保留期，无法查看。</p>
+            <p class="meta">保留至 {{ formatTime(shared.expiresAt) }}</p>
+          </div>
+        </section>
+
+        <section class="help-sec" aria-labelledby="help-replies-title">
           <h2 id="help-replies-title">教师回复</h2>
-          <p v-if="detail.replies.length === 0" class="muted">教师尚未回复；回复后会收到消息提醒。</p>
-          <ul v-else class="help-replies">
-            <li v-for="reply in detail.replies" :key="reply.id">
-              <p class="help-reply-meta"><strong>{{ reply.teacher.displayName }}</strong> · {{ formatTime(reply.createdAt) }}</p>
+          <p v-if="detail.replies.length === 0" class="meta">老师还没有回复。回复后会收到「求助回复」消息。</p>
+          <div v-else class="replies">
+            <article v-for="reply in detail.replies" :key="reply.id" class="reply">
+              <p class="meta">{{ reply.teacher.displayName }} · {{ formatTime(reply.createdAt) }}</p>
               <p class="help-text">{{ reply.content }}</p>
-            </li>
-          </ul>
+            </article>
+          </div>
         </section>
-      </template>
+      </div>
     </template>
   </div>
 </template>
-
-<style scoped>
-.help-section { padding: 22px 26px; margin-bottom: 20px; }
-.help-section h2 { font-size: 18px; margin: 0 0 12px; }
-.help-section h3 { font-size: 15px; margin: 16px 0 8px; }
-.help-text { margin: 0; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
-.help-tags-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
-.help-retention { font-size: 13px; margin: 0 0 8px; }
-.help-file { border: 1px solid var(--line); border-radius: var(--radius-control); margin-bottom: 8px; }
-.help-file summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-family: Consolas, monospace; font-size: 13px; color: var(--blue-text); }
-.help-file pre { margin: 0; padding: 12px 14px; border-top: 1px solid var(--line); background: var(--canvas); font: 13px/1.8 Consolas, 'Microsoft YaHei', monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; }
-.help-shared-quote { margin: 0 0 10px; padding: 10px 14px; border-left: 3px solid var(--blue); background: var(--blue-soft); border-radius: 0 var(--radius-control) var(--radius-control) 0; }
-.help-shared-quote p { margin: 0; font-size: 14px; line-height: 1.7; }
-.help-replies { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-.help-reply-meta { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
-.tag-open { background: var(--orange-soft); color: var(--orange); }
-</style>

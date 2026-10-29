@@ -163,14 +163,12 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <div class="workspace-page help-create-page">
-    <header class="workspace-heading">
+  <div class="workspace-page sr-help-create">
+    <header class="page-head">
       <div>
-        <h1 tabindex="-1">向教师求助</h1>
-        <p>{{ assignment?.title ?? '正在读取作业…' }}</p>
-      </div>
-      <div class="workspace-heading-actions">
-        <RouterLink class="button secondary" :to="assignmentId !== null ? { name: 'student-assignment', params: { id: assignmentId } } : { name: 'student-assignments' }">← 返回作业详情</RouterLink>
+        <p class="page-eyebrow"><RouterLink :to="assignmentId !== null ? { name: 'student-assignment', params: { id: assignmentId } } : { name: 'student-assignments' }">← 返回作业</RouterLink></p>
+        <h1 class="page-title" tabindex="-1">问老师</h1>
+        <p class="page-summary">{{ assignment?.title ?? '正在读取作业…' }}</p>
       </div>
     </header>
 
@@ -178,33 +176,34 @@ async function submit(): Promise<void> {
     <template v-else>
       <ApiState :status="assignmentQuery.status.value" :error="assignmentQuery.error.value" @retry="assignmentQuery.load" />
 
-      <form v-if="assignmentQuery.status.value === 'success'" class="surface help-form" @submit.prevent="submit">
-        <label class="help-field">
+      <form v-if="assignmentQuery.status.value === 'success'" class="help-form" @submit.prevent="submit">
+        <label class="field col">
           <span>标题</span>
-          <input v-model="title" maxlength="200" required placeholder="一句话说明问题" />
+          <input v-model="title" maxlength="200" required placeholder="一句话说清问题" />
         </label>
-        <label class="help-field">
+        <label class="field col">
           <span>问题描述</span>
-          <textarea v-model="content" rows="4" maxlength="8000" required placeholder="现象、期望与疑问" />
+          <textarea v-model="content" rows="4" maxlength="8000" required placeholder="现象是什么，你期望的结果是什么" />
         </label>
-        <label class="help-field">
-          <span>实际尝试（必填）</span>
-          <textarea v-model="attempt" rows="3" maxlength="8000" required placeholder="已经做过什么、结果如何" />
+        <label class="field col">
+          <span>实际尝试</span>
+          <textarea v-model="attempt" rows="3" maxlength="8000" required placeholder="已经试过哪些办法，结果如何" />
         </label>
 
-        <fieldset v-if="tagsQuery.status.value === 'success' && tagsQuery.data.value" class="help-field">
-          <legend>问题标签（可选，帮助教师归类共性问题）</legend>
-          <div class="help-tags">
-            <label v-for="tag in tagsQuery.data.value.items" :key="tag.tag" class="help-tag" :aria-pressed="selectedTags.includes(tag.tag)">
+        <fieldset v-if="tagsQuery.status.value === 'success' && tagsQuery.data.value" class="tags">
+          <legend>问题标签</legend>
+          <div class="tag-options">
+            <label v-for="tag in tagsQuery.data.value.items" :key="tag.tag" class="tag-option" :aria-pressed="selectedTags.includes(tag.tag)">
               <input type="checkbox" :value="tag.tag" :checked="selectedTags.includes(tag.tag)" @change="toggle(selectedTags, tag.tag)" />
               <span :title="tag.description">{{ tag.title }}</span>
             </label>
           </div>
         </fieldset>
 
-        <fieldset class="help-field">
-          <legend>共享材料（可选，教师只能看到这里勾选的内容）</legend>
-          <label class="help-check">
+        <fieldset class="share">
+          <legend>共享材料</legend>
+          <p class="field-note">教师只能看到勾选的内容。</p>
+          <label class="check">
             <input
               v-model="shareWorkspace"
               type="checkbox"
@@ -213,16 +212,16 @@ async function submit(): Promise<void> {
             <span>当前工作区代码（版本 {{ workspaceQuery.data.value?.revision ?? '—' }}{{ (workspaceQuery.data.value?.revision ?? 0) < 1 ? '；尚未保存过，无可共享版本' : '' }}）</span>
           </label>
           <p v-if="shareQuery.status.value === 'error'" class="field-error" role="alert">AI 对话片段加载失败：{{ shareQuery.error.value?.message }}<button type="button" class="button secondary" @click="shareQuery.load">重试</button></p>
-          <p v-else-if="shareQuery.status.value === 'loading'" class="muted" role="status">正在读取可共享的 AI 回复…</p>
+          <p v-else-if="shareQuery.status.value === 'loading'" class="field-note" role="status">正在读取可共享的 AI 回复…</p>
           <template v-else>
-            <div v-if="shareOptions.length > 0" class="help-shares">
-              <label v-for="option in shareOptions" :key="option.requestId" class="help-check">
+            <div v-if="shareOptions.length > 0" class="tag-options">
+              <label v-for="option in shareOptions" :key="option.requestId" class="check">
                 <input type="checkbox" :value="option.requestId" :checked="sharedRequests.includes(option.requestId)" @change="toggle(sharedRequests, option.requestId)" />
                 <span>AI 对话片段：{{ option.preview }}…</span>
               </label>
             </div>
-            <p v-else class="muted">本作业还没有可共享的 AI 回复。</p>
-            <p v-if="shareQuery.data.value !== null && (shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions || shareQuery.data.value.truncatedSessions > 0)" class="muted">
+            <p v-else class="field-note">本作业还没有可共享的 AI 回复。</p>
+            <p v-if="shareQuery.data.value !== null && (shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions || shareQuery.data.value.truncatedSessions > 0)" class="field-note">
               仅显示最近 {{ shareQuery.data.value.loadedSessions }} / 共 {{ shareQuery.data.value.sessionsTotal }} 个会话{{ shareQuery.data.value.truncatedSessions > 0 ? `（其中 ${shareQuery.data.value.truncatedSessions} 个会话仅取最近 ${SHARE_MESSAGE_PAGE_SIZE} 条消息）` : '' }}。
             </p>
             <button v-if="shareQuery.data.value !== null && shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions" type="button" class="button secondary" :disabled="loadingMore" @click="loadMoreSessions">{{ loadingMore ? '正在加载…' : '加载更多会话' }}</button>
@@ -231,24 +230,13 @@ async function submit(): Promise<void> {
         </fieldset>
 
         <p v-if="formError" class="field-error" role="alert">{{ formError }}</p>
-        <button type="submit" class="button primary" :disabled="submitting">{{ submitting ? '正在提交…' : '提交求助' }}</button>
+        <div class="form-foot">
+          <RouterLink class="quiet-link" :to="assignmentId !== null ? { name: 'student-assignment', params: { id: assignmentId } } : { name: 'student-assignments' }">取消</RouterLink>
+          <button type="submit" class="button primary" :disabled="submitting">{{ submitting ? '正在提交…' : '提交求助' }}</button>
+        </div>
       </form>
     </template>
   </div>
 </template>
 
-<style scoped>
-.help-form { display: grid; gap: 18px; max-width: 760px; }
-.help-field { display: grid; gap: 8px; font-size: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
-.help-field > span, .help-field legend { color: var(--ink); font-weight: 600; }
-.help-field input[type='text'], .help-field input:not([type]), .help-field textarea { border: 1px solid var(--line-control); border-radius: var(--radius-control); min-height: 44px; padding: 8px 12px; font: inherit; background: var(--surface); color: var(--ink); }
-.help-field textarea { resize: vertical; }
-.help-tags { display: flex; flex-wrap: wrap; gap: 8px; }
-.help-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); font-size: 13px; cursor: pointer; }
-.help-tag:has(input:checked) { border-color: var(--blue); background: var(--blue-soft); color: var(--blue-text); }
-.help-tag input { accent-color: var(--blue); margin: 0; }
-.help-check { display: flex; align-items: flex-start; gap: 8px; min-height: 32px; font-size: 14px; }
-.help-check input { accent-color: var(--blue); margin-top: 3px; }
-.help-shares { display: grid; gap: 6px; margin-top: 8px; }
-.help-form .button { justify-self: start; }
-</style>
+
