@@ -12,8 +12,9 @@
   --fs-h1:28px;
   --content-max:1040px; --gutter:32px;
   --sr-canvas:var(--canvas); --sr-surface:var(--surface); --sr-ink:var(--ink); --sr-muted:var(--muted);
-  --sr-line:var(--line); --sr-line-strong:var(--line-strong); --sr-sunken:var(--sunken);
+  --sr-line:var(--line); --sr-line-strong:var(--line-strong); --sr-line-control:var(--line-control); --sr-sunken:var(--sunken);
   --sr-brand:var(--blue); --sr-brand-hover:var(--blue-hover); --sr-brand-soft:var(--blue-soft);
+  --sr-blue:var(--blue); --sr-green:var(--green); --sr-green-soft:var(--green-soft);
   --sr-focus:var(--focus-ring); --sr-warn:var(--orange); --sr-warn-soft:var(--orange-soft);
   --sr-r-s:var(--radius-control); --sr-r-m:var(--radius-panel); --sr-r-focus:var(--radius-hero);
   --sr-serif:Georgia,"Times New Roman",serif;
@@ -25,12 +26,12 @@
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
-/* 消息与求助沿用同一套文字层级；页面根只负责字体、内容宽度与焦点，具体排版在各页块。 */
-.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
-.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) a {text-decoration:none}
-.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
-.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
-.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
+/* 消息、求助、工作区与 AI 辅导沿用同一套文字层级；页面根只负责字体、内容宽度与焦点，具体排版在各页块。 */
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) a {text-decoration:none}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
+.student-release :is(.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
 
 /* 学科身份：颜色只表示学科（--subject-* 令牌） */
 .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family] {--acc:var(--subject-neutral);--acc-soft:var(--subject-neutral-soft)}
@@ -516,6 +517,106 @@
 .student-release .sr-help-create .quiet-link {display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:var(--sr-muted)}
 .student-release .sr-help-create .quiet-link:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:3px}
 
+/* ===== 工作区：无框文件页签 + 细线编辑与预览面板 ===== */
+.student-release .sr-workspace .ws-head {display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:0 0 16px}
+.student-release .sr-workspace .ws-head .grow {flex:1;min-width:0}
+.student-release .sr-workspace .ws-head .page-eyebrow a {color:var(--sr-muted)}
+.student-release .sr-workspace .ws-head .page-eyebrow a:hover {color:var(--sr-brand)}
+.student-release .sr-workspace .save-st {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-workspace .notice {margin:0 0 14px;padding:10px 14px;border-radius:var(--sr-r-s);font-size:13px}
+.student-release .sr-workspace>.button.secondary {margin:0 0 14px}
+.student-release .sr-workspace .conflict {margin:0 0 18px;padding:16px 18px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-workspace .conflict h2 {font-size:15px;font-weight:600}
+.student-release .sr-workspace .conflict .meta {margin:6px 0 10px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-workspace .snap-file {border-bottom:1px solid var(--sr-line)}
+.student-release .sr-workspace .snap-file summary {display:flex;align-items:center;min-height:40px;cursor:pointer;list-style:none;font:13px/1.6 Consolas,'Cascadia Code',monospace;color:var(--sr-brand)}
+.student-release .sr-workspace .snap-file summary::-webkit-details-marker {display:none}
+.student-release .sr-workspace .snap-file pre {margin:6px 0 10px;padding:12px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-sunken);overflow-x:auto;font:12px/1.6 Consolas,'Cascadia Code',monospace;white-space:pre-wrap;word-break:break-word}
+.student-release .sr-workspace .conflict-actions {display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.student-release .sr-workspace .file-tabs {display:flex;gap:2px;padding:0 6px;border:1px solid var(--sr-line);border-bottom:0;border-radius:var(--sr-r-m) var(--sr-r-m) 0 0;background:var(--sr-sunken);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-workspace .file-tab {display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font:13px/1.4 Consolas,'Cascadia Code',monospace;white-space:nowrap;flex:none;cursor:pointer}
+.student-release .sr-workspace .file-tab:hover {color:var(--sr-ink)}
+.student-release .sr-workspace .file-tab[aria-selected=true] {background:var(--sr-surface);color:var(--sr-ink);border-bottom-color:var(--sr-brand)}
+.student-release .sr-workspace .editor {border:1px solid var(--sr-line);border-radius:0 0 var(--sr-r-m) var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
+.student-release .sr-workspace .workspace-editor {display:block;width:100%;min-height:440px;padding:14px 16px;border:0;background:transparent;color:var(--sr-ink);font:14px/1.65 Consolas,'Cascadia Code',monospace;tab-size:2;resize:vertical}
+.student-release .sr-workspace .workspace-editor:focus-visible {outline:2px solid var(--sr-brand);outline-offset:-2px}
+.student-release .sr-workspace .workspace-editor:disabled {background:var(--sr-sunken);color:var(--sr-muted);cursor:not-allowed}
+.student-release .sr-workspace .preview {margin-top:16px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
+.student-release .sr-workspace .preview-bar {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;min-height:44px;padding:2px 8px 2px 14px;border-bottom:1px solid var(--sr-line);background:var(--sr-sunken)}
+.student-release .sr-workspace .preview-bar .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-workspace .preview-actions {display:inline-flex;gap:2px}
+.student-release .sr-workspace .quiet-btn {min-height:36px;padding:0 10px;border:0;background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
+.student-release .sr-workspace .quiet-btn:disabled {color:var(--sr-muted);cursor:default}
+.student-release .sr-workspace .preview-status {margin:0;padding:10px 14px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-workspace .teacher-dialog {border:1px solid var(--sr-line);border-radius:var(--sr-r-m);color:var(--sr-ink)}
+.student-release .sr-workspace .teacher-dialog h2 {font-size:18px;font-weight:650}
+.student-release .sr-workspace .teacher-dialog>p {margin:10px 0;font-size:14px;line-height:1.7;color:var(--sr-muted)}
+.student-release .sr-workspace .teacher-dialog label {display:block;margin:14px 0 6px;font-size:14px;font-weight:600}
+.student-release .sr-workspace .teacher-dialog textarea {display:block;width:100%;min-height:100px;margin-top:6px;padding:10px 12px;border:1px solid var(--sr-line-control);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font:14px/1.6 inherit;resize:vertical}
+.student-release .sr-workspace .teacher-dialog .teacher-checkbox {display:flex;align-items:center;gap:8px;margin:14px 0;font-size:14px;font-weight:400}
+.student-release .sr-workspace .teacher-dialog .teacher-checkbox input {margin:0;accent-color:var(--sr-brand)}
+.student-release .sr-workspace .teacher-dialog-actions {display:flex;justify-content:flex-end;gap:12px;margin-top:18px}
+.student-release .sr-workspace .teacher-dialog .notice {margin:10px 0;font-size:13px}
+
+/* ===== AI 辅导：对话列 + 辅导规则侧栏 ===== */
+.student-release .sr-tutoring .page-actions .quiet-link {display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:var(--sr-brand)}
+.student-release .sr-tutoring .tutor-grid {display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:40px;align-items:start}
+.student-release .sr-tutoring .chat-col {display:grid;gap:14px;min-width:0}
+.student-release .sr-tutoring .sessions {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding-bottom:2px}
+.student-release .sr-tutoring .session-btns {display:flex;flex-wrap:wrap;gap:2px;min-width:0}
+.student-release .sr-tutoring .session-btn {min-height:36px;padding:0 10px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font-size:13px;cursor:pointer}
+.student-release .sr-tutoring .session-btn:hover {color:var(--sr-ink)}
+.student-release .sr-tutoring .session-btn[aria-pressed=true] {color:var(--sr-ink);font-weight:650;border-bottom-color:var(--sr-brand)}
+.student-release .sr-tutoring .quiet-btn {min-height:36px;padding:0 10px;border:0;background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
+.student-release .sr-tutoring .quiet-btn:disabled {color:var(--sr-muted);cursor:default}
+.student-release .sr-tutoring .chat {display:grid;gap:12px;align-content:start;min-height:220px;max-height:calc(100dvh - 400px);overflow-y:auto;padding:2px 4px 2px 0}
+.student-release .sr-tutoring .thread {list-style:none;display:grid;gap:12px;margin:0;padding:0}
+.student-release .sr-tutoring .msg {display:grid;gap:4px;max-width:min(70ch,86%);font-size:14px}
+.student-release .sr-tutoring .msg.student {justify-self:end;padding:10px 14px;border-radius:var(--sr-r-m);background:var(--sr-brand-soft)}
+.student-release .sr-tutoring .msg.assistant {justify-self:start;padding:10px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-tutoring .msg.pending {border-style:dashed}
+.student-release .sr-tutoring .lv {font-size:12px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-tutoring .msg-text {margin:0;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.student-release .sr-tutoring .msg-time {justify-self:end;font-size:11px}
+.student-release .sr-tutoring .msg .meta {font-size:12px;color:var(--sr-muted);margin:0}
+.student-release .sr-tutoring .chat-empty-text {margin:0;padding:40px 0;text-align:center;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-tutoring .chat-empty {display:grid;justify-items:start;gap:6px;max-width:56ch;padding:28px 0}
+.student-release .sr-tutoring .chat-empty p {margin:0;font-size:15px}
+.student-release .sr-tutoring .chat-empty .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tutoring .chat-empty .button {margin-top:6px}
+.student-release .sr-tutoring .composer {padding:16px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-tutoring .composer-fields {display:grid;gap:12px;margin:0;padding:0;border:0;min-width:0}
+.student-release .sr-tutoring .seg {display:inline-flex;width:fit-content;max-width:100%;justify-self:start;border:1px solid var(--sr-line-control);border-radius:var(--sr-r-s);overflow:hidden}
+.student-release .sr-tutoring .seg-option {position:relative;display:inline-flex;align-items:center;min-height:38px;padding:0 14px;background:var(--sr-surface);color:var(--sr-muted);font-size:13px;cursor:pointer;white-space:nowrap}
+.student-release .sr-tutoring .seg-option+.seg-option {border-left:1px solid var(--sr-line-control)}
+.student-release .sr-tutoring .seg-option input {position:absolute;opacity:0;pointer-events:none}
+.student-release .sr-tutoring .seg-option:has(input:checked) {background:var(--sr-brand-soft);color:var(--sr-brand);font-weight:600}
+.student-release .sr-tutoring .seg-option:has(input:focus-visible) {outline:3px solid var(--sr-brand);outline-offset:-3px}
+.student-release .sr-tutoring .field.col {display:grid;gap:6px;margin:0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tutoring .field.col>span {font-weight:600;color:var(--sr-ink)}
+.student-release .sr-tutoring .field textarea {width:100%;padding:8px 12px;border:1px solid var(--sr-line-control);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font:14px/1.55 inherit;resize:vertical}
+.student-release .sr-tutoring .field-error {margin:0;font-size:13px;color:var(--red)}
+.student-release .sr-tutoring .composer-foot {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+.student-release .sr-tutoring .composer-foot .meta {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-tutoring .col.side {display:grid;gap:28px;min-width:0}
+.student-release .sr-tutoring .sec {min-width:0}
+.student-release .sr-tutoring .sec>h2 {margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted)}
+.student-release .sr-tutoring .lead-sm {margin:0;font-size:14px;line-height:1.7;color:var(--sr-ink)}
+.student-release .sr-tutoring .facts {display:grid;gap:10px;margin:14px 0 0;padding-top:14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-tutoring .facts>div {display:grid;gap:2px}
+.student-release .sr-tutoring .facts dt {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-tutoring .facts dd {display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:var(--sr-ink)}
+.student-release .sr-tutoring .levels {display:inline-flex;gap:3px}
+.student-release .sr-tutoring .levels i {width:14px;height:3px;border-radius:2px;background:var(--sr-line-strong)}
+.student-release .sr-tutoring .levels i.on {background:var(--sr-brand)}
+.student-release .sr-tutoring .col.side .meta {margin:0 0 8px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-tutoring .col.side .quiet-link {font-size:14px;color:var(--sr-brand)}
+
+@media (max-width:1199px) {
+  .student-release .sr-tutoring .tutor-grid {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-tutoring .chat {max-height:none;overflow:visible}
+}
+
 @media (max-width:760px) {
   .student-release .sr-messages .notification-item {flex-direction:column;gap:8px}
   .student-release .sr-messages .m-side {width:100%;justify-content:flex-start;gap:14px}
@@ -523,6 +624,14 @@
   .student-release .sr-help-list .pagination {flex-direction:column;align-items:flex-start;gap:10px}
   .student-release .sr-help-create .share {padding:14px}
   .student-release .sr-help-create .form-foot {justify-content:space-between}
+  .student-release .sr-workspace .ws-head .grow {flex:1 0 100%}
+  .student-release .sr-workspace .save-st {margin-right:auto}
+  .student-release .sr-workspace .workspace-editor {min-height:360px}
+  .student-release .sr-tutoring .chat {min-height:0}
+  .student-release .sr-tutoring .seg {width:100%}
+  .student-release .sr-tutoring .seg-option {flex:1;justify-content:center;padding:0 8px}
+  .student-release .sr-tutoring .msg {max-width:92%}
+  .student-release .sr-tutoring .composer {padding:14px}
 }
 
 /* ===== 公共外壳 ===== */
