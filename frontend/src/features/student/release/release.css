@@ -19,19 +19,19 @@
   --sr-serif:Georgia,"Times New Roman",serif;
   background:var(--sr-canvas);
 }
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) a {text-decoration:none}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) {color:var(--sr-ink);font-size:15px;line-height:1.6;max-width:var(--content-max)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) a {text-decoration:none}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) :is(a,button,select,summary):focus-visible {outline:3px solid var(--sr-brand);outline-offset:3px}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h1 {font-size:var(--fs-h1);font-weight:650;line-height:var(--lh-tight);margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h2 {font-size:18px;font-weight:650;line-height:1.45;margin:0}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) :is(.vx-muted,.explore-muted) {color:var(--sr-muted);font-size:13px;margin:0}
 
 /* 学科身份：颜色只表示学科（--subject-* 令牌） */
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) [data-family] {--acc:var(--subject-neutral);--acc-soft:var(--subject-neutral-soft)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) [data-family=code] {--acc:var(--subject-code);--acc-soft:var(--subject-code-soft)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) [data-family=data] {--acc:var(--subject-data);--acc-soft:var(--subject-data-soft)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) [data-family=systems] {--acc:var(--subject-systems);--acc-soft:var(--subject-systems-soft)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) [data-family=explore] {--acc:var(--subject-explore);--acc-soft:var(--subject-explore-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family] {--acc:var(--subject-neutral);--acc-soft:var(--subject-neutral-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family=code] {--acc:var(--subject-code);--acc-soft:var(--subject-code-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family=data] {--acc:var(--subject-data);--acc-soft:var(--subject-data-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family=systems] {--acc:var(--subject-systems);--acc-soft:var(--subject-systems-soft)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) [data-family=explore] {--acc:var(--subject-explore);--acc-soft:var(--subject-explore-soft)}
 .student-release .v35-subject {display:inline-flex;align-items:baseline;gap:8px;min-width:0;color:var(--sr-muted);font-size:13px}
 .student-release .v35-subject-mark {flex-shrink:0;padding:0 6px;border-radius:var(--radius-control);background:var(--acc-soft);color:var(--acc);font-size:12px;font-weight:700;line-height:1.7;letter-spacing:.02em}
 .student-release .v35-subject>span:last-child {overflow-wrap:anywhere}
@@ -140,12 +140,12 @@
 .student-release .sr-chapter .kp-line {display:flex;flex-wrap:wrap;gap:8px;padding-top:8px}
 .student-release .sr-chapter .read-state {font-size:12px}
 /* 通用控件：下拉框与按钮统一外观 */
-.student-release :is(.sr-courses,.sr-tasks) label {display:grid;gap:6px;font-size:13px;color:var(--sr-muted)}
-.student-release :is(.sr-courses,.sr-tasks) select {min-height:44px;padding:0 36px 0 12px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2352627a' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 12px center;appearance:none;color:var(--sr-ink);font-size:14px}
-.student-release :is(.sr-courses,.sr-tasks) select:hover {border-color:var(--sr-brand)}
-.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) .button {min-height:44px;border-radius:var(--sr-r-s);font-size:14px;font-weight:600;padding:0 16px;box-shadow:none}
-.student-release :is(.sr-courses,.sr-tasks) .button.secondary {background:var(--sr-surface);border:1px solid var(--sr-line-strong);color:var(--sr-brand)}
-.student-release :is(.sr-courses,.sr-tasks) .button.secondary:not(:disabled):hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
+.student-release :is(.sr-courses,.sr-tasks,.sr-records,.sr-calendar) label {display:grid;gap:6px;font-size:13px;color:var(--sr-muted)}
+.student-release :is(.sr-courses,.sr-tasks,.sr-records,.sr-calendar) select {min-height:44px;padding:0 36px 0 12px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2352627a' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 12px center;appearance:none;color:var(--sr-ink);font-size:14px}
+.student-release :is(.sr-courses,.sr-tasks,.sr-records,.sr-calendar) select:hover {border-color:var(--sr-brand)}
+.student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) .button {min-height:44px;border-radius:var(--sr-r-s);font-size:14px;font-weight:600;padding:0 16px;box-shadow:none}
+.student-release :is(.sr-courses,.sr-tasks,.sr-records,.sr-calendar) .button.secondary {background:var(--sr-surface);border:1px solid var(--sr-line-strong);color:var(--sr-brand)}
+.student-release :is(.sr-courses,.sr-tasks,.sr-records,.sr-calendar) .button.secondary:not(:disabled):hover {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
 
 /* ===== 我的作业：无框行，截止 / 作业与课程 / 状态 / 动作 ===== */
 .student-release .sr-tasks .page-head {margin:0 0 8px}
@@ -274,23 +274,136 @@
 .student-release .sr-assignment .feedback-view .section-heading h3 {margin:0;font-size:15px}
 .student-release .sr-assignment .feedback-view h4 {margin:18px 0 6px;font-size:13px;font-weight:600;color:var(--sr-muted)}
 
-/* ===== 学习记录：路径改为连续行，节点轨保留 ===== */
-.student-release .vx-records .vx-path-body {padding:10px 0;background:none;border:0;border-bottom:1px solid var(--sr-line);border-radius:0}
-.student-release .vx-records .vx-path>li:last-child .vx-path-body {border-bottom:0}
-.student-release .vx-records .vx-path>li[data-state=in_progress] .vx-path-body {background:none;box-shadow:none;border:0;border-bottom:1px solid var(--sr-line);border-left:3px solid var(--vx-accent);padding-left:12px}
-.student-release .vx-records .vx-feedback-history>ul {border:1px solid var(--sr-line);border-radius:var(--sr-r-m)}
-.student-release .vx-records .vx-feedback-history>ul>li {border-bottom:1px solid var(--sr-line)}
-.student-release .vx-records .vx-feedback-history>ul>li:last-child {border-bottom:0}
+/* ===== 学习记录：统计条 / 下一步 / 知识点与评价历史 ===== */
+.student-release .sr-records .page-head {margin:0 0 20px}
+.student-release .sr-records .page-actions label {display:grid;gap:6px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-records .page-actions select {min-width:260px}
+.student-release .sr-records .stats {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 24px;padding:0;border-top:1px solid var(--sr-line);border-bottom:1px solid var(--sr-line)}
+.student-release .sr-records .stats>div {min-width:0;padding:14px 18px;border-left:1px solid var(--sr-line)}
+.student-release .sr-records .stats>div:first-child {padding-left:0;border-left:0}
+.student-release .sr-records .stats dt {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-records .stats dd {display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 4px;margin:6px 0 0;font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-records .stats dd b {font-size:24px;font-weight:600;line-height:1;color:var(--sr-ink)}
+.student-release .sr-records .stats dd small {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-records .stats .stat-note {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-records .reco {display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin:0 0 28px;padding:20px 24px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-records .reco-main {min-width:0}
+.student-release .sr-records .eyebrow {margin:0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-records .reco h2 {margin:6px 0 0;font-size:17px;font-weight:650;line-height:1.45}
+.student-release .sr-records .reco p {margin:6px 0 0;font-size:14px;line-height:1.65;color:var(--sr-muted)}
+.student-release .sr-records .reco .button {flex:none}
+.student-release .sr-records .records-grid {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:48px;align-items:start}
+.student-release .sr-records .col {min-width:0}
+.student-release .sr-records .col-head {display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 8px;padding-bottom:10px;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-records .col-head h2 {font-size:16px;font-weight:650}
+.student-release .sr-records .col-head .meta {font-size:12px;color:var(--sr-muted);text-align:right}
+.student-release .sr-records .col-empty {margin:12px 0 0;font-size:14px;line-height:1.65;color:var(--sr-muted)}
+.student-release .sr-records .kp {border-bottom:1px solid var(--sr-line)}
+.student-release .sr-records .kp summary {display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:54px;padding:8px 0;cursor:pointer;list-style:none;font-size:14px}
+.student-release .sr-records .kp summary::-webkit-details-marker {display:none}
+.student-release .sr-records .kp summary b {font-weight:600;color:var(--sr-ink);overflow-wrap:anywhere}
+.student-release .sr-records .kp summary .meta {font-size:12px;color:var(--sr-muted);text-align:right}
+.student-release .sr-records .kstate {justify-self:start;display:inline-flex;align-items:center;height:22px;padding:0 7px;border:1px solid var(--sr-line-strong);border-radius:4px;font-size:12px;white-space:nowrap}
+.student-release .sr-records .kstate[data-state=basically_mastered] {border-color:var(--green);color:var(--green)}
+.student-release .sr-records .kstate[data-state=needs_practice] {border-color:var(--orange);color:var(--orange)}
+.student-release .sr-records .kstate[data-state=learning] {border-color:var(--blue);color:var(--blue)}
+.student-release .sr-records .kstate[data-state=insufficient_evidence] {color:var(--sr-muted)}
+.student-release .sr-records .kp-body {display:grid;gap:10px;padding:0 0 16px 88px;font-size:14px}
+.student-release .sr-records .kp-body p {margin:0;line-height:1.65;color:var(--sr-muted)}
+.student-release .sr-records .kp-evidence {list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.student-release .sr-records .kp-evidence li {display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:13px}
+.student-release .sr-records .kp-evidence a {color:var(--sr-brand)}
+.student-release .sr-records .kp-evidence .meta {color:var(--sr-muted)}
+.student-release .sr-records .kres {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-records .kres[data-result=meets_expectation] {color:var(--green)}
+.student-release .sr-records .kres[data-result=needs_practice] {color:var(--orange)}
+.student-release .sr-records .fb-rows {list-style:none;margin:0;padding:0;display:grid}
+.student-release .sr-records .fb-rows li {border-bottom:1px solid var(--sr-line)}
+.student-release .sr-records .fb-row {display:grid;grid-template-columns:56px minmax(0,1fr);gap:16px;padding:16px 0;color:var(--sr-ink)}
+.student-release .sr-records .fb-row.is-recent .fb-score {color:var(--sr-ink)}
+.student-release .sr-records .fb-score {font-size:22px;font-weight:650;line-height:1.2;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-records .fb-score small {font-size:12px;font-weight:400;color:var(--sr-muted)}
+.student-release .sr-records .fb-main {display:grid;gap:3px;min-width:0}
+.student-release .sr-records .fb-main b {font-size:14px;font-weight:600;color:var(--sr-ink);overflow-wrap:anywhere}
+.student-release .sr-records .fb-row:hover .fb-main b {color:var(--sr-brand)}
+.student-release .sr-records .fb-main .meta {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-records .fb-comment {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:4px 0 0;font-size:13px;line-height:1.6;color:var(--sr-muted)}
+.student-release .sr-records .pagination {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:12px;border-top:1px solid var(--sr-line)}
+.student-release .sr-records .pagination .meta {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-records .pager {display:inline-flex;align-items:center;gap:8px}
+.student-release .sr-records .pager .button {min-height:36px;padding:0 12px;font-size:13px}
+.student-release .sr-records .empty-state {padding:36px 20px;text-align:center;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m)}
+.student-release .sr-records .empty-state h2 {font-size:15px;margin:0 0 4px}
+.student-release .sr-records .empty-state p {margin:0 0 14px;font-size:14px;color:var(--sr-muted)}
 
-/* ===== 学习日历：月格紧凑、空态收短 ===== */
-.student-release .vx-calendar .vx-day-cell {min-height:92px;padding:6px}
-.student-release .vx-calendar .vx-calendar-empty {padding:2px 0 8px}
-.student-release .vx-calendar .vx-calendar-empty>span {font-size:32px}
-.student-release .vx-calendar .vx-calendar-empty>h3 {font-size:15px;margin:6px 0}
-.student-release .vx-calendar .vx-calendar-empty p {margin:6px 0}
-.student-release .vx-calendar .vx-calendar-empty h4 {margin:12px 0 6px;padding-top:12px}
-.student-release .vx-calendar .vx-agenda {padding:16px}
-.student-release .vx-calendar .vx-deadline-heading {padding:8px 10px}
+/* ===== 学习日历：细线月格 + 右侧当日安排 ===== */
+.student-release .sr-calendar .page-head {margin:0 0 20px}
+.student-release .sr-calendar .page-actions label {display:grid;gap:6px;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-calendar .page-actions select {min-width:280px}
+.student-release .sr-calendar .vx-calendar-toolbar {display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin:0 0 16px}
+.student-release .sr-calendar .vx-month-signature {display:flex;align-items:baseline;gap:12px}
+.student-release .sr-calendar .vx-month-signature h2 {font-size:18px;font-weight:650}
+.student-release .sr-calendar .vx-month-signature .meta {font-size:13px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-month-controls {display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.student-release .sr-calendar .vx-month-controls .button {min-height:36px;padding:0 12px;font-size:13px}
+.student-release .sr-calendar .segmented {display:inline-flex;padding:2px;border:1px solid var(--sr-line-strong);border-radius:var(--sr-r-s);background:var(--sr-surface)}
+.student-release .sr-calendar .segmented button {min-width:44px;min-height:30px;border:0;border-radius:4px;background:none;color:var(--sr-muted);font-size:13px;cursor:pointer}
+.student-release .sr-calendar .segmented button[aria-pressed=true] {background:var(--sr-brand-soft);color:var(--sr-brand);font-weight:600}
+.student-release .sr-calendar .vx-time-grid {display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:40px;align-items:start}
+.student-release .sr-calendar .vx-calendar-board {min-width:0}
+.student-release .sr-calendar .vx-weekday-labels {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--sr-line);border-bottom:0;border-radius:var(--sr-r-m) var(--sr-r-m) 0 0;background:var(--sr-sunken);overflow:hidden}
+.student-release .sr-calendar .vx-weekday-labels span {padding:8px 10px;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-month-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--sr-line);border-radius:0 0 var(--sr-r-m) var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
+.student-release .sr-calendar .vx-day-cell {display:flex;flex-direction:column;gap:3px;min-width:0;min-height:92px;padding:6px 8px;border-right:1px solid var(--sr-line);border-bottom:1px solid var(--sr-line);background:var(--sr-surface)}
+.student-release .sr-calendar .vx-day-cell:nth-child(7n) {border-right:0}
+.student-release .sr-calendar .vx-day-cell:nth-last-child(-n+7) {border-bottom:0}
+.student-release .sr-calendar .vx-day-cell.outside {background:var(--sr-sunken);color:var(--sr-muted)}
+.student-release .sr-calendar .vx-day-cell.selected {box-shadow:inset 0 0 0 2px var(--sr-brand)}
+.student-release .sr-calendar .vx-day-heading {display:flex;align-items:center;justify-content:space-between;gap:4px}
+.student-release .sr-calendar .vx-date-button {width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:50%;background:none;color:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer}
+.student-release .sr-calendar .vx-date-button:hover {background:var(--sr-brand-soft);color:var(--sr-brand)}
+.student-release .sr-calendar .vx-date-button.today {background:var(--sr-brand);color:#fff}
+.student-release .sr-calendar .vx-day-count {font-size:12px;color:var(--sr-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.student-release .sr-calendar .vx-calendar-chip {display:block;width:100%;min-height:24px;padding:2px 6px;border:0;border-radius:3px;background:var(--sr-brand-soft);color:var(--sr-brand);font-size:12px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.student-release .sr-calendar .vx-calendar-chip[data-tone=submitted],.student-release .sr-calendar .vx-calendar-chip[data-tone=reviewed] {background:var(--sr-sunken);color:var(--sr-muted);text-decoration:line-through}
+.student-release .sr-calendar .vx-calendar-chip[data-tone=archived] {background:var(--sr-sunken);color:var(--sr-muted)}
+.student-release .sr-calendar .vx-more {min-height:24px;padding:0 6px;border:0;background:none;color:var(--sr-muted);font-size:12px;text-align:left;cursor:pointer}
+.student-release .sr-calendar .vx-more:hover {color:var(--sr-brand)}
+.student-release .sr-calendar .vx-mobile-calendar {display:none}
+.student-release .sr-calendar .vx-week-controls {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
+.student-release .sr-calendar .vx-week-controls p {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-calendar .vx-week-controls .button {min-height:36px;padding:0 10px;font-size:13px}
+.student-release .sr-calendar .vx-week-strip {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.student-release .sr-calendar .vx-week-day {display:flex;flex-direction:column;align-items:center;gap:4px;min-height:76px;min-width:0;padding:8px 0;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);cursor:pointer}
+.student-release .sr-calendar .vx-week-day small {font-size:11px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-week-day strong {font-size:17px;line-height:1.2;font-variant-numeric:tabular-nums}
+.student-release .sr-calendar .vx-week-day span {font-size:11px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-week-day.today {border-color:var(--sr-brand)}
+.student-release .sr-calendar .vx-week-day[aria-pressed=true] {border-color:var(--sr-brand);background:var(--sr-brand-soft)}
+.student-release .sr-calendar .vx-agenda {min-width:0;padding:18px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
+.student-release .sr-calendar .vx-agenda-heading {padding:0 0 12px;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-calendar .vx-agenda-heading h2 {font-size:16px}
+.student-release .sr-calendar .vx-agenda-heading p {margin:4px 0 0;font-size:13px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-time-groups {list-style:none;margin:0;padding:0}
+.student-release .sr-calendar .vx-time-groups>li+li {border-top:1px solid var(--sr-line)}
+.student-release .sr-calendar .vx-deadline-heading {display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 0 6px;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-deadline-heading time {font-weight:600;color:var(--sr-ink);font-variant-numeric:tabular-nums}
+.student-release .sr-calendar .vx-agenda-group-items {list-style:none;margin:0;padding:0;display:grid}
+.student-release .sr-calendar .vx-agenda-group-items li+li {border-top:1px solid var(--sr-line)}
+.student-release .sr-calendar .vx-agenda-event {display:grid;gap:3px;width:100%;padding:10px 0;border:0;background:none;color:var(--sr-ink);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.student-release .sr-calendar .vx-agenda-course {font-size:12px;color:var(--sr-muted);overflow-wrap:anywhere}
+.student-release .sr-calendar .vx-agenda-event strong {font-size:14px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.student-release .sr-calendar .vx-agenda-event:hover strong {color:var(--sr-brand)}
+.student-release .sr-calendar .vx-agenda-meta {display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-eligibility {color:var(--sr-brand)}
+.student-release .sr-calendar .vx-calendar-empty {padding:12px 0 4px}
+.student-release .sr-calendar .vx-calendar-empty h3 {margin:0;font-size:15px;color:var(--sr-ink)}
+.student-release .sr-calendar .vx-calendar-empty p {margin:6px 0 0;font-size:14px;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-calendar-empty h4 {margin:20px 0 4px;padding-top:14px;border-top:1px solid var(--sr-line);font-size:13px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-calendar-empty .button {margin-top:12px}
+.student-release .sr-calendar .vx-eligibility-note {margin:14px 0 0;padding-top:12px;border-top:1px solid var(--sr-line);font-size:12px;line-height:1.6;color:var(--sr-muted)}
+.student-release .sr-calendar .vx-text-action {padding:0;border:0;background:none;color:var(--sr-brand);font-size:12px;cursor:pointer}
+.student-release .sr-calendar .calendar-dialog h2 {overflow-wrap:anywhere}
 
 /* ===== 消息：行密度与操作权重 ===== */
 .student-release .vc-page.vc-inbox .notification-item {padding:14px 14px 14px 56px;gap:0 18px}
@@ -325,7 +438,7 @@
 .student-release .mobile-primary-nav a[aria-current=page] {color:var(--sr-brand);background:var(--sr-brand-soft);border-radius:var(--sr-r-s)}
 
 @media (prefers-reduced-motion:no-preference) {
-  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) :is(a,button,select,li,.task-table-row) {transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease}
+  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) :is(a,button,select,li,.task-table-row) {transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease}
 }
 
 /* ===== ≤1100px：作业行两段式；课程行两段式；章节与作业侧栏落到正文后 ===== */
@@ -344,11 +457,13 @@
   .student-release .sr-courses .course-now {grid-column:1/-1;grid-row:2}
   .student-release .sr-chapter .read-grid {grid-template-columns:minmax(0,1fr);gap:32px}
   .student-release .sr-chapter .reader {max-width:none}
+  .student-release .sr-records .records-grid {grid-template-columns:minmax(0,1fr);gap:36px}
+  .student-release .sr-calendar .vx-time-grid {grid-template-columns:minmax(0,1fr);gap:28px}
 }
 
 /* ===== ≤760px：手机 ===== */
 @media (max-width:760px) {
-  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks) h1 {font-size:25px}
+  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h1 {font-size:25px}
   .student-release .sr-courses .course-filters>label {flex:1 1 140px}
   .student-release .sr-courses .course-filters select {width:100%}
   .student-release .sr-courses .course-count {margin-left:0;flex-basis:100%}
@@ -368,6 +483,25 @@
   .student-release .sr-assignment .tabs {margin-bottom:16px}
   .student-release .sr-assignment .sub-row {flex-direction:column;align-items:flex-start;gap:8px}
   .student-release .sr-assignment .grid-table {display:block;overflow-x:auto}
+  .student-release .sr-records .page-head {grid-template-columns:minmax(0,1fr)}
+  .student-release .sr-records .page-actions {grid-column:1;grid-row:auto}
+  .student-release .sr-records .page-actions select {width:100%;min-width:0}
+  .student-release .sr-records .stats {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .student-release .sr-records .stats>div {padding:12px 14px}
+  .student-release .sr-records .stats>div:nth-child(odd) {padding-left:0;border-left:0}
+  .student-release .sr-records .stats>div:nth-child(-n+2) {border-bottom:1px solid var(--sr-line)}
+  .student-release .sr-records .reco {flex-direction:column;align-items:flex-start;gap:14px;padding:18px}
+  .student-release .sr-records .kp summary {grid-template-columns:72px minmax(0,1fr);gap:8px 10px}
+  .student-release .sr-records .kp summary .meta {grid-column:2;text-align:left}
+  .student-release .sr-records .kp-body {padding-left:0}
+  .student-release .sr-records .pagination {flex-direction:column;align-items:flex-start;gap:10px}
+  .student-release .sr-calendar .page-actions select {width:100%;min-width:0}
+  .student-release .sr-calendar .vx-calendar-toolbar {align-items:flex-start;margin-bottom:14px}
+  .student-release .sr-calendar .vx-month-controls {width:100%}
+  .student-release .sr-calendar .vx-desktop-calendar {display:none}
+  .student-release .sr-calendar .vx-mobile-calendar {display:block}
+  .student-release .sr-calendar .vx-time-grid {gap:20px}
+  .student-release .sr-calendar .vx-agenda {padding:16px}
 }
 
 /* ===== 外壳：224px 白色导航轨 / 56px 画布顶栏 / 1040px 内容列 =====

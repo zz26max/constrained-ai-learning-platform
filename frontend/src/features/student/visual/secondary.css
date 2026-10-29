@@ -1,10 +1,10 @@
 /* Release-only student shell; preview and teacher roots do not receive this class. */
 .student-release{--ink:#1c2d49;--muted:#52627a;--line:#d7dfe9;font-family:"Microsoft YaHei UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif}
-.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks){color:var(--ink);font-size:14px;line-height:1.65}
-.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks) h1{font-size:28px;line-height:1.4;font-weight:700}
-.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks) h2{line-height:1.5}
-.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks) .button{min-height:44px;border-radius:var(--radius-control);font-size:14px}
+.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar){color:var(--ink);font-size:14px;line-height:1.65}
+.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar) h1{font-size:28px;line-height:1.4;font-weight:700}
+.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar) h2{line-height:1.5}
+.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar) .button{min-height:44px;border-radius:var(--radius-control);font-size:14px}
 .student-release .business-main :is(a,button,input,select,textarea,summary):focus-visible{outline:3px solid #2853bc;outline-offset:3px}
 .student-release .business-main :is(h1,h2,h3){overflow-wrap:anywhere}
-.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks) :is(input,select){min-height:44px}
-@media(max-width:760px){.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks) h1{font-size:26px}}
+.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar) :is(input,select){min-height:44px}
+@media(max-width:760px){.student-release .business-main>.workspace-page:not(.vx-page):not(.sr-home):not(.sr-courses):not(.sr-course-home):not(.sr-chapter):not(.sr-tasks):not(.sr-records):not(.sr-calendar) h1{font-size:26px}}

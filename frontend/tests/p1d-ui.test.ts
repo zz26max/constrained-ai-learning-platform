@@ -425,10 +425,48 @@ describe('P1-D 学习记录', () => {
     await page.find('select').setValue(OFFERING_2)
     await flushPromises()
     expect(router?.currentRoute.value.path).toBe(`/student/progress/${OFFERING_2}`)
-    expect(page.text()).toContain('章节学习路径')
+    expect(page.text()).toContain('知识点')
   })
 
-  it('5e. 403/404 显示无法查看并给出返回入口', async () => {
+  it('5e. 知识点按需要练习优先，证据与下一步都能回到作业反馈', async () => {
+    const base = recordsFor(1)
+    const recent = base.recentFeedback!
+    learningRecords = {
+      ...base,
+      knowledgeEvidence: [
+        {
+          knowledgePointId: '00000000-0000-4000-8000-000000000d02', title: 'CSS 布局',
+          assessmentState: 'basically_mastered', ruleVersion: 'knowledge-v2',
+          asOf: '2026-10-14T02:00:00Z', latestEvidenceAt: '2026-10-14T02:00:00Z',
+          evidenceCount: 1, freshness: 'fresh', evidenceIds: ['00000000-0000-4000-8000-000000000e01'],
+          explanation: '已稳定达到预期。',
+          evidence: [{
+            id: '00000000-0000-4000-8000-000000000e01', submissionId: recent.submissionId,
+            feedbackId: recent.id, assignmentId: ASSIGNMENT, assignmentTitle: recent.assignmentTitle,
+            result: 'meets_expectation', note: '结构清晰', occurredAt: '2026-10-14T02:00:00Z',
+          }],
+        },
+        {
+          knowledgePointId: '00000000-0000-4000-8000-000000000d01', title: '盒模型',
+          assessmentState: 'needs_practice', ruleVersion: 'knowledge-v2',
+          asOf: '2026-10-14T02:00:00Z', latestEvidenceAt: '2026-10-14T02:00:00Z',
+          evidenceCount: 0, freshness: 'none', evidenceIds: [], explanation: '最近一次评价显示仍需练习。', evidence: [],
+        },
+      ],
+      nextRecommendation: {
+        knowledgePointId: '00000000-0000-4000-8000-000000000d01', title: '复习盒模型', reason: '先复习盒子尺寸与间距。',
+        sourceFeedbackId: recent.id, evidenceIds: [], target: { type: 'assignment', id: ASSIGNMENT, offeringId: OFFERING },
+      },
+    } as unknown as ReturnType<typeof recordsFor>
+    const page = await open(`/student/progress/${OFFERING}`)
+    expect(page.findAll('.kp summary b').map(item => item.text())).toEqual(['盒模型', 'CSS 布局'])
+    expect(page.text()).toContain('证据较新')
+    expect(page.text()).toContain('复习盒模型')
+    expect(page.get('.kp-evidence a').attributes('href')).toContain(`feedbackId=${recent.id}`)
+    expect(page.get('.reco .button').attributes('href')).toBe(`/student/assignments/${ASSIGNMENT}`)
+  })
+
+  it('5f. 403/404 显示无法查看并给出返回入口', async () => {
     scripted.setHandler(request => request.operationId === 'getMyLearningRecords'
       ? failEnvelope(404, 'NOT_FOUND', {}, 'req-lr-404')
       : normalResponse(request))
