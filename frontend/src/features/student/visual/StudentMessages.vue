@@ -43,7 +43,7 @@ function openLabel(type: NotificationDTO['type']): string {
     <ActionNotice :error="actions.error.value ?? navigateError" :message="actions.message.value" />
 
     <section v-if="query.data.value" aria-label="消息列表">
-      <p v-if="notifications.length === 0" class="empty-state">没有符合条件的消息。切换筛选条件查看其他消息。</p>
+      <p v-if="notifications.length === 0" class="empty-state">暂无消息</p>
 
       <ul v-else ref="listElement" class="msg-list">
         <template v-for="(notification,index) in notifications" :key="notification.id">

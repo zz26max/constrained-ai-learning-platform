@@ -214,8 +214,8 @@ async function submit(): Promise<void> {
           <p v-if="shareQuery.status.value === 'error'" class="field-error" role="alert">AI 对话片段加载失败：{{ shareQuery.error.value?.message }}<button type="button" class="button secondary" @click="shareQuery.load">重试</button></p>
           <p v-else-if="shareQuery.status.value === 'loading'" class="field-note" role="status">正在读取可共享的 AI 回复…</p>
           <template v-else>
-            <div v-if="shareOptions.length > 0" class="tag-options">
-              <label v-for="option in shareOptions" :key="option.requestId" class="check">
+            <div v-if="shareOptions.length > 0" class="tag-options help-shares">
+              <label v-for="option in shareOptions" :key="option.requestId" class="check help-check">
                 <input type="checkbox" :value="option.requestId" :checked="sharedRequests.includes(option.requestId)" @change="toggle(sharedRequests, option.requestId)" />
                 <span>AI 对话片段：{{ option.preview }}…</span>
               </label>
