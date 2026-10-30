@@ -2540,7 +2540,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: implemented
+      x-implementation-status: verified
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
@@ -2572,7 +2572,7 @@ paths:
       tags:
       - teacher
       x-phase: P2
-      x-implementation-status: implemented
+      x-implementation-status: verified
       x-contract-status: reviewed
       x-permission: 本班授课教师
       x-csrf-required: false
