@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
+import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
+import UiFilterTabs from '../../../components/ui/UiFilterTabs.vue'
+import UiPager from '../../../components/ui/UiPager.vue'
 import { beijingDay } from '../../../features/calendar/dates'
 import { formatTime } from '../../../features/courses/format'
-import { MESSAGE_FILTERS, MESSAGE_TYPE_LABELS, useMessageInbox } from '../../notifications/use-message-inbox'
+import { MESSAGE_FILTERS, MESSAGE_TYPE_LABELS, useMessageInbox, type MessageFilterKey } from '../../notifications/use-message-inbox'
 import type { NotificationDTO } from '../../../api/assignments'
 
 // 消息行为（列表/筛选/分页/标读/跳转/徽标）由 useMessageInbox 共享，本组件只保留视觉壳。
@@ -14,6 +17,7 @@ const {
 } = useMessageInbox({ withCourses: true })
 const messageFilters = MESSAGE_FILTERS
 const TYPE_LABELS = MESSAGE_TYPE_LABELS as Record<NotificationDTO['type'], string>
+function setMessageFilter(key: string): void { messageFilter.value = key as MessageFilterKey }
 
 const today = beijingDay(new Date())
 const yesterday = beijingDay(new Date(Date.now() - 86400000))
@@ -37,13 +41,13 @@ function openLabel(type: NotificationDTO['type']): string {
       </div>
     </header>
 
-    <nav class="filter-tabs" aria-label="消息筛选"><button v-for="f in messageFilters" :key="f.key" :aria-pressed="messageFilter===f.key" @click="messageFilter=f.key">{{f.label}}</button></nav>
+    <UiFilterTabs :items="messageFilters" :model-value="messageFilter" label="消息筛选" @update:model-value="setMessageFilter" />
 
     <ApiState v-if="!query.data.value || query.status.value === 'error'" :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <ActionNotice :error="actions.error.value ?? navigateError" :message="actions.message.value" />
 
     <section v-if="query.data.value" aria-label="消息列表">
-      <p v-if="notifications.length === 0" class="empty-state">暂无消息</p>
+      <UiEmptyState v-if="notifications.length === 0">暂无消息</UiEmptyState>
 
       <ul v-else ref="listElement" class="msg-list">
         <template v-for="(notification,index) in notifications" :key="notification.id">
@@ -67,10 +71,7 @@ function openLabel(type: NotificationDTO['type']): string {
         </li></template>
       </ul>
 
-      <nav v-if="totalPages > 1" class="pagination" aria-label="消息分页">
-        <span class="meta">第 {{ currentPage }} / {{ totalPages }} 页</span>
-        <span class="pager"><button type="button" class="button secondary" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">上一页</button><button type="button" class="button secondary" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">下一页</button></span>
-      </nav>
+      <UiPager :page="currentPage" :total="totalPages" label="消息分页" :meta="`第 ${currentPage} / ${totalPages} 页`" @update:page="goToPage" />
     </section>
   </div>
 </template>

@@ -3,6 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { assignmentsApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
+import UiEmptyState from '../../components/ui/UiEmptyState.vue'
+import UiFilterTabs from '../../components/ui/UiFilterTabs.vue'
+import UiPager from '../../components/ui/UiPager.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { formatTime } from '../courses/format'
@@ -29,6 +32,7 @@ watch(() => auth.identity?.id, () => { page.value = 1; void query.load() })
 
 const requests = computed(() => query.data.value?.items ?? [])
 const totalPages = computed(() => Math.max(1, Math.ceil((query.data.value?.total ?? 0) / pageSize)))
+function setStatusFilter(key: string): void { statusFilter.value = key as typeof statusFilter.value }
 
 /** 摘要只有 assignmentId；用我的作业列表把标题补上，避免列表里出现裸 UUID。 */
 const titlesQuery = usePageQuery(async signal => {
@@ -56,14 +60,12 @@ function assignmentTitle(id: string): string {
       </div>
     </header>
 
-    <nav class="filter-tabs" aria-label="求助筛选">
-      <button v-for="f in filters" :key="f.key" :aria-pressed="statusFilter === f.key" @click="statusFilter = f.key">{{ f.label }}</button>
-    </nav>
+    <UiFilterTabs :items="filters" :model-value="statusFilter" label="求助筛选" @update:model-value="setStatusFilter" />
 
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
 
     <section v-if="query.data.value" aria-label="求助列表">
-      <p v-if="requests.length === 0" class="empty-state">没有符合条件的求助。做作业遇到问题时，可以先用 AI 辅导，仍解决不了再问老师。</p>
+      <UiEmptyState v-if="requests.length === 0">没有符合条件的求助。做作业遇到问题时，可以先用 AI 辅导，仍解决不了再问老师。</UiEmptyState>
       <ul v-else class="rows">
         <li v-for="item in requests" :key="item.id">
           <RouterLink class="row" :to="{ name: 'student-help-request', params: { id: item.id } }">
@@ -75,10 +77,7 @@ function assignmentTitle(id: string): string {
           </RouterLink>
         </li>
       </ul>
-      <nav v-if="totalPages > 1" class="pagination" aria-label="求助分页">
-        <span class="meta">第 {{ page }} / {{ totalPages }} 页</span>
-        <span class="pager"><button type="button" class="button secondary" :disabled="page <= 1" @click="page -= 1">上一页</button><button type="button" class="button secondary" :disabled="page >= totalPages" @click="page += 1">下一页</button></span>
-      </nav>
+      <UiPager :page="page" :total="totalPages" label="求助分页" :meta="`第 ${page} / ${totalPages} 页`" @update:page="page = $event" />
     </section>
   </div>
 </template>

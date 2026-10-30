@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { assignmentsApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
@@ -54,7 +55,7 @@ function tagTitle(tag: string): string {
       </div>
     </header>
 
-    <p v-if="helpRequestId === null" class="notice notice-warn" role="alert">求助地址不正确，请从我的求助重新进入。</p>
+    <UiNotice v-if="helpRequestId === null" tone="warn" role="alert">求助地址不正确，请从我的求助重新进入。</UiNotice>
     <template v-else>
       <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
 

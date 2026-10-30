@@ -4,6 +4,9 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi, tutoringApi } from '../../api'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiField from '../../components/ui/UiField.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { runBounded } from '../courses/worker-pool'
 import { useAuthStore } from '../../stores/auth'
@@ -172,23 +175,20 @@ async function submit(): Promise<void> {
       </div>
     </header>
 
-    <p v-if="assignmentId === null" class="notice notice-warn" role="alert">作业地址不正确，请从作业列表重新进入。</p>
+    <UiNotice v-if="assignmentId === null" tone="warn" role="alert">作业地址不正确，请从作业列表重新进入。</UiNotice>
     <template v-else>
       <ApiState :status="assignmentQuery.status.value" :error="assignmentQuery.error.value" @retry="assignmentQuery.load" />
 
       <form v-if="assignmentQuery.status.value === 'success'" class="help-form" @submit.prevent="submit">
-        <label class="field col">
-          <span>标题</span>
+        <UiField label="标题" col>
           <input v-model="title" maxlength="200" required placeholder="一句话说清问题" />
-        </label>
-        <label class="field col">
-          <span>问题描述</span>
+        </UiField>
+        <UiField label="问题描述" col>
           <textarea v-model="content" rows="4" maxlength="8000" required placeholder="现象是什么，你期望的结果是什么" />
-        </label>
-        <label class="field col">
-          <span>实际尝试</span>
+        </UiField>
+        <UiField label="实际尝试" col>
           <textarea v-model="attempt" rows="3" maxlength="8000" required placeholder="已经试过哪些办法，结果如何" />
-        </label>
+        </UiField>
 
         <fieldset v-if="tagsQuery.status.value === 'success' && tagsQuery.data.value" class="tags">
           <legend>问题标签</legend>
@@ -211,7 +211,7 @@ async function submit(): Promise<void> {
             />
             <span>当前工作区代码（版本 {{ workspaceQuery.data.value?.revision ?? '—' }}{{ (workspaceQuery.data.value?.revision ?? 0) < 1 ? '；尚未保存过，无可共享版本' : '' }}）</span>
           </label>
-          <p v-if="shareQuery.status.value === 'error'" class="field-error" role="alert">AI 对话片段加载失败：{{ shareQuery.error.value?.message }}<button type="button" class="button secondary" @click="shareQuery.load">重试</button></p>
+          <p v-if="shareQuery.status.value === 'error'" class="field-error" role="alert">AI 对话片段加载失败：{{ shareQuery.error.value?.message }}<UiButton variant="secondary" @click="shareQuery.load">重试</UiButton></p>
           <p v-else-if="shareQuery.status.value === 'loading'" class="field-note" role="status">正在读取可共享的 AI 回复…</p>
           <template v-else>
             <div v-if="shareOptions.length > 0" class="tag-options help-shares">
@@ -224,7 +224,7 @@ async function submit(): Promise<void> {
             <p v-if="shareQuery.data.value !== null && (shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions || shareQuery.data.value.truncatedSessions > 0)" class="field-note">
               仅显示最近 {{ shareQuery.data.value.loadedSessions }} / 共 {{ shareQuery.data.value.sessionsTotal }} 个会话{{ shareQuery.data.value.truncatedSessions > 0 ? `（其中 ${shareQuery.data.value.truncatedSessions} 个会话仅取最近 ${SHARE_MESSAGE_PAGE_SIZE} 条消息）` : '' }}。
             </p>
-            <button v-if="shareQuery.data.value !== null && shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions" type="button" class="button secondary" :disabled="loadingMore" @click="loadMoreSessions">{{ loadingMore ? '正在加载…' : '加载更多会话' }}</button>
+            <UiButton v-if="shareQuery.data.value !== null && shareQuery.data.value.sessionsTotal > shareQuery.data.value.loadedSessions" variant="secondary" :disabled="loadingMore" @click="loadMoreSessions">{{ loadingMore ? '正在加载…' : '加载更多会话' }}</UiButton>
             <p v-if="shareMoreError" class="field-error" role="alert">{{ shareMoreError }}</p>
           </template>
         </fieldset>
@@ -232,7 +232,7 @@ async function submit(): Promise<void> {
         <p v-if="formError" class="field-error" role="alert">{{ formError }}</p>
         <div class="form-foot">
           <RouterLink class="quiet-link" :to="assignmentId !== null ? { name: 'student-assignment', params: { id: assignmentId } } : { name: 'student-assignments' }">取消</RouterLink>
-          <button type="submit" class="button primary" :disabled="submitting">{{ submitting ? '正在提交…' : '提交求助' }}</button>
+          <UiButton variant="primary" type="submit" :disabled="submitting">{{ submitting ? '正在提交…' : '提交求助' }}</UiButton>
         </div>
       </form>
     </template>
