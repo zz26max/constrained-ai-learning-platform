@@ -4,6 +4,8 @@ import { RouterLink, useRoute, useRouter, type LocationQuery } from 'vue-router'
 import { assignmentsApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { useAssignmentActions } from './use-assignment-actions'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import StudentFeedbackView from './StudentFeedbackView.vue'
@@ -152,10 +154,10 @@ const attemptsText = computed(() => {
         </div>
       </header>
 
-      <p v-if="archived" class="notice notice-info">教学班或作业已归档，作业为只读，工作区不能继续编辑。</p>
+      <UiNotice v-if="archived" tone="info">教学班或作业已归档，作业为只读，工作区不能继续编辑。</UiNotice>
       <ApiState v-if="feedbackQuery.status.value === 'error'" :status="feedbackQuery.status.value" :error="feedbackQuery.error.value" @retry="feedbackQuery.load" />
       <ActionNotice :error="readActions.error.value" :message="readActions.message.value" />
-      <button v-if="readActions.error.value" type="button" class="button secondary" :disabled="readActions.pending.value" @click="markFeedbackRead">重试标记已读</button>
+      <UiButton v-if="readActions.error.value" variant="secondary" :disabled="readActions.pending.value" @click="markFeedbackRead">重试标记已读</UiButton>
 
       <div class="detail-grid">
         <div class="col main">

@@ -17,7 +17,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :aria-pressed="modelValue === item.key"
       @click="emit('update:modelValue', item.key)"
     >
-      {{ item.label }}<span v-if="item.count !== undefined"> {{ item.count }}</span>
+      {{ item.label }}<span v-if="item.count !== undefined">{{ ` ${item.count}` }}</span>
     </button>
   </nav>
 </template>

@@ -5,6 +5,9 @@ import { coursesApi, dashboardApi } from '../../../api'
 import type { LearningRecordsDTO } from '../../../api/dashboard'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
+import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
+import UiField from '../../../components/ui/UiField.vue'
+import UiPager from '../../../components/ui/UiPager.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
 import { isUuid } from '../../../features/assignments/format'
@@ -101,22 +104,19 @@ function goToPage(next: number): void {
         <p class="page-summary">掌握判断只依据已批阅作业里的知识点评价，不代表考试成绩。</p>
       </div>
       <div class="page-actions">
-        <label class="field">课程<select :value="rawId ?? ''" :disabled="offeringsQuery.status.value !== 'success'" @change="router.push({name:'student-progress',params:{offeringId:($event.target as HTMLSelectElement).value}})"><option v-if="selecting || !currentCourse" value="">选择课程</option><option v-for="course in offeringsQuery.data.value?.items" :key="course.offeringId" :value="course.offeringId">{{ course.title }} · {{ course.groupName }}</option></select></label>
+        <UiField label="课程">
+          <select :value="rawId ?? ''" :disabled="offeringsQuery.status.value !== 'success'" @change="router.push({name:'student-progress',params:{offeringId:($event.target as HTMLSelectElement).value}})"><option v-if="selecting || !currentCourse" value="">选择课程</option><option v-for="course in offeringsQuery.data.value?.items" :key="course.offeringId" :value="course.offeringId">{{ course.title }} · {{ course.groupName }}</option></select>
+        </UiField>
       </div>
     </header>
 
     <ApiState v-if="offeringsQuery.status.value === 'error'" :status="offeringsQuery.status.value" :error="offeringsQuery.error.value" @retry="offeringsQuery.load" />
-    <section v-else-if="invalidLink || restricted" class="empty-state" role="alert">
-      <h2>无法查看该教学班的学习记录</h2>
-      <p v-if="invalidLink">链接无效，请从课程列表重新进入。</p>
-      <p v-else>目标不是你可查看的教学班。</p>
+    <UiEmptyState v-else-if="invalidLink || restricted" role="alert" title="无法查看该教学班的学习记录" :description="invalidLink ? '链接无效，请从课程列表重新进入。' : '目标不是你可查看的教学班。'">
       <RouterLink class="button secondary" to="/student/progress">返回学习记录</RouterLink>
-    </section>
-    <section v-else-if="offeringsQuery.status.value === 'success' && !offeringsQuery.data.value?.items.length" class="empty-state">
-      <h2>学习足迹，从第一门课程开始。</h2>
-      <p>尚未加入教学班，请前往课程页了解课程。</p>
+    </UiEmptyState>
+    <UiEmptyState v-else-if="offeringsQuery.status.value === 'success' && !offeringsQuery.data.value?.items.length" title="学习足迹，从第一门课程开始。" description="尚未加入教学班，请前往课程页了解课程。">
       <RouterLink class="button secondary" to="/course">查看我的课程 →</RouterLink>
-    </section>
+    </UiEmptyState>
     <template v-else-if="!selecting">
       <ApiState :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
       <template v-if="recordsQuery.status.value === 'success' && records">
@@ -183,10 +183,7 @@ function goToPage(next: number): void {
                   </RouterLink>
                 </li>
               </ul>
-              <nav v-if="totalPages > 1" class="pagination" aria-label="评价历史分页">
-                <span class="meta">第 {{ page }} / {{ totalPages }} 页</span>
-                <span class="pager"><button class="button secondary" :disabled="page <= 1" @click="goToPage(page - 1)">上一页</button><button class="button secondary" :disabled="page >= totalPages" @click="goToPage(page + 1)">下一页</button></span>
-              </nav>
+              <UiPager :page="page" :total="totalPages" label="评价历史分页" :meta="`第 ${page} / ${totalPages} 页`" @update:page="goToPage" />
             </template>
           </section>
         </div>
