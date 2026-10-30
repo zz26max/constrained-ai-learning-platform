@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
+import AssignmentCommonIssues from './AssignmentCommonIssues.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { formatDueTime, isUuid } from './format'
@@ -109,6 +110,7 @@ async function archiveAssignment(id: string): Promise<void> {
                 </button>
               </div>
             </RouterLink>
+            <AssignmentCommonIssues :assignment-id="assignment.id" />
           </li>
         </ul>
       </section>

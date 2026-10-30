@@ -86,6 +86,13 @@ const restricted = computed(() => {
 })
 const knowledge = computed(() => [...(records.value?.knowledgeEvidence ?? [])]
   .sort((a, b) => STATE_ORDER.indexOf(a.assessmentState) - STATE_ORDER.indexOf(b.assessmentState)))
+const OVERVIEW_ORDER: KnowledgeAssessment['assessmentState'][] = ['basically_mastered', 'learning', 'needs_practice', 'insufficient_evidence']
+const masteryLegend = computed(() => OVERVIEW_ORDER.map(state => ({
+  state,
+  label: ASSESSMENT_LABELS[state],
+  count: knowledge.value.filter(item => item.assessmentState === state).length,
+})))
+const masterySegments = computed(() => masteryLegend.value.filter(segment => segment.count > 0))
 const feedbackItems = computed(() => records.value?.feedbackPage.items ?? [])
 const totalPages = computed(() => Math.max(1, Math.ceil((records.value?.feedbackPage.total ?? 0) / PAGE_SIZE)))
 const recommendationLink = computed(() => {
@@ -150,25 +157,36 @@ function chooseCourse(offeringId: string): void {
               <span v-if="knowledge.length" class="meta">规则 {{ knowledge[0]?.ruleVersion }} · {{ formatTime(knowledge[0]!.asOf) }} 计算</span>
             </div>
             <p v-if="!knowledge.length" class="col-empty">这门课没有配置知识点。教师给作业关联知识点并发布评价后，这里会显示掌握情况。</p>
-            <div v-else class="kp-list">
-              <details v-for="item in knowledge" :key="item.knowledgePointId" class="kp">
-                <summary>
-                  <span class="kstate" :data-state="item.assessmentState">{{ ASSESSMENT_LABELS[item.assessmentState] }}</span>
-                  <b>{{ item.title }}</b>
-                  <span class="meta">{{ item.evidenceCount }} 条证据 · {{ FRESHNESS_LABELS[item.freshness] }}</span>
-                </summary>
-                <div class="kp-body">
-                  <p>{{ item.explanation }}</p>
-                  <ul v-if="item.evidence.length" class="kp-evidence">
-                    <li v-for="evidence in item.evidence" :key="evidence.id">
-                      <span class="kres" :data-result="evidence.result">{{ RESULT_LABELS[evidence.result] }}</span>
-                      <RouterLink :to="{ name: 'student-assignment', params: { id: evidence.assignmentId }, query: { feedbackId: evidence.feedbackId } }">{{ evidence.assignmentTitle }}</RouterLink>
-                      <span class="meta">{{ formatTime(evidence.occurredAt) }}<template v-if="evidence.note"> · {{ evidence.note }}</template></span>
-                    </li>
-                  </ul>
+            <template v-else>
+              <div class="mastery-overview" aria-label="知识点掌握概览">
+                <div class="mastery-bar" aria-hidden="true">
+                  <span v-for="segment in masterySegments" :key="segment.state" :data-state="segment.state" :style="{ flexGrow: segment.count }"></span>
                 </div>
-              </details>
-            </div>
+                <ul class="mastery-legend">
+                  <li v-for="segment in masteryLegend" :key="segment.state" :data-state="segment.state"><i aria-hidden="true"></i>{{ segment.label }}<b>{{ segment.count }}</b></li>
+                </ul>
+                <p class="mastery-note">共 {{ knowledge.length }} 个知识点，颜色越深表示掌握程度越高。</p>
+              </div>
+              <div class="kp-list">
+                <details v-for="item in knowledge" :key="item.knowledgePointId" class="kp">
+                  <summary>
+                    <span class="kstate" :data-state="item.assessmentState">{{ ASSESSMENT_LABELS[item.assessmentState] }}</span>
+                    <b>{{ item.title }}</b>
+                    <span class="meta">{{ item.evidenceCount }} 条证据 · {{ FRESHNESS_LABELS[item.freshness] }}</span>
+                  </summary>
+                  <div class="kp-body">
+                    <p>{{ item.explanation }}</p>
+                    <ul v-if="item.evidence.length" class="kp-evidence">
+                      <li v-for="evidence in item.evidence" :key="evidence.id">
+                        <span class="kres" :data-result="evidence.result">{{ RESULT_LABELS[evidence.result] }}</span>
+                        <RouterLink :to="{ name: 'student-assignment', params: { id: evidence.assignmentId }, query: { feedbackId: evidence.feedbackId } }">{{ evidence.assignmentTitle }}</RouterLink>
+                        <span class="meta">{{ formatTime(evidence.occurredAt) }}<template v-if="evidence.note"> · {{ evidence.note }}</template></span>
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+              </div>
+            </template>
           </section>
 
           <section class="col feedback vx-feedback" aria-labelledby="feedback-title">

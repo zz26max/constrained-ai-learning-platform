@@ -53,7 +53,10 @@ onBeforeUnmount(closeArchive)
     <RouterLink class="teacher-back" to="/teacher">返回授课教学班</RouterLink>
     <header class="workspace-heading">
       <div><h1 tabindex="-1">{{ data?.title ?? '教学班工作台' }}</h1><p v-if="data">{{ data.groupName }} · {{ data.termLabel }} · {{ data.teachers.map(teacher => teacher.displayName).join('、') }}</p><p v-else>管理当前教学班的课程内容与成员。</p></div>
-      <button type="button" class="button secondary" :disabled="readOnly" @click="openArchive">归档教学班</button>
+      <div class="workspace-heading-actions">
+        <RouterLink class="button secondary" :to="{ name: 'teacher-analytics', params: { id } }">学习分析</RouterLink>
+        <button type="button" class="button secondary" :disabled="readOnly" @click="openArchive">归档教学班</button>
+      </div>
     </header>
     <section class="stat-cards" aria-label="班级统计">
       <RouterLink class="button" :to="{ name: 'teacher-assignments', params: { offeringId: id } }">作业管理与批阅</RouterLink>

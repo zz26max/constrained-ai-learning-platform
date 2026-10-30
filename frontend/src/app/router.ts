@@ -31,6 +31,7 @@ import HelpRequestDetailPage from '../features/help/HelpRequestDetailPage.vue'
 import HelpRequestCreatePage from '../features/help/HelpRequestCreatePage.vue'
 import TeacherHelpRequestPage from '../features/teacher/TeacherHelpRequestPage.vue'
 import TeacherStudentProgressPage from '../features/teacher/TeacherStudentProgressPage.vue'
+import TeacherAnalyticsPage from '../features/teacher/TeacherAnalyticsPage.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -93,6 +94,7 @@ const routes: RouteRecordRaw[] = [
   { name: 'teacher-feedback', path: '/teacher/submissions/:submissionId/feedback', component: TeacherFeedbackEditor, meta: { requiresAuth: true, requiresRole: 'teacher', title: '批阅作业 · 学习空间' } },
   { name: 'teacher', path: '/teacher', component: TeacherOfferingsPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学班 · 学习空间' } },
   { name: 'teacher-offering', path: '/teacher/offerings/:id', component: TeacherOfferingPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '教学工作台 · 学习空间' } },
+  { name: 'teacher-analytics', path: '/teacher/offerings/:id/analytics', component: TeacherAnalyticsPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '学习分析 · 学习空间' } },
   { name: 'teacher-help-request', path: '/teacher/help-requests/:id', component: TeacherHelpRequestPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '求助处理 · 学习空间' } },
   { name: 'teacher-student-progress', path: '/teacher/offerings/:offeringId/students/:studentId/progress', component: TeacherStudentProgressPage, meta: { requiresAuth: true, requiresRole: 'teacher', title: '学生学习记录 · 学习空间' } },
   { name: 'teacher-assignments', path: '/teacher/offerings/:offeringId/assignments', component: AssignmentManagement, meta: { requiresAuth: true, requiresRole: 'teacher', title: '作业管理 · 学习空间' } },

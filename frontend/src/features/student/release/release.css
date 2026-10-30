@@ -304,6 +304,22 @@
 .student-release .sr-records .col-head h2 {font-size:16px;font-weight:650}
 .student-release .sr-records .col-head .meta {font-size:12px;color:var(--sr-muted);text-align:right}
 .student-release .sr-records .col-empty {margin:12px 0 0;font-size:14px;line-height:1.65;color:var(--sr-muted)}
+.student-release .sr-records .mastery-overview {display:grid;gap:8px;margin:12px 0 14px;padding:12px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-surface)}
+.student-release .sr-records .mastery-bar {display:flex;gap:2px;height:8px;overflow:hidden;border-radius:4px;background:var(--sr-sunken)}
+.student-release .sr-records .mastery-bar span {display:block;min-width:0}
+.student-release .sr-records .mastery-bar span[data-state=basically_mastered] {background:var(--mastery-4)}
+.student-release .sr-records .mastery-bar span[data-state=learning] {background:var(--mastery-3)}
+.student-release .sr-records .mastery-bar span[data-state=needs_practice] {background:var(--mastery-2)}
+.student-release .sr-records .mastery-bar span[data-state=insufficient_evidence] {background:var(--mastery-1)}
+.student-release .sr-records .mastery-legend {display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0;list-style:none;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-records .mastery-legend li {display:flex;align-items:center;gap:6px}
+.student-release .sr-records .mastery-legend i {width:9px;height:9px;border-radius:2px}
+.student-release .sr-records .mastery-legend i[data-state=basically_mastered] {background:var(--mastery-4)}
+.student-release .sr-records .mastery-legend i[data-state=learning] {background:var(--mastery-3)}
+.student-release .sr-records .mastery-legend i[data-state=needs_practice] {background:var(--mastery-2)}
+.student-release .sr-records .mastery-legend i[data-state=insufficient_evidence] {background:var(--mastery-1)}
+.student-release .sr-records .mastery-legend b {font-weight:600;color:var(--sr-ink);font-variant-numeric:tabular-nums}
+.student-release .sr-records .mastery-note {margin:0;font-size:12px;color:var(--sr-muted)}
 .student-release .sr-records .kp {border-bottom:1px solid var(--sr-line)}
 .student-release .sr-records .kp summary {display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:54px;padding:8px 0;cursor:pointer;list-style:none;font-size:14px}
 .student-release .sr-records .kp summary::-webkit-details-marker {display:none}
