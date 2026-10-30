@@ -5,6 +5,8 @@ import { tutoringApi } from '../../api'
 import type { TutoringMessageDTO, TutoringSessionDTO } from '../../api/tutoring'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiField from '../../components/ui/UiField.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { useTutoringPoll } from './use-tutoring-poll'
@@ -189,9 +191,9 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                 会话 · {{ new Date(session.createdAt).toLocaleDateString('zh-CN') }}
               </button>
             </div>
-            <button type="button" class="quiet-btn" :disabled="creatingSession" @click="startSession">
+            <UiButton variant="quiet" :disabled="creatingSession" @click="startSession">
               {{ creatingSession ? '正在创建…' : '+ 新会话' }}
-            </button>
+            </UiButton>
           </div>
 
           <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
@@ -224,20 +226,18 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                   <span>{{ label }}</span>
                 </label>
               </div>
-              <label class="field col">
-                <span>你的问题</span>
+              <UiField label="你的问题" col>
                 <textarea v-model="content" rows="2" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
-              </label>
-              <label class="field col">
-                <span>实际尝试（第 {{ policy.requireAttemptFromLevel }} 级起必填）</span>
+              </UiField>
+              <UiField :label="`实际尝试（第 ${policy.requireAttemptFromLevel} 级起必填）`" col>
                 <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />
-              </label>
+              </UiField>
               <p v-if="actionError" class="field-error" role="alert">{{ actionError }}</p>
               <div class="composer-foot">
                 <span class="meta">提示最多 {{ policy.maxHintLevel }} 级</span>
-                <button type="submit" class="button primary" :disabled="sending || poll.state.value === 'polling'">
+                <UiButton variant="primary" type="submit" :disabled="sending || poll.state.value === 'polling'">
                   {{ poll.state.value === 'polling' ? '等待回复…' : sending ? '正在发送…' : '发送' }}
-                </button>
+                </UiButton>
               </div>
             </fieldset>
           </form>

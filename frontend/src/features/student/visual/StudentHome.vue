@@ -12,6 +12,7 @@ import type { AssignmentDetailDTO } from '../../../api/assignments'
 import { formatTime } from '../../../features/courses/format'
 
 import ApiState from '../../../components/ApiState.vue'
+import UiButton from '../../../components/ui/UiButton.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { chapterOverview } from '../../../features/dashboard/bplus-presentation'
 import { useAuthStore } from '../../../stores/auth'
@@ -125,7 +126,7 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
               </div>
               <p v-if="tasksQuery.data.value?.unconfirmed" class="focus-unconfirmed" role="status">
                 另有 {{ tasksQuery.data.value.unconfirmed }} 项任务状态未能确认，已按可确认结果展示。
-                <button type="button" class="quiet-btn" @click="tasksQuery.load">重试</button>
+                <UiButton variant="quiet" @click="tasksQuery.load">重试</UiButton>
               </p>
             </template>
 
@@ -133,10 +134,10 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
               <h2 id="explore-focus-title">任务状态未能完全确认</h2>
               <p class="focus-empty-text">另有 {{ tasksQuery.data.value.unconfirmed }} 项待办的提交资格未能确认，确认前不假设其可提交或不可提交。</p>
               <div class="focus-actions">
-                <button type="button" class="button secondary" @click="tasksQuery.load">重试确认</button>
+                <UiButton variant="secondary" @click="tasksQuery.load">重试确认</UiButton>
                 <RouterLink to="/student/assignments">查看全部待办</RouterLink>
               </div>
-              <p v-if="chaptersFailed" class="focus-unconfirmed">章节进度未能确认。<template v-if="chaptersQuery.error.value?.requestId">requestId: {{ chaptersQuery.error.value.requestId }}。 </template><button type="button" class="quiet-btn" @click="chaptersQuery.load">重新加载</button></p>
+              <p v-if="chaptersFailed" class="focus-unconfirmed">章节进度未能确认。<template v-if="chaptersQuery.error.value?.requestId">requestId: {{ chaptersQuery.error.value.requestId }}。 </template><UiButton variant="quiet" @click="chaptersQuery.load">重新加载</UiButton></p>
             </template>
 
             <template v-else>
@@ -146,7 +147,7 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
                 <RouterLink class="button primary bplus-course-action" data-home-action="primary" :to="bplusCourseAction.to">{{ bplusCourseAction.label }}</RouterLink>
                 <RouterLink to="/student/assignments">查看全部待办</RouterLink>
               </div>
-              <p v-if="chaptersFailed" class="focus-unconfirmed">章节进度未能确认，已按课程页入口处理。<template v-if="chaptersQuery.error.value?.requestId">requestId: {{ chaptersQuery.error.value.requestId }}。 </template><button type="button" class="quiet-btn" @click="chaptersQuery.load">重新加载</button></p>
+              <p v-if="chaptersFailed" class="focus-unconfirmed">章节进度未能确认，已按课程页入口处理。<template v-if="chaptersQuery.error.value?.requestId">requestId: {{ chaptersQuery.error.value.requestId }}。 </template><UiButton variant="quiet" @click="chaptersQuery.load">重新加载</UiButton></p>
             </template>
           </template>
         </section>

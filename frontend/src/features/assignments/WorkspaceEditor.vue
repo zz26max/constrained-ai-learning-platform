@@ -5,6 +5,8 @@ import { assignmentsApi } from '../../api'
 import type { WorkspaceWrite } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { useDebouncedSave } from './use-debounced-save'
@@ -280,24 +282,23 @@ onBeforeUnmount(() => {
         <span v-else-if="saveState.lastSavedRevision > 0">已保存 · r{{ saveState.lastSavedRevision }}</span>
         <span v-else>还没有保存</span>
       </span>
-      <button
-        type="button"
-        class="button primary"
+      <UiButton
+        variant="primary"
         :disabled="!canSubmit"
         @click="openSubmitDialog"
       >
         提交作业
-      </button>
+      </UiButton>
     </header>
 
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <ApiState v-if="assignmentQuery.status.value === 'error'" :status="assignmentQuery.status.value" :error="assignmentQuery.error.value" @retry="assignmentQuery.load" />
     <ActionNotice :error="actions.error.value" :message="actions.message.value" />
 
-    <p v-if="saveState.error" class="notice notice-error" role="alert">
+    <UiNotice v-if="saveState.error" tone="error">
       {{ saveState.error }}
-    </p>
-    <button v-if="saveState.paused" type="button" class="button secondary" :disabled="saveState.recovering || saveState.saving || auth.phase !== 'authenticated'" @click="recover">读取服务端并恢复保存</button>
+    </UiNotice>
+    <UiButton v-if="saveState.paused" variant="secondary" :disabled="saveState.recovering || saveState.saving || auth.phase !== 'authenticated'" @click="recover">读取服务端并恢复保存</UiButton>
     <section v-if="saveState.serverSnapshot" class="conflict" aria-label="比较工作区版本">
       <h2>服务端版本 r{{ saveState.serverSnapshot.revision }}</h2>
       <p class="meta">本地作品保留在下方编辑器。比较后可编辑合并，再明确保存。</p>
@@ -306,18 +307,18 @@ onBeforeUnmount(() => {
         <pre>{{ file.content }}</pre>
       </details>
       <div class="conflict-actions">
-        <button class="button" type="button" :disabled="!saveState.serverSnapshot.canSave || saveState.recovering" @click="resolveConflict(currentDraft())">确认保存编辑器中的合并结果</button>
-        <button class="button secondary" type="button" :disabled="saveState.recovering" @click="restoreServer">放弃本地文件，恢复服务端版本</button>
+        <UiButton :disabled="!saveState.serverSnapshot.canSave || saveState.recovering" @click="resolveConflict(currentDraft())">确认保存编辑器中的合并结果</UiButton>
+        <UiButton variant="secondary" :disabled="saveState.recovering" @click="restoreServer">放弃本地文件，恢复服务端版本</UiButton>
       </div>
     </section>
 
-    <p v-if="canSave && submitBlockedText" class="notice notice-info" role="status">
+    <UiNotice v-if="canSave && submitBlockedText" tone="info" role="status">
       暂不能正式提交：{{ submitBlockedText }}。仍可保存练习内容。
-    </p>
+    </UiNotice>
 
-    <p v-if="query.data.value && !canSave" class="notice notice-info">
+    <UiNotice v-if="query.data.value && !canSave" tone="info">
       {{ query.data.value.saveBlockedReason === 'OFFERING_ARCHIVED' ? '教学班已归档' : '作业已归档' }}，工作区为只读。
-    </p>
+    </UiNotice>
 
     <template v-if="query.status.value === 'success' && query.data.value">
       <div class="file-tabs" role="tablist" aria-label="文件切换">
@@ -381,25 +382,23 @@ onBeforeUnmount(() => {
       </label>
 
       <ActionNotice :error="actions.error.value" :message="null" />
-      <p v-if="submitFailure" class="notice notice-error" role="alert">{{ submitFailure }}</p>
+      <UiNotice v-if="submitFailure" tone="error">{{ submitFailure }}</UiNotice>
 
       <div class="teacher-dialog-actions">
-        <button
-          type="button"
-          class="button secondary"
+        <UiButton
+          variant="secondary"
           :disabled="frozen"
           @click="closeSubmitDialog"
         >
           取消
-        </button>
-        <button
-          type="button"
-          class="button primary"
+        </UiButton>
+        <UiButton
+          variant="primary"
           :disabled="actions.pending.value || submitting || !confirmSubmit || !reflection.trim()"
           @click="submitAssignment"
         >
           {{ submitting ? '正在保存最新修改...' : actions.pending.value ? '正在提交...' : '确认提交' }}
-        </button>
+        </UiButton>
       </div>
     </dialog>
     <dialog ref="leaveDialog" class="teacher-dialog" aria-labelledby="leave-title" @cancel.prevent="finishLeave(false)">
@@ -407,9 +406,9 @@ onBeforeUnmount(() => {
       <p>可以等待文件保存、留在页面处理，或明确放弃本地修改。</p>
       <p v-if="reflection">反思只随正式提交保存。请留在页面完成提交，或明确放弃反思。</p>
       <p v-if="saveState.error" role="alert">{{ saveState.error }}</p>
-      <button type="button" class="button" :disabled="leaveBusy" @click="waitAndLeave">等待保存</button>
-      <button type="button" class="button secondary" :disabled="leaveBusy" @click="finishLeave(false)">留在页面</button>
-      <button type="button" class="button secondary" :disabled="leaveBusy" @click="finishLeave(true)">放弃修改并离开</button>
+      <UiButton :disabled="leaveBusy" @click="waitAndLeave">等待保存</UiButton>
+      <UiButton variant="secondary" :disabled="leaveBusy" @click="finishLeave(false)">留在页面</UiButton>
+      <UiButton variant="secondary" :disabled="leaveBusy" @click="finishLeave(true)">放弃修改并离开</UiButton>
     </dialog>
   </div>
 </template>

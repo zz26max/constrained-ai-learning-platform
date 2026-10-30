@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import TutoringPanel from '../tutoring/TutoringPanel.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { isUuid } from '../assignments/format'
 
 const route = useRoute()
@@ -24,7 +25,7 @@ const assignmentId = computed(() => {
       </p>
     </header>
 
-    <p v-if="assignmentId === null" class="notice notice-warn" role="alert">作业地址不正确，请从作业列表重新进入。</p>
+    <UiNotice v-if="assignmentId === null" tone="warn" role="alert">作业地址不正确，请从作业列表重新进入。</UiNotice>
     <TutoringPanel v-else :assignment-id="assignmentId" />
   </div>
 </template>

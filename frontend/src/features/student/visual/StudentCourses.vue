@@ -5,6 +5,8 @@ import { coursesApi, type MyCoursesQuery } from '../../../api'
 import { useAuthStore } from '../../../stores/auth'
 import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
+import UiButton from '../../../components/ui/UiButton.vue'
+import UiPager from '../../../components/ui/UiPager.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { useCourseActions } from '../../../features/courses/use-course-actions'
 import type { CourseSummaryDTO } from '../../../api/courses'
@@ -21,6 +23,8 @@ const query = usePageQuery(async signal => {
   return { items: items.sort(byRecentStudy), total: items.length }
 })
 const visibleCourses = computed(() => query.data.value?.items.slice((page.value - 1) * 20, page.value * 20) ?? [])
+const totalPages = computed(() => Math.max(1, Math.ceil((query.data.value?.total ?? 0) / 20)))
+function goToPage(next: number) { page.value = next }
 watch([termId, courseStatus], () => { page.value = 1 })
 watch([termId, courseStatus], () => { void query.load() }, { immediate: true })
 const actions = useCourseActions(), inviteCode = ref(''), joinDialog = ref<HTMLDialogElement | null>(null), joinTrigger = ref<HTMLButtonElement | null>(null)
@@ -88,8 +92,8 @@ function hasProgress(course: CourseSummaryDTO) { return course.progress.total > 
           <RouterLink class="course-go vx-course-primary" :to="learningEntry(course)" :aria-label="'学习课程：' + course.title">{{ actionFor(course) }} →</RouterLink>
         </li>
       </ul>
-      <nav v-if="query.data.value.total > 20" class="pagination" aria-label="课程分页"><button class="button secondary" :disabled="page <= 1" @click="page -= 1">上一页</button><span>第 {{ page }} 页</span><button class="button secondary" :disabled="page * 20 >= query.data.value.total" @click="page += 1">下一页</button></nav>
+      <UiPager :page="page" :total="totalPages" label="课程分页" :meta="`第 ${page} / ${totalPages} 页`" @update:page="goToPage" />
     </template>
-    <dialog ref="joinDialog" class="workspace-dialog" aria-labelledby="join-title" @cancel="inviteCode = ''" @close="joinTrigger?.focus()"><form @submit.prevent="join"><h2 id="join-title">加入课程</h2><label>课程邀请码<input v-model="inviteCode" autocomplete="off" required :disabled="actions.pending.value" /></label><p class="muted">请输入教师提供的邀请码。无效、过期或撤销的邀请码都会显示为不可用。</p><ActionNotice :error="actions.error.value" :message="null" /><div class="form-actions"><button class="button" :disabled="actions.pending.value || !inviteCode.trim()">{{ actions.pending.value ? '正在加入…' : '确认加入' }}</button><button type="button" class="button secondary" @click="closeJoin">取消</button></div></form></dialog>
+    <dialog ref="joinDialog" class="workspace-dialog" aria-labelledby="join-title" @cancel="inviteCode = ''" @close="joinTrigger?.focus()"><form @submit.prevent="join"><h2 id="join-title">加入课程</h2><label>课程邀请码<input v-model="inviteCode" autocomplete="off" required :disabled="actions.pending.value" /></label><p class="muted">请输入教师提供的邀请码。无效、过期或撤销的邀请码都会显示为不可用。</p><ActionNotice :error="actions.error.value" :message="null" /><div class="form-actions"><UiButton type="submit" :disabled="actions.pending.value || !inviteCode.trim()">{{ actions.pending.value ? '正在加入…' : '确认加入' }}</UiButton><UiButton variant="secondary" @click="closeJoin">取消</UiButton></div></form></dialog>
   </div>
 </template>
