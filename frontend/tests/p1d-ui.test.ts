@@ -193,14 +193,21 @@ describe('P1-D 路由与首页', () => {
     expect(view.get('.explore-focus').text()).toContain('重试确认')
     expect(view.get('.explore-focus').text()).toContain('重试')
     expect(view.find('[data-home-action=primary]').exists()).toBe(false)
-    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在课程卡内呈现。
-    expect(view.get('.explore-courses').text()).toContain('req-chapters')
-    expect(view.get('.explore-courses').text()).toContain('重新加载')
+    // F6：任务详情降级后任务列表仍算成功加载；章节失败的错误与重试在焦点卡内呈现。
+    expect(view.get('.explore-focus').text()).toContain('req-chapters')
+    expect(view.get('.explore-focus').text()).toContain('重新加载')
     wrapper?.unmount()
     scripted.setHandler(r=>r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
     const chapters=await open('/student/home')
-    expect(chapters.get('.explore-courses').text()).toContain('req-chapters')
-    expect(chapters.get('.bplus-course-action').text()).toContain('查看课程')
+    // 有可提交任务时，章节预加载失败只影响课程入口回退，不打扰焦点任务。
+    expect(chapters.get('#explore-focus-title').text()).toBe('逾期实验')
+    expect(chapters.find('.focus-unconfirmed').exists()).toBe(false)
+    wrapper?.unmount()
+    scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):r.operationId==='listChapters'?failEnvelope(503,'SERVICE_UNAVAILABLE',{},'req-chapters'):normalResponse(r))
+    const fallback=await open('/student/home')
+    expect(fallback.get('.explore-focus').text()).toContain('req-chapters')
+    expect(fallback.get('.explore-focus').text()).toContain('重新加载')
+    expect(fallback.get('.bplus-course-action').text()).toContain('查看课程')
   })
   it('正式首页无资格待办时保留课程入口，不虚构学习进度',async()=>{
     scripted.setHandler(r=>r.operationId==='getAssignment'?okEnvelope({...summary(ASSIGNMENT_2),canSubmit:false}):normalResponse(r))
@@ -418,10 +425,48 @@ describe('P1-D 学习记录', () => {
     await page.find('select').setValue(OFFERING_2)
     await flushPromises()
     expect(router?.currentRoute.value.path).toBe(`/student/progress/${OFFERING_2}`)
-    expect(page.text()).toContain('章节学习路径')
+    expect(page.text()).toContain('知识点')
   })
 
-  it('5e. 403/404 显示无法查看并给出返回入口', async () => {
+  it('5e. 知识点按需要练习优先，证据与下一步都能回到作业反馈', async () => {
+    const base = recordsFor(1)
+    const recent = base.recentFeedback!
+    learningRecords = {
+      ...base,
+      knowledgeEvidence: [
+        {
+          knowledgePointId: '00000000-0000-4000-8000-000000000d02', title: 'CSS 布局',
+          assessmentState: 'basically_mastered', ruleVersion: 'knowledge-v2',
+          asOf: '2026-10-14T02:00:00Z', latestEvidenceAt: '2026-10-14T02:00:00Z',
+          evidenceCount: 1, freshness: 'fresh', evidenceIds: ['00000000-0000-4000-8000-000000000e01'],
+          explanation: '已稳定达到预期。',
+          evidence: [{
+            id: '00000000-0000-4000-8000-000000000e01', submissionId: recent.submissionId,
+            feedbackId: recent.id, assignmentId: ASSIGNMENT, assignmentTitle: recent.assignmentTitle,
+            result: 'meets_expectation', note: '结构清晰', occurredAt: '2026-10-14T02:00:00Z',
+          }],
+        },
+        {
+          knowledgePointId: '00000000-0000-4000-8000-000000000d01', title: '盒模型',
+          assessmentState: 'needs_practice', ruleVersion: 'knowledge-v2',
+          asOf: '2026-10-14T02:00:00Z', latestEvidenceAt: '2026-10-14T02:00:00Z',
+          evidenceCount: 0, freshness: 'none', evidenceIds: [], explanation: '最近一次评价显示仍需练习。', evidence: [],
+        },
+      ],
+      nextRecommendation: {
+        knowledgePointId: '00000000-0000-4000-8000-000000000d01', title: '复习盒模型', reason: '先复习盒子尺寸与间距。',
+        sourceFeedbackId: recent.id, evidenceIds: [], target: { type: 'assignment', id: ASSIGNMENT, offeringId: OFFERING },
+      },
+    } as unknown as ReturnType<typeof recordsFor>
+    const page = await open(`/student/progress/${OFFERING}`)
+    expect(page.findAll('.kp summary b').map(item => item.text())).toEqual(['盒模型', 'CSS 布局'])
+    expect(page.text()).toContain('证据较新')
+    expect(page.text()).toContain('复习盒模型')
+    expect(page.get('.kp-evidence a').attributes('href')).toContain(`feedbackId=${recent.id}`)
+    expect(page.get('.reco .button').attributes('href')).toBe(`/student/assignments/${ASSIGNMENT}`)
+  })
+
+  it('5f. 403/404 显示无法查看并给出返回入口', async () => {
     scripted.setHandler(request => request.operationId === 'getMyLearningRecords'
       ? failEnvelope(404, 'NOT_FOUND', {}, 'req-lr-404')
       : normalResponse(request))

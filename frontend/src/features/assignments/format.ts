@@ -2,6 +2,15 @@ import type { components } from '../../api/generated/schema'
 
 type AssignmentState = components['schemas']['AssignmentState']
 
+export function assignmentTypeLabel(type: string | null | undefined): string {
+  switch (type) {
+    case 'web_lab': return '网页实验'
+    case 'sql_text': return 'SQL 作业'
+    case 'text': return '文本作业'
+    default: return ''
+  }
+}
+
 export function assignmentStateLabel(state: AssignmentState): string {
   switch (state) {
     case 'NOT_STARTED': return '未开始'

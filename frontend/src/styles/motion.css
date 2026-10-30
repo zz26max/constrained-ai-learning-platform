@@ -65,6 +65,15 @@
     transform: translateX(3px);
   }
 
+  /* 弹层：遮罩淡入、面板轻微上浮；关闭保持即时，不阻塞交互 */
+  .student-release dialog[open] { animation: m6-dialog-enter var(--dur-enter) var(--ease-out) backwards; }
+  .student-release dialog[open]::backdrop { animation: m6-backdrop-enter var(--dur-enter) ease backwards; }
+
+  /* 筛选页签：选择态的颜色与下划线平滑切换 */
+  .student-release .filter-tabs button {
+    transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+  }
+
   /* 未读呼吸点：全站唯一循环动效，只动透明度 */
   .student-release .vc-inbox .notification-item.unread .notification-header .tag,
   .student-release .sr-home .notice-read[data-unread='true'] {
@@ -83,4 +92,12 @@
 @keyframes m6-breathe {
   0%, 100% { opacity: 1; }
   50% { opacity: .55; }
+}
+@keyframes m6-dialog-enter {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes m6-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

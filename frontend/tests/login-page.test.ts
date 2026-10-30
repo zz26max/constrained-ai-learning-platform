@@ -76,7 +76,7 @@ describe('登录页（LoginPage）', () => {
   it('渲染标题、两个输入与登录按钮', async () => {
     scripted.setHandler(happyAuthScript())
     const wrapper = await mountLoginPage()
-    expect(wrapper.find('h1').text()).toBe('登录知学')
+    expect(wrapper.find('h1').text()).toBe('登录')
     expect(wrapper.find('#login-username').exists()).toBe(true)
     expect(wrapper.find('#login-password').exists()).toBe(true)
     const submit = wrapper.find('button[type="submit"]')

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import TutoringPanel from '../tutoring/TutoringPanel.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { isUuid } from '../assignments/format'
 
 const route = useRoute()
@@ -13,25 +14,18 @@ const assignmentId = computed(() => {
 </script>
 
 <template>
-  <div class="workspace-page tutoring-page">
-    <header class="workspace-heading">
+  <div class="workspace-page sr-tutoring">
+    <header class="page-head">
       <div>
-        <h1 tabindex="-1">AI 辅导</h1>
-        <p>引导式辅导：解释概念、指出方向，不提供完整实现。</p>
+        <p v-if="assignmentId !== null" class="page-eyebrow"><RouterLink :to="{ name: 'student-assignment', params: { id: assignmentId } }">← 作业详情</RouterLink></p>
+        <h1 class="page-title" tabindex="-1">AI 辅导</h1>
       </div>
-      <div class="workspace-heading-actions">
-        <RouterLink
-          v-if="assignmentId !== null"
-          class="button secondary"
-          :to="{ name: 'student-assignment', params: { id: assignmentId } }"
-        >
-          ← 返回作业详情
-        </RouterLink>
-        <RouterLink class="button secondary" to="/student/assignments">作业列表</RouterLink>
-      </div>
+      <p v-if="assignmentId !== null" class="page-actions">
+        <RouterLink class="quiet-link" :to="{ name: 'student-workspace', params: { id: assignmentId } }">回到工作区</RouterLink>
+      </p>
     </header>
 
-    <p v-if="assignmentId === null" class="notice notice-warn" role="alert">作业地址不正确，请从作业列表重新进入。</p>
+    <UiNotice v-if="assignmentId === null" tone="warn" role="alert">作业地址不正确，请从作业列表重新进入。</UiNotice>
     <TutoringPanel v-else :assignment-id="assignmentId" />
   </div>
 </template>

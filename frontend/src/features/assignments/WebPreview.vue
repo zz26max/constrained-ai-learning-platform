@@ -20,13 +20,16 @@ window.addEventListener('message', receive)
 onBeforeUnmount(() => { window.removeEventListener('message', receive); reset() })
 </script>
 <template>
-  <section class="surface" aria-label="Web 隔离预览">
-    <h2>预览效果</h2>
-    <p>预览当前编辑内容；不代表自动检查通过。仅支持本地三个文件，不加载外部包或网站。脚本卡住时可重置预览。</p>
-    <button type="button" class="button" @click="preview">预览当前内容</button>
-    <button type="button" class="button secondary" :disabled="!source" @click="reset">重置预览</button>
-    <p role="status">{{ message }}</p>
+  <section class="preview" aria-label="Web 隔离预览">
+    <div class="preview-bar">
+      <span class="meta">隔离预览 · 不代表检查通过</span>
+      <span class="preview-actions">
+        <button type="button" class="quiet-btn" @click="preview">{{ source ? '刷新' : '运行预览' }}</button>
+        <button type="button" class="quiet-btn" :disabled="!source" @click="reset">重置</button>
+      </span>
+    </div>
+    <p class="meta preview-status" role="status">{{ message || (source ? '' : '在隔离沙箱中加载 index.html，不访问网络。') }}</p>
     <iframe v-if="source" :key="nonce" ref="frame" title="学生作品隔离预览" sandbox="allow-scripts" referrerpolicy="no-referrer" :srcdoc="source" />
   </section>
 </template>
-<style scoped>iframe { width: 100%; min-height: 360px; border: 1px solid var(--line-strong); background: var(--surface); }</style>
+<style scoped>iframe { width: 100%; min-height: 360px; border: 0; border-top: 1px solid var(--sr-line); background: #fff; }</style>

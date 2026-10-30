@@ -1,18 +1,21 @@
 <script setup lang="ts">
-
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { assignmentsApi, coursesApi } from '../../../api'
 import type { AssignmentDetailDTO, AssignmentSummaryDTO } from '../../../api/assignments'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
+import UiButton from '../../../components/ui/UiButton.vue'
+import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
+import UiFilterTabs from '../../../components/ui/UiFilterTabs.vue'
+import UiNotice from '../../../components/ui/UiNotice.vue'
+import UiPager from '../../../components/ui/UiPager.vue'
+import UiSelect from '../../../components/ui/UiSelect.vue'
 import IntegratedTaskStatus from './CraftTaskState.vue'
-import SubjectIdentity from './SubjectIdentity.vue'
-import CraftDate from './CraftDate.vue'
-import {taskContentTone} from './content-presentation'
-import {deadlineLabel} from '../../../features/assignments/task-presentation'
+import { assignmentTypeLabel } from '../../../features/assignments/format'
+import { taskContentTone } from './content-presentation'
+import { deadlineLabel } from '../../../features/assignments/task-presentation'
 import { usePageQuery } from '../../../features/courses/use-page-query'
-import { formatTime } from '../../../features/courses/format'
 import { byDeadline, matchesTask, taskAction, todoPriority, todoGroupLabel, canEnterWorkspace, type TaskFilter } from '../../../features/assignments/task-presentation'
 const route=useRoute(), router=useRouter(), api=assignmentsApi(), courses=coursesApi()
 const PAGE_SIZE=20
@@ -40,12 +43,20 @@ const filtered=computed(()=>scoped.value.filter(t=>matchesTask(t,filter.value)).
 const totalPages=computed(()=>Math.max(1,Math.ceil(filtered.value.length/PAGE_SIZE)))
 const visible=computed(()=>filtered.value.slice((page.value-1)*PAGE_SIZE,page.value*PAGE_SIZE))
 function change(key:string,value:string){void router.push({query:{...route.query,[key]:value,page:'1'}})}
+const filterTabs=computed(()=>filters.map(f=>({key:f.key,label:f.label,count:scoped.value.filter(t=>matchesTask(t,f.key)).length})))
+const courseOptions=computed(()=>[
+  {value:'',label:'全部课程'},
+  ...(query.data.value?.classes??[]).map(c=>({value:c.offeringId,label:c.title,hint:c.groupName})),
+])
+const sortOptions=[{value:'asc',label:'最早截止优先'},{value:'desc',label:'最晚截止优先'}]
+function setStatusFilter(key:string){change('status',key)}
+function goToPage(next:number){void router.push({query:{...route.query,page:String(next)}})}
 watch(totalPages,n=>{if(page.value>n)void router.replace({query:{...route.query,page:String(n)}})})
 // All todo eligibility is loaded before sorting and slicing, including later API pages.
 // Other filters retain their existing current-display-page detail reads.
 const eligibilityCandidates=computed(()=>filter.value==='todo'
   ? scoped.value.filter(t=>matchesTask(t,'todo'))
-  : scoped.value.filter(t=>matchesTask(t,filter.value)).sort((a,b)=>(descending.value?-1:1)*byDeadline(a,b)).slice((page.value-1)*PAGE_SIZE,page.value*PAGE_SIZE))
+  : scoped.value.filter(t=>matchesTask(t,filter.value)&&t.publicationState!=='archived').sort((a,b)=>(descending.value?-1:1)*byDeadline(a,b)).slice((page.value-1)*PAGE_SIZE,page.value*PAGE_SIZE))
 const details=usePageQuery(async signal=>{
   const tasks=eligibilityCandidates.value
   const result:Record<string, AssignmentDetailDTO>={}
@@ -68,7 +79,6 @@ const eligibilityKey=computed(()=>eligibilityCandidates.value.map(t=>t.id).join(
 watch([query.data,eligibilityKey],([data,key],[prevData,prevKey])=>{
   if(query.status.value!=='success')return
   if(data===prevData&&key===prevKey)return
-  console.log('[DEBUG] details.load key-changed', key.slice(0,40), 'prev', prevKey?.slice(0,40))
   void details.load()
 })
 function groupLabel(id:string):string {
@@ -77,35 +87,48 @@ function groupLabel(id:string):string {
 }
 function courseName(id:string){return query.data.value?.classes.find(c=>c.offeringId===id)?.title??'课程信息未返回'}
 function detailOf(id:string){return details.status.value==='success'?details.data.value?.[id]:undefined}
+function typeLabel(type: string | null | undefined) { return assignmentTypeLabel(type) }
 // 可继续作答的任务直达工作区；已评价/已提交仍进说明页并带上反馈定位。
 function taskEntry(task:AssignmentSummaryDTO){
   return canEnterWorkspace(task,detailOf(task.id))
     ? {name:'student-workspace',params:{id:task.id}}
     : {name:'student-assignment',params:{id:task.id},...(task.publishedFeedbackId?{query:{feedbackId:task.publishedFeedbackId}}:{})}
 }
+const dayFormat=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'long',day:'numeric'})
+const whenFormat=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false})
+function dueDay(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?'无截止':dayFormat.format(date)}
+function dueWhen(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?'':whenFormat.format(date)}
 </script>
 <template>
   <div class="workspace-page sr-tasks student-tasks">
-    <header class="workspace-heading"><div><h1 tabindex="-1">我的作业</h1><p>先处理待完成任务，截止时间均为北京时间。</p></div></header>
+    <header class="page-head">
+      <div><h1 class="page-title" tabindex="-1">我的作业</h1><p class="page-summary">截止时间均为北京时间。</p></div>
+    </header>
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <template v-if="query.status.value==='success' && query.data.value">
-      <nav class="filter-tabs" aria-label="作业状态"><button v-for="f in filters" :key="f.key" :aria-pressed="filter===f.key" @click="change('status',f.key)">{{ f.label }} <span>{{ scoped.filter(t=>matchesTask(t,f.key)).length }}</span></button></nav>
-      <div class="task-toolbar"><label>课程<select :value="offering" @change="change('offering',($event.target as HTMLSelectElement).value)"><option value="">全部课程</option><option v-for="c in query.data.value.classes" :key="c.offeringId" :value="c.offeringId">{{ c.title }} · {{ c.groupName }}</option></select></label><label>排序<select :value="descending?'desc':'asc'" @change="change('sort',($event.target as HTMLSelectElement).value)"><option value="asc">最早截止优先</option><option value="desc">最晚截止优先</option></select></label><span class="muted">{{ filtered.length }} 项作业<span v-if="filter==='todo' && details.status.value==='success'">可处理优先，组内按截止时间排序</span></span></div>
-      <p v-if="details.status.value==='loading'" role="status" class="muted">正在确认提交资格…</p>
-      <div v-if="details.status.value==='error'" class="notice notice-warn" role="alert"><p>提交资格未能完整加载，当前仅按截止时间排序，可查看详情。</p><button class="button secondary" type="button" @click="details.load">重试</button></div>
-      <section class="surface task-table" aria-label="作业列表">
-        <div class="task-table-head" aria-hidden="true"><span>截止</span><span>作业与课程</span><span>作答状态</span><span>操作</span></div>
-        <div v-if="!visible.length" class="empty-state"><h2>暂无符合条件的作业</h2><p>调整课程或状态筛选，查看其他任务。</p><button class="button secondary" @click="router.push({query:{status:'all'}})">清除筛选</button></div>
+      <UiFilterTabs :items="filterTabs" :model-value="filter" label="作业状态" @update:model-value="setStatusFilter" />
+      <div class="task-toolbar"><UiSelect :model-value="offering" :options="courseOptions" aria-label="课程" @update:model-value="v=>change('offering',v)" /><UiSelect :model-value="descending?'desc':'asc'" :options="sortOptions" aria-label="排序" @update:model-value="v=>change('sort',v)" /></div>
+      <p v-if="details.status.value==='loading'" role="status" class="meta task-hint">正在确认提交资格…</p>
+      <UiNotice v-if="details.status.value==='error'" tone="warn" role="alert"><p>提交资格未能完整加载，当前仅按截止时间排序，可查看详情。</p><UiButton variant="secondary" @click="details.load">重试</UiButton></UiNotice>
+      <section class="task-table" aria-label="作业列表">
+        <UiEmptyState v-if="!visible.length" title="暂无符合条件的作业" description="调整课程或状态筛选，查看其他任务。"><UiButton variant="secondary" @click="router.push({query:{status:'all'}})">清除筛选</UiButton></UiEmptyState>
         <template v-for="(task,index) in visible" :key="task.id">
         <h2 v-if="filter==='todo' && groupLabel(task.id) && (index===0 || groupLabel(visible[index-1]!.id)!==groupLabel(task.id))" class="task-group-heading" :data-group="groupLabel(task.id)==='可继续处理'?'open':'closed'">{{groupLabel(task.id)}}</h2>
         <article class="task-table-row" :data-task-id="task.id" :data-tone="taskContentTone(task,details.status.value==='success'?details.data.value?.[task.id]:undefined)">
-          <div class="vc-task-copy"><RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink><div class="task-course"><SubjectIdentity :course="query.data.value.classes.find(c=>c.offeringId===task.offeringId)" /></div></div>
-          <div class="vc-task-date"><CraftDate :value="task.dueAt"/><span class="vc-due-state">{{deadlineLabel(task.dueAt)}}</span></div>
+          <div class="t-due">
+            <b>{{ dueDay(task.dueAt) }}</b>
+            <span class="meta">{{ dueWhen(task.dueAt) }}</span>
+            <span v-if="matchesTask(task,'todo')" class="rel" :data-tone="taskContentTone(task,details.status.value==='success'?details.data.value?.[task.id]:undefined)">{{ deadlineLabel(task.dueAt) }}</span>
+          </div>
+          <div class="t-main vc-task-copy">
+            <RouterLink :title="task.title" class="task-title" :to="{name:'student-assignment',params:{id:task.id}}">{{ task.title }}</RouterLink>
+            <span class="meta t-meta"><template v-if="typeLabel(task.type)">{{ typeLabel(task.type) }} · </template>{{ courseName(task.offeringId) }}</span>
+          </div>
           <IntegratedTaskStatus :show-deadline="false" :task="task" :detail="details.status.value==='success'?details.data.value?.[task.id]:undefined" />
-          <RouterLink class="button secondary" :to="taskEntry(task)">{{ taskAction(task,details.status.value==='success'?details.data.value?.[task.id]:undefined) }}</RouterLink>
+          <RouterLink class="button t-go" :to="taskEntry(task)">{{ taskAction(task,details.status.value==='success'?details.data.value?.[task.id]:undefined) }}</RouterLink>
         </article></template>
       </section>
-      <nav v-if="totalPages>1" class="pagination" aria-label="作业列表分页"><button class="button secondary" :disabled="page<=1" @click="router.push({query:{...route.query,page:String(page-1)}})">上一页</button><span>第 {{ page }} / {{ totalPages }} 页</span><button class="button secondary" :disabled="page>=totalPages" @click="router.push({query:{...route.query,page:String(page+1)}})">下一页</button></nav>
+      <UiPager :page="page" :total="totalPages" label="作业列表分页" :meta="`第 ${page} / ${totalPages} 页 · 共 ${filtered.length} 项`" @update:page="goToPage" />
     </template>
   </div>
 </template>

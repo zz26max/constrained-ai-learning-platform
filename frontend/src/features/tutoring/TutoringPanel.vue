@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { tutoringApi } from '../../api'
 import type { TutoringMessageDTO, TutoringSessionDTO } from '../../api/tutoring'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiField from '../../components/ui/UiField.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { useTutoringPoll } from './use-tutoring-poll'
@@ -148,16 +151,18 @@ watch(pendingRequest, request => {
 onScopeDispose(() => { generation += 1 })
 
 const MODE_LABELS: Record<string, string> = {
-  concept: '概念',
+  concept: '概念解释',
   debug_hint: '排错提示',
   guided_question: '引导提问',
-  fallback: '政策回退',
+  fallback: '安全模板',
 }
-const ACTION_HINTS: Record<'ask' | 'concept' | 'next_hint', string> = {
-  ask: '围绕当前问题继续追问，不提升提示层次',
-  concept: '解释涉及的基础概念',
-  next_hint: '获取下一层提示；从第 2 层起需先描述实际尝试',
-}
+const ACTION_LABELS = { ask: '继续追问', concept: '解释概念', next_hint: '下一层提示' } as const
+
+/** 已到达的提示层级：安全模板不计层，与契约的 fallback 语义一致。 */
+const hintLevel = computed(() => Math.max(0, ...messages.value
+  .filter(message => message.role === 'assistant' && message.mode !== 'fallback')
+  .map(message => message.hintLevel ?? 0)))
+const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
 </script>
 
 <template>
@@ -165,104 +170,98 @@ const ACTION_HINTS: Record<'ask' | 'concept' | 'next_hint', string> = {
     <ApiState :status="policyQuery.status.value" :error="policyQuery.error.value" @retry="policyQuery.load" />
 
     <template v-if="policyQuery.status.value === 'success' && policy">
-      <p v-if="!policy.enabled" class="notice notice-info" role="note">
-        该作业未启用 AI 辅导。有疑问时请在作业详情发起教师求助。
-      </p>
+      <div v-if="!policy.enabled" class="chat-empty">
+        <p>这项作业没有开启 AI 辅导。</p>
+        <p class="meta">遇到问题可以直接问老师。</p>
+        <RouterLink class="button primary" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+      </div>
 
-      <template v-else>
-        <p class="notice notice-info tutoring-boundary" role="note">{{ policy.boundaryText }}</p>
-
-        <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
-
-        <div v-if="sessionsQuery.status.value === 'success'" class="tutoring-toolbar">
-          <div class="tutoring-sessions" role="group" aria-label="辅导会话">
-            <button
-              v-for="session in sessionsQuery.data.value?.items ?? []"
-              :key="session.id"
-              type="button"
-              class="tutoring-session-chip"
-              :aria-pressed="activeSession?.id === session.id"
-              @click="selectSession(session)"
-            >
-              会话 · {{ new Date(session.createdAt).toLocaleDateString('zh-CN') }}
-            </button>
+      <div v-else class="tutor-grid">
+        <div class="chat-col">
+          <div class="sessions">
+            <div class="session-btns" role="group" aria-label="辅导会话">
+              <button
+                v-for="session in sessionsQuery.data.value?.items ?? []"
+                :key="session.id"
+                type="button"
+                class="session-btn"
+                :aria-pressed="activeSession?.id === session.id"
+                @click="selectSession(session)"
+              >
+                会话 · {{ new Date(session.createdAt).toLocaleDateString('zh-CN') }}
+              </button>
+            </div>
+            <UiButton variant="quiet" :disabled="creatingSession" @click="startSession">
+              {{ creatingSession ? '正在创建…' : '+ 新会话' }}
+            </UiButton>
           </div>
-          <button type="button" class="button secondary" :disabled="creatingSession" @click="startSession">
-            {{ creatingSession ? '正在创建…' : '新会话' }}
-          </button>
+
+          <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
+
+          <section v-if="activeSession !== null" class="chat" aria-label="辅导对话">
+            <ol v-if="messages.length > 0" class="thread">
+              <li v-for="message in messages" :key="message.id" :class="['msg', message.role]">
+                <span class="lv">
+                  {{ message.role === 'student' ? '我' : 'AI 助教' }}<template v-if="message.role === 'assistant' && message.mode !== null"> · {{ MODE_LABELS[message.mode] ?? message.mode }}<template v-if="message.hintLevel !== null"> · 第 {{ message.hintLevel }} 级</template></template>
+                </span>
+                <p v-if="message.content !== null" class="msg-text">{{ message.content }}</p>
+                <p v-else class="msg-text meta">内容已过保留期限，不可查看。</p>
+                <span v-if="message.role === 'student'" class="meta msg-time">{{ clock(message.createdAt) }}</span>
+              </li>
+              <li v-if="poll.state.value === 'polling'" class="msg assistant pending" aria-live="polite">
+                <span class="lv">AI 助教 · {{ pendingRequest?.status === 'running' ? '生成中' : '排队中' }}</span>
+                <p class="msg-text meta" role="status">回复经过审核后才会显示。</p>
+              </li>
+            </ol>
+            <p v-else-if="poll.state.value !== 'polling'" class="chat-empty-text">
+              还没有提问。描述你遇到的问题，或请 AI 解释一个概念。
+            </p>
+          </section>
+
+          <form v-if="activeSession !== null" class="composer" @submit.prevent="send">
+            <fieldset :disabled="sending || poll.state.value === 'polling'" class="composer-fields" aria-label="向 AI 助教提问">
+              <div class="seg" role="radiogroup" aria-label="提问方式">
+                <label v-for="(label, key) in ACTION_LABELS" :key="key" class="seg-option" :aria-pressed="action === key">
+                  <input v-model="action" type="radio" :value="key" name="tutoring-action" />
+                  <span>{{ label }}</span>
+                </label>
+              </div>
+              <UiField label="你的问题" col>
+                <textarea v-model="content" rows="2" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
+              </UiField>
+              <UiField :label="`实际尝试（第 ${policy.requireAttemptFromLevel} 级起必填）`" col>
+                <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />
+              </UiField>
+              <p v-if="actionError" class="field-error" role="alert">{{ actionError }}</p>
+              <div class="composer-foot">
+                <span class="meta">提示最多 {{ policy.maxHintLevel }} 级</span>
+                <UiButton variant="primary" type="submit" :disabled="sending || poll.state.value === 'polling'">
+                  {{ poll.state.value === 'polling' ? '等待回复…' : sending ? '正在发送…' : '发送' }}
+                </UiButton>
+              </div>
+            </fieldset>
+          </form>
         </div>
 
-        <section v-if="activeSession !== null" class="surface tutoring-messages" aria-label="辅导对话">
-          <ol v-if="messages.length > 0" class="tutoring-thread">
-            <li v-for="message in messages" :key="message.id" :class="['tutoring-bubble', message.role]">
-              <span class="tutoring-role">{{ message.role === 'student' ? '我' : 'AI 助教' }}</span>
-              <p v-if="message.content !== null" class="tutoring-content">{{ message.content }}</p>
-              <p v-else class="tutoring-content muted">内容已过保留期限，不可查看。</p>
-              <span v-if="message.role === 'assistant' && message.mode !== null" class="tag">
-                {{ MODE_LABELS[message.mode] ?? message.mode }}<template v-if="message.hintLevel !== null"> · 第 {{ message.hintLevel }} 层</template>
-              </span>
-            </li>
-            <li v-if="poll.state.value === 'polling'" class="tutoring-bubble assistant" aria-live="polite">
-              <span class="tutoring-role">AI 助教</span>
-              <p class="tutoring-content muted" role="status">AI 正在按引导模式生成回复…（{{ pendingRequest?.status === 'running' ? '生成中' : '排队中' }}）</p>
-            </li>
-          </ol>
-          <p v-else-if="poll.state.value !== 'polling'" class="muted tutoring-empty">
-            提问从观察开始：描述你看到的现象与已做的尝试，AI 会以引导问题回应。
-          </p>
-        </section>
-
-        <form v-if="activeSession !== null" class="tutoring-composer" @submit.prevent="send">
-          <fieldset :disabled="sending || poll.state.value === 'polling'" class="tutoring-composer-fields">
-            <legend class="sr-only">向 AI 助教提问</legend>
-            <div class="tutoring-actions" role="radiogroup" aria-label="提问方式">
-              <label v-for="(hint, key) in ACTION_HINTS" :key="key" class="tutoring-action" :aria-pressed="action === key">
-                <input v-model="action" type="radio" :value="key" name="tutoring-action" />
-                <span>{{ { ask: '继续追问', concept: '解释概念', next_hint: '下一层提示' }[key] }}</span>
-              </label>
-            </div>
-            <p class="muted tutoring-action-hint">{{ ACTION_HINTS[action] }}</p>
-            <label class="tutoring-field">
-              <span>你的问题</span>
-              <textarea v-model="content" rows="3" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
-            </label>
-            <label class="tutoring-field">
-              <span>实际尝试（第 2 层提示起必填）</span>
-              <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />
-            </label>
-            <p v-if="actionError" class="field-error" role="alert">{{ actionError }}</p>
-            <button type="submit" class="button primary" :disabled="sending || poll.state.value === 'polling'">
-              {{ poll.state.value === 'polling' ? '等待 AI 回复…' : sending ? '正在发送…' : '发送' }}
-            </button>
-          </fieldset>
-        </form>
-      </template>
+        <aside class="col side">
+          <section class="sec">
+            <h2>本作业的辅导规则</h2>
+            <p class="lead-sm">{{ policy.boundaryText }}</p>
+            <dl class="facts">
+              <div><dt>当前层级</dt><dd><span class="levels"><i v-for="level in policy.maxHintLevel" :key="level" :class="{ on: level <= hintLevel }" /></span>第 {{ hintLevel }}/{{ policy.maxHintLevel }} 级</dd></div>
+              <div><dt>完整答案</dt><dd>{{ policy.restrictCompleteSolution ? '不提供' : '可提供' }}</dd></div>
+              <div><dt>代码块</dt><dd>{{ policy.allowCodeBlocks ? '允许' : '不生成' }}</dd></div>
+              <div><dt>需附尝试</dt><dd>第 {{ policy.requireAttemptFromLevel }} 级起</dd></div>
+              <div><dt>次数上限</dt><dd>每天 {{ policy.dailyAssignmentLimit }} 次 · 每分钟 {{ policy.perMinuteLimit }} 次</dd></div>
+            </dl>
+          </section>
+          <section class="sec">
+            <h2>仍然没解决</h2>
+            <p class="meta">问老师时可以附上这里已经给出的提示。</p>
+            <RouterLink class="quiet-link" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+          </section>
+        </aside>
+      </div>
     </template>
   </div>
 </template>
-
-<style scoped>
-.tutoring-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 16px; }
-.tutoring-sessions { display: flex; flex-wrap: wrap; gap: 8px; }
-.tutoring-session-chip { min-height: 36px; padding: 4px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-panel); background: var(--surface); color: var(--muted); font-size: 13px; cursor: pointer; }
-.tutoring-session-chip[aria-pressed='true'] { border-color: var(--blue); color: var(--blue-text); background: var(--blue-soft); font-weight: 600; }
-.tutoring-messages { padding: 20px 22px; }
-.tutoring-thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-.tutoring-bubble { max-width: min(72ch, 92%); display: grid; gap: 6px; }
-.tutoring-bubble.student { justify-self: end; background: var(--blue-soft); border-radius: var(--radius-panel); padding: 10px 14px; }
-.tutoring-bubble.assistant { justify-self: start; }
-.tutoring-role { font-size: 12px; color: var(--muted); }
-.tutoring-content { margin: 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.tutoring-empty { margin: 0; }
-.tutoring-composer { margin-top: 16px; }
-.tutoring-composer-fields { display: grid; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
-.tutoring-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.tutoring-action { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); font-size: 13px; cursor: pointer; }
-.tutoring-action:has(input:checked) { border-color: var(--blue); color: var(--blue-text); background: var(--blue-soft); font-weight: 600; }
-.tutoring-action input { margin: 0; accent-color: var(--blue); }
-.tutoring-action-hint { margin: 0; font-size: 13px; }
-.tutoring-field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-.tutoring-field textarea { border: 1px solid var(--line-control); border-radius: var(--radius-control); padding: 8px 12px; font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); resize: vertical; }
-.tutoring-field textarea:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
-.tutoring-composer .button { justify-self: start; }
-</style>
