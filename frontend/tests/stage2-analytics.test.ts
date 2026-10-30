@@ -282,6 +282,8 @@ describe('学生知识点掌握概览', () => {
     expect(legend).toContain('需要练习1')
     expect(legend).toContain('证据不足1')
     expect(wrapper.findAll('.mastery-bar span')).toHaveLength(4)
+    expect(wrapper.findAll('.mastery-legend i').map(swatch => swatch.attributes('data-state')))
+      .toEqual(['basically_mastered', 'learning', 'needs_practice', 'insufficient_evidence'])
     expect(wrapper.text()).toContain('共 4 个知识点，颜色越深表示掌握程度越高。')
   })
 })

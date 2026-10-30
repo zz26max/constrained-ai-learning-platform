@@ -163,7 +163,7 @@ function chooseCourse(offeringId: string): void {
                   <span v-for="segment in masterySegments" :key="segment.state" :data-state="segment.state" :style="{ flexGrow: segment.count }"></span>
                 </div>
                 <ul class="mastery-legend">
-                  <li v-for="segment in masteryLegend" :key="segment.state" :data-state="segment.state"><i aria-hidden="true"></i>{{ segment.label }}<b>{{ segment.count }}</b></li>
+                  <li v-for="segment in masteryLegend" :key="segment.state" :data-state="segment.state"><i :data-state="segment.state" aria-hidden="true"></i>{{ segment.label }}<b>{{ segment.count }}</b></li>
                 </ul>
                 <p class="mastery-note">共 {{ knowledge.length }} 个知识点，颜色越深表示掌握程度越高。</p>
               </div>
