@@ -91,6 +91,7 @@ frontend/
 | `/student/offerings/{offeringId}/notices` / `/student/notices/{noticeId}` | 课程公告，P1 | 课程公告列表与详情，支持晚加入成员读取 |
 | `/teacher` | 授课教学班选择，P1 | `/teacher/offerings`；显示本人授课范围 |
 | `/teacher/offerings/{id}` | 教师工作台，P1 | 班级统计、成员、章节、资料、公告和邀请 |
+| `/teacher/offerings/{id}/analytics` | 学习分析，P2 | `/teacher/offerings/{id}/activity`、`/teacher/offerings/{id}/knowledge-mastery`、作业统计；14 天活动趋势、知识点四态分布、共性问题；空态与无证据分别展示 |
 | `/teacher/offerings/{offeringId}/assignments` | 作业管理，P1 | 本班作业列表、发布及归档 |
 | `/teacher/offerings/{offeringId}/assignments/new` | 布置作业，P1 | 班级章节/知识点；建立草稿后进入草稿详情 |
 | `/teacher/assignments/{id}` | 作业编辑与提交列表，P1；2026-10-24 起已发布作业内嵌 AI 政策配置（P2，mock 先行） | `/teacher/assignments/{id}`、提交列表、`/teacher/assignments/{id}/ai-policy`（乐观锁 baseVersion，平台固定项只读展示） |
@@ -177,6 +178,7 @@ API 字符串均为不可信输入。Vue 普通文本插值可用于文字显示
 - 真实作业日历路由为 `/student/calendar` 与 `/teacher/calendar`；月/周网格、当天列表、手机周日期条均按北京时间。学生默认当前学期全部课程、教师先选教学班；查询参数保存日期/视图/教学班。完整分页读取成功后才展示日程，失败不伪装空态。没有排课接口，不展示课程上课时间。
 - 提交列表采用表格，保留服务端状态筛选、latestOnly 和分页。从列表进入支持抽屉批阅与跨页待评价队列，直达仍显示独立批阅页；评分上限与量规取提交快照，已发布只读。连续批改依次保存草稿并确认发布后才跳转，失败保留当前内容，结果不确定不自动重放；刷新队列清空但详情可恢复。
 - 管理员管理、无接口支持的搜索/资料编辑和未开放分析不提供入口。会话调试保留直接地址，移出日常导航。统计只展示真实字段，不填充原型示例。
+- 学习分析图表只在教师分析页动态加载 ECharts，主题从 tokens 生成；不用渐变、3D、装饰动画或默认模板配色。图例与文字摘要同时说明四态，不能只靠颜色区分；`prefers-reduced-motion` 时关闭动画；无数据、无证据、加载失败分别展示。
 
 - 首页以当前学习任务、其他待办和课程总览为主区域，教师反馈和公告为辅助栏；“我的课程”使用响应式课程卡片，保留课程入口、章节与进度及作业反馈摘要。
 - 作业任务使用固定字段的紧凑列表；任务详情按状态、要求和操作连续阅读。课程章节优先展示实验入口，手机保留可展开的章节目录。学习记录先展示教师反馈和下一步，再展示知识点证据；消息按内容、来源、日期和阅读状态排列。

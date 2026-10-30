@@ -1048,6 +1048,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teacher/offerings/{offeringId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * getOfferingActivity
+         * @description 权限：本班授课教师。请求约定：无。结果约定：200 近 14 天逐日行为计数与区间汇总；`date/from/to` 均为 Asia/Shanghai 自然日，无事件的日期补零；`activeStudentCount` 按用户去重。只汇总 `learning_events` 已有事实，不推断能力、扣分或成绩。业务规则以 DEVELOPMENT.md 为准。
+         */
+        get: operations["getOfferingActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teacher/offerings/{offeringId}/knowledge-mastery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * getOfferingKnowledgeMastery
+         * @description 权限：本班授课教师。请求约定：无。结果约定：200 班级知识点掌握分布；按 knowledge-v2 对每名学生逐知识点计算状态后聚合，未发布评价、AI 猜测和客户端事件不作为证据。`distribution` 覆盖本班全部学生，每人每知识点恰有一态；`masteryRate` 仅为基本掌握人数占比，用于展示，不是成绩或能力结论。业务规则以 DEVELOPMENT.md 为准。
+         */
+        get: operations["getOfferingKnowledgeMastery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teacher/assignments/{assignmentId}/stats": {
         parameters: {
             query?: never;
@@ -2549,6 +2589,148 @@ export interface components {
             activeAssignmentCount: number;
             pendingReviewCount: number;
             pendingHelpCount: number;
+        };
+        ActivityDayDTO: {
+            /**
+             * Format: date
+             * @description Asia/Shanghai 自然日。
+             */
+            date: string;
+            activeStudentCount: number;
+            chapterOpenedCount: number;
+            resourceOpenedCount: number;
+            editorOpenedCount: number;
+            previewOpenedCount: number;
+            workspaceSavedCount: number;
+            assignmentSubmittedCount: number;
+            helpRequestCreatedCount: number;
+            tutoringCompletedCount: number;
+        };
+        ActivityTotalsDTO: {
+            /** @description 区间内去重学生数。 */
+            activeStudentCount: number;
+            chapterOpenedCount: number;
+            resourceOpenedCount: number;
+            editorOpenedCount: number;
+            previewOpenedCount: number;
+            workspaceSavedCount: number;
+            assignmentSubmittedCount: number;
+            helpRequestCreatedCount: number;
+            tutoringCompletedCount: number;
+        };
+        /**
+         * @example {
+         *       "offeringId": "00000000-0000-4000-8000-000000000001",
+         *       "from": "2026-10-18",
+         *       "to": "2026-10-31",
+         *       "days": [
+         *         {
+         *           "date": "2026-10-31",
+         *           "activeStudentCount": 2,
+         *           "chapterOpenedCount": 3,
+         *           "resourceOpenedCount": 1,
+         *           "editorOpenedCount": 2,
+         *           "previewOpenedCount": 1,
+         *           "workspaceSavedCount": 2,
+         *           "assignmentSubmittedCount": 1,
+         *           "helpRequestCreatedCount": 1,
+         *           "tutoringCompletedCount": 1
+         *         }
+         *       ],
+         *       "totals": {
+         *         "activeStudentCount": 2,
+         *         "chapterOpenedCount": 3,
+         *         "resourceOpenedCount": 1,
+         *         "editorOpenedCount": 2,
+         *         "previewOpenedCount": 1,
+         *         "workspaceSavedCount": 2,
+         *         "assignmentSubmittedCount": 1,
+         *         "helpRequestCreatedCount": 1,
+         *         "tutoringCompletedCount": 1
+         *       }
+         *     }
+         */
+        OfferingActivityDTO: {
+            offeringId: components["schemas"]["UUID"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            days: components["schemas"]["ActivityDayDTO"][];
+            totals: components["schemas"]["ActivityTotalsDTO"];
+        };
+        KnowledgeStateDistributionDTO: {
+            basicallyMastered: number;
+            needsPractice: number;
+            learning: number;
+            insufficientEvidence: number;
+        };
+        KnowledgeMasterySummaryDTO: {
+            /** @description 学生与知识点组合总数；等于 distribution 四项之和。 */
+            assessmentCount: number;
+            distribution: components["schemas"]["KnowledgeStateDistributionDTO"];
+            /** @description 基本掌握组合数 / assessmentCount；无组合时为 null。仅用于展示，不是成绩。 */
+            masteryRate: number | null;
+        };
+        KnowledgeMasteryItemDTO: {
+            knowledgePointId: components["schemas"]["UUID"];
+            title: string;
+            chapterId: components["schemas"]["UUID"] | null;
+            /** @description 本班学生数。 */
+            studentCount: number;
+            /** @description 在该知识点有教师证据的学生数。 */
+            assessedStudentCount: number;
+            distribution: components["schemas"]["KnowledgeStateDistributionDTO"];
+            /** @description 基本掌握人数 / studentCount；无学生时为 null。仅用于展示，不是成绩。 */
+            masteryRate: number | null;
+        };
+        /**
+         * @example {
+         *       "offeringId": "00000000-0000-4000-8000-000000000001",
+         *       "ruleVersion": "knowledge-v2",
+         *       "asOf": "2026-10-31T02:00:00Z",
+         *       "studentCount": 2,
+         *       "assessedStudentCount": 1,
+         *       "knowledgePointCount": 1,
+         *       "summary": {
+         *         "assessmentCount": 2,
+         *         "distribution": {
+         *           "basicallyMastered": 1,
+         *           "needsPractice": 0,
+         *           "learning": 0,
+         *           "insufficientEvidence": 1
+         *         },
+         *         "masteryRate": 0.5
+         *       },
+         *       "items": [
+         *         {
+         *           "knowledgePointId": "00000000-0000-4000-8000-000000000002",
+         *           "title": "事件绑定",
+         *           "chapterId": null,
+         *           "studentCount": 2,
+         *           "assessedStudentCount": 1,
+         *           "distribution": {
+         *             "basicallyMastered": 1,
+         *             "needsPractice": 0,
+         *             "learning": 0,
+         *             "insufficientEvidence": 1
+         *           },
+         *           "masteryRate": 0.5
+         *         }
+         *       ]
+         *     }
+         */
+        OfferingKnowledgeMasteryDTO: {
+            offeringId: components["schemas"]["UUID"];
+            /** @constant */
+            ruleVersion: "knowledge-v2";
+            asOf: components["schemas"]["Timestamp"];
+            studentCount: number;
+            /** @description 至少一个知识点有教师证据的学生数。 */
+            assessedStudentCount: number;
+            knowledgePointCount: number;
+            summary: components["schemas"]["KnowledgeMasterySummaryDTO"];
+            items: components["schemas"]["KnowledgeMasteryItemDTO"][];
         };
         TimeRange: {
             from: components["schemas"]["Timestamp"];
@@ -4230,6 +4412,14 @@ export interface components {
             data: components["schemas"]["OfferingStatsDTO"];
             requestId: string;
         };
+        Response_getOfferingActivity: {
+            data: components["schemas"]["OfferingActivityDTO"];
+            requestId: string;
+        };
+        Response_getOfferingKnowledgeMastery: {
+            data: components["schemas"]["OfferingKnowledgeMasteryDTO"];
+            requestId: string;
+        };
         Response_getAssignmentStats: {
             data: components["schemas"]["AssignmentStatsDTO"];
             requestId: string;
@@ -5324,6 +5514,28 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Response_getOfferingStats"];
+            };
+        };
+        /** @description 200 近 14 天逐日行为计数与汇总；无事件日期补零，activeStudentCount 按用户去重 */
+        getOfferingActivity_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_getOfferingActivity"];
+            };
+        };
+        /** @description 200 班级知识点掌握分布；按 knowledge-v2 聚合，masteryRate 不是成绩 */
+        getOfferingKnowledgeMastery_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_getOfferingKnowledgeMastery"];
             };
         };
         /** @description 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1 `commonIssues:[]` */
@@ -7381,6 +7593,54 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["getOfferingStats_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["getMe_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    getOfferingActivity: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string;
+            };
+            path: {
+                offeringId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["getOfferingActivity_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["getMe_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    getOfferingKnowledgeMastery: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string;
+            };
+            path: {
+                offeringId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["getOfferingKnowledgeMastery_200"];
             400: components["responses"]["getCsrfToken_400"];
             401: components["responses"]["logout_401"];
             403: components["responses"]["getMe_403"];

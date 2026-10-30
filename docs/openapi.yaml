@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 个性化学习平台接口契约
-  version: 1.1.1
+  version: 1.2.0
   description: 设计基线 2026-10-11。实现状态以各 operation 的 x-implementation-status 为准，并由后端生产路由测试双向核对；本段不重复维护接口状态数量。
     x-contract-status：reviewed 表示静态契约审计，draft 表示尚未审定的草案，均不等于运行验收；implemented 不表示联调环境已部署。字段以此文件为唯一结构源；运行规则见 DEVELOPMENT.md，存储见 BACKEND.md。
 servers:
@@ -2524,6 +2524,70 @@ paths:
         schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
       responses:
         '200': {$ref: '#/components/responses/getOfferingStats_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/getMe_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+  /api/v1/teacher/offerings/{offeringId}/activity:
+    get:
+      operationId: getOfferingActivity
+      summary: getOfferingActivity
+      description: 权限：本班授课教师。请求约定：无。结果约定：200 近 14 天逐日行为计数与区间汇总；`date/from/to` 均为 Asia/Shanghai 自然日，无事件的日期补零；`activeStudentCount` 按用户去重。只汇总 `learning_events` 已有事实，不推断能力、扣分或成绩。业务规则以 DEVELOPMENT.md 为准。
+      tags:
+      - teacher
+      x-phase: P2
+      x-implementation-status: planned
+      x-contract-status: reviewed
+      x-permission: 本班授课教师
+      x-csrf-required: false
+      x-idempotency: none
+      parameters:
+      - name: offeringId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+      - name: X-Request-ID
+        in: header
+        required: false
+        schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
+      responses:
+        '200': {$ref: '#/components/responses/getOfferingActivity_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/getMe_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+  /api/v1/teacher/offerings/{offeringId}/knowledge-mastery:
+    get:
+      operationId: getOfferingKnowledgeMastery
+      summary: getOfferingKnowledgeMastery
+      description: 权限：本班授课教师。请求约定：无。结果约定：200 班级知识点掌握分布；按 knowledge-v2 对每名学生逐知识点计算状态后聚合，未发布评价、AI 猜测和客户端事件不作为证据。`distribution` 覆盖本班全部学生，每人每知识点恰有一态；`masteryRate` 仅为基本掌握人数占比，用于展示，不是成绩或能力结论。业务规则以 DEVELOPMENT.md 为准。
+      tags:
+      - teacher
+      x-phase: P2
+      x-implementation-status: planned
+      x-contract-status: reviewed
+      x-permission: 本班授课教师
+      x-csrf-required: false
+      x-idempotency: none
+      parameters:
+      - name: offeringId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UUID'}
+      - name: X-Request-ID
+        in: header
+        required: false
+        schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
+      responses:
+        '200': {$ref: '#/components/responses/getOfferingKnowledgeMastery_200'}
         '400': {$ref: '#/components/responses/getCsrfToken_400'}
         '401': {$ref: '#/components/responses/logout_401'}
         '403': {$ref: '#/components/responses/getMe_403'}
@@ -5681,6 +5745,177 @@ components:
       - activeAssignmentCount
       - pendingReviewCount
       - pendingHelpCount
+    ActivityDayDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        date: {type: string, format: date, pattern: '^\d{4}-\d{2}-\d{2}$', description: Asia/Shanghai 自然日。}
+        activeStudentCount: {type: integer, minimum: 0, maximum: 2147483647}
+        chapterOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        resourceOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        editorOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        previewOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        workspaceSavedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        assignmentSubmittedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        helpRequestCreatedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        tutoringCompletedCount: {type: integer, minimum: 0, maximum: 2147483647}
+      required:
+      - date
+      - activeStudentCount
+      - chapterOpenedCount
+      - resourceOpenedCount
+      - editorOpenedCount
+      - previewOpenedCount
+      - workspaceSavedCount
+      - assignmentSubmittedCount
+      - helpRequestCreatedCount
+      - tutoringCompletedCount
+    ActivityTotalsDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        activeStudentCount: {type: integer, minimum: 0, maximum: 2147483647, description: 区间内去重学生数。}
+        chapterOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        resourceOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        editorOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        previewOpenedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        workspaceSavedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        assignmentSubmittedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        helpRequestCreatedCount: {type: integer, minimum: 0, maximum: 2147483647}
+        tutoringCompletedCount: {type: integer, minimum: 0, maximum: 2147483647}
+      required:
+      - activeStudentCount
+      - chapterOpenedCount
+      - resourceOpenedCount
+      - editorOpenedCount
+      - previewOpenedCount
+      - workspaceSavedCount
+      - assignmentSubmittedCount
+      - helpRequestCreatedCount
+      - tutoringCompletedCount
+    OfferingActivityDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        offeringId: {$ref: '#/components/schemas/UUID'}
+        from: {type: string, format: date, pattern: '^\d{4}-\d{2}-\d{2}$'}
+        to: {type: string, format: date, pattern: '^\d{4}-\d{2}-\d{2}$'}
+        days:
+          type: array
+          items: {$ref: '#/components/schemas/ActivityDayDTO'}
+          minItems: 1
+          maxItems: 31
+        totals: {$ref: '#/components/schemas/ActivityTotalsDTO'}
+      required:
+      - offeringId
+      - from
+      - to
+      - days
+      - totals
+      examples:
+      - offeringId: 00000000-0000-4000-8000-000000000001
+        from: '2026-10-18'
+        to: '2026-10-31'
+        days:
+        - {date: '2026-10-31', activeStudentCount: 2, chapterOpenedCount: 3, resourceOpenedCount: 1, editorOpenedCount: 2, previewOpenedCount: 1, workspaceSavedCount: 2, assignmentSubmittedCount: 1, helpRequestCreatedCount: 1, tutoringCompletedCount: 1}
+        totals: {activeStudentCount: 2, chapterOpenedCount: 3, resourceOpenedCount: 1, editorOpenedCount: 2, previewOpenedCount: 1, workspaceSavedCount: 2, assignmentSubmittedCount: 1, helpRequestCreatedCount: 1, tutoringCompletedCount: 1}
+    KnowledgeStateDistributionDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        basicallyMastered: {type: integer, minimum: 0, maximum: 2147483647}
+        needsPractice: {type: integer, minimum: 0, maximum: 2147483647}
+        learning: {type: integer, minimum: 0, maximum: 2147483647}
+        insufficientEvidence: {type: integer, minimum: 0, maximum: 2147483647}
+      required:
+      - basicallyMastered
+      - needsPractice
+      - learning
+      - insufficientEvidence
+    KnowledgeMasterySummaryDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        assessmentCount: {type: integer, minimum: 0, maximum: 2147483647, description: 学生与知识点组合总数；等于 distribution 四项之和。}
+        distribution: {$ref: '#/components/schemas/KnowledgeStateDistributionDTO'}
+        masteryRate:
+          anyOf:
+          - {type: number, minimum: 0, maximum: 1}
+          - {type: 'null'}
+          description: 基本掌握组合数 / assessmentCount；无组合时为 null。仅用于展示，不是成绩。
+      required:
+      - assessmentCount
+      - distribution
+      - masteryRate
+    KnowledgeMasteryItemDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        knowledgePointId: {$ref: '#/components/schemas/UUID'}
+        title: {type: string, maxLength: 200, minLength: 1}
+        chapterId:
+          anyOf:
+          - {$ref: '#/components/schemas/UUID'}
+          - {type: 'null'}
+        studentCount: {type: integer, minimum: 0, maximum: 2147483647, description: 本班学生数。}
+        assessedStudentCount: {type: integer, minimum: 0, maximum: 2147483647, description: 在该知识点有教师证据的学生数。}
+        distribution: {$ref: '#/components/schemas/KnowledgeStateDistributionDTO'}
+        masteryRate:
+          anyOf:
+          - {type: number, minimum: 0, maximum: 1}
+          - {type: 'null'}
+          description: 基本掌握人数 / studentCount；无学生时为 null。仅用于展示，不是成绩。
+      required:
+      - knowledgePointId
+      - title
+      - chapterId
+      - studentCount
+      - assessedStudentCount
+      - distribution
+      - masteryRate
+    OfferingKnowledgeMasteryDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        offeringId: {$ref: '#/components/schemas/UUID'}
+        ruleVersion: {type: string, const: knowledge-v2}
+        asOf: {$ref: '#/components/schemas/Timestamp'}
+        studentCount: {type: integer, minimum: 0, maximum: 2147483647}
+        assessedStudentCount: {type: integer, minimum: 0, maximum: 2147483647, description: 至少一个知识点有教师证据的学生数。}
+        knowledgePointCount: {type: integer, minimum: 0, maximum: 2147483647}
+        summary: {$ref: '#/components/schemas/KnowledgeMasterySummaryDTO'}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/KnowledgeMasteryItemDTO'}
+          minItems: 0
+      required:
+      - offeringId
+      - ruleVersion
+      - asOf
+      - studentCount
+      - assessedStudentCount
+      - knowledgePointCount
+      - summary
+      - items
+      examples:
+      - offeringId: 00000000-0000-4000-8000-000000000001
+        ruleVersion: knowledge-v2
+        asOf: '2026-10-31T02:00:00Z'
+        studentCount: 2
+        assessedStudentCount: 1
+        knowledgePointCount: 1
+        summary:
+          assessmentCount: 2
+          distribution: {basicallyMastered: 1, needsPractice: 0, learning: 0, insufficientEvidence: 1}
+          masteryRate: 0.5
+        items:
+        - knowledgePointId: 00000000-0000-4000-8000-000000000002
+          title: 事件绑定
+          chapterId: null
+          studentCount: 2
+          assessedStudentCount: 1
+          distribution: {basicallyMastered: 1, needsPractice: 0, learning: 0, insufficientEvidence: 1}
+          masteryRate: 0.5
     TimeRange:
       type: object
       additionalProperties: false
@@ -8841,6 +9076,24 @@ components:
       required:
       - data
       - requestId
+    Response_getOfferingActivity:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/OfferingActivityDTO'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - data
+      - requestId
+    Response_getOfferingKnowledgeMastery:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/OfferingKnowledgeMasteryDTO'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - data
+      - requestId
     Response_getAssignmentStats:
       type: object
       additionalProperties: false
@@ -9886,6 +10139,22 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Response_getOfferingStats'}
+    getOfferingActivity_200:
+      description: 200 近 14 天逐日行为计数与汇总；无事件日期补零，activeStudentCount 按用户去重
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_getOfferingActivity'}
+    getOfferingKnowledgeMastery_200:
+      description: 200 班级知识点掌握分布；按 knowledge-v2 聚合，masteryRate 不是成绩
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_getOfferingKnowledgeMastery'}
     getAssignmentStats_200:
       description: 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1 `commonIssues:[]`
       headers:
