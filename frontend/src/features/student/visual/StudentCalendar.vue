@@ -9,8 +9,8 @@ import { isUuid, formatTime } from '../../../features/courses/format'
 import { addDays, beijingDay, monthDays, shiftMonth, validDay, weekDays } from '../../../features/calendar/dates'
 import ApiState from '../../../components/ApiState.vue'
 import UiButton from '../../../components/ui/UiButton.vue'
-import UiField from '../../../components/ui/UiField.vue'
 import UiNotice from '../../../components/ui/UiNotice.vue'
+import UiSelect from '../../../components/ui/UiSelect.vue'
 import { deadlineGroups, submissionLabel } from './refinement'
 import { beijingTime } from './presentation'
 
@@ -20,6 +20,10 @@ const day=computed(()=>validDay(route.query.date)?route.query.date:today)
 const view=computed(()=>route.query.view==='week'?'week':'month')
 const offeringId=computed(()=>typeof route.query.offering==='string'?route.query.offering:'')
 const options=usePageQuery(async signal=>(await allPages(async(page,pageSize,signal)=>(await courses.listMyCourses({page,pageSize,status:'all'},{signal})).data,signal)).map(c=>({id:c.offeringId,title:c.title,groupName:c.groupName})))
+const offeringOptions=computed(()=>[
+  {value:'',label:'当前学期全部课程'},
+  ...(options.data.value??[]).map(c=>({value:c.id,label:c.title,hint:c.groupName})),
+])
 const query=usePageQuery(async signal=>{
   const selected=offeringId.value
   if(selected && (!isUuid(selected) || !options.data.value?.some(c=>c.id===selected))) throw new Error('该教学班不在当前可访问范围，请重新选择。')
@@ -68,7 +72,7 @@ function eventTone(a:{state:string;process:string|null}){return a.state==='archi
 </script>
 <template>
  <div class="workspace-page sr-calendar">
-  <header class="page-head"><div><h1 class="page-title" tabindex="-1">学习日历</h1><p class="page-summary">作业截止时间 · 北京时间。</p></div><div class="page-actions"><UiField label="教学班"><select :value="offeringId" :disabled="options.status.value!=='success'" @change="update({offering:($event.target as HTMLSelectElement).value})"><option value="">当前学期全部课程</option><option v-for="c in options.data.value" :key="c.id" :value="c.id">{{c.title}} · {{c.groupName}}</option></select></UiField></div></header>
+  <header class="page-head"><div><h1 class="page-title" tabindex="-1">学习日历</h1><p class="page-summary">作业截止时间 · 北京时间。</p></div><div class="page-actions"><UiSelect :model-value="offeringId" :options="offeringOptions" :disabled="options.status.value!=='success'" aria-label="教学班" placeholder="选择教学班" @update:model-value="v=>update({offering:v})"/></div></header>
   <ApiState :status="options.status.value" :error="options.error.value" @retry="options.load"/><ApiState :status="query.status.value" :error="query.error.value" @retry="query.load"/>
   <UiNotice v-if="query.status.value==='error'" tone="warn">日程未完整加载，请重试，不将部分结果视为全部日程。</UiNotice>
   <template v-if="options.status.value==='success'&&query.status.value==='success'">

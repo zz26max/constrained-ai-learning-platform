@@ -6,8 +6,8 @@ import type { LearningRecordsDTO } from '../../../api/dashboard'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
 import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
-import UiField from '../../../components/ui/UiField.vue'
 import UiPager from '../../../components/ui/UiPager.vue'
+import UiSelect from '../../../components/ui/UiSelect.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
 import { isUuid } from '../../../features/assignments/format'
@@ -51,6 +51,11 @@ const page = computed(() => {
 const offeringsQuery = usePageQuery(async signal => ({items:(await allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal)).sort(byRecentStudy)}))
 void offeringsQuery.load()
 const currentCourse = computed(() => offeringsQuery.data.value?.items.find(c => c.offeringId === rawId.value))
+const selectedCourseId = computed(() => typeof rawId.value === 'string' ? rawId.value : '')
+const courseOptions = computed(() => [
+  ...(selecting.value || !currentCourse.value ? [{ value: '', label: '选择课程' }] : []),
+  ...(offeringsQuery.data.value?.items ?? []).map(course => ({ value: course.offeringId, label: course.title, hint: course.groupName })),
+])
 const courseProgress = computed(() => {
   const progress = currentCourse.value?.progress
   return progress && !progress.notConfigured && progress.total > 0 ? { completed: progress.completed, total: progress.total } : null
@@ -94,6 +99,10 @@ function goToPage(next: number): void {
   if (next < 1 || next > totalPages.value) return
   void router.push({ query: { ...route.query, page: String(next) } })
 }
+function chooseCourse(offeringId: string): void {
+  if (!offeringId || offeringId === selectedCourseId.value) return
+  void router.push({ name: 'student-progress', params: { offeringId } })
+}
 </script>
 
 <template>
@@ -104,9 +113,7 @@ function goToPage(next: number): void {
         <p class="page-summary">掌握判断只依据已批阅作业里的知识点评价，不代表考试成绩。</p>
       </div>
       <div class="page-actions">
-        <UiField label="课程">
-          <select :value="rawId ?? ''" :disabled="offeringsQuery.status.value !== 'success'" @change="router.push({name:'student-progress',params:{offeringId:($event.target as HTMLSelectElement).value}})"><option v-if="selecting || !currentCourse" value="">选择课程</option><option v-for="course in offeringsQuery.data.value?.items" :key="course.offeringId" :value="course.offeringId">{{ course.title }} · {{ course.groupName }}</option></select>
-        </UiField>
+        <UiSelect :model-value="selectedCourseId" :options="courseOptions" :disabled="offeringsQuery.status.value !== 'success'" aria-label="课程" @update:model-value="chooseCourse" />
       </div>
     </header>
 

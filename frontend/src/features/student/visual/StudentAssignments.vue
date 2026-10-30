@@ -10,6 +10,7 @@ import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
 import UiFilterTabs from '../../../components/ui/UiFilterTabs.vue'
 import UiNotice from '../../../components/ui/UiNotice.vue'
 import UiPager from '../../../components/ui/UiPager.vue'
+import UiSelect from '../../../components/ui/UiSelect.vue'
 import IntegratedTaskStatus from './CraftTaskState.vue'
 import { assignmentTypeLabel } from '../../../features/assignments/format'
 import { taskContentTone } from './content-presentation'
@@ -43,6 +44,11 @@ const totalPages=computed(()=>Math.max(1,Math.ceil(filtered.value.length/PAGE_SI
 const visible=computed(()=>filtered.value.slice((page.value-1)*PAGE_SIZE,page.value*PAGE_SIZE))
 function change(key:string,value:string){void router.push({query:{...route.query,[key]:value,page:'1'}})}
 const filterTabs=computed(()=>filters.map(f=>({key:f.key,label:f.label,count:scoped.value.filter(t=>matchesTask(t,f.key)).length})))
+const courseOptions=computed(()=>[
+  {value:'',label:'全部课程'},
+  ...(query.data.value?.classes??[]).map(c=>({value:c.offeringId,label:c.title,hint:c.groupName})),
+])
+const sortOptions=[{value:'asc',label:'最早截止优先'},{value:'desc',label:'最晚截止优先'}]
 function setStatusFilter(key:string){change('status',key)}
 function goToPage(next:number){void router.push({query:{...route.query,page:String(next)}})}
 watch(totalPages,n=>{if(page.value>n)void router.replace({query:{...route.query,page:String(n)}})})
@@ -101,7 +107,7 @@ function dueWhen(value:string){const date=new Date(value);return Number.isNaN(da
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <template v-if="query.status.value==='success' && query.data.value">
       <UiFilterTabs :items="filterTabs" :model-value="filter" label="作业状态" @update:model-value="setStatusFilter" />
-      <div class="task-toolbar"><label>课程<select :value="offering" @change="change('offering',($event.target as HTMLSelectElement).value)"><option value="">全部课程</option><option v-for="c in query.data.value.classes" :key="c.offeringId" :value="c.offeringId">{{ c.title }} · {{ c.groupName }}</option></select></label><label>排序<select :value="descending?'desc':'asc'" @change="change('sort',($event.target as HTMLSelectElement).value)"><option value="asc">最早截止优先</option><option value="desc">最晚截止优先</option></select></label></div>
+      <div class="task-toolbar"><UiSelect :model-value="offering" :options="courseOptions" aria-label="课程" @update:model-value="v=>change('offering',v)" /><UiSelect :model-value="descending?'desc':'asc'" :options="sortOptions" aria-label="排序" @update:model-value="v=>change('sort',v)" /></div>
       <p v-if="details.status.value==='loading'" role="status" class="meta task-hint">正在确认提交资格…</p>
       <UiNotice v-if="details.status.value==='error'" tone="warn" role="alert"><p>提交资格未能完整加载，当前仅按截止时间排序，可查看详情。</p><UiButton variant="secondary" @click="details.load">重试</UiButton></UiNotice>
       <section class="task-table" aria-label="作业列表">

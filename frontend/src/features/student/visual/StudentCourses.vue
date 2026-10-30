@@ -7,6 +7,7 @@ import ApiState from '../../../components/ApiState.vue'
 import ActionNotice from '../../../components/ActionNotice.vue'
 import UiButton from '../../../components/ui/UiButton.vue'
 import UiPager from '../../../components/ui/UiPager.vue'
+import UiSelect from '../../../components/ui/UiSelect.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { useCourseActions } from '../../../features/courses/use-course-actions'
 import type { CourseSummaryDTO } from '../../../api/courses'
@@ -22,6 +23,11 @@ const query = usePageQuery(async signal => {
   const items = await allPages((page, pageSize, signal) => api.listMyCourses({ ...(termId.value ? { termId: termId.value } : {}), status: courseStatus.value, page, pageSize }, { signal }).then(r => r.data), signal)
   return { items: items.sort(byRecentStudy), total: items.length }
 })
+const termOptions = computed(() => [
+  { value: '', label: '当前学期' },
+  ...(auth.config?.terms ?? []).map(term => ({ value: term.id, label: term.label })),
+])
+const statusOptions = [{ value: 'active', label: '进行中' }, { value: 'archived', label: '已归档' }, { value: 'all', label: '全部' }]
 const visibleCourses = computed(() => query.data.value?.items.slice((page.value - 1) * 20, page.value * 20) ?? [])
 const totalPages = computed(() => Math.max(1, Math.ceil((query.data.value?.total ?? 0) / 20)))
 function goToPage(next: number) { page.value = next }
@@ -80,7 +86,7 @@ function hasProgress(course: CourseSummaryDTO) { return course.progress.total > 
       </div>
       <div class="page-actions"><button ref="joinTrigger" class="button secondary" @click="openJoin">加入课程</button></div>
     </header>
-    <div class="course-filters"><label>学期<select v-model="termId"><option value="">当前学期</option><option v-for="term in auth.config?.terms" :key="term.id" :value="term.id">{{ term.label }}</option></select></label><label>课程状态<select v-model="courseStatus"><option value="active">进行中</option><option value="archived">已归档</option><option value="all">全部</option></select></label><p v-if="query.data.value" class="course-count">共 {{ query.data.value.total }} 门课程</p></div>
+    <div class="course-filters"><UiSelect v-model="termId" :options="termOptions" label="学期" /><UiSelect v-model="courseStatus" :options="statusOptions" label="课程状态" /><p v-if="query.data.value" class="course-count">共 {{ query.data.value.total }} 门课程</p></div>
     <p v-if="integrated && chapterActions.status.value === 'error'" role="alert">章节状态未能读取，可查看章节或重试。<button class="button secondary" @click="chapterActions.load">重新读取章节状态</button></p><ActionNotice :error="actions.error.value" :message="actions.message.value" /><ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <template v-if="query.status.value === 'success' && query.data.value">
       <section v-if="!query.data.value.total" class="course-empty"><h2>暂无符合条件的课程</h2><p>调整学期或状态，或用教师提供的邀请码加入课程。</p></section>
