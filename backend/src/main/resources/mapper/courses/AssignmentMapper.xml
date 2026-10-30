@@ -650,7 +650,7 @@ SELECT
 (SELECT COUNT(*) FROM submissions s
  WHERE s.offering_id=#{offeringId} AND s.is_current=1
  AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')) AS pending_review_count,
-0 AS pending_help_count
+(SELECT COUNT(*) FROM help_requests WHERE offering_id=#{offeringId} AND status='open') AS pending_help_count
 </select>
 
 <select id="getAssignmentStats" resultType="com.learningplatform.modules.courses.model.AssignmentRows$AssignmentStatsRow">

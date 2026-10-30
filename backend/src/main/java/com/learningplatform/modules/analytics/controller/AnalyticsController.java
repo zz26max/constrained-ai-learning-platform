@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.*;
 public class AnalyticsController {
     private final LearningEventService events;private final IssueTagService tags;
     private final com.learningplatform.modules.courses.service.DashboardService dashboard;
-    public AnalyticsController(LearningEventService events,IssueTagService tags,com.learningplatform.modules.courses.service.DashboardService dashboard){this.events=events;this.tags=tags;this.dashboard=dashboard;}
+    private final OfferingAnalyticsService analytics;
+    public AnalyticsController(LearningEventService events,IssueTagService tags,com.learningplatform.modules.courses.service.DashboardService dashboard,OfferingAnalyticsService analytics){this.events=events;this.tags=tags;this.dashboard=dashboard;this.analytics=analytics;}
     @GetMapping("/me/learning-records")
     public ApiResponse<?> records(Authentication auth,HttpServletRequest req,@RequestParam String offeringId,
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
@@ -27,5 +28,13 @@ public class AnalyticsController {
     @GetMapping("/offerings/{offeringId}/issue-tags")
     public ApiResponse<?> tags(Authentication auth,HttpServletRequest req,@PathVariable String offeringId) {
         return new ApiResponse<>(tags.get(((SessionIdentity)auth.getPrincipal()).user(),offeringId),RequestIdFilter.getRequestId(req));
+    }
+    @GetMapping("/teacher/offerings/{offeringId}/activity")
+    public ApiResponse<?> activity(Authentication auth,HttpServletRequest req,@PathVariable String offeringId) {
+        return new ApiResponse<>(analytics.activity(offeringId,((SessionIdentity)auth.getPrincipal()).user()),RequestIdFilter.getRequestId(req));
+    }
+    @GetMapping("/teacher/offerings/{offeringId}/knowledge-mastery")
+    public ApiResponse<?> mastery(Authentication auth,HttpServletRequest req,@PathVariable String offeringId) {
+        return new ApiResponse<>(analytics.mastery(offeringId,((SessionIdentity)auth.getPrincipal()).user()),RequestIdFilter.getRequestId(req));
     }
 }

@@ -106,7 +106,6 @@ public class KnowledgeService {
         }
         return inProgress?"learning":"insufficient_evidence";
     }
-    public int pendingHelp(String offering) {return mapper.pendingHelp(offering);}
     @SuppressWarnings("unchecked")
     public List<Object> commonIssues(String assignment,String offering) {
         var config=tags.configuration(offering);int current=((Number)config.get("version")).intValue();

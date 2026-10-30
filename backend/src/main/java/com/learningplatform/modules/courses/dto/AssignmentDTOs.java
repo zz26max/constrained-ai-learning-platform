@@ -88,7 +88,7 @@ public final class AssignmentDTOs {
             TeacherFeedbackPage feedbackPage,List<Object> knowledgeEvidence,Object nextRecommendation,StudentBrief student) {}
     public record OfferingStatsDTO(int studentCount,int activeAssignmentCount,
             int pendingReviewCount,int pendingHelpCount) {}
-    /** 契约 AssignmentStatsDTO：P1 没有 commonIssues 数据来源，恒为空数组。 */
+    /** 契约 AssignmentStatsDTO。 */
     public record AssignmentStatsDTO(int studentCount,int submittedStudentCount,int pendingReviewCount,
             int reviewedStudentCount,List<Object> commonIssues) {}
     /** 契约 NoticeDTO：target 是可选跳转对象（TargetDTO），不是收件人；存于 notices.target_type/target_id，为空时为 null。 */

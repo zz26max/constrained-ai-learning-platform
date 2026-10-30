@@ -35,7 +35,6 @@ public interface KnowledgeMapper {
     String resource(String offering,String knowledge);
     @Select("SELECT a.id FROM assignments a JOIN assignment_knowledge_points ak ON ak.assignment_id=a.id JOIN course_offerings o ON o.id=a.offering_id WHERE a.offering_id=#{offering} AND ak.knowledge_point_id=#{knowledge} AND a.status='published' AND o.status='active' AND a.published_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{student} AND s.is_current=1) ORDER BY a.due_at,a.id LIMIT 1")
     String task(String student,String offering,String knowledge);
-    @Select("SELECT COUNT(*) FROM help_requests WHERE offering_id=#{offering} AND status='open'") int pendingHelp(String offering);
     @Select("SELECT f.student_id AS studentId,t.tag,f.issue_tag_version AS version,f.published_at AS occurredAt FROM feedback f JOIN feedback_issue_tags t ON t.feedback_id=f.id WHERE f.assignment_id=#{assignment} AND f.status='published'")
     List<Map<String,Object>> confirmed(String assignment);
     @Select("SELECT student_id AS studentId,issue_tags AS tags,issue_tag_version AS version,created_at AS occurredAt FROM help_requests WHERE assignment_id=#{assignment}")

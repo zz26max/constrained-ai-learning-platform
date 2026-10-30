@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.learningplatform.modules.analytics.mapper.OfferingAnalyticsMapper">
+<resultMap id="masteryEvidence" type="com.learningplatform.modules.analytics.mapper.OfferingAnalyticsMapper$MasteryEvidence"><constructor>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="knowledgePointId" column="knowledge_point_id" javaType="java.lang.String"/>
+<arg name="assignmentId" column="assignment_id" javaType="java.lang.String"/>
+<arg name="result" column="result" javaType="java.lang.String"/>
+<arg name="occurredAt" column="occurred_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+<arg name="id" column="id" javaType="java.lang.String"/>
+</constructor></resultMap>
+<resultMap id="inProgressRow" type="com.learningplatform.modules.analytics.mapper.OfferingAnalyticsMapper$InProgressRow"><constructor>
+<arg name="studentId" column="student_id" javaType="java.lang.String"/>
+<arg name="knowledgePointId" column="knowledge_point_id" javaType="java.lang.String"/>
+</constructor></resultMap>
+<resultMap id="activityEvent" type="com.learningplatform.modules.analytics.mapper.OfferingAnalyticsMapper$ActivityEvent"><constructor>
+<arg name="userId" column="user_id" javaType="java.lang.String"/>
+<arg name="type" column="type" javaType="java.lang.String"/>
+<arg name="receivedAt" column="received_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
+</constructor></resultMap>
+<select id="activeStudentIds" resultType="java.lang.String">
+SELECT user_id FROM offering_members WHERE offering_id=#{offeringId} AND role='student' AND status='active' ORDER BY user_id
+</select>
+<select id="currentEvidence" resultMap="masteryEvidence">
+SELECT student_id,knowledge_point_id,assignment_id,result,occurred_at,id
+FROM knowledge_evidence WHERE offering_id=#{offeringId} AND is_current=1
+ORDER BY student_id,knowledge_point_id,occurred_at DESC,id DESC
+</select>
+<select id="inProgress" resultMap="inProgressRow">
+SELECT DISTINCT w.student_id,ak.knowledge_point_id
+FROM assignments a
+JOIN assignment_knowledge_points ak ON ak.assignment_id=a.id
+JOIN workspaces w ON w.assignment_id=a.id
+JOIN course_offerings o ON o.id=a.offering_id
+WHERE a.offering_id=#{offeringId} AND a.status='published' AND o.status='active' AND a.published_at IS NOT NULL
+AND NOT EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=w.student_id AND s.is_current=1)
+</select>
+<select id="activityEvents" resultMap="activityEvent">
+SELECT user_id,type,received_at FROM learning_events
+WHERE offering_id=#{offeringId}
+AND received_at &gt;= #{from,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+AND received_at &lt; #{to,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+ORDER BY received_at,id
+</select>
+</mapper>

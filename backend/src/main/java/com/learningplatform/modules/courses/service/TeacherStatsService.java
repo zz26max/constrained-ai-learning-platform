@@ -25,7 +25,7 @@ public class TeacherStatsService {
     public OfferingStatsDTO getOfferingStats(String offeringId,UserDTO user) {
         access.requireTeacher(user,AssignmentInput.uuid(offeringId),false);
         var row=mapper.getOfferingStats(offeringId);
-        return new OfferingStatsDTO(row.studentCount(),row.activeAssignmentCount(),row.pendingReviewCount(),knowledge.pendingHelp(offeringId));
+        return new OfferingStatsDTO(row.studentCount(),row.activeAssignmentCount(),row.pendingReviewCount(),row.pendingHelpCount());
     }
     /** 作业不存在或不属于本人任教班级统一 404。 */
     @Transactional(readOnly=true)
@@ -35,7 +35,6 @@ public class TeacherStatsService {
         if(assignment==null) throw CourseAccess.notFound();
         access.requireTeacher(user,assignment.offeringId(),false);
         AssignmentStatsRow row=mapper.getAssignmentStats(assignmentId);
-        // commonIssues：P1 没有求助/检查数据来源，契约允许空数组。
         return new AssignmentStatsDTO(row.studentCount(),row.submittedStudentCount(),row.pendingReviewCount(),
                 row.reviewedStudentCount(),knowledge.commonIssues(assignmentId,assignment.offeringId()));
     }

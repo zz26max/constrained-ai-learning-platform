@@ -52,6 +52,7 @@ class AnalyticsIntegrationIT {
     private static final UserDTO OTHER_STUDENT = user("c5", "ns.other", "student");
     private static final UserDTO OUTSIDER = user("c6", "ns.outsider", "student");
     private static final UserDTO OTHER_TEACHER = user("c7", "ns.teacher2", "teacher");
+    private static final UserDTO FOURTH_STUDENT = user("c8", "ns.fourth", "student");
     private static final JsonMapper JSON = JsonMapper.builder().findAndAddModules().build();
 
     @Container
@@ -74,6 +75,7 @@ class AnalyticsIntegrationIT {
     @Autowired private KnowledgeService knowledge;
     @Autowired private DashboardService dashboard;
     @Autowired private TeacherStatsService stats;
+    @Autowired private OfferingAnalyticsService analytics;
     @Autowired private org.springframework.test.web.servlet.MockMvc mvc;
     @Autowired private com.learningplatform.modules.auth.service.DatabaseSessionService sessions;
     @Autowired private org.springframework.security.crypto.password.PasswordEncoder passwords;
@@ -94,7 +96,7 @@ class AnalyticsIntegrationIT {
                 "course_offerings", "courses", "terms", "audit_logs", "auth_sessions", "users")) {
             jdbc.update("DELETE FROM " + table);
         }
-        for (UserDTO u : List.of(TEACHER, STUDENT, OTHER_STUDENT, OUTSIDER, OTHER_TEACHER)) {
+        for (UserDTO u : List.of(TEACHER, STUDENT, OTHER_STUDENT, OUTSIDER, OTHER_TEACHER, FOURTH_STUDENT)) {
             jdbc.update("INSERT INTO users(id,username,display_name,password_hash,roles,status,created_at,updated_at) VALUES(?,?,?,?,CAST(? AS JSON),'active',?,?)",
                     u.id(), u.username(), u.displayName(), "TEST_ONLY_NOT_A_REAL_HASH", JSON.writeValueAsString(u.roles()), ts(NOW), ts(NOW));
         }
@@ -131,8 +133,20 @@ class AnalyticsIntegrationIT {
         String id=UUID.randomUUID().toString();jdbc.update("INSERT INTO knowledge_points(id,offering_id,chapter_id,title,description,position,created_at,updated_at) VALUES(?,?,NULL,'fixture','fixture',1,?,?)",id,offering,ts(NOW),ts(NOW));return id;
     }
     private String submission(String offering,String kp) {
+        return submissionFor(offering, kp, STUDENT);
+    }
+    private String submissionFor(String offering,String kp,UserDTO student) {
         var draft=createDraft(offering,"fixture");jdbc.update("INSERT INTO assignment_knowledge_points VALUES(?,?,?)",draft.id(),offering,kp);
-        assignmentService.publishAssignment(TEACHER,draft.id(),"publish");return saveAndSubmit(STUDENT,draft.id());
+        assignmentService.publishAssignment(TEACHER,draft.id(),"publish");return saveAndSubmit(student,draft.id());
+    }
+    private TeacherAssignmentDTO publishAssignmentWithKnowledgePoint(String offering,String kp) {
+        var draft=createDraft(offering,"fixture");jdbc.update("INSERT INTO assignment_knowledge_points VALUES(?,?,?)",draft.id(),offering,kp);
+        return assignmentService.publishAssignment(TEACHER,draft.id(),"publish");
+    }
+    private void openWorkspace(UserDTO student,String assignmentId) {
+        String type=jdbc.queryForObject("SELECT type FROM assignments WHERE id=?",String.class,assignmentId);
+        String path="web_lab".equals(type)?"index.html":"answer.md";
+        assignmentService.saveWorkspace(student,assignmentId,new HashMap<>(Map.of("baseRevision",0,"files",List.of(Map.of("path",path,"content","V1")),"activeFile",path)),"save");
     }
     private Map<String,Object> feedback(String kp,String result) {
         return new HashMap<>(Map.of("baseVersion",0,"score",100,"rubricResults",List.of(Map.of("criterionId","layout","score",60,"comment","fixture"),Map.of("criterionId","quality","score",40,"comment","fixture")),"comment","fixture","knowledgeEvaluations",List.of(Map.of("knowledgePointId",kp,"result",result,"note","fixture")),"issueTags",List.of("box_model")));
@@ -208,6 +222,119 @@ class AnalyticsIntegrationIT {
     }
 
     private int offeringSeq = 0;
+
+    private void learningEvent(String offering, String user, String type, String receivedAt) {
+        Instant instant = Instant.parse(receivedAt);
+        jdbc.update("INSERT INTO learning_events(id,user_id,offering_id,type,source,occurred_at,received_at,payload,source_event_key) VALUES(?,?,?,?,'server',?,?,'{}',?)",
+                UUID.randomUUID().toString(), user, offering, type, ts(instant), ts(instant), "fixture:" + UUID.randomUUID());
+    }
+
+    @Test void offeringActivityUsesShanghaiDaysAndZeroFills() {
+        var o = createOffering();
+        enrollStudent(o.id(), STUDENT);
+        enrollStudent(o.id(), OTHER_STUDENT);
+        // 2026-10-14T16:30Z is already 2026-10-15 in Asia/Shanghai.
+        learningEvent(o.id(), STUDENT.id(), "editor_opened", "2026-10-14T16:30:00Z");
+        learningEvent(o.id(), STUDENT.id(), "editor_opened", "2026-10-14T16:45:00Z");
+        learningEvent(o.id(), OTHER_STUDENT.id(), "workspace_saved", "2026-10-14T15:30:00Z");
+        learningEvent(o.id(), STUDENT.id(), "assignment_submitted", "2026-10-14T15:45:00Z");
+        learningEvent(o.id(), STUDENT.id(), "not_a_fact", "2026-10-15T01:00:00Z");
+        learningEvent(o.id(), STUDENT.id(), "chapter_opened", "2026-09-30T15:59:59Z");
+        var activity = analytics.activity(o.id(), TEACHER);
+        assertThat(activity.from()).isEqualTo("2026-10-02");
+        assertThat(activity.to()).isEqualTo("2026-10-15");
+        assertThat(activity.days()).hasSize(14);
+        var oct14 = activity.days().get(12);
+        var oct15 = activity.days().get(13);
+        assertThat(oct14.date()).isEqualTo("2026-10-14");
+        assertThat(oct14.activeStudentCount()).isEqualTo(2);
+        assertThat(oct14.workspaceSavedCount()).isEqualTo(1);
+        assertThat(oct14.assignmentSubmittedCount()).isEqualTo(1);
+        assertThat(oct14.editorOpenedCount()).isZero();
+        assertThat(oct15.date()).isEqualTo("2026-10-15");
+        assertThat(oct15.activeStudentCount()).isEqualTo(1);
+        assertThat(oct15.editorOpenedCount()).isEqualTo(2);
+        assertThat(activity.days().getFirst().activeStudentCount()).isZero();
+        assertThat(activity.totals().activeStudentCount()).isEqualTo(2);
+        assertThat(activity.totals().chapterOpenedCount()).isZero();
+        assertThat(activity.totals().workspaceSavedCount()).isEqualTo(1);
+        assertThat(activity.totals().assignmentSubmittedCount()).isEqualTo(1);
+    }
+
+    @Test void offeringMasteryAggregatesKnowledgeV2FourStatesAndHidesDraftChapters() {
+        var o = createOffering();
+        for (UserDTO student : List.of(STUDENT, OTHER_STUDENT, OUTSIDER, FOURTH_STUDENT)) enrollStudent(o.id(), student);
+        String kp = knowledgePoint(o.id());
+        for (int i = 0; i < 2; i++) {
+            String sid = submissionFor(o.id(), kp, STUDENT);
+            var save = assignmentService.saveFeedback(TEACHER, sid, feedback(kp, "meets_expectation"), "save");
+            assignmentService.publishFeedback(TEACHER, sid, Map.of("baseVersion", save.feedback().version()), "publish");
+        }
+        String needs = submissionFor(o.id(), kp, OTHER_STUDENT);
+        var save = assignmentService.saveFeedback(TEACHER, needs, feedback(kp, "needs_practice"), "save");
+        assignmentService.publishFeedback(TEACHER, needs, Map.of("baseVersion", save.feedback().version()), "publish");
+        var inProgress = publishAssignmentWithKnowledgePoint(o.id(), kp);
+        openWorkspace(OUTSIDER, inProgress.id());
+        String draftChapter = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO chapters(id,offering_id,position,title,summary,status,is_required,content_version,created_at,updated_at) VALUES(?,?,2,'Draft','Summary','draft',1,1,?,?)",
+                draftChapter, o.id(), ts(NOW), ts(NOW));
+        jdbc.update("INSERT INTO knowledge_points(id,offering_id,chapter_id,title,description,position,created_at,updated_at) VALUES(?,?,?,'hidden','fixture',2,?,?)",
+                UUID.randomUUID().toString(), o.id(), draftChapter, ts(NOW), ts(NOW));
+        var mastery = analytics.mastery(o.id(), TEACHER);
+        assertThat(mastery.ruleVersion()).isEqualTo("knowledge-v2");
+        assertThat(mastery.asOf()).isEqualTo(NOW);
+        assertThat(mastery.studentCount()).isEqualTo(4);
+        assertThat(mastery.assessedStudentCount()).isEqualTo(2);
+        assertThat(mastery.knowledgePointCount()).isEqualTo(1);
+        assertThat(mastery.summary().assessmentCount()).isEqualTo(4);
+        assertThat(mastery.summary().distribution().basicallyMastered()).isEqualTo(1);
+        assertThat(mastery.summary().distribution().needsPractice()).isEqualTo(1);
+        assertThat(mastery.summary().distribution().learning()).isEqualTo(1);
+        assertThat(mastery.summary().distribution().insufficientEvidence()).isEqualTo(1);
+        assertThat(mastery.summary().masteryRate()).isEqualByComparingTo(new BigDecimal("0.25"));
+        assertThat(mastery.items()).hasSize(1);
+        var item = mastery.items().getFirst();
+        assertThat(item.knowledgePointId()).isEqualTo(kp);
+        assertThat(item.chapterId()).isNull();
+        assertThat(item.studentCount()).isEqualTo(4);
+        assertThat(item.assessedStudentCount()).isEqualTo(2);
+        assertThat(item.masteryRate()).isEqualByComparingTo(new BigDecimal("0.25"));
+    }
+
+    @Test void offeringAnalyticsRequireTeacherMembershipAndRealHttpHeaders() throws Exception {
+        var o = createOffering();
+        enrollStudent(o.id(), STUDENT);
+        var teacherCookie = new jakarta.servlet.http.Cookie("lp_session", httpLogin(TEACHER).token());
+        var studentCookie = new jakarta.servlet.http.Cookie("lp_session", httpLogin(STUDENT).token());
+        var otherTeacherCookie = new jakarta.servlet.http.Cookie("lp_session", httpLogin(OTHER_TEACHER).token());
+        for (String suffix : List.of("/activity", "/knowledge-mastery")) {
+            String path = "/api/v1/teacher/offerings/" + o.id() + suffix;
+            var response = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                            .cookie(teacherCookie).header("X-Request-ID", "req-analytics").accept("application/json"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Request-ID", "req-analytics"))
+                    .andReturn();
+            var data = JSON.readTree(response.getResponse().getContentAsString()).path("data");
+            if (suffix.equals("/activity")) {
+                assertThat(data.path("days").size()).isEqualTo(14);
+                assertThat(data.path("totals").path("activeStudentCount").asInt()).isZero();
+            } else {
+                assertThat(data.path("studentCount").asInt()).isEqualTo(1);
+                assertThat(data.path("items").size()).isZero();
+            }
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).cookie(studentCookie))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).cookie(otherTeacherCookie))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/teacher/offerings/not-a-uuid" + suffix).cookie(teacherCookie))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(422));
+        }
+        assertThatThrownBy(() -> analytics.activity(o.id(), STUDENT)).satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+        assertThatThrownBy(() -> analytics.mastery(o.id(), OTHER_TEACHER)).satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+    }
 
     @Test void knowledgeFeedbackHttpWritePublishesFrozenEvidenceAndStudentView() throws Exception {
         var o=createOffering();enrollStudent(o.id(),STUDENT);

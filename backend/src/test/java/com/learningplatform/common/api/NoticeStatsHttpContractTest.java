@@ -14,6 +14,8 @@ import com.learningplatform.modules.auth.security.CsrfTokenService;
 import com.learningplatform.modules.auth.service.DatabaseSessionService;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.*;
 import com.learningplatform.modules.courses.dto.CourseDTOs;
+import com.learningplatform.modules.analytics.dto.OfferingAnalyticsDTOs.*;
+import com.learningplatform.modules.analytics.service.OfferingAnalyticsService;
 import com.learningplatform.modules.courses.service.NoticeService;
 import com.learningplatform.modules.courses.service.TeacherStatsService;
 import jakarta.servlet.http.Cookie;
@@ -37,7 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** P1-D 公告与教师统计：listNotices / getNotice / createNotice / getOfferingStats / getAssignmentStats / getStudentLearningRecords。 */
+/** P1-D 公告与教师统计：listNotices / getNotice / createNotice / getOfferingStats / getAssignmentStats / getStudentLearningRecords / P2 教师分析。 */
 @SpringBootTest(classes = LearningPlatformApplication.class, properties = {
         "spring.flyway.enabled=false", "spring.sql.init.mode=never",
         "DB_URL=jdbc:mysql://127.0.0.1:1/unused", "DB_USERNAME=unused", "DB_PASSWORD=unused",
@@ -65,6 +67,7 @@ class NoticeStatsHttpContractTest {
     @MockitoBean private DatabaseSessionService sessions;
     @MockitoBean private NoticeService notices;
     @MockitoBean private TeacherStatsService stats;
+    @MockitoBean private OfferingAnalyticsService analytics;
 
     private static final NoticeDTO NOTICE = new NoticeDTO(ID, OFFERING, "公告标题", "公告内容", null, T, 3);
 
@@ -78,6 +81,8 @@ class NoticeStatsHttpContractTest {
         when(stats.getOfferingStats(anyString(), any())).thenReturn(new OfferingStatsDTO(30, 4, 7, 0));
         when(stats.getAssignmentStats(anyString(), any())).thenReturn(new AssignmentStatsDTO(30, 20, 5, 15, List.of()));
         when(stats.getStudentLearningRecords(anyString(), anyString(), any(), anyInt(), anyInt())).thenReturn(teacherRecords());
+        when(analytics.activity(anyString(), any())).thenReturn(activity());
+        when(analytics.mastery(anyString(), any())).thenReturn(mastery());
     }
 
     private static TeacherFeedbackDTO teacherFeedback() {
@@ -91,6 +96,19 @@ class NoticeStatsHttpContractTest {
         return new TeacherLearningRecordsDTO(OFFERING, new LearningSummary(1, 1, null), fb,
                 new TeacherFeedbackPage(List.of(fb), 1, 20, 1), List.of(), null,
                 new StudentBrief(STUDENT_ID, "stu", "学生"));
+    }
+
+    private static OfferingActivityDTO activity() {
+        return new OfferingActivityDTO(OFFERING, "2026-10-01", "2026-10-14",
+                List.of(new ActivityDayDTO("2026-10-14", 2, 3, 1, 2, 1, 2, 1, 1, 1)),
+                new ActivityTotalsDTO(2, 3, 1, 2, 1, 2, 1, 1, 1));
+    }
+
+    private static OfferingKnowledgeMasteryDTO mastery() {
+        KnowledgeStateDistributionDTO distribution = new KnowledgeStateDistributionDTO(1, 0, 0, 1);
+        return new OfferingKnowledgeMasteryDTO(OFFERING, "knowledge-v2", T, 2, 1, 1,
+                new KnowledgeMasterySummaryDTO(2, distribution, new BigDecimal("0.5")),
+                List.of(new KnowledgeMasteryItemDTO(ID, "事件绑定", null, 2, 1, distribution, new BigDecimal("0.5"))));
     }
 
     // ---------- NoticeDTO / NoticePage ----------
@@ -221,6 +239,68 @@ class NoticeStatsHttpContractTest {
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
         mvc.perform(get("/api/v1/teacher/assignments/not-a-uuid/stats", TEACHER_TOKEN)).andExpect(status().is(422))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    // ---------- P2 offering analytics ----------
+
+    @Test
+    void getOfferingActivityHasContractShape() throws Exception {
+        mvc.perform(get("/api/v1/teacher/offerings/" + OFFERING + "/activity", TEACHER_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Request-ID", REQUEST_ID))
+                .andExpect(jsonPath("$.requestId").value(REQUEST_ID))
+                .andExpect(jsonPath("$.data.length()").value(5))
+                .andExpect(jsonPath("$.data.offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.from").value("2026-10-01"))
+                .andExpect(jsonPath("$.data.to").value("2026-10-14"))
+                .andExpect(jsonPath("$.data.days", hasSize(1)))
+                .andExpect(jsonPath("$.data.days[0].length()").value(10))
+                .andExpect(jsonPath("$.data.days[0].date").value("2026-10-14"))
+                .andExpect(jsonPath("$.data.days[0].activeStudentCount").value(2))
+                .andExpect(jsonPath("$.data.days[0].workspaceSavedCount").value(2))
+                .andExpect(jsonPath("$.data.days[0].tutoringCompletedCount").value(1))
+                .andExpect(jsonPath("$.data.totals.length()").value(9))
+                .andExpect(jsonPath("$.data.totals.activeStudentCount").value(2))
+                .andExpect(jsonPath("$.data.totals.helpRequestCreatedCount").value(1));
+    }
+
+    @Test
+    void getOfferingKnowledgeMasteryHasContractShape() throws Exception {
+        mvc.perform(get("/api/v1/teacher/offerings/" + OFFERING + "/knowledge-mastery", TEACHER_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Request-ID", REQUEST_ID))
+                .andExpect(jsonPath("$.data.length()").value(8))
+                .andExpect(jsonPath("$.data.offeringId").value(OFFERING))
+                .andExpect(jsonPath("$.data.ruleVersion").value("knowledge-v2"))
+                .andExpect(jsonPath("$.data.asOf").value("2026-10-14T00:00:00Z"))
+                .andExpect(jsonPath("$.data.studentCount").value(2))
+                .andExpect(jsonPath("$.data.assessedStudentCount").value(1))
+                .andExpect(jsonPath("$.data.knowledgePointCount").value(1))
+                .andExpect(jsonPath("$.data.summary.length()").value(3))
+                .andExpect(jsonPath("$.data.summary.assessmentCount").value(2))
+                .andExpect(jsonPath("$.data.summary.distribution.length()").value(4))
+                .andExpect(jsonPath("$.data.summary.distribution.basicallyMastered").value(1))
+                .andExpect(jsonPath("$.data.summary.distribution.insufficientEvidence").value(1))
+                .andExpect(jsonPath("$.data.summary.masteryRate").value(0.5))
+                .andExpect(jsonPath("$.data.items", hasSize(1)))
+                .andExpect(jsonPath("$.data.items[0].length()").value(7))
+                .andExpect(jsonPath("$.data.items[0].title").value("事件绑定"))
+                .andExpect(jsonPath("$.data.items[0].chapterId").value(nullValue()))
+                .andExpect(jsonPath("$.data.items[0].masteryRate").value(0.5));
+    }
+
+    @Test
+    void offeringAnalyticsMapServiceErrors() throws Exception {
+        when(analytics.activity(anyString(), any()))
+                .thenThrow(new BusinessException(HttpStatus.FORBIDDEN, "FORBIDDEN", "权限不足。"));
+        mvc.perform(get("/api/v1/teacher/offerings/" + OFFERING + "/activity", STUDENT_TOKEN))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        when(analytics.mastery(anyString(), any()))
+                .thenThrow(new BusinessException(HttpStatus.NOT_FOUND, "NOT_FOUND", "请求的资源不存在。"));
+        mvc.perform(get("/api/v1/teacher/offerings/" + OFFERING + "/knowledge-mastery", TEACHER_TOKEN))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 
     // ---------- getStudentLearningRecords ----------

@@ -91,9 +91,9 @@ class DatabaseIntegrationIT {
     void migrationIsAppliedOnceAndValidatedAgain() {
         assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class))
                 .startsWith("8.4.11");
-        assertThat(flyway.info().applied()).hasSize(14)
+        assertThat(flyway.info().applied()).hasSize(15)
                 .extracting(migration -> migration.getVersion().getVersion())
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
         Integer checksum = flyway.info().applied()[0].getChecksum();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(flyway.info().applied()[0].getChecksum()).isEqualTo(checksum);
