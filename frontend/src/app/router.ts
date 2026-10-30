@@ -133,12 +133,14 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresRole && !auth.identity?.roles.includes(to.meta.requiresRole)) return { name: 'access-denied' }
   return true
 })
-router.afterEach((to, _from, failure) => {
+router.afterEach((to, from, failure) => {
   if (failure) return
   const title = to.meta.title
   if (typeof title === 'string') {
     document.title = title.replaceAll('学习空间', '知学')
   }
+  // 只切页时聚焦标题；筛选、分页等查询参数变化保留触发控件的焦点。
+  if (to.path === from.path) return
   // 切页聚焦标题（FRONTEND.md 9）；标题均带 tabindex="-1"。
   void nextTick(() => {
     const heading = document.querySelector<HTMLElement>('main h1')
