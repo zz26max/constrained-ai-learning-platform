@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { coursesApi, type CourseSummaryDTO } from '../../api'
 import { allPages } from '../../api/pagination'
 import ApiState from '../../components/ApiState.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from './use-page-query'
 import type { ChapterSummaryDTO } from '../../api/courses'
 import { formatShortTime, isUuid } from './format'
@@ -57,7 +58,7 @@ function progressText(course: CourseSummaryDTO): string {
           <RouterLink class="button secondary" to="/course">← 我的课程</RouterLink>
         </div>
       </header>
-      <p v-if="query.data.value.offering.status !== 'active'" class="notice notice-info">已归档 · 历史内容可阅读，阅读进度和学习位置不再写入。</p>
+      <UiNotice v-if="query.data.value.offering.status !== 'active'" tone="info">已归档 · 历史内容可阅读，阅读进度和学习位置不再写入。</UiNotice>
       <ApiState v-if="resume.status.value === 'error'" :status="resume.status.value" :error="resume.error.value" @retry="resume.load" />
       <nav class="subnav" aria-label="课程"><RouterLink class="on" aria-current="page" :to="{ name: 'course', params: { offeringId: query.data.value.offering.id } }">章节</RouterLink><RouterLink :to="{ name: 'student-assignments', query: { offering: query.data.value.offering.id } }">作业</RouterLink><RouterLink :to="{ name: 'student-progress', params: { offeringId: query.data.value.offering.id } }">学习记录</RouterLink><RouterLink :to="{ name: 'student-notices', params: { offeringId: query.data.value.offering.id } }">公告</RouterLink></nav>
       <ol v-if="query.data.value.chapters.items.length" class="toc" aria-label="课程目录">

@@ -5,6 +5,8 @@ import { coursesApi, type ProgressDTO } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
+import UiButton from '../../components/ui/UiButton.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from './use-page-query'
 import { useCourseActions } from './use-course-actions'
 import { formatShortTime, isUuid, statusLabel } from './format'
@@ -60,11 +62,11 @@ function resourceBody(resource: { title: string; content: string }) {
           <p v-if="query.data.value.chapter.summary" class="page-summary">{{ query.data.value.chapter.summary }}</p>
         </div>
         <div class="page-actions">
-          <button type="button" class="button" :disabled="readonly || actions.pending.value || query.data.value.chapter.studentProgress?.status === 'completed'" @click="confirmCompleted">{{ query.data.value.chapter.studentProgress?.status === 'completed' ? '已确认阅读' : '确认已阅读' }}</button>
+          <UiButton :disabled="readonly || actions.pending.value || query.data.value.chapter.studentProgress?.status === 'completed'" @click="confirmCompleted">{{ query.data.value.chapter.studentProgress?.status === 'completed' ? '已确认阅读' : '确认已阅读' }}</UiButton>
           <RouterLink class="button secondary" :to="{ name: 'course', params: { offeringId: route.params.offeringId } }">← 课程目录</RouterLink>
         </div>
       </header>
-      <p v-if="readonly" class="notice notice-info">本章节为只读，阅读进度和学习位置不再写入。</p><ActionNotice :error="actions.error.value" :message="actions.message.value" />
+      <UiNotice v-if="readonly" tone="info">本章节为只读，阅读进度和学习位置不再写入。</UiNotice><ActionNotice :error="actions.error.value" :message="actions.message.value" />
       <section class="reading-content read-grid">
         <article class="reader">
           <section v-for="resource in query.data.value.chapter.resources" :id="'resource-' + resource.id" :key="resource.id" class="res"><header class="res-head"><h2>{{ resource.title }}</h2><RouterLink :to="{ name: 'resource', params: { resourceId: resource.id } }">单独打开 →</RouterLink></header><SafeMarkdown :content="resourceBody(resource)" /></section>

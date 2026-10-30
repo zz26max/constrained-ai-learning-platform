@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { StudentFeedbackDTO } from '../../api/assignments'
 import SafeMarkdown from '../../components/SafeMarkdown.vue'
+import UiNotice from '../../components/ui/UiNotice.vue'
 
 interface Props {
   feedback: StudentFeedbackDTO | null
@@ -95,7 +96,7 @@ const formatDate = (date: string | null | undefined) => {
   </section>
 
   <section v-else-if="feedback" class="surface feedback-view">
-    <p class="notice notice-info">教师正在批阅中，请等待反馈发布</p>
+    <UiNotice tone="info">教师正在批阅中，请等待反馈发布</UiNotice>
   </section>
 </template>
 
