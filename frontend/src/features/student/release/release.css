@@ -669,7 +669,7 @@
 
 /* ===== ≤760px：手机 ===== */
 @media (max-width:760px) {
-  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar) h1 {font-size:25px}
+  .student-release :is(.sr-home,.sr-courses,.sr-course-home,.sr-chapter,.sr-tasks,.sr-records,.sr-calendar,.sr-messages,.sr-help-list,.sr-help-detail,.sr-help-create,.sr-workspace,.sr-tutoring) h1 {font-size:25px}
   .student-release .sr-courses .course-filters>label {flex:1 1 140px}
   .student-release .sr-courses .course-filters select {width:100%}
   .student-release .sr-courses .course-count {margin-left:0;flex-basis:100%}
@@ -770,7 +770,6 @@
   .student-release {--gutter:16px}
   .student-release .page-head {grid-template-columns:minmax(0,1fr)}
   .student-release .page-head>.page-actions {grid-column:1;grid-row:auto;justify-content:flex-start;margin-top:4px}
-  .student-release .page-title {font-size:25px}
   .student-release .topbar-messages {width:32px;height:32px}
   .student-release .workspace-topbar {height:56px;min-height:56px;gap:8px}
   .student-release .app-main.business-main {padding:20px var(--gutter) calc(48px + 80px)}
