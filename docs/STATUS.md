@@ -8,22 +8,24 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`a7c1890`（2026-10-31，`frontend/ui-kit` 学生端 Ui 组件层合入 master，15 个前端提交收口），须为 HEAD 祖先且落后不超过 3 个提交。当前阶段二分支 `stage2/analytics` 从该提交起，契约 1.2.0 与教师分析接口正在实施；此前 P2 后端与前端证据保留在 §1。
+- **代码基线**：`f2eaeb9`（2026-10-31，`stage2/analytics` 收口阶段二教师学习分析与学生掌握概览），须为 HEAD 祖先且落后不超过 3 个提交。该分支领先 master `a7c1890` 4 个实现提交，尚未合并 master。
 
-- **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)。前端知识评价/标签 UI 已由 `801c940` 完成（前端交接及 `986d854` 日志为依据）。已有真实模式浏览器证据包括政策配置、索答 fallback、求助回复/消息跳转及 chapter_opened。后端本轮新增配置适配器 completed/failed 与知识评价 HTTP 写入闭环证据，未执行真实供应商或正式页面新一轮联调；外部调用按用户确认保持关闭。P3 自动检查未实现。
+- **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。
 
-- **契约状态**：1.1.1，83 个业务操作 + 2 个健康检查，2026-10-25 代码现状为 71 implemented、10 verified、4 planned。P2 的 17 个专属操作及 getLearningRecords 查询入口已接入生产路由；本次只变更实现/审定元数据，字段结构未改，未标 verified。
+- **契约状态**：1.2.0，85 个业务操作 + 2 个健康检查；业务操作为 12 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 已返回真实 `commonIssues`，但契约描述仍写 P1 空数组，见未决事项。
 
-- **门禁现状**（2026-10-27）：后端本轮定向 verify 通过 455 单元/HTTP + 31 MySQL 8.4.11 IT（公告统计 30、V13→V14 迁移 1），0 失败/错误/跳过，BUILD SUCCESS。此前本轮全量执行 455 单元/HTTP 全过、256 IT 中 254 通过，另 1 项测试异常类型断言失败、1 项测试容器创建触发器权限错误；这两项测试修正后随上述 31 IT 定向复跑通过，不能称为一次全量全绿。详细命令和日志见 §1。前端 F1–F6 证据以 `fdb00f1` 记录为准；本次续跑未重新执行前端测试。现有 3307 仍为 V13（来自前一轮获准迁移），V14 只在隔离临时库验证。
+- **门禁现状**（2026-10-31）：后端全量 `./mvnw.cmd --batch-mode verify` 通过 458 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 44 文件/382 项通过；`validate_contract.py` PASS。真实浏览器证据覆盖教师学习分析页（14 天活跃卡片与摘要、两张 SVG 图表、四态掌握分布、无障碍明细）与学生掌握概览（四色图例、分段条、说明）；页面收到的数据与接口夹具、SQL 事实逐项一致，截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`。本地 3307 已迁移到 V15（两个读索引），演示数据经产品接口创建。
 
-- **未决事项**（2026-10-24 更新：原 ①～④ 已全部处置——①③幂等语义写入契约 1.1.1 描述，②course_notice 消息继承公告 target 已实现（V10），④全班公告禁止 feedback 目标已实现并 422，详见 §1 会话日志 2026-10-24 条目）：
+- **未决事项**（2026-10-31 更新）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
-  2. 此前补充的慢网络、会话失效、作业归档只读真实浏览器证据，不将作业归档证据等同于公告归档验证。
-  3. 历史公告如无唯一可信的创建审计，收件人数沿用原按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
+  2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
+  3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
+  4. `getAssignmentStats` 的契约描述（操作说明与 200 响应说明）仍写"P1 `commonIssues:[]`"，与 P2 起的真实返回不一致；修正描述需用户授权，本次未改。
+  5. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
 
 ### 0.1 接手前必读
 
-- 端口：MySQL 3307（Docker，Flyway 到 V13，2026-10-25 起本地库已迁移且备份在 temp/）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
+- 端口：MySQL 3307（Docker，Flyway 到 V15，2026-10-31 阶段二联调时已迁移）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
 - 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
 - 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
 - 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
@@ -248,6 +250,14 @@
 - **实际测试**：`./mvnw.cmd --batch-mode '-Dit.test=NoticeRecipientMigrationIT,NoticeStatsIntegrationIT' verify`，455 单元/HTTP + 31 MySQL IT，0 失败/错误/跳过，BUILD SUCCESS；`backend/target/audit-notice-resume-verification.log`。覆盖 V13→V14 的唯一/缺失/重复/非法审计、数据库非负约束、新公告同时间同标题隔离，以及第一条通知插入后第二条失败的公告/通知/审计整体回滚。`audit-verification.log` 此前对前三项运行 455 单元/HTTP + 62 作业/辅导 IT 全过。`audit-full-verification.log` 的全量曾有 256 IT 中 1 失败、1 错误：负数约束测试断言的 Spring 异常子类过窄，以及临时容器触发器权限不足；相关测试调整后在上述 31 IT 通过。不得合并这几次运行冒充一次全量通过。
 - **实际 SmartFlow**：本轮 `backend_audit_build` 实现首批，`backend_resume` 续修测试并提交 V14；`backend_audit_review` 独立只读审查生产修复和后续测试，未发现阻断、未运行测试。前端方案由主线程编写并以 `d7c9f95` 提交；后续前端实现是用户中断期间已有提交，不计作本轮代理工作。
 - **尚未完成**：旧公告缺少可靠审计时仍为估算；多实例 worker、会话 touch 节流、连接池调参及 N+1 性能优化未包含在本修复包，须结合部署需求和测量另行处理。V14 应用到真实数据库或部署前仍须用户确认。
+
+### 2026-10-31 阶段二教师学习分析与学生掌握概览
+
+- **分支与范围**：从 master `a7c1890` 起在 `stage2/analytics` 实施。用户授权新增两个契约操作（`getOfferingActivity`、`getOfferingKnowledgeMastery`，契约 1.2.0）、图表采用 ECharts、先合 ui-kit 再开阶段二。本轮只覆盖阶段二的可视化与掌握分析；P3 自动检查、共性问题映射知识点、建议/路径/预测及论文/软著材料不在范围内。
+- **交付提交**：`f5a95e4` 契约新增两个操作、schema 与示例；`08096ba` 后端新增分析控制器/服务/Mapper、V15 两个读索引，并让教师作业统计返回真实的 `pendingHelpCount` 与 `commonIssues`；`5103351` 前端 ECharts 懒加载图表、教师学习分析页、作业共性问题、学生掌握概览及路由/测试；`f2eaeb9` 修复学生掌握图例色块缺少 `data-state` 导致透明。
+- **口径**：活跃度按 Asia/Shanghai 最近 14 个自然日（含今日）以 `received_at` 分桶并补零，活跃学生按去重用户；掌握度复用 knowledge-v2，`basically_mastered` 需至少两个不同作业给出 `meets_expectation`，"学习中"取在途作业；`masteryRate` 仅展示，不参与任何判定。
+- **验证**：后端全量 `./mvnw.cmd --batch-mode verify` 为 458 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 44 文件/382 项，定向 vitest 6/6。真实浏览器用 `teacher.demo`/`student.demo` 登录正式页面，教师分析页与学生学习记录页收到的 payload 与接口夹具、SQL 查询逐项一致；截图为 `D:/tmp/lp/stage2-evidence/` 下 `teacher-analytics.png`、`teacher-issues.png`、`student-records.png`。4 个知识点、4 份已发布作业（其中 2 份给出 `meets_expectation`）均经产品接口创建，未直接写业务表。控制台仅有登录前 401 `/api/v1/me` 与 favicon 404，无业务错误。
+- **限制**：只验证单教师单班演示数据；未执行真实供应商调用；ECharts 仅在分析页按需加载；未新增共性问题到知识点的映射。
 
 ## 2. 交接说明（2026-10-15）
 
