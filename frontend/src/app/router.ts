@@ -1,6 +1,7 @@
 import { nextTick } from 'vue'
 import { createRouter, createWebHashHistory, type RouteRecordRaw, type RouterHistory } from 'vue-router'
 import LoginPage from '../features/auth/LoginPage.vue'
+import RegisterPage from '../features/auth/RegisterPage.vue'
 import SessionPanel from '../features/auth/SessionPanel.vue'
 import NotFoundPage from '../features/NotFoundPage.vue'
 import { useAuthStore } from '../stores/auth'
@@ -63,6 +64,12 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     component: LoginPage,
     meta: { public: true, title: '登录 · 学习空间' },
+  },
+  {
+    name: 'register',
+    path: '/register',
+    component: RegisterPage,
+    meta: { public: true, title: '注册 · 知学' },
   },
   {
     path: '/',

@@ -22,6 +22,24 @@ export type LoginFailure =
   | { kind: 'rate'; message: string }
   | { kind: 'unavailable'; message: string }
 
+export type RegisterFailure =
+  | { kind: 'username-taken'; message: string }
+  | { kind: 'invalid-invite'; message: string }
+  | { kind: 'csrf'; message: string }
+  | { kind: 'csrf-stalled'; message: string }
+  | { kind: 'validation'; message: string; fields: FieldError[] }
+  | { kind: 'unavailable'; message: string }
+
+export interface RegisterForm {
+  username: string
+  password: string
+  displayName: string
+  mode: 'personal' | 'school'
+  role?: 'student' | 'teacher'
+  inviteCode?: string
+  createClass?: boolean
+}
+
 /** 身份只在内存保存；CSRF 恢复遵循契约 1.1.0，不自动重放写请求。 */
 export const useAuthStore = defineStore('auth', () => {
   const api: AuthApi = authApi()
@@ -33,6 +51,8 @@ export const useAuthStore = defineStore('auth', () => {
   const csrfToken = ref<string | null>(null)
   const loginStatus = ref<RequestPhase>('idle')
   const loginFailure = ref<LoginFailure | null>(null)
+  const registerStatus = ref<RequestPhase>('idle')
+  const registerFailure = ref<RegisterFailure | null>(null)
   // 本地操作提示，不是接口字段或业务错误码。
   const logoutFailure = ref<string | null>(null)
   const lastRequestId = ref<string | null>(null)
@@ -229,6 +249,88 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 注册：双模式注册，成功后自动登录。 */
+  async function register(form: RegisterForm): Promise<boolean> {
+    if (registerStatus.value === 'loading') return false
+    registerStatus.value = 'loading'
+    registerFailure.value = null
+    lastRequestId.value = null
+    let registerAccepted = false
+    try {
+      const token = await ensureCsrfToken()
+      const result = await api.register({
+        username: form.username,
+        password: form.password,
+        displayName: form.displayName,
+        mode: form.mode,
+        role: form.role,
+        inviteCode: form.inviteCode,
+        createClass: form.createClass,
+      }, token)
+      registerAccepted = true
+      csrfToken.value = result.data.csrfToken
+      const me = await api.getMe()
+      identity.value = me.data
+      identityRequestId.value = me.requestId
+      config.value = null
+      clearWorkspaceRecovery(me.data.id)
+      phase.value = 'authenticated'
+      await loadConfig()
+      registerStatus.value = 'success'
+      logoutFailure.value = null
+      return true
+    } catch (error) {
+      if (registerAccepted) clearAuthenticatedState()
+      registerStatus.value = 'error'
+      if (error instanceof ApiError) {
+        lastRequestId.value = error.requestId
+        if (error.status === 403 && error.code === 'CSRF_INVALID') {
+          if (loginRecoveryUsed) {
+            clearAuthenticatedState()
+            registerFailure.value = {
+              kind: 'csrf-stalled',
+              message: '注册令牌再次校验失败，请刷新页面后重试。',
+            }
+          } else {
+            loginRecoveryUsed = true
+            try {
+              await csrfRefresh.recover()
+              registerFailure.value = {
+                kind: 'csrf',
+                message: '注册令牌已刷新，请重新点击"注册"。',
+              }
+            } catch {
+              clearAuthenticatedState()
+              registerFailure.value = {
+                kind: 'csrf-stalled',
+                message: '注册令牌刷新或身份核对失败，请重试。',
+              }
+            } finally {
+              loginRecoveryUsed = true
+            }
+          }
+        } else if (error.status === 400 && error.code === 'USERNAME_TAKEN') {
+          registerFailure.value = { kind: 'username-taken', message: '该用户名已被占用，请更换后重试。' }
+        } else if (error.status === 400 && error.code === 'INVALID_INVITE_CODE') {
+          registerFailure.value = { kind: 'invalid-invite', message: '邀请码无效，请向教师确认。' }
+        } else if (error.status === 422 && error.code === 'VALIDATION_ERROR') {
+          registerFailure.value = {
+            kind: 'validation',
+            message: '输入不合法，请修改后重试。',
+            fields: parseFieldErrors(error.errorDetails),
+          }
+        } else {
+          // 展示后端返回的实际错误信息，便于用户与支持人员定位；requestId 已单独保留。
+          const backendMessage = error.message || '服务暂不可用，请稍后重试。'
+          registerFailure.value = { kind: 'unavailable', message: `${backendMessage} (HTTP ${error.status})` }
+        }
+      } else {
+        registerFailure.value = { kind: 'unavailable', message: '网络连接失败，请稍后重试。' }
+      }
+      return false
+    }
+  }
+
   /** 退出：401 清理身份；CSRF 首次恢复后由用户重试，再次失败停止恢复。 */
   async function logout(): Promise<boolean> {
     if (phase.value !== 'authenticated') return false
@@ -314,12 +416,15 @@ export const useAuthStore = defineStore('auth', () => {
     csrfToken,
     loginStatus,
     loginFailure,
+    registerStatus,
+    registerFailure,
     logoutFailure,
     lastRequestId,
     identityRequestId,
     ensureBoot,
     retryBoot,
     login,
+    register,
     logout,
     ensureCsrfToken,
     recoverCsrfFailure,

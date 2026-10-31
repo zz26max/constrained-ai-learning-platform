@@ -23,6 +23,11 @@ const SessionStub: Component = defineComponent({
   setup: () => () => h('div', 'session-stub'),
 })
 
+const RegisterStub: Component = defineComponent({
+  name: 'RegisterStub',
+  setup: () => () => h('div', 'register-stub'),
+})
+
 let router: Router
 let scripted: ScriptedTransport
 
@@ -49,6 +54,7 @@ async function mountLoginPage(): Promise<ReturnType<typeof mount>> {
     routes: [
       { name: 'login', path: '/login', component: LoginPage },
       { name: 'session', path: '/', component: SessionStub },
+      { name: 'register', path: '/register', component: RegisterStub },
     ],
   })
   router.push('/login')
@@ -134,6 +140,7 @@ describe('登录页（LoginPage）', () => {
       routes: [
         { name: 'login', path: '/login', component: LoginPage },
         { name: 'session', path: '/', component: SessionStub },
+        { name: 'register', path: '/register', component: RegisterStub },
       ],
     })
     router.push('/login?return=/')

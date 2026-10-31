@@ -1,5 +1,5 @@
 import type { Transport, TransportRequest, TransportResponse } from '../api/transport'
-import { authHandlers, resetMockAuthState } from './auth'
+import { authHandlers, resetMockAuthState, resetMockAccounts } from './auth'
 import { courseHandlers, resetMockCourseState } from './courses'
 import { assignmentHandlers, resetMockAssignmentState } from './assignments'
 import { feedbackHandlers, resetMockFeedbackState } from './feedback'
@@ -8,6 +8,7 @@ import { tutoringHandlers, resetMockTutoringState } from './tutoring'
 import { analyticsHandlers, resetMockAnalyticsState } from './analytics'
 import { applySetCookies, currentCookies, resetMockCookies } from './jar'
 import { MockNotImplementedError, toTransportResponse, type MockHandler } from './types'
+import { resetSharedMembers } from './shared-state'
 
 /** 构建产物扫描哨兵：scripts/check-no-mock.mjs 检查 dist 不含该标记。 */
 export const MOCK_LAYER_MARKER = 'MOCK_LAYER_ACTIVE'
@@ -60,4 +61,4 @@ export const mockTransport: Transport = {
   },
 }
 
-export { resetMockAuthState, resetMockCookies, resetMockCourseState, resetMockAssignmentState, resetMockFeedbackState, resetMockDashboardState, resetMockTutoringState, resetMockAnalyticsState }
+export { resetMockAuthState, resetMockAccounts, resetMockCookies, resetMockCourseState, resetMockAssignmentState, resetMockFeedbackState, resetMockDashboardState, resetMockTutoringState, resetMockAnalyticsState, resetSharedMembers }

@@ -156,6 +156,9 @@ async function submit(): Promise<void> {
         </form>
 
         <p class="login-note">请使用本人账号登录；遇到问题请联系任课教师或管理员。</p>
+        <p class="login-register-link">
+          还没有账号？<router-link :to="{ name: 'register' }">自助注册</router-link>
+        </p>
       </section>
       <footer class="login-legal">© {{ year }} 知学学习平台 · 仅限本校师生使用</footer>
     </main>
@@ -253,6 +256,9 @@ async function submit(): Promise<void> {
 .login-submit[aria-busy="true"] {opacity: .75; cursor: progress}
 .request-id {text-align: left}
 .login-note {margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.7; color: var(--muted)}
+.login-register-link {margin: 12px 0 0; font-size: 13px; color: var(--muted)}
+.login-register-link a {color: var(--blue); text-decoration: none; font-weight: 500}
+.login-register-link a:hover {text-decoration: underline}
 .login-legal {margin-top: 20px; font-size: 12px; color: var(--muted)}
 
 @media (max-width: 1100px) and (min-width: 981px) {

@@ -2,7 +2,7 @@ import type { DashboardDTO, LearningRecordsDTO } from '../api/dashboard'
 import type { NoticeDTO, NoticeWrite } from '../api/notices'
 import type { OfferingActivityDTO, OfferingKnowledgeMasteryDTO, TeacherLearningRecordsDTO } from '../api/stats'
 import { MOCK_TERM, mockSession } from './auth'
-import { P1A_FIXTURES, P1A_IDS } from './courses'
+import { P1A_FIXTURES, P1A_IDS, isMember } from './courses'
 import { mockAssignmentStore, toSummary } from './assignments'
 import { publishedFeedbackFor, publishedFeedbacks, studentFeedbackView } from './feedback'
 import { addMockMessage, mockMessages } from './message-store'
@@ -29,7 +29,7 @@ export function resetMockDashboardState(): void {
 }
 resetMockDashboardState()
 
-const knownOffering = (offeringId: string) => offeringId === P1A_IDS.offeringWeb
+const knownOffering = (offeringId: string) => offeringId === P1A_IDS.offeringWeb || offeringId === P1A_IDS.offeringPersonal
 const feedbackOf = (offeringId: string) => publishedFeedbacks().filter(item => item.offeringId === offeringId)
 const byPublishedDesc = <T extends { publishedAt: string | null; id: string }>(items: T[]) =>
   [...items].sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') || b.id.localeCompare(a.id))
@@ -47,7 +47,7 @@ function handleDashboard(context: MockRequestContext): MockResult {
   if (termId !== null && !isUuid(termId)) return invalid(context, 'termId 不合法。', 'termId')
   const userId = mockSession()?.account.id ?? MOCK_STUDENT.id
   const pending = [...mockAssignmentStore.assignments.values()]
-    .filter(item => item.dto.publicationState === 'published')
+    .filter(item => item.dto.publicationState === 'published' && isMember(item.dto.offeringId, userId, 'student'))
     .map(item => toSummary(item.dto, userId))
     .filter(item => item.assignmentState === 'NOT_STARTED' || item.assignmentState === 'IN_PROGRESS')
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
