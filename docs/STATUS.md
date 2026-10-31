@@ -8,23 +8,27 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`1da2a78`（2026-10-31，`stage2/analytics` 阶段二教师学习分析与学生掌握概览收口），须为 HEAD 祖先且落后不超过 3 个提交。该分支领先 master `a7c1890` 4 个实现提交，尚未合并 master。
+- **代码基线**：`39c3ab9`（2026-10-31，双模式注册闭环：`31764ee` 契约、`596a309` 后端与 V16、`30b46f0` 前端注册页、`39c3ab9` 工作区布局），须为 HEAD 祖先且落后不超过 3 个提交。该分支领先 master `a7c1890` 8 个实现提交，尚未合并 master。
 
-- **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；不做服务端自动判题（P3 planned）。
+- **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；不做服务端自动判题（P3 planned）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者。
 
-- **契约状态**：1.2.0，85 个业务操作 + 2 个健康检查；业务操作为 12 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。
+- **契约状态**：1.2.0，86 个业务操作 + 2 个健康检查；业务操作为 12 verified、70 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 双模式注册接口已实现（personal/school 模式），标记 implemented。
 
-- **门禁现状**（2026-10-31）：后端全量 `./mvnw.cmd --batch-mode verify` 通过 458 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 44 文件/386 项通过；`validate_contract.py` PASS。真实浏览器证据覆盖教师学习分析页（14 天活跃卡片与摘要、两张 SVG 图表、四态掌握分布、无障碍明细）与学生掌握概览（四色图例、分段条、说明）；页面收到的数据与接口夹具、SQL 事实逐项一致，截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`。本地 3307 已迁移到 V15（两个读索引），演示数据经产品接口创建。工作区 IDE 分栏与 AI 求助抽屉经真实浏览器验收：题面/要求/评分标准、运行隔离预览（iframe srcdoc + CSP + sandbox allow-scripts）、AI 抽屉懒加载、快捷提问填充、关闭卸载、aria-expanded 切换、侧栏规则隐藏、保存失败阻断求助。
+- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据仍为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）；本轮注册流程与注册后 `/me` 只有 HTTP 契约测试与前端测试证据，没有浏览器证据。本地 3307 仍是改写前的 V16（含旧 system 账号行），重建后才能与新 V16 校验和一致。
 
 - **未决事项**（2026-10-31 更新）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
   2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
   3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
   4. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
+  5. 本地 3307 需要重建：V16 已改写，旧库的 `flyway_schema_history` 校验和不一致，直接启动会在 Flyway 校验失败；重建会丢失现有演示数据，重建后需重新执行账户与演示数据初始化。
+  6. V16 的个人学习 offering 用 `SELECT ... FROM terms WHERE is_current = 1` 挂载；全新库没有当前学期时不会生成 offering，个人模式注册会返回 `NO_CURRENT_TERM`。真实环境的学期来源（管理接口或初始化脚本）确认后再决定迁移是否自带学期。
+  7. 注册页与注册后自动登录尚无真实浏览器联调证据；后端 401 已修并有 HTTP 回归，浏览器复验未做。
+  8. 作业工作区的「测试示例」是硬编码的最值示例，会出现在所有 `web_lab` 作业上，待改为按作业配置或删除。
 
 ### 0.1 接手前必读
 
-- 端口：MySQL 3307（Docker，Flyway 到 V15，2026-10-31 阶段二联调时已迁移）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。
+- 端口：MySQL 3307（Docker，Flyway 到 V16）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。V16 已按 2026-10-31 结论改写（迁移不建账号），旧库需重建后校验和才一致。
 - 演示账号 `student.demo`、`teacher.demo`、`admin.demo`；密码在被 Git 忽略的 `backend/.env` 中，**不要提交、截图或贴进对话**。
 - 单独跑某个前端测试要在 `frontend/` 目录下执行 `npx vitest run tests/xxx.test.ts`；在仓库根目录用 `npm --prefix frontend exec vitest` 不会加载 happy-dom，会报 `window is not defined`。
 - 不要读 `frontend/src/api/generated/`（生成代码）、`node_modules`、lock 文件与日志；生成类型以 `openapi.yaml` 为源。
@@ -36,6 +40,8 @@
 > **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；§4 已知限制是被 §0 引用的现行清单，同样不属日志；判断某条缺陷是否已修，先看 §0、§3 与 §4，再对照本节是否有更晚的条目。历史条目中的旧文件路径按 2026-10-24 归档迁移对照：`frontend/DESIGN.md` → `docs/archive/frontend-DESIGN.md`、`frontend/V3*-DELIVERY.md` 等报告 → `docs/archive/`、`frontend/scripts` 一次性验收脚本 → `frontend/scripts/archive/`。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
+
+> **2026-10-31 注册联调收口（`31764ee`、`596a309`、`30b46f0`、`39c3ab9`）：** 交接文档记录的「后端注册成功、前端随后 401」已定位并修复：`RegisterService` 建立会话时只把密码哈希摘要进 `credential_hash`，而 `DatabaseSessionService.resolve` 用「密码哈希 + 排序角色」计算指纹，两者不一致，会话第一次访问即被判失效并撤销。抽出 `SessionFingerprint` 供登录、注册与续期共用；`AuthController.register` 改为返回契约要求的 201，并移除临时调试日志与前端 `console.error`。`AuthHttpContractTest` 新增「注册 → /me」回归，反向验证（把指纹改回 `digest(passwordHash)`）得到 `Status expected:<200> but was:<401>`。V16 迁移改写：删除原插入的 `system` 账号（它同时占用了演示学生固定 ID `…0001`），`course_offerings.created_by` 改为可空、个人学习 offering 创建者为 NULL，恢复「迁移不创建账号」不变量；迁移计数断言随之更新 15→16、2→3。前端侧修掉 9 处 typecheck 报错（mock 注册处理器 unknown 收窄、邀请码取值类型、`failEnvelope` 参数顺序）。检查：后端 469 单元/HTTP + 259 IT、前端 47 文件/408 用例、`validate_contract.py` PASS。未做：真实浏览器注册联调、本地 3307 重建、V16 对当前学期的依赖、工作区硬编码测试示例（见 §0 未决事项）。
 
 > **2026-10-17 最新结论：P1 闭环实测通过。** 本轮以 `84a6fa6` 为基线，用浏览器直接操作真实前后端，补齐此前“接受证据缺口”的主要场景，并修复公告消息入口与两端作业列表截断。完整矩阵、范围和证据见 §3.8。下列较早日期的未修复/未验收描述保留为历史，当前判断以 §3.8 和 OpenAPI 状态为准；没有把静态检查代替页面验收。
 
