@@ -538,12 +538,17 @@
 .student-release .sr-help-create .quiet-link {display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:var(--sr-muted)}
 .student-release .sr-help-create .quiet-link:hover {color:var(--sr-brand);text-decoration:underline;text-underline-offset:3px}
 
-/* ===== 工作区：无框文件页签 + 细线编辑与预览面板 ===== */
+/* ===== 工作区：LeetCode 式分栏 —— 编辑器为主，题目为辅 ===== */
 .student-release .sr-workspace .ws-head {display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:0 0 16px}
 .student-release .sr-workspace .ws-head .grow {flex:1;min-width:0}
 .student-release .sr-workspace .ws-head .page-eyebrow a {color:var(--sr-muted)}
 .student-release .sr-workspace .ws-head .page-eyebrow a:hover {color:var(--sr-brand)}
-.student-release .sr-workspace .save-st {font-size:13px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-workspace .save-st {font-size:12px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.student-release .sr-workspace .ws-head-actions {display:flex;align-items:center;gap:8px;margin-left:auto}
+.student-release .sr-workspace .ws-head-actions .button.secondary {min-height:36px;padding:0 14px;font-size:13px}
+.student-release .sr-workspace .ws-head-actions .quiet-btn {min-height:36px;padding:0 10px;font-size:13px}
+.student-release .sr-workspace .ws-head-actions .quiet-btn[aria-pressed=true] {color:var(--sr-brand);font-weight:600}
+.student-release .sr-workspace .ws-head-actions .button.primary {min-height:36px;padding:0 16px;font-size:14px}
 .student-release .sr-workspace .notice {margin:0 0 14px;padding:10px 14px;border-radius:var(--sr-r-s);font-size:13px}
 .student-release .sr-workspace>.button.secondary {margin:0 0 14px}
 .student-release .sr-workspace .conflict {margin:0 0 18px;padding:16px 18px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface)}
@@ -554,21 +559,6 @@
 .student-release .sr-workspace .snap-file summary::-webkit-details-marker {display:none}
 .student-release .sr-workspace .snap-file pre {margin:6px 0 10px;padding:12px 14px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-sunken);overflow-x:auto;font:12px/1.6 Consolas,'Cascadia Code',monospace;white-space:pre-wrap;word-break:break-word}
 .student-release .sr-workspace .conflict-actions {display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
-.student-release .sr-workspace .file-tabs {display:flex;gap:2px;padding:0 6px;border:1px solid var(--sr-line);border-bottom:0;border-radius:var(--sr-r-m) var(--sr-r-m) 0 0;background:var(--sr-sunken);overflow-x:auto;scrollbar-width:none}
-.student-release .sr-workspace .file-tab {display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font:13px/1.4 Consolas,'Cascadia Code',monospace;white-space:nowrap;flex:none;cursor:pointer}
-.student-release .sr-workspace .file-tab:hover {color:var(--sr-ink)}
-.student-release .sr-workspace .file-tab[aria-selected=true] {background:var(--sr-surface);color:var(--sr-ink);border-bottom-color:var(--sr-brand)}
-.student-release .sr-workspace .editor {border:1px solid var(--sr-line);border-radius:0 0 var(--sr-r-m) var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
-.student-release .sr-workspace .workspace-editor {display:block;width:100%;min-height:440px;padding:14px 16px;border:0;background:transparent;color:var(--sr-ink);font:14px/1.65 Consolas,'Cascadia Code',monospace;tab-size:2;resize:vertical}
-.student-release .sr-workspace .workspace-editor:focus-visible {outline:2px solid var(--sr-brand);outline-offset:-2px}
-.student-release .sr-workspace .workspace-editor:disabled {background:var(--sr-sunken);color:var(--sr-muted);cursor:not-allowed}
-.student-release .sr-workspace .preview {margin-top:16px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
-.student-release .sr-workspace .preview-bar {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;min-height:44px;padding:2px 8px 2px 14px;border-bottom:1px solid var(--sr-line);background:var(--sr-sunken)}
-.student-release .sr-workspace .preview-bar .meta {font-size:13px;color:var(--sr-muted)}
-.student-release .sr-workspace .preview-actions {display:inline-flex;gap:2px}
-.student-release .sr-workspace .quiet-btn {min-height:36px;padding:0 10px;border:0;background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
-.student-release .sr-workspace .quiet-btn:disabled {color:var(--sr-muted);cursor:default}
-.student-release .sr-workspace .preview-status {margin:0;padding:10px 14px;font-size:13px;color:var(--sr-muted)}
 .student-release .sr-workspace .teacher-dialog {border:1px solid var(--sr-line);border-radius:var(--sr-r-m);color:var(--sr-ink)}
 .student-release .sr-workspace .teacher-dialog h2 {font-size:18px;font-weight:650}
 .student-release .sr-workspace .teacher-dialog>p {margin:10px 0;font-size:14px;line-height:1.7;color:var(--sr-muted)}
@@ -579,61 +569,102 @@
 .student-release .sr-workspace .teacher-dialog-actions {display:flex;justify-content:flex-end;gap:12px;margin-top:18px}
 .student-release .sr-workspace .teacher-dialog .notice {margin:10px 0;font-size:13px}
 
-/* ===== 工作区：左题面 + 右编辑器/运行结果 ===== */
-.student-release .sr-workspace .ws-ide-grid {display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:32px;align-items:start}
-.student-release .sr-workspace .ws-problem {position:sticky;top:84px;max-height:calc(100dvh - 112px);overflow-y:auto;min-width:0;padding-right:4px;scrollbar-width:thin}
-.student-release .sr-workspace .ws-prob-meta {display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:0 0 18px;font-size:13px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-prob-state {margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--sr-brand-soft);color:var(--sr-brand);font-size:12px;font-weight:600}
-.student-release .sr-workspace .ws-prob-block {margin:0 0 22px;font-size:14px;line-height:1.7}
-.student-release .sr-workspace .section-label {margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-req {display:grid;gap:8px;margin:0;padding-left:20px}
-.student-release .sr-workspace .ws-req .safe-markdown :is(p) {margin:0}
-.student-release .sr-workspace .ws-rubric {width:100%;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);border-collapse:separate;border-spacing:0;overflow:hidden;font-size:13px}
-.student-release .sr-workspace .ws-rubric :is(th,td) {padding:8px 12px;border-bottom:1px solid var(--sr-line);text-align:left;vertical-align:top}
-.student-release .sr-workspace .ws-rubric thead th {background:var(--sr-sunken);color:var(--sr-muted);font-weight:600}
-.student-release .sr-workspace .ws-rubric tbody tr:last-child td {border-bottom:0}
+/* ===== IDE 分栏：左题目 + 右编辑器（含底部输出 + 右侧 AI）===== */
+.student-release .sr-workspace .ws-ide-grid {display:flex;gap:24px;align-items:stretch;min-height:calc(100dvh - 180px)}
+.student-release .sr-workspace .ws-problem {flex:0 0 340px;min-width:0;padding:16px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);font-size:14px;line-height:1.7;overflow-y:auto}
+.student-release .sr-workspace .ws-problem-enter-active,.student-release .sr-workspace .ws-problem-leave-active {transition:opacity .2s ease,transform .2s ease}
+.student-release .sr-workspace .ws-problem-enter-from,.student-release .sr-workspace .ws-problem-leave-to {opacity:0;transform:translateX(-20px)}
+.student-release .sr-workspace .ws-prob-compact {display:flex;flex-wrap:wrap;gap:8px 12px;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid var(--sr-line);font-size:12px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-prob-due {font-weight:600}
+.student-release .sr-workspace .ws-prob-due[data-tone=late] {color:var(--red)}
+.student-release .sr-workspace .ws-prob-attempts {font-variant-numeric:tabular-nums}
+.student-release .sr-workspace .ws-prob-block {margin:0 0 16px}
+.student-release .sr-workspace .ws-prob-section-title {margin:0 0 10px;font-size:14px;font-weight:650;color:var(--sr-ink)}
+.student-release .sr-workspace .ws-prob-block .safe-markdown :is(h1,h2,h3,h4,h5,h6) {margin:12px 0 6px;font-size:15px;font-weight:600}
+.student-release .sr-workspace .ws-prob-block .safe-markdown :is(p) {margin:0 0 8px}
+.student-release .sr-workspace .ws-prob-block .safe-markdown :is(ul,ol) {margin:0 0 8px;padding-left:20px}
+.student-release .sr-workspace .ws-req {margin:0;padding-left:18px}
+.student-release .sr-workspace .ws-rubric {width:100%;font-size:13px;border-collapse:collapse}
+.student-release .sr-workspace .ws-rubric th,.student-release .sr-workspace .ws-rubric td {padding:6px 8px;border-bottom:1px solid var(--sr-line);text-align:left;vertical-align:top}
+.student-release .sr-workspace .ws-rubric th {font-weight:600;font-size:12px;color:var(--sr-muted)}
 .student-release .sr-workspace .ws-rubric .r {text-align:right}
 .student-release .sr-workspace .ws-rubric .num {font-variant-numeric:tabular-nums}
-.student-release .sr-workspace .ws-rubric .crit-desc {display:block;margin-top:2px;font-size:12px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-prob-facts {display:grid;gap:8px;margin:0 0 16px;padding-top:14px;border-top:1px solid var(--sr-line);font-size:13px}
-.student-release .sr-workspace .ws-prob-facts>div {display:flex;gap:10px}
-.student-release .sr-workspace .ws-prob-facts dt {flex:none;min-width:56px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-prob-facts dd {margin:0;min-width:0;overflow-wrap:anywhere}
-.student-release .sr-workspace .ws-prob-facts .rel {margin-left:8px;font-size:12px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-prob-facts .rel[data-tone=late] {color:var(--red)}
-.student-release .sr-workspace .ws-prob-link {font-size:13px;color:var(--sr-brand)}
+.student-release .sr-workspace .ws-rubric .crit-desc {display:block;margin-top:4px;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-rubric-examples {margin-top:12px;padding:10px 12px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-canvas);font-size:12px}
+.student-release .sr-workspace .ws-rubric-examples-title {margin:0 0 8px;font-size:12px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-rubric-examples-list {margin:0;padding-left:16px}
+.student-release .sr-workspace .ws-rubric-examples-list li {margin:0 0 4px;font-family:Consolas,'Cascadia Code',monospace;font-size:11px}
+.student-release .sr-workspace .ws-rubric-examples-list code {padding:1px 4px;border-radius:3px;background:var(--sr-sunken);font-size:11px}
+.student-release .sr-workspace .ws-prob-link {display:block;margin-top:14px;padding-top:12px;border-top:1px solid var(--sr-line);font-size:12px;color:var(--sr-brand)}
 .student-release .sr-workspace .ws-prob-link:hover {text-decoration:underline;text-underline-offset:3px}
-.student-release .sr-workspace .ws-work {min-width:0}
-.student-release .sr-workspace .ws-run-bar {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:12px 0 0}
-.student-release .sr-workspace .ws-run-actions {display:flex;flex-wrap:wrap;gap:8px}
-.student-release .sr-workspace .ws-run-note {margin:0;font-size:13px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-output {margin-top:14px}
-.student-release .sr-workspace .ws-output .preview {margin-top:0}
 
-/* 工作区 AI 求助抽屉：贴在顶栏下沿，对话区内部滚动 */
-.student-release .sr-workspace .ws-tutor {position:fixed;top:72px;right:20px;bottom:20px;z-index:20;display:flex;flex-direction:column;width:min(440px,calc(100vw - 40px));border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);box-shadow:0 16px 48px rgba(20,30,50,.18);overflow:hidden;outline:none}
-.student-release .sr-workspace .ws-tutor-head {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--sr-line)}
-.student-release .sr-workspace .ws-tutor-head h2 {margin:0;font-size:16px;font-weight:650}
-.student-release .sr-workspace .ws-tutor-head .meta {margin:4px 0 0;font-size:12px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-tutor-close {flex:none;min-height:32px;padding:0 8px;border:0;border-radius:var(--sr-r-s);background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
-.student-release .sr-workspace .ws-tutor-close:hover {background:var(--sr-brand-soft)}
-.student-release .sr-workspace .ws-tutor-close:focus-visible {outline:2px solid var(--sr-brand);outline-offset:2px}
-.student-release .sr-workspace .ws-tutor-body {flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 16px 0}
-.student-release .sr-workspace .ws-tutor-body .tutoring-panel {display:flex;flex-direction:column;flex:1;min-height:0}
-.student-release .sr-workspace .ws-tutor-body .tutor-grid {display:grid;grid-template-columns:minmax(0,1fr);gap:0;flex:1;min-height:0;align-items:stretch}
-.student-release .sr-workspace .ws-tutor-body .chat-col {display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
-.student-release .sr-workspace .ws-tutor-body .chat {flex:1;min-height:0;max-height:none;overflow-y:auto;padding:2px 4px 2px 0}
-.student-release .sr-workspace .ws-tutor-body .col.side {display:none}
-.student-release .sr-workspace .ws-tutor-body .composer {flex:none;padding:12px}
-.student-release .sr-workspace .ws-tutor-body .sessions {flex:none}
-.student-release .sr-workspace .ws-tutor-body .quick-asks {display:flex;flex-wrap:wrap;gap:6px}
-.student-release .sr-workspace .ws-tutor-body .quick-ask {min-height:32px;padding:0 10px;border:1px solid var(--sr-line-control);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-muted);font-size:13px;cursor:pointer}
-.student-release .sr-workspace .ws-tutor-body .quick-ask:hover {border-color:var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-brand)}
-.student-release .sr-workspace .ws-tutor-body .quick-ask:focus-visible {outline:2px solid var(--sr-brand);outline-offset:2px}
-.student-release .sr-workspace .ws-tutor-body .chat-empty {padding:20px 0}
-.student-release .sr-workspace .ws-tutor-foot {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 16px;border-top:1px solid var(--sr-line);font-size:12px}
-.student-release .sr-workspace .ws-tutor-foot .meta {margin:0;font-size:12px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-tutor-foot a {color:var(--sr-brand)}
+/* 作答区：编辑器列 + AI 侧边栏 */
+.student-release .sr-workspace .ws-work {flex:1;min-width:0;display:flex;flex-direction:column}
+.student-release .sr-workspace .ws-work-inner {display:flex;flex:1;min-height:0;gap:0}
+.student-release .sr-workspace .ws-editor-col {flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.student-release .sr-workspace .file-tabs {display:flex;gap:2px;padding:0 6px;border:1px solid var(--sr-line);border-bottom:0;border-radius:var(--sr-r-m) var(--sr-r-m) 0 0;background:var(--sr-sunken);overflow-x:auto;scrollbar-width:none}
+.student-release .sr-workspace .file-tab {display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--sr-muted);font:13px/1.4 Consolas,'Cascadia Code',monospace;white-space:nowrap;flex:none;cursor:pointer}
+.student-release .sr-workspace .file-tab:hover {color:var(--sr-ink)}
+.student-release .sr-workspace .file-tab[aria-selected=true] {background:var(--sr-surface);color:var(--sr-ink);border-bottom-color:var(--sr-brand)}
+.student-release .sr-workspace .editor {flex:1;min-height:0;border:1px solid var(--sr-line);border-radius:0 0 var(--sr-r-m) var(--sr-r-m);background:var(--sr-surface);overflow:hidden}
+.student-release .sr-workspace .workspace-editor {display:block;width:100%;height:100%;min-height:300px;padding:14px 16px;border:0;background:transparent;color:var(--sr-ink);font:14px/1.65 Consolas,'Cascadia Code',monospace;tab-size:2;resize:none}
+.student-release .sr-workspace .workspace-editor:focus-visible {outline:2px solid var(--sr-brand);outline-offset:-2px}
+.student-release .sr-workspace .workspace-editor:disabled {background:var(--sr-sunken);color:var(--sr-muted);cursor:not-allowed}
+
+/* 底部输出面板 */
+.student-release .sr-workspace .ws-output {flex:0 0 auto;max-height:320px;overflow:hidden;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);margin-top:12px}
+.student-release .sr-workspace .ws-output-enter-active,.student-release .sr-workspace .ws-output-leave-active {transition:max-height .25s ease,opacity .2s ease}
+.student-release .sr-workspace .ws-output-enter-from,.student-release .sr-workspace .ws-output-leave-to {max-height:0;opacity:0;margin-top:0}
+.student-release .sr-workspace .ws-output-head {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-bottom:1px solid var(--sr-line);background:var(--sr-sunken);font-size:12px}
+.student-release .sr-workspace .ws-output-head .meta {color:var(--sr-muted)}
+.student-release .sr-workspace .ws-output-close {min-height:28px;padding:0 8px;border:0;border-radius:var(--sr-r-s);background:none;color:var(--sr-brand);font-size:12px;cursor:pointer}
+.student-release .sr-workspace .ws-output-close:hover {background:var(--sr-brand-soft)}
+.student-release .sr-workspace .ws-output .preview {margin-top:0;border:0;border-radius:0}
+
+/* 右侧 AI 侧边栏 */
+.student-release .sr-workspace .ws-tutor-inline {flex:0 0 380px;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--sr-line);background:var(--sr-surface);overflow:hidden}
+.student-release .sr-workspace .ws-tutor-slide-enter-active,.student-release .sr-workspace .ws-tutor-slide-leave-active {transition:opacity .2s ease,transform .2s ease}
+.student-release .sr-workspace .ws-tutor-slide-enter-from,.student-release .sr-workspace .ws-tutor-slide-leave-to {opacity:0;transform:translateX(20px)}
+.student-release .sr-workspace .ws-tutor-inline-head {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-workspace .ws-tutor-inline-head h3 {margin:0;font-size:15px;font-weight:650}
+.student-release .sr-workspace .ws-tutor-inline-head .meta {margin:2px 0 0;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-close {flex:none;min-height:32px;padding:0 10px;border:0;border-radius:var(--sr-r-s);background:none;color:var(--sr-brand);font-size:13px;cursor:pointer}
+.student-release .sr-workspace .ws-tutor-inline-close:hover {background:var(--sr-brand-soft)}
+.student-release .sr-workspace .ws-tutor-inline-body {flex:1;min-height:0;display:flex;flex-direction:column;padding:0}
+.student-release .sr-workspace .ws-tutor-inline-body .tutoring-panel {display:flex;flex-direction:column;flex:1;min-height:0}
+.student-release .sr-workspace .ws-tutor-inline-body .tutor-grid {display:grid;grid-template-columns:minmax(0,1fr);gap:0;flex:1;min-height:0;align-items:stretch}
+.student-release .sr-workspace .ws-tutor-inline-body .chat-col {display:flex;flex-direction:column;min-height:0;flex:1}
+.student-release .sr-workspace .ws-tutor-inline-body .sessions {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sr-line)}
+.student-release .sr-workspace .ws-tutor-inline-body .sessions .quiet-btn {min-height:32px;padding:0 10px;font-size:13px}
+.student-release .sr-workspace .ws-tutor-inline-body .chat {flex:1;min-height:0;overflow-y:auto;padding:12px 14px}
+.student-release .sr-workspace .ws-tutor-inline-body .thread {list-style:none;display:grid;gap:14px;margin:0;padding:0}
+.student-release .sr-workspace .ws-tutor-inline-body .msg {display:grid;gap:4px;font-size:14px}
+.student-release .sr-workspace .ws-tutor-inline-body .msg.student {padding:10px 12px;border-radius:var(--sr-r-m);background:var(--sr-brand-soft);margin-left:40px}
+.student-release .sr-workspace .ws-tutor-inline-body .msg.assistant {padding:10px 12px;border:1px solid var(--sr-line);border-radius:var(--sr-r-m);background:var(--sr-surface);margin-right:40px}
+.student-release .sr-workspace .ws-tutor-inline-body .msg.pending {border-style:dashed}
+.student-release .sr-workspace .ws-tutor-inline-body .lv {font-size:12px;font-weight:600;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-body .msg-text {margin:0;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.student-release .sr-workspace .ws-tutor-inline-body .msg-time {font-size:11px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-body .col.side {display:none}
+.student-release .sr-workspace .ws-tutor-inline-body .composer {flex:none;padding:12px 14px;border-top:1px solid var(--sr-line)}
+.student-release .sr-workspace .ws-tutor-inline-body .quick-asks {display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.student-release .sr-workspace .ws-tutor-inline-body .quick-ask {min-height:32px;padding:0 12px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-muted);font-size:13px;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.student-release .sr-workspace .ws-tutor-inline-body .quick-ask:hover {border-color:var(--sr-brand);background:var(--sr-brand-soft);color:var(--sr-brand)}
+.student-release .sr-workspace .ws-tutor-inline-body .quick-ask:focus-visible {outline:2px solid var(--sr-brand);outline-offset:2px}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-fields {border:0;padding:0;margin:0}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-fields .ui-field {margin-bottom:10px}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-fields .ui-field label {font-size:12px;font-weight:600;color:var(--sr-muted);margin-bottom:4px}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-fields textarea {min-height:60px;padding:8px 10px;font-size:13px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-surface);color:var(--sr-ink);font-family:inherit;resize:vertical}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-fields textarea:focus {border-color:var(--sr-brand);outline:none}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-foot {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.student-release .sr-workspace .ws-tutor-inline-body .composer-foot .meta {font-size:11px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-body .field-error {margin:6px 0 0;font-size:12px;color:var(--red)}
+.student-release .sr-workspace .ws-tutor-inline-body .chat-empty {padding:24px 14px;text-align:center}
+.student-release .sr-workspace .ws-tutor-inline-body .chat-empty p {margin:0 0 8px;font-size:14px}
+.student-release .sr-workspace .ws-tutor-inline-body .chat-empty .meta {font-size:12px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-foot {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 14px;border-top:1px solid var(--sr-line);font-size:12px}
+.student-release .sr-workspace .ws-tutor-inline-foot .meta {margin:0;font-size:12px;color:var(--sr-muted)}
+.student-release .sr-workspace .ws-tutor-inline-foot a {color:var(--sr-brand)}
 
 /* ===== AI 辅导：对话列 + 辅导规则侧栏 ===== */
 .student-release .sr-tutoring .page-actions .quiet-link {display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:var(--sr-brand)}
@@ -736,8 +767,10 @@
   .student-release .sr-tasks .task-table-row>.button {grid-area:action}
   .student-release .sr-assignment .detail-grid {grid-template-columns:minmax(0,1fr);gap:32px}
   .student-release .sr-assignment .status-box {position:static}
-  .student-release .sr-workspace .ws-ide-grid {grid-template-columns:minmax(0,1fr);gap:28px}
-  .student-release .sr-workspace .ws-problem {position:static;max-height:none;overflow:visible;padding-right:0}
+  .student-release .sr-workspace .ws-ide-grid {flex-direction:column;min-height:auto}
+  .student-release .sr-workspace .ws-problem {flex:0 0 auto;max-height:none;overflow:visible}
+  .student-release .sr-workspace .ws-work-inner {flex-direction:column}
+  .student-release .sr-workspace .ws-tutor-inline {flex:0 0 auto;max-height:400px;border-left:0;border-top:1px solid var(--sr-line)}
   .student-release .sr-courses .course {grid-template-columns:minmax(0,1fr) 150px auto;gap:16px 24px}
   .student-release .sr-courses .course-main {grid-column:1;grid-row:1}
   .student-release .sr-courses .course-prog {grid-column:2;grid-row:1}
@@ -855,4 +888,8 @@
   .student-release .app-main.business-main {padding:20px var(--gutter) calc(48px + 80px)}
   /* 移动端侧栏是抽屉：必须脱离文档流，否则 100dvh 高度会把整页推下去。 */
   .student-release .workspace-sidebar {position:fixed;top:0;left:0;width:224px;height:100dvh}
+  /* 移动端工作区：AI 侧边栏改为底部弹出 */
+  .student-release .sr-workspace .ws-tutor-inline {position:fixed;bottom:0;left:0;right:0;max-height:60vh;border-left:0;border-top:1px solid var(--sr-line);border-radius:var(--sr-r-m) var(--sr-r-m) 0 0;z-index:30;box-shadow:0 -8px 24px rgba(20,30,50,.12)}
+  .student-release .sr-workspace .ws-tutor-slide-enter-active,.student-release .sr-workspace .ws-tutor-slide-leave-active {transition:transform .25s ease,opacity .2s ease}
+  .student-release .sr-workspace .ws-tutor-slide-enter-from,.student-release .sr-workspace .ws-tutor-slide-leave-to {transform:translateY(100%);opacity:0}
 }

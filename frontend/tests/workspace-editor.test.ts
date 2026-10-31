@@ -265,7 +265,7 @@ describe('正式提交资格以服务端 canSubmit 为准（B6）', () => {
   })
 })
 
-const aiButton = (page: VueWrapper) => page.findAll('button').find(item => item.text() === 'AI 求助')
+const aiButton = (page: VueWrapper) => page.findAll('button').find(item => item.text() === 'AI')
 
 async function openTutor(page: VueWrapper): Promise<void> {
   await aiButton(page)!.trigger('click')
@@ -285,30 +285,29 @@ describe('工作区题面与实时求助', () => {
     expect(problem.text()).toContain('60')
     expect(page.find('.ws-work').exists()).toBe(true)
     expect(page.findAll('button').some(item => item.text() === '运行')).toBe(true)
-    expect(page.text()).toContain('运行只做隔离预览，不代表自动检查')
   })
 
-  it('AI 求助抽屉懒加载：点击前不请求辅导，关闭后卸载', async () => {
+  it('AI 求助侧边栏懒加载：点击前不请求辅导，关闭后卸载', async () => {
     const page = await openWorkspace()
-    expect(page.find('.ws-tutor').exists()).toBe(false)
+    expect(page.find('.ws-tutor-inline').exists()).toBe(false)
     expect(requestsOf('getAiPolicy')).toHaveLength(0)
     expect(requestsOf('listTutoringSessions')).toHaveLength(0)
 
     await openTutor(page)
-    expect(page.find('.ws-tutor').exists()).toBe(true)
+    expect(page.find('.ws-tutor-inline').exists()).toBe(true)
     expect(requestsOf('getAiPolicy')).toHaveLength(1)
     expect(requestsOf('listTutoringSessions')).toHaveLength(1)
 
-    await page.find('.ws-tutor-close').trigger('click')
-    expect(page.find('.ws-tutor').exists()).toBe(false)
+    await page.find('.ws-tutor-inline-close').trigger('click')
+    expect(page.find('.ws-tutor-inline').exists()).toBe(false)
   })
 
   it('发送求助前先保存最新内容，并以保存后的 revision 请求 AI', async () => {
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('AI_LATEST_CODE')
     await openTutor(page)
-    await page.find('.ws-tutor textarea[placeholder="描述现象与具体疑问"]').setValue('这段代码为什么没生效？')
-    await page.find('.ws-tutor form.composer').trigger('submit')
+    await page.find('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]').setValue('这段代码为什么没生效？')
+    await page.find('.ws-tutor-inline form.composer').trigger('submit')
     await flushPromises()
 
     const saves = requestsOf('saveWorkspace')
@@ -320,16 +319,16 @@ describe('工作区题面与实时求助', () => {
     expect(scripted.requests.indexOf(saves[0]!)).toBeLessThan(scripted.requests.indexOf(sends[0]!))
   })
 
-  it('最新修改保存失败时不发送求助，并在抽屉内提示原因', async () => {
+  it('最新修改保存失败时不发送求助，并在侧边栏内提示原因', async () => {
     saveFails = true
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('WILL_NOT_SAVE')
     await openTutor(page)
-    await page.find('.ws-tutor textarea[placeholder="描述现象与具体疑问"]').setValue('先保存再问我')
-    await page.find('.ws-tutor form.composer').trigger('submit')
+    await page.find('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]').setValue('先保存再问我')
+    await page.find('.ws-tutor-inline form.composer').trigger('submit')
     await flushPromises()
 
     expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
-    expect(page.find('.ws-tutor .field-error').text()).toContain('最新修改尚未保存，暂不能请求 AI 辅导。')
+    expect(page.find('.ws-tutor-inline .field-error').text()).toContain('最新修改尚未保存，暂不能请求 AI 辅导。')
   })
 })

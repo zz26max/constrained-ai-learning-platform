@@ -19,7 +19,7 @@ import { retainWorkspace, takeWorkspace } from './workspace-recovery'
 import { trackLearningEvent, EDITOR_FILES, type EditorFile } from '../analytics/reporter'
 import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
-import WorkspaceTutorPanel from '../tutoring/WorkspaceTutorPanel.vue'
+import TutoringPanel from '../tutoring/TutoringPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +64,8 @@ const confirmSubmit = ref(false)
 const submitting = ref(false)
 const submitFailure = ref<string | null>(null)
 const tutorOpen = ref(false)
+const outputOpen = ref(false)
+const problemVisible = ref(true)
 const previewRef = ref<{ run: () => void } | null>(null)
 const outputRef = ref<HTMLElement | null>(null)
 
@@ -246,6 +248,7 @@ function openSubmitDialog(): void {
 }
 
 async function runPreview(): Promise<void> {
+  outputOpen.value = true
   previewRef.value?.run()
   await nextTick()
   outputRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
@@ -323,19 +326,39 @@ onBeforeUnmount(() => {
         <h1 class="page-title" tabindex="-1">{{ assignmentQuery.data.value?.title ?? '工作区' }}</h1>
       </div>
       <span v-if="query.data.value" class="save-st" role="status" aria-live="polite">
-        <span v-if="saveState.error || saveState.paused">未保存 · 本地内容已保留</span>
-        <span v-else-if="saveState.saving">正在保存…</span>
-        <span v-else-if="saveState.pendingSave">等待保存…</span>
-        <span v-else-if="saveState.lastSavedRevision > 0">已保存 · r{{ saveState.lastSavedRevision }}</span>
-        <span v-else>还没有保存</span>
+        <span v-if="saveState.error || saveState.paused">未保存</span>
+        <span v-else-if="saveState.saving">保存中…</span>
+        <span v-else-if="saveState.pendingSave">待保存</span>
+        <span v-else-if="saveState.lastSavedRevision > 0">r{{ saveState.lastSavedRevision }}</span>
       </span>
-      <UiButton
-        variant="primary"
-        :disabled="!canSubmit"
-        @click="openSubmitDialog"
-      >
-        提交作业
-      </UiButton>
+      <div class="ws-head-actions">
+        <UiButton
+          variant="quiet"
+          :aria-pressed="problemVisible"
+          @click="problemVisible = !problemVisible"
+          title="题目面板"
+        >
+          题目
+        </UiButton>
+        <UiButton v-if="isWebLab" variant="secondary" @click="runPreview">运行</UiButton>
+        <UiButton
+          variant="quiet"
+          :disabled="frozen"
+          :aria-pressed="tutorOpen"
+          aria-controls="workspace-tutor"
+          @click="toggleTutor"
+          title="AI 求助"
+        >
+          AI
+        </UiButton>
+        <UiButton
+          variant="primary"
+          :disabled="!canSubmit"
+          @click="openSubmitDialog"
+        >
+          提交作业
+        </UiButton>
+      </div>
     </header>
 
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
@@ -369,112 +392,118 @@ onBeforeUnmount(() => {
 
     <template v-if="query.status.value === 'success' && query.data.value">
       <div class="ws-ide-grid">
-        <aside class="ws-problem" aria-label="题目与要求">
-          <div class="ws-prob-meta">
-            <span v-if="typeLabel">{{ typeLabel }}</span>
-            <span>{{ detail?.isRequired ? '必做' : '选做' }}</span>
-            <span v-if="detail?.estimatedMinutes">预计 {{ detail.estimatedMinutes }} 分钟</span>
-            <span v-if="detail?.maxScore">满分 {{ detail.maxScore }}</span>
-            <b class="ws-prob-state">{{ stateLabel }}</b>
-          </div>
+        <Transition name="ws-problem">
+          <aside v-if="problemVisible" class="ws-problem" aria-label="题目与要求">
+            <div class="ws-prob-compact">
+              <span v-if="due.hasDue" class="ws-prob-due" :data-tone="due.overdue ? 'late' : ''">{{ due.relative }}</span>
+              <span v-if="attemptsText" class="ws-prob-attempts">{{ attemptsText }}</span>
+            </div>
 
-          <section class="ws-prob-block">
-            <h2 class="section-label">题目</h2>
-            <SafeMarkdown v-if="detail?.description" :content="detail.description" />
-            <p v-else class="meta">按下面的要求完成作答。</p>
-          </section>
+            <section class="ws-prob-block">
+              <SafeMarkdown v-if="detail?.description" :content="detail.description" />
+              <p v-else class="meta">按下面的要求完成作答。</p>
+            </section>
 
-          <section v-if="requirements.length" class="ws-prob-block">
-            <h2 class="section-label">要求</h2>
-            <ol class="ws-req"><li v-for="(req, index) in requirements" :key="index"><SafeMarkdown :content="req" /></li></ol>
-          </section>
+            <section v-if="requirements.length" class="ws-prob-block">
+              <h3 class="ws-prob-section-title">要求</h3>
+              <ol class="ws-req"><li v-for="(req, index) in requirements" :key="index"><SafeMarkdown :content="req" /></li></ol>
+            </section>
 
-          <section v-if="rubric.length" class="ws-prob-block">
-            <h2 class="section-label">评分标准</h2>
-            <table class="ws-rubric">
-              <thead><tr><th>评分项</th><th class="r">分值</th></tr></thead>
-              <tbody><tr v-for="criterion in rubric" :key="criterion.criterionId"><td>{{ criterion.title }}<span v-if="criterion.description" class="crit-desc">{{ criterion.description }}</span></td><td class="r num">{{ criterion.maxScore }}</td></tr></tbody>
-            </table>
-          </section>
+            <section v-if="rubric.length" class="ws-prob-block">
+              <h3 class="ws-prob-section-title">评分标准</h3>
+              <table class="ws-rubric">
+                <thead><tr><th>评分项</th><th class="r">分值</th></tr></thead>
+                <tbody><tr v-for="criterion in rubric" :key="criterion.criterionId"><td>{{ criterion.title }}<span v-if="criterion.description" class="crit-desc">{{ criterion.description }}</span></td><td class="r num">{{ criterion.maxScore }}</td></tr></tbody>
+              </table>
+              <div v-if="isWebLab" class="ws-rubric-examples">
+                <h4 class="ws-rubric-examples-title">测试示例</h4>
+                <ul class="ws-rubric-examples-list">
+                  <li>输入 <code>[2, 6, 1, 77, 52, 25, 7]</code> → 输出最大值 <code>77</code></li>
+                  <li>输入 <code>[-3, 0, 15, 8]</code> → 输出最大值 <code>15</code></li>
+                  <li>输入 <code>[42]</code> → 输出最大值 <code>42</code></li>
+                </ul>
+              </div>
+            </section>
 
-          <dl class="ws-prob-facts">
-            <div><dt>截止</dt><dd>{{ due.absolute }}<span v-if="due.hasDue" class="rel" :data-tone="due.overdue ? 'late' : ''">{{ due.relative }}</span></dd></div>
-            <div><dt>补交</dt><dd>{{ lateText }}</dd></div>
-            <div v-if="attemptsText"><dt>提交次数</dt><dd>{{ attemptsText }}</dd></div>
-          </dl>
-
-          <RouterLink class="ws-prob-link" :to="{ name: 'student-assignment', params: { id: assignmentId } }">查看提交记录与评价 →</RouterLink>
-        </aside>
+            <RouterLink class="ws-prob-link" :to="{ name: 'student-assignment', params: { id: assignmentId } }">提交记录与评价 →</RouterLink>
+          </aside>
+        </Transition>
 
         <section class="ws-work" aria-label="作答区">
-          <div class="file-tabs" role="tablist" aria-label="文件切换">
-            <button
-              v-for="(file, index) in query.data.value.files"
-              :id="`workspace-file-tab-${index}`"
-              :key="file.path"
-              type="button"
-              role="tab"
-              class="file-tab"
-              :aria-selected="activeTab === file.path"
-              :tabindex="activeTab === file.path ? 0 : -1"
-              @click="activeTab = file.path"
-              @keydown="onTablistKeydown($event, activateFileTab)"
-            >
-              {{ file.path }}
-            </button>
-          </div>
+          <div class="ws-work-inner">
+            <div class="ws-editor-col">
+              <div class="file-tabs" role="tablist" aria-label="文件切换">
+                <button
+                  v-for="(file, index) in query.data.value.files"
+                  :id="`workspace-file-tab-${index}`"
+                  :key="file.path"
+                  type="button"
+                  role="tab"
+                  class="file-tab"
+                  :aria-selected="activeTab === file.path"
+                  :tabindex="activeTab === file.path ? 0 : -1"
+                  @click="activeTab = file.path"
+                  @keydown="onTablistKeydown($event, activateFileTab)"
+                >
+                  {{ file.path }}
+                </button>
+              </div>
 
-          <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
-            <textarea
-              :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
-              :disabled="!canSave || frozen || auth.phase !== 'authenticated'"
-              class="workspace-editor"
-              :aria-label="activeTab"
-              rows="20"
-              spellcheck="false"
-              @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
-            />
-          </section>
+              <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
+                <textarea
+                  :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
+                  :disabled="!canSave || frozen || auth.phase !== 'authenticated'"
+                  class="workspace-editor"
+                  :aria-label="activeTab"
+                  rows="20"
+                  spellcheck="false"
+                  @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
+                />
+              </section>
 
-          <div class="ws-run-bar">
-            <div class="ws-run-actions">
-              <UiButton v-if="isWebLab" variant="secondary" @click="runPreview">运行</UiButton>
-              <UiButton
-                variant="secondary"
-                :disabled="frozen"
-                :aria-expanded="tutorOpen"
-                aria-controls="workspace-tutor"
-                @click="toggleTutor"
-              >
-                AI 求助
-              </UiButton>
+              <Transition name="ws-output">
+                <div v-if="isWebLab && outputOpen" ref="outputRef" class="ws-output">
+                  <div class="ws-output-head">
+                    <span class="meta">运行结果 · 隔离预览，不代表自动检查</span>
+                    <button type="button" class="ws-output-close" @click="outputOpen = false" aria-label="关闭运行结果">关闭</button>
+                  </div>
+                  <WebPreview
+                    ref="previewRef"
+                    :key="editingAssignmentId"
+                    :files="fileContents"
+                    :offering-id="detail?.offeringId"
+                    :assignment-id="editingAssignmentId"
+                    :show-run="false"
+                  />
+                </div>
+              </Transition>
             </div>
-            <p class="meta ws-run-note">
-              <template v-if="isWebLab">运行只做隔离预览，不代表自动检查。</template>
-              <template v-else>这类作业暂不支持运行，提交后由教师评阅。</template>
-            </p>
-          </div>
 
-          <div v-if="isWebLab" ref="outputRef" class="ws-output">
-            <WebPreview
-              ref="previewRef"
-              :key="editingAssignmentId"
-              :files="fileContents"
-              :offering-id="detail?.offeringId"
-              :assignment-id="editingAssignmentId"
-              :show-run="false"
-            />
+            <Transition name="ws-tutor-slide">
+              <div v-if="tutorOpen" id="workspace-tutor" class="ws-tutor-inline">
+                <div class="ws-tutor-inline-head">
+                  <div>
+                    <h3>AI 求助</h3>
+                    <p class="meta">发送前自动保存，AI 看到的是当前工作区版本。</p>
+                  </div>
+                  <button type="button" class="ws-tutor-inline-close" aria-label="关闭 AI 求助" @click="closeTutor">关闭</button>
+                </div>
+                <div class="ws-tutor-inline-body">
+                  <TutoringPanel
+                    :assignment-id="assignmentId"
+                    embedded
+                    :prepare-workspace="prepareWorkspaceForAi"
+                  />
+                </div>
+                <div class="ws-tutor-inline-foot">
+                  <span class="meta">只给思路和排错提示，不给完整答案。</span>
+                  <RouterLink :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+                </div>
+              </div>
+            </Transition>
           </div>
         </section>
       </div>
-
-      <WorkspaceTutorPanel
-        v-if="tutorOpen"
-        id="workspace-tutor"
-        :assignment-id="assignmentId"
-        :prepare-workspace="prepareWorkspaceForAi"
-        @close="closeTutor"
-      />
     </template>
 
     <dialog
