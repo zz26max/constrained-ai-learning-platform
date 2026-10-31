@@ -4,17 +4,20 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, type Router } from 'vue-router'
 import App from '../src/app/App.vue'
 import { createAppRouter } from '../src/app/router'
-import { registerAssignmentsApi, registerAuthApi, registerCoursesApi } from '../src/api'
+import { registerAssignmentsApi, registerAuthApi, registerCoursesApi, registerTutoringApi } from '../src/api'
 import { AuthApi } from '../src/api/auth'
 import { ApiClient } from '../src/api/client'
 import { AssignmentsApi } from '../src/api/assignments'
 import { CoursesApi } from '../src/api/courses'
+import { TutoringApi } from '../src/api/tutoring'
 import { useAuthStore } from '../src/stores/auth'
 import { clearWorkspaceRecovery } from '../src/features/assignments/workspace-recovery'
 import { createScriptedTransport, DEMO_CONFIG, DEMO_USER, failEnvelope, okEnvelope, type ScriptedResponse, type ScriptedTransport, type ScriptHandler } from './helpers'
 
 const ASSIGNMENT = '00000000-0000-4000-8000-000000000701'
 const ASSIGNMENT_B = '00000000-0000-4000-8000-000000000702'
+const TUTOR_SESSION = '00000000-0000-4000-8000-000000000901'
+const TUTOR_REQUEST = '00000000-0000-4000-8000-000000000902'
 
 let scripted: ScriptedTransport
 let wrapper: VueWrapper | undefined
@@ -29,7 +32,34 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
       assignmentId: ASSIGNMENT, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
       savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null,
     })
-    case 'getAssignment': return okEnvelope({ id: ASSIGNMENT, canSubmit: true, submissionBlockedReason: null, ...assignmentOverride })
+    case 'getAssignment': return okEnvelope({
+      id: ASSIGNMENT, canSubmit: true, submissionBlockedReason: null,
+      offeringId: '00000000-0000-4000-8000-000000000801', offeringStatus: 'active', publicationState: 'published',
+      title: '卡片布局练习', type: 'web_lab', isRequired: true, estimatedMinutes: 30, maxScore: 100,
+      description: '把卡片改成两列，窄屏时单列且不溢出。',
+      requirements: ['使用 flex 布局', '窄屏不溢出'],
+      rubric: [{ criterionId: 'c1', title: '布局正确性', description: '两列与单列切换正确', maxScore: 60 }],
+      dueAt: '2026-10-20T02:00:00Z', overdue: false, lateUntil: null,
+      assignmentState: 'IN_PROGRESS', attemptsUsed: 0, maxAttempts: 3, allowResubmit: true,
+      ...assignmentOverride,
+    })
+    case 'getAiPolicy': return okEnvelope({
+      assignmentId: ASSIGNMENT, version: 1, enabled: true,
+      allowedActions: ['ask', 'concept', 'next_hint'], allowedModes: ['concept', 'debug_hint', 'guided_question'],
+      restrictCompleteSolution: true, allowCodeBlocks: false, maxHintLevel: 3, requireAttemptFromLevel: 2,
+      dailyUserLimit: 30, dailyAssignmentLimit: 12, perMinuteLimit: 3, maxOutputTokens: 800,
+      boundaryText: '引导模式：只解释概念和排查方向。',
+    })
+    case 'listTutoringSessions': return okEnvelope({
+      items: [{ id: TUTOR_SESSION, assignmentId: ASSIGNMENT, createdAt: '2026-10-14T02:00:00Z', status: 'active', pendingRequestId: null, lastMessageAt: null }],
+      page: 1, pageSize: 20, total: 1,
+    })
+    case 'listTutoringMessages': return okEnvelope({ items: [], page: 1, pageSize: 50, total: 0 })
+    case 'sendTutoringMessage': return { status: 202, body: { data: { tutoringRequestId: TUTOR_REQUEST, status: 'queued' }, requestId: 'req-ai' } }
+    case 'getTutoringRequest': return okEnvelope({
+      id: TUTOR_REQUEST, sessionId: TUTOR_SESSION, status: 'completed', result: null, error: null,
+      createdAt: '2026-10-14T02:00:00Z', completedAt: '2026-10-14T02:00:01Z',
+    })
     case 'saveWorkspace':
       return saveFails
         ? failEnvelope(409, 'WORKSPACE_CONFLICT', {}, 'req-conflict')
@@ -86,6 +116,7 @@ beforeEach(() => {
   registerAuthApi(new AuthApi(client))
   registerCoursesApi(new CoursesApi(client))
   registerAssignmentsApi(new AssignmentsApi(client))
+  registerTutoringApi(new TutoringApi(client))
 })
 
 afterEach(() => {
@@ -231,5 +262,74 @@ describe('正式提交资格以服务端 canSubmit 为准（B6）', () => {
 
     expect(submitButton(page)?.attributes('disabled')).toBeDefined()
     expect(page.text()).toContain('req-assign-fail')
+  })
+})
+
+const aiButton = (page: VueWrapper) => page.findAll('button').find(item => item.text() === 'AI 求助')
+
+async function openTutor(page: VueWrapper): Promise<void> {
+  await aiButton(page)!.trigger('click')
+  await flushPromises()
+  await flushPromises()
+}
+
+describe('工作区题面与实时求助', () => {
+  it('左侧题面展示说明、要求与评分标准，右侧保留编辑器与运行入口', async () => {
+    const page = await openWorkspace()
+
+    const problem = page.find('.ws-problem')
+    expect(problem.exists()).toBe(true)
+    expect(problem.text()).toContain('把卡片改成两列')
+    expect(problem.text()).toContain('使用 flex 布局')
+    expect(problem.text()).toContain('布局正确性')
+    expect(problem.text()).toContain('60')
+    expect(page.find('.ws-work').exists()).toBe(true)
+    expect(page.findAll('button').some(item => item.text() === '运行')).toBe(true)
+    expect(page.text()).toContain('运行只做隔离预览，不代表自动检查')
+  })
+
+  it('AI 求助抽屉懒加载：点击前不请求辅导，关闭后卸载', async () => {
+    const page = await openWorkspace()
+    expect(page.find('.ws-tutor').exists()).toBe(false)
+    expect(requestsOf('getAiPolicy')).toHaveLength(0)
+    expect(requestsOf('listTutoringSessions')).toHaveLength(0)
+
+    await openTutor(page)
+    expect(page.find('.ws-tutor').exists()).toBe(true)
+    expect(requestsOf('getAiPolicy')).toHaveLength(1)
+    expect(requestsOf('listTutoringSessions')).toHaveLength(1)
+
+    await page.find('.ws-tutor-close').trigger('click')
+    expect(page.find('.ws-tutor').exists()).toBe(false)
+  })
+
+  it('发送求助前先保存最新内容，并以保存后的 revision 请求 AI', async () => {
+    const page = await openWorkspace()
+    await page.find('textarea.workspace-editor').setValue('AI_LATEST_CODE')
+    await openTutor(page)
+    await page.find('.ws-tutor textarea[placeholder="描述现象与具体疑问"]').setValue('这段代码为什么没生效？')
+    await page.find('.ws-tutor form.composer').trigger('submit')
+    await flushPromises()
+
+    const saves = requestsOf('saveWorkspace')
+    expect(saves).toHaveLength(1)
+    expect((bodyOf(saves[0]!)['files'] as { content: string }[])[0]?.content).toBe('AI_LATEST_CODE')
+    const sends = requestsOf('sendTutoringMessage')
+    expect(sends).toHaveLength(1)
+    expect(bodyOf(sends[0]!)['workspaceRevision']).toBe(2)
+    expect(scripted.requests.indexOf(saves[0]!)).toBeLessThan(scripted.requests.indexOf(sends[0]!))
+  })
+
+  it('最新修改保存失败时不发送求助，并在抽屉内提示原因', async () => {
+    saveFails = true
+    const page = await openWorkspace()
+    await page.find('textarea.workspace-editor').setValue('WILL_NOT_SAVE')
+    await openTutor(page)
+    await page.find('.ws-tutor textarea[placeholder="描述现象与具体疑问"]').setValue('先保存再问我')
+    await page.find('.ws-tutor form.composer').trigger('submit')
+    await flushPromises()
+
+    expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
+    expect(page.find('.ws-tutor .field-error').text()).toContain('最新修改尚未保存，暂不能请求 AI 辅导。')
   })
 })

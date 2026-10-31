@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { tutoringApi } from '../../api'
-import type { TutoringMessageDTO, TutoringSessionDTO } from '../../api/tutoring'
+import type { TutoringMessageDTO, TutoringSessionDTO, TutoringWrite } from '../../api/tutoring'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
 import UiButton from '../../components/ui/UiButton.vue'
@@ -11,7 +11,11 @@ import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { useTutoringPoll } from './use-tutoring-poll'
 
-const props = defineProps<{ assignmentId: string }>()
+const props = withDefaults(defineProps<{
+  assignmentId: string
+  embedded?: boolean
+  prepareWorkspace?: () => Promise<number | null>
+}>(), { embedded: false, prepareWorkspace: undefined })
 const auth = useAuthStore()
 
 const policyQuery = usePageQuery(async signal => (await tutoringApi().getAiPolicy(props.assignmentId, { signal })).data)
@@ -30,6 +34,7 @@ const pendingRequest = poll.request
 
 const action = ref<'ask' | 'concept' | 'next_hint'>('ask')
 const content = ref('')
+const composerInput = ref<HTMLTextAreaElement | null>(null)
 const attempt = ref('')
 const sending = ref(false)
 const actionError = ref('')
@@ -99,12 +104,23 @@ async function send(): Promise<void> {
   sending.value = true
   actionError.value = ''
   try {
+    let workspaceRevision: number | null = null
+    if (props.prepareWorkspace) {
+      try { workspaceRevision = await props.prepareWorkspace() }
+      catch (cause) {
+        if (current === generation) actionError.value = cause instanceof Error ? cause.message : '最新修改尚未保存，暂不能请求 AI 辅导。'
+        return
+      }
+    }
+    if (current !== generation || auth.identity?.id !== userId) return
     const token = await auth.ensureCsrfToken()
-    const result = await tutoringApi().sendTutoringMessage(activeSession.value.id, {
+    const body: TutoringWrite = {
       action: action.value,
       content: content.value,
       studentAttempt: attempt.value.trim() === '' ? null : attempt.value.trim(),
-    }, { csrfToken: token })
+      ...(workspaceRevision === null ? {} : { workspaceRevision }),
+    }
+    const result = await tutoringApi().sendTutoringMessage(activeSession.value.id, body, { csrfToken: token })
     if (current !== generation || auth.identity?.id !== userId) return
     auth.markActionSucceeded()
     content.value = ''
@@ -158,6 +174,19 @@ const MODE_LABELS: Record<string, string> = {
 }
 const ACTION_LABELS = { ask: '继续追问', concept: '解释概念', next_hint: '下一层提示' } as const
 
+const QUICK_ASKS = [
+  { label: '解释题目', action: 'concept', content: '请解释这道题的题意和完成标准。' },
+  { label: '给我提示', action: 'next_hint', content: '请给我一个不直接给出答案的下一步提示。' },
+  { label: '检查思路', action: 'ask', content: '请检查我的思路，指出遗漏或错误。' },
+] as const
+function applyQuickAsk(preset: typeof QUICK_ASKS[number]): void {
+  action.value = preset.action
+  content.value = preset.content
+  void nextTick(() => composerInput.value?.focus())
+}
+const hasNoSessions = computed(() => sessionsQuery.status.value === 'success'
+  && activeSession.value === null && (sessionsQuery.data.value?.items.length ?? 0) === 0)
+
 /** 已到达的提示层级：安全模板不计层，与契约的 fallback 语义一致。 */
 const hintLevel = computed(() => Math.max(0, ...messages.value
   .filter(message => message.role === 'assistant' && message.mode !== 'fallback')
@@ -166,7 +195,7 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
 </script>
 
 <template>
-  <div class="tutoring-panel">
+  <div class="tutoring-panel" :class="{ 'is-embedded': embedded }">
     <ApiState :status="policyQuery.status.value" :error="policyQuery.error.value" @retry="policyQuery.load" />
 
     <template v-if="policyQuery.status.value === 'success' && policy">
@@ -178,8 +207,8 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
 
       <div v-else class="tutor-grid">
         <div class="chat-col">
-          <div class="sessions">
-            <div class="session-btns" role="group" aria-label="辅导会话">
+          <div v-if="!embedded || activeSession !== null" class="sessions">
+            <div v-if="!embedded" class="session-btns" role="group" aria-label="辅导会话">
               <button
                 v-for="session in sessionsQuery.data.value?.items ?? []"
                 :key="session.id"
@@ -192,11 +221,19 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
               </button>
             </div>
             <UiButton variant="quiet" :disabled="creatingSession" @click="startSession">
-              {{ creatingSession ? '正在创建…' : '+ 新会话' }}
+              {{ creatingSession ? '正在创建…' : embedded ? '+ 新建求助' : '+ 新会话' }}
             </UiButton>
           </div>
 
           <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
+
+          <section v-if="embedded && hasNoSessions" class="chat-empty">
+            <p>随时可以求助。</p>
+            <p class="meta">提问前会自动保存工作区，AI 只看到你这一版内容。</p>
+            <UiButton variant="primary" :disabled="creatingSession" @click="startSession">
+              {{ creatingSession ? '正在创建…' : '开始求助' }}
+            </UiButton>
+          </section>
 
           <section v-if="activeSession !== null" class="chat" aria-label="辅导对话">
             <ol v-if="messages.length > 0" class="thread">
@@ -214,20 +251,31 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
               </li>
             </ol>
             <p v-else-if="poll.state.value !== 'polling'" class="chat-empty-text">
-              还没有提问。描述你遇到的问题，或请 AI 解释一个概念。
+              {{ embedded ? '选一个快捷提问，或直接描述你卡住的地方。' : '还没有提问。描述你遇到的问题，或请 AI 解释一个概念。' }}
             </p>
           </section>
 
           <form v-if="activeSession !== null" class="composer" @submit.prevent="send">
             <fieldset :disabled="sending || poll.state.value === 'polling'" class="composer-fields" aria-label="向 AI 助教提问">
-              <div class="seg" role="radiogroup" aria-label="提问方式">
+              <div v-if="!embedded" class="seg" role="radiogroup" aria-label="提问方式">
                 <label v-for="(label, key) in ACTION_LABELS" :key="key" class="seg-option" :aria-pressed="action === key">
                   <input v-model="action" type="radio" :value="key" name="tutoring-action" />
                   <span>{{ label }}</span>
                 </label>
               </div>
+              <div v-else class="quick-asks" role="group" aria-label="快捷提问">
+                <button
+                  v-for="preset in QUICK_ASKS"
+                  :key="preset.label"
+                  type="button"
+                  class="quick-ask"
+                  @click="applyQuickAsk(preset)"
+                >
+                  {{ preset.label }}
+                </button>
+              </div>
               <UiField label="你的问题" col>
-                <textarea v-model="content" rows="2" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
+                <textarea ref="composerInput" v-model="content" rows="2" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
               </UiField>
               <UiField :label="`实际尝试（第 ${policy.requireAttemptFromLevel} 级起必填）`" col>
                 <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />

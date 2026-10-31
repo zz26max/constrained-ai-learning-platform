@@ -5,18 +5,21 @@ import { assignmentsApi } from '../../api'
 import type { WorkspaceWrite } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
+import SafeMarkdown from '../../components/SafeMarkdown.vue'
 import UiButton from '../../components/ui/UiButton.vue'
 import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { useDebouncedSave } from './use-debounced-save'
 import { useAuthStore } from '../../stores/auth'
-import { isUuid } from './format'
+import { assignmentStateLabel, assignmentTypeLabel, dueInfo, isUuid } from './format'
+import { formatShortTime } from '../courses/format'
 import { pageError } from '../courses/page-error'
 import { retainWorkspace, takeWorkspace } from './workspace-recovery'
 import { trackLearningEvent, EDITOR_FILES, type EditorFile } from '../analytics/reporter'
 import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
+import WorkspaceTutorPanel from '../tutoring/WorkspaceTutorPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,6 +63,9 @@ const reflection = ref('')
 const confirmSubmit = ref(false)
 const submitting = ref(false)
 const submitFailure = ref<string | null>(null)
+const tutorOpen = ref(false)
+const previewRef = ref<{ run: () => void } | null>(null)
+const outputRef = ref<HTMLElement | null>(null)
 
 // 保存目标固定为已加载工作区的作业，不随路由参数变化，避免旧编辑写入新作业。
 let editingAssignmentId = ''
@@ -83,6 +89,7 @@ const { state: saveState, scheduleSave, cancelPending, flush, recover, resolveCo
 watch(() => route.params.id, async () => {
   const generation = ++loadGeneration
   const loadingId = assignmentId.value
+  tutorOpen.value = false
   void assignmentQuery.load()
   await query.load()
   if (query.data.value && generation === loadGeneration && loadingId === assignmentId.value) {
@@ -113,6 +120,20 @@ const currentFile = computed(() => {
 
 const canSave = computed(() => {
   return query.data.value?.canSave ?? false
+})
+
+const detail = computed(() => assignmentQuery.data.value)
+const isWebLab = computed(() => detail.value?.type === 'web_lab')
+const requirements = computed(() => detail.value?.requirements ?? [])
+const rubric = computed(() => detail.value?.rubric ?? [])
+const typeLabel = computed(() => assignmentTypeLabel(detail.value?.type))
+const stateLabel = computed(() => assignmentStateLabel(detail.value?.assignmentState ?? 'NOT_STARTED'))
+const due = computed(() => dueInfo(detail.value?.dueAt, detail.value?.overdue ?? false))
+const lateText = computed(() => detail.value?.lateUntil ? formatShortTime(detail.value.lateUntil) : '不接受补交')
+const attemptsText = computed(() => {
+  const data = detail.value
+  if (typeof data?.attemptsUsed !== 'number' || typeof data?.maxAttempts !== 'number') return ''
+  return `${data.attemptsUsed}/${data.maxAttempts}${data.allowResubmit ? ' · 批阅前可重交' : ''}`
 })
 
 const submitBlockedLabels: Record<string, string> = {
@@ -224,6 +245,32 @@ function openSubmitDialog(): void {
   submitDialog.value?.showModal()
 }
 
+async function runPreview(): Promise<void> {
+  previewRef.value?.run()
+  await nextTick()
+  outputRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+}
+
+function toggleTutor(): void {
+  tutorOpen.value = !tutorOpen.value
+}
+
+function closeTutor(): void {
+  tutorOpen.value = false
+}
+
+/** AI 求助前先把工作区落到服务端：后端按 revision 快照，提问才能带上最新代码。 */
+async function prepareWorkspaceForAi(): Promise<number | null> {
+  if (frozen.value) throw new Error('正在提交作业，请稍后再求助。')
+  if (!canSave.value) throw new Error('当前工作区为只读，不能请求 AI 辅导。')
+  if (saveState.value.paused) throw new Error('工作区有未处理的冲突或保存错误，请先恢复保存再求助。')
+  if (hasUnsavedEdits.value) {
+    const saved = await flush()
+    if (!saved) throw new Error('最新修改尚未保存，暂不能请求 AI 辅导。')
+  }
+  return saveState.value.lastSavedRevision > 0 ? saveState.value.lastSavedRevision : null
+}
+
 function closeSubmitDialog(): void {
   if (frozen.value) return
   submitDialog.value?.close()
@@ -321,35 +368,113 @@ onBeforeUnmount(() => {
     </UiNotice>
 
     <template v-if="query.status.value === 'success' && query.data.value">
-      <div class="file-tabs" role="tablist" aria-label="文件切换">
-        <button
-          v-for="(file, index) in query.data.value.files"
-          :id="`workspace-file-tab-${index}`"
-          :key="file.path"
-          type="button"
-          role="tab"
-          class="file-tab"
-          :aria-selected="activeTab === file.path"
-          :tabindex="activeTab === file.path ? 0 : -1"
-          @click="activeTab = file.path"
-          @keydown="onTablistKeydown($event, activateFileTab)"
-        >
-          {{ file.path }}
-        </button>
+      <div class="ws-ide-grid">
+        <aside class="ws-problem" aria-label="题目与要求">
+          <div class="ws-prob-meta">
+            <span v-if="typeLabel">{{ typeLabel }}</span>
+            <span>{{ detail?.isRequired ? '必做' : '选做' }}</span>
+            <span v-if="detail?.estimatedMinutes">预计 {{ detail.estimatedMinutes }} 分钟</span>
+            <span v-if="detail?.maxScore">满分 {{ detail.maxScore }}</span>
+            <b class="ws-prob-state">{{ stateLabel }}</b>
+          </div>
+
+          <section class="ws-prob-block">
+            <h2 class="section-label">题目</h2>
+            <SafeMarkdown v-if="detail?.description" :content="detail.description" />
+            <p v-else class="meta">按下面的要求完成作答。</p>
+          </section>
+
+          <section v-if="requirements.length" class="ws-prob-block">
+            <h2 class="section-label">要求</h2>
+            <ol class="ws-req"><li v-for="(req, index) in requirements" :key="index"><SafeMarkdown :content="req" /></li></ol>
+          </section>
+
+          <section v-if="rubric.length" class="ws-prob-block">
+            <h2 class="section-label">评分标准</h2>
+            <table class="ws-rubric">
+              <thead><tr><th>评分项</th><th class="r">分值</th></tr></thead>
+              <tbody><tr v-for="criterion in rubric" :key="criterion.criterionId"><td>{{ criterion.title }}<span v-if="criterion.description" class="crit-desc">{{ criterion.description }}</span></td><td class="r num">{{ criterion.maxScore }}</td></tr></tbody>
+            </table>
+          </section>
+
+          <dl class="ws-prob-facts">
+            <div><dt>截止</dt><dd>{{ due.absolute }}<span v-if="due.hasDue" class="rel" :data-tone="due.overdue ? 'late' : ''">{{ due.relative }}</span></dd></div>
+            <div><dt>补交</dt><dd>{{ lateText }}</dd></div>
+            <div v-if="attemptsText"><dt>提交次数</dt><dd>{{ attemptsText }}</dd></div>
+          </dl>
+
+          <RouterLink class="ws-prob-link" :to="{ name: 'student-assignment', params: { id: assignmentId } }">查看提交记录与评价 →</RouterLink>
+        </aside>
+
+        <section class="ws-work" aria-label="作答区">
+          <div class="file-tabs" role="tablist" aria-label="文件切换">
+            <button
+              v-for="(file, index) in query.data.value.files"
+              :id="`workspace-file-tab-${index}`"
+              :key="file.path"
+              type="button"
+              role="tab"
+              class="file-tab"
+              :aria-selected="activeTab === file.path"
+              :tabindex="activeTab === file.path ? 0 : -1"
+              @click="activeTab = file.path"
+              @keydown="onTablistKeydown($event, activateFileTab)"
+            >
+              {{ file.path }}
+            </button>
+          </div>
+
+          <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
+            <textarea
+              :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
+              :disabled="!canSave || frozen || auth.phase !== 'authenticated'"
+              class="workspace-editor"
+              :aria-label="activeTab"
+              rows="20"
+              spellcheck="false"
+              @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
+            />
+          </section>
+
+          <div class="ws-run-bar">
+            <div class="ws-run-actions">
+              <UiButton v-if="isWebLab" variant="secondary" @click="runPreview">运行</UiButton>
+              <UiButton
+                variant="secondary"
+                :disabled="frozen"
+                :aria-expanded="tutorOpen"
+                aria-controls="workspace-tutor"
+                @click="toggleTutor"
+              >
+                AI 求助
+              </UiButton>
+            </div>
+            <p class="meta ws-run-note">
+              <template v-if="isWebLab">运行只做隔离预览，不代表自动检查。</template>
+              <template v-else>这类作业暂不支持运行，提交后由教师评阅。</template>
+            </p>
+          </div>
+
+          <div v-if="isWebLab" ref="outputRef" class="ws-output">
+            <WebPreview
+              ref="previewRef"
+              :key="editingAssignmentId"
+              :files="fileContents"
+              :offering-id="detail?.offeringId"
+              :assignment-id="editingAssignmentId"
+              :show-run="false"
+            />
+          </div>
+        </section>
       </div>
 
-      <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
-        <textarea
-          :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
-          :disabled="!canSave || frozen || auth.phase !== 'authenticated'"
-          class="workspace-editor"
-          :aria-label="activeTab"
-          rows="20"
-          spellcheck="false"
-          @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
-        />
-      </section>
-      <WebPreview v-if="assignmentQuery.data.value?.type === 'web_lab'" :key="editingAssignmentId" :files="fileContents" :offering-id="assignmentQuery.data.value.offeringId" :assignment-id="editingAssignmentId" />
+      <WorkspaceTutorPanel
+        v-if="tutorOpen"
+        id="workspace-tutor"
+        :assignment-id="assignmentId"
+        :prepare-workspace="prepareWorkspaceForAi"
+        @close="closeTutor"
+      />
     </template>
 
     <dialog

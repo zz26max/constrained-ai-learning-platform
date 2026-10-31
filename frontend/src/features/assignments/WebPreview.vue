@@ -2,7 +2,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { buildWebPreview, previewMessage } from './web-preview'
 import { trackLearningEvent } from '../analytics/reporter'
-const props = withDefaults(defineProps<{ files: Record<string, string>; offeringId?: string; assignmentId?: string }>(), { offeringId: undefined, assignmentId: undefined })
+const props = withDefaults(defineProps<{ files: Record<string, string>; offeringId?: string; assignmentId?: string; showRun?: boolean }>(), { offeringId: undefined, assignmentId: undefined, showRun: true })
 const frame = ref<HTMLIFrameElement | null>(null), source = ref(''), nonce = ref(''), message = ref('')
 function preview(): void {
   nonce.value = crypto.randomUUID(); source.value = buildWebPreview(props.files, nonce.value); message.value = '正在加载预览…'
@@ -18,17 +18,18 @@ function receive(event: MessageEvent): void {
 }
 window.addEventListener('message', receive)
 onBeforeUnmount(() => { window.removeEventListener('message', receive); reset() })
+defineExpose({ run: preview })
 </script>
 <template>
   <section class="preview" aria-label="Web 隔离预览">
     <div class="preview-bar">
-      <span class="meta">隔离预览 · 不代表检查通过</span>
+      <span class="meta">运行结果 · 隔离预览，不代表自动检查</span>
       <span class="preview-actions">
-        <button type="button" class="quiet-btn" @click="preview">{{ source ? '刷新' : '运行预览' }}</button>
+        <button v-if="showRun" type="button" class="quiet-btn" @click="preview">{{ source ? '刷新' : '运行' }}</button>
         <button type="button" class="quiet-btn" :disabled="!source" @click="reset">重置</button>
       </span>
     </div>
-    <p class="meta preview-status" role="status">{{ message || (source ? '' : '在隔离沙箱中加载 index.html，不访问网络。') }}</p>
+    <p class="meta preview-status" role="status">{{ message || (source ? '' : '点「运行」后在隔离沙箱中加载 index.html，不访问网络。') }}</p>
     <iframe v-if="source" :key="nonce" ref="frame" title="学生作品隔离预览" sandbox="allow-scripts" referrerpolicy="no-referrer" :srcdoc="source" />
   </section>
 </template>
