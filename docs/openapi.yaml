@@ -93,7 +93,7 @@ paths:
       tags:
       - auth
       x-phase: P2
-      x-implementation-status: implemented
+      x-implementation-status: verified
       x-contract-status: reviewed
       x-permission: 匿名，需 CSRF
       x-csrf-required: true
