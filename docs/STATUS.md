@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`88dcdd5`（2026-10-31，注册收口：标记 verified、合并 `origin/master`、手册基线同步 1.2.0；此前 `beccd3f` 完成 V16 兜底学期与本地库重建），须为 HEAD 祖先且落后不超过 3 个提交。该分支已合入 `origin/master` 的 6 个文档提交（PR #14 等），领先 master `a7c1890` 18 个实现提交，合并后 master 以本分支为准。
+- **代码基线**：`d4900c9`（2026-10-31，收口：合并 `origin/master`、注册标记 verified、手册基线同步 1.2.0；此前 `beccd3f` 完成 V16 兜底学期与本地库重建），须为 HEAD 祖先且落后不超过 3 个提交。该分支已合入 `origin/master` 的 6 个文档提交（PR #14 等），领先旧 master `a7c1890` 26 个提交，并已推送 `origin/master`。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；不做服务端自动判题（P3 planned）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
@@ -39,7 +39,7 @@
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
 
-> **2026-10-31 收口与合并（`cc6e087` + 本提交）：** ① 合并 `origin/master` 的 6 个文档提交（PR #14 等），唯一冲突是 §0 基线一行，保留本地 2026-10-31 基线并说明已合入远端；② README、DEVELOPMENT、BACKEND、FRONTEND 的契约版本与 Flyway 口径同步到 1.2.0 与 V1–V16，修正远端遗留的「本地库 V13、V14 只在隔离库验证」；③ `POST /api/v1/auth/register` 按使用者浏览器验收（个人模式）标记 verified，业务操作计数变为 13 verified / 69 implemented / 4 planned；学校模式分支仍只有自动化证据。
+> **2026-10-31 收口与合并（`cc6e087` + `88dcdd5` + 本提交）：** ① 合并 `origin/master` 的 6 个文档提交（PR #14 等），唯一冲突是 §0 基线一行，保留本地 2026-10-31 基线并说明已合入远端；② README、DEVELOPMENT、BACKEND、FRONTEND 的契约版本与 Flyway 口径同步到 1.2.0 与 V1–V16，修正远端遗留的「本地库 V13、V14 只在隔离库验证」；③ `POST /api/v1/auth/register` 按使用者浏览器验收（个人模式）标记 verified，业务操作计数变为 13 verified / 69 implemented / 4 planned；学校模式分支仍只有自动化证据；④ master 快进到收口提交并推送，删除已合并的 `frontend/student-v4-sync`、`frontend/ui-kit`；⑤ 新增 [演示路线](features/demo-route.md)（12 分钟答辩脚本、一次性数据准备、故障兜底），登记进 docs 索引。
 
 > **2026-10-31 本地环境收口（`b6e545b`、`dd9c887`、`beccd3f`）：** ① 重建本地 3307（drop/create `learning_platform`，用 `Start-Local.ps1 -InitializeAccounts` 重放 V1–V16 并重建 3 个演示账号）；② V16 增补「空库没有当前学期时补个人学习学期」的条件插入，个人 offering 不再依赖外部先建学期，迁移后自带 5 章 / 10 资源 / 12 知识点；③ `DatabaseIntegrationIT` 的 @BeforeEach 改为按外键顺序清理种子数据，修掉由此暴露的 7 个 IT 报错；④ 真实 MySQL 端到端实测 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用 `e2e.reg.*` 账号已清理；⑤ 删除工作区评分标准下硬编码的「测试示例」块与样式；⑥ 修 `Start-Local.ps1`：子命令 stdout 与 `$LASTEXITCODE` 一起被赋给退出码变量导致「后端启动失败」误报，两处调用补 `| Out-Host`（文件保持 UTF-8 BOM）。门禁：后端 469 单元/HTTP + 259 IT、前端 47 文件/408 用例、`validate_contract.py` PASS。未做：注册页仍无浏览器操作证据。
 
