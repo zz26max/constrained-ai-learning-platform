@@ -415,14 +415,6 @@ onBeforeUnmount(() => {
                 <thead><tr><th>评分项</th><th class="r">分值</th></tr></thead>
                 <tbody><tr v-for="criterion in rubric" :key="criterion.criterionId"><td>{{ criterion.title }}<span v-if="criterion.description" class="crit-desc">{{ criterion.description }}</span></td><td class="r num">{{ criterion.maxScore }}</td></tr></tbody>
               </table>
-              <div v-if="isWebLab" class="ws-rubric-examples">
-                <h4 class="ws-rubric-examples-title">测试示例</h4>
-                <ul class="ws-rubric-examples-list">
-                  <li>输入 <code>[2, 6, 1, 77, 52, 25, 7]</code> → 输出最大值 <code>77</code></li>
-                  <li>输入 <code>[-3, 0, 15, 8]</code> → 输出最大值 <code>15</code></li>
-                  <li>输入 <code>[42]</code> → 输出最大值 <code>42</code></li>
-                </ul>
-              </div>
             </section>
 
             <RouterLink class="ws-prob-link" :to="{ name: 'student-assignment', params: { id: assignmentId } }">提交记录与评价 →</RouterLink>

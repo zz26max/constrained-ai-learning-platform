@@ -590,11 +590,6 @@
 .student-release .sr-workspace .ws-rubric .r {text-align:right}
 .student-release .sr-workspace .ws-rubric .num {font-variant-numeric:tabular-nums}
 .student-release .sr-workspace .ws-rubric .crit-desc {display:block;margin-top:4px;font-size:12px;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-rubric-examples {margin-top:12px;padding:10px 12px;border:1px solid var(--sr-line);border-radius:var(--sr-r-s);background:var(--sr-canvas);font-size:12px}
-.student-release .sr-workspace .ws-rubric-examples-title {margin:0 0 8px;font-size:12px;font-weight:600;color:var(--sr-muted)}
-.student-release .sr-workspace .ws-rubric-examples-list {margin:0;padding-left:16px}
-.student-release .sr-workspace .ws-rubric-examples-list li {margin:0 0 4px;font-family:Consolas,'Cascadia Code',monospace;font-size:11px}
-.student-release .sr-workspace .ws-rubric-examples-list code {padding:1px 4px;border-radius:3px;background:var(--sr-sunken);font-size:11px}
 .student-release .sr-workspace .ws-prob-link {display:block;margin-top:14px;padding-top:12px;border-top:1px solid var(--sr-line);font-size:12px;color:var(--sr-brand)}
 .student-release .sr-workspace .ws-prob-link:hover {text-decoration:underline;text-underline-offset:3px}
 
