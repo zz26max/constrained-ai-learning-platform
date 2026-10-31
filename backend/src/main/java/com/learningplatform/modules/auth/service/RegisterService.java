@@ -24,6 +24,7 @@ import com.learningplatform.modules.auth.security.SessionFingerprint;
 import com.learningplatform.modules.auth.security.SessionTokenCodec;
 import com.learningplatform.modules.courses.mapper.CourseMapper;
 import com.learningplatform.modules.courses.model.CourseRows.Invite;
+import com.learningplatform.modules.courses.security.InviteCodeCodec;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ public class RegisterService {
 
     private final UserMapper userMapper;
     private final CourseMapper courseMapper;
+    private final InviteCodeCodec inviteCodes;
     private final PasswordEncoder passwordEncoder;
     private final AuthSessionMapper sessionMapper;
     private final SessionTokenCodec sessionTokens;
@@ -50,12 +52,13 @@ public class RegisterService {
     private final AuditService auditService;
     private final Clock clock;
 
-    public RegisterService(UserMapper userMapper, CourseMapper courseMapper,
+    public RegisterService(UserMapper userMapper, CourseMapper courseMapper, InviteCodeCodec inviteCodes,
                            PasswordEncoder passwordEncoder, AuthSessionMapper sessionMapper,
                            SessionTokenCodec sessionTokens, CsrfTokenService csrfTokens,
                            AuthSessionProperties sessionProperties, AuditService auditService, Clock clock) {
         this.userMapper = userMapper;
         this.courseMapper = courseMapper;
+        this.inviteCodes = inviteCodes;
         this.passwordEncoder = passwordEncoder;
         this.sessionMapper = sessionMapper;
         this.sessionTokens = sessionTokens;
@@ -100,9 +103,6 @@ public class RegisterService {
                                     "message", "学校模式须选择角色（student 或 teacher）。"))));
                 }
                 roles = List.of(body.role());
-                if ("student".equals(body.role())) {
-                    validateAndEnrollInvite(body.inviteCode(), userId, now);
-                }
             }
             default -> throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR",
                     "模式须为 personal 或 school。",
@@ -121,13 +121,19 @@ public class RegisterService {
             enrollPersonalOffering(userId, now);
         }
 
-        // 7. 学校+教师+创建班级
+        // 7. 学校+学生：校验邀请码并入班。成员行引用 users(id)，必须在用户写入之后；
+        // 任何失败都与用户创建同事务回滚，不留半个账号。
+        if ("school".equals(body.mode()) && "student".equals(body.role())) {
+            validateAndEnrollInvite(body.inviteCode(), userId, now);
+        }
+
+        // 8. 学校+教师+创建班级
         if ("school".equals(body.mode()) && "teacher".equals(body.role())
                 && Boolean.TRUE.equals(body.createClass())) {
             createTeacherOffering(userId, now);
         }
 
-        // 8. 自动登录：创建会话
+        // 9. 自动登录：创建会话
         String token = sessionTokens.generate();
         String csrfSecret = sessionTokens.generate();
         Instant expiresAt = now.plus(sessionProperties.absoluteTimeout());
@@ -193,8 +199,8 @@ public class RegisterService {
                     Map.of("fields", List.of(Map.of("field", "inviteCode",
                             "message", "学生模式须填写邀请码。"))));
         }
-        // 邀请码验证：按 FNV-1a 摘要查找
-        String digest = inviteCodeDigest(inviteCode);
+        // 邀请码摘要必须与教师端 createInvite 的算法一致：服务端密钥的 HMAC-SHA256
+        String digest = inviteCodes.digest(inviteCode);
         Invite invite = courseMapper.inviteByDigest(digest);
         if (invite == null || invite.revokedAt() != null || !invite.expiresAt().isAfter(now)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_INVITE_CODE", "邀请码无效，请向教师确认。");
@@ -209,8 +215,10 @@ public class RegisterService {
             return; // 已加入
         }
         courseMapper.insertMember(UUID.randomUUID().toString(), offering.id(), userId, "student", now);
-        // 消耗邀请码（标记已使用）
-        courseMapper.consumeInvite(invite.id(), now);
+        // 名额消费与成员写入同事务：条件更新失败（用完/过期/撤销）时整个注册回滚
+        if (courseMapper.consumeInvite(invite.id(), now) != 1) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_INVITE_CODE", "邀请码已被用完或已失效。");
+        }
     }
 
     /** 学校+教师模式：创建新班级并关联教师。 */
@@ -225,16 +233,6 @@ public class RegisterService {
         courseMapper.insertOffering(offeringId, personalCourseId, currentTermId,
                 "我的班级", "默认班级", "chapter", userId, now);
         courseMapper.insertMember(UUID.randomUUID().toString(), offeringId, userId, "teacher", now);
-    }
-
-    /** 邀请码摘要：FNV-1a 32 位哈希（与前端 Mock 层保持一致）。 */
-    private String inviteCodeDigest(String code) {
-        int hash = 0x811c9dc5;
-        for (byte b : code.toUpperCase(Locale.ROOT).getBytes()) {
-            hash ^= (b & 0xff);
-            hash = (hash * 0x01000193) & 0xffffffff;
-        }
-        return String.format("%08x", hash);
     }
 
     private Instant idleDeadline(Instant now, Instant expiresAt) {

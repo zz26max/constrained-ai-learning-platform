@@ -20,6 +20,7 @@ import com.learningplatform.modules.auth.security.CsrfTokenService;
 import com.learningplatform.modules.auth.security.SessionTokenCodec;
 import com.learningplatform.modules.courses.mapper.CourseMapper;
 import com.learningplatform.modules.courses.model.CourseRows.Invite;
+import com.learningplatform.modules.courses.security.InviteCodeCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class RegisterServiceTest {
 
     private UserMapper userMapper;
     private CourseMapper courseMapper;
+    private InviteCodeCodec inviteCodes;
     private PasswordEncoder passwordEncoder;
     private AuthSessionMapper sessionMapper;
     private SessionTokenCodec sessionTokens;
@@ -53,6 +55,9 @@ class RegisterServiceTest {
     void setUp() {
         userMapper = mock(UserMapper.class);
         courseMapper = mock(CourseMapper.class);
+        // 摘要算法用真实实现的替身：返回传入的明文，便于用 anyString() 匹配邀请码查询
+        inviteCodes = mock(InviteCodeCodec.class);
+        when(inviteCodes.digest(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         passwordEncoder = new PasswordConfiguration().passwordEncoder();
         sessionMapper = mock(AuthSessionMapper.class);
         sessionTokens = new SessionTokenCodec();
@@ -63,8 +68,10 @@ class RegisterServiceTest {
 
         when(sessionProperties.absoluteTimeout()).thenReturn(java.time.Duration.ofHours(8));
         when(sessionProperties.idleTimeout()).thenReturn(java.time.Duration.ofMinutes(30));
+        // 学校模式在写入用户后才校验邀请码；默认让用户写入成功，错误分支由各用例断言
+        when(userMapper.insert(any(User.class))).thenReturn(1);
 
-        service = new RegisterService(userMapper, courseMapper, passwordEncoder, sessionMapper,
+        service = new RegisterService(userMapper, courseMapper, inviteCodes, passwordEncoder, sessionMapper,
                 sessionTokens, csrfTokens, sessionProperties, auditService, clock);
     }
 
@@ -114,6 +121,8 @@ class RegisterServiceTest {
         RegisterService.RegisterResult result = service.register(body, "request-id-2");
 
         assertThat(result.user().roles()).containsExactly("student");
+        // 摘要必须走与教师端 createInvite 相同的 InviteCodeCodec，不能自带一套算法
+        verify(inviteCodes).digest("P1A-DB-DEMO-2026");
         verify(courseMapper).consumeInvite(eq("invite-1"), any(Instant.class));
     }
 
