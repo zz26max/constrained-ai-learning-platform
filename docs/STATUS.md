@@ -14,14 +14,14 @@
 
 - **契约状态**：1.2.0，86 个业务操作 + 2 个健康检查；业务操作为 13 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式的邀请码入班与教师建班仍只有自动化测试证据。
 
-- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）。本地 3307 已重建并在新 V16 上重放迁移：terms/courses/course_offerings 为 1/1/1、章节 5、资源 10、知识点 12，演示账号 3 个；真实 HTTP 端到端 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用的 `e2e.reg.*` 账号已清理。注册页本身仍只有前端测试证据，没有浏览器操作记录。
+- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）。本地 3307 已重建并在新 V16 上重放迁移：terms/courses/course_offerings 为 1/1/1、章节 5、资源 10、知识点 12，演示账号 3 个；真实 HTTP 端到端 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用的 `e2e.reg.*` 账号已清理；学校模式（邀请码入班）由 `scripts/demo-seed.mjs` 真实注册两名学生验证通过。本地演示数据经产品接口备齐：教学班 1、章节 3、知识点 4、作业 1（含待批阅提交）、演示学生 2。注册页本身仍只有前端测试证据，没有浏览器操作记录。
 
 - **未决事项**（2026-10-31 更新）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
   2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
   3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
   4. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
-  5. 学校模式的注册分支（邀请码入班、教师建班）尚无浏览器验收；个人模式已由使用者验收并标记 verified。
+  5. 学校模式注册的邀请码入班已有真实 HTTP 端到端证据（`scripts/demo-seed.mjs` 成功注册两名学生），但注册页的学校分支与教师建班分支仍无浏览器验收；个人模式已由使用者验收并标记 verified。
   6. V16 自带「个人学习学期」是迁移写业务配置的折中；若真实环境要求学期只能由管理流程创建，应改为注册时按需创建个人 offering，并同步迁移与文档。
 
 ### 0.1 接手前必读
@@ -38,6 +38,8 @@
 > **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；§4 已知限制是被 §0 引用的现行清单，同样不属日志；判断某条缺陷是否已修，先看 §0、§3 与 §4，再对照本节是否有更晚的条目。历史条目中的旧文件路径按 2026-10-24 归档迁移对照：`frontend/DESIGN.md` → `docs/archive/frontend-DESIGN.md`、`frontend/V3*-DELIVERY.md` 等报告 → `docs/archive/`、`frontend/scripts` 一次性验收脚本 → `frontend/scripts/archive/`。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
+
+> **2026-11-01 演示数据与学校模式注册修复：** ① 新增 [scripts/demo-seed.mjs](../scripts/demo-seed.mjs)，用产品 HTTP 接口备好演示数据（教学班、3 章、4 知识点、1 份已发布作业、邀请码、`demo.s1`/`demo.s2` 两名学校模式学生、一次已批阅提交、一次待批阅提交、3 条学习事件），可重复执行；② 修复学校模式注册两个真实缺陷：邀请码摘要用了自造 FNV-1a，与教师端 `InviteCodeCodec` 的 HMAC-SHA256 不一致，任何真实邀请码都被判无效；成员行写入发生在用户行之前，触发外键失败 500，现改为先建用户再入班并与注册同事务回滚；③ `RegisterServiceTest` 增加「摘要必须走 InviteCodeCodec」断言。检查：专项测试 20 项通过，全量 469 单元/HTTP + 259 IT 通过；脚本连续两次执行幂等，自检 学生 2 / 待批阅 1 / 活跃学生 2 / 掌握分布含 8 次评价。
 
 > **2026-10-31 收口与合并（`cc6e087` + `88dcdd5` + 本提交）：** ① 合并 `origin/master` 的 6 个文档提交（PR #14 等），唯一冲突是 §0 基线一行，保留本地 2026-10-31 基线并说明已合入远端；② README、DEVELOPMENT、BACKEND、FRONTEND 的契约版本与 Flyway 口径同步到 1.2.0 与 V1–V16，修正远端遗留的「本地库 V13、V14 只在隔离库验证」；③ `POST /api/v1/auth/register` 按使用者浏览器验收（个人模式）标记 verified，业务操作计数变为 13 verified / 69 implemented / 4 planned；学校模式分支仍只有自动化证据；④ master 快进到收口提交并推送，删除已合并的 `frontend/student-v4-sync`、`frontend/ui-kit`；⑤ 新增 [演示路线](features/demo-route.md)（12 分钟答辩脚本、一次性数据准备、故障兜底），登记进 docs 索引。
 
