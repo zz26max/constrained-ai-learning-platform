@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-契约基线 **1.1.1**，共 83 个业务操作与 2 个健康检查。截至 2026-10-18，**P0-A、P1-A、P1-B、P1-C、P1-D 已完成**：认证、课程与教学班、作业与工作区、提交与评价、多班聚合均有后端实现；53 个操作 `implemented`、10 个 `verified`、22 个 `planned`。P2（受限式 AI 辅导、学习行为分析）与 P3（独立运行检查）尚未实现。接口实现状态以 [接口契约](docs/openapi.yaml) 的 `x-implementation-status` 为准，不在本文件另维护计数。
+契约基线 **1.1.1**，共 83 个业务操作与 2 个健康检查。截至 2026-10-27，**P1 教学闭环已完成，P2-A、P2-B 后端已完成**：受限式 AI 辅导、教师求助、学习事件与知识证据的后端已交付；前端知识评价/标签 UI 已完成，前端审计修复 F1–F6 已实施（真实模式浏览器验证未做）；P3（独立运行检查）尚未实现。接口实现状态以 [接口契约](docs/openapi.yaml) 的 `x-implementation-status` 为准，当前计数与阶段以 [STATUS §0](docs/STATUS.md) 为准，不在本文件另维护计数。
 
 ## 文档入口
 
@@ -58,7 +58,7 @@ npm run dev
 
 默认只监听 `127.0.0.1:8080`：`http://127.0.0.1:8080/health/live` 返回 HTTP 200 和 `{"status":"ok"}`；`http://127.0.0.1:8080/health/ready` 返回 HTTP 200 和 `{"status":"ready"}`。端口被占用时可给脚本增加 `-Port 8081`，或在 IDEA 环境变量中设置 `SERVER_PORT`。在启动终端按 Ctrl+C 停止 API。
 
-应用首次启动时 Flyway 依次执行 V1～V9，建立学期、账户、会话、审计、课程内容、作业、评价通知与公告相关表及迁移记录；已有数据库只执行尚未应用的迁移。迁移不初始化学期、账户或会话，再次启动先校验迁移，不重复建表。数据库初始连接或迁移失败时应用启动失败；已启动后数据库失联，ready 返回 503 `{"status":"unavailable"}`，live 仍可返回 200。
+应用首次启动时 Flyway 依次执行 V1～V14，建立学期、账户、会话、审计、课程内容、作业、评价通知与公告相关表及迁移记录；已有数据库只执行尚未应用的迁移。现有本地库仍为 V13，V14 只在隔离库验证，见 [STATUS §0](docs/STATUS.md)。迁移不初始化学期、账户或会话，再次启动先校验迁移，不重复建表。数据库初始连接或迁移失败时应用启动失败；已启动后数据库失联，ready 返回 503 `{"status":"unavailable"}`，live 仍可返回 200。
 
 IDEA 开发步骤：
 
@@ -134,7 +134,7 @@ scripts/
   contract_slice.py             按 operationId 提取只读契约
   requirements-contract.txt     契约工具依赖
 .github/workflows/contract.yml  契约、后端与前端检查
-frontend/                       正式 Vue 工程，课程、作业、评价与通知流程已交付
+frontend/                       正式 Vue 工程，课程、作业、评价与通知流程及 P2 知识评价/标签 UI 已交付
 backend/
   pom.xml                       Maven 依赖与打包配置
   compose.yml                   本地 MySQL 8.4.11 与持久化数据卷
