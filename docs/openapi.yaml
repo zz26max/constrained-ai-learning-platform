@@ -84,6 +84,49 @@ paths:
         content:
           application/json:
             schema: {$ref: '#/components/schemas/LoginWrite'}
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      summary: register
+      description: 权限：匿名，需 CSRF。请求约定：`{username,password,displayName,mode,role?,inviteCode?,createClass?}`。结果约定：201 `{user:UserDTO,csrfToken}`；注册成功自动登录并建立会话。业务规则以 DEVELOPMENT.md 为准。
+        双模式注册：personal 模式统一学生身份并自动关联个人课程；school 模式需选择角色（student/teacher），学生通过邀请码加入班级，教师可创建班级。
+      tags:
+      - auth
+      x-phase: P2
+      x-implementation-status: implemented
+      x-contract-status: reviewed
+      x-permission: 匿名，需 CSRF
+      x-csrf-required: true
+      x-idempotency: none
+      parameters:
+      - name: X-Request-ID
+        in: header
+        required: false
+        schema: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$', maxLength: 64, minLength: 1}
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: {type: string, maxLength: 512, minLength: 1}
+      - name: Origin
+        in: header
+        required: true
+        schema: {type: string, format: uri}
+      responses:
+        '201': {$ref: '#/components/responses/register_201'}
+        '400': {$ref: '#/components/responses/register_400'}
+        '403': {$ref: '#/components/responses/login_403'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '415': {$ref: '#/components/responses/login_415'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '429': {$ref: '#/components/responses/login_429'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterWrite'}
   /api/v1/auth/logout:
     post:
       operationId: logout
@@ -3681,6 +3724,39 @@ components:
       - csrfToken
       examples:
       - user: {id: 00000000-0000-4000-8000-000000000001, username: student.demo, displayName: 演示学生, roles: [student]}
+        csrfToken: example-csrf-token
+    RegisterWrite:
+      type: object
+      additionalProperties: false
+      properties:
+        username: {type: string, maxLength: 32, minLength: 3, pattern: '^[a-z0-9._-]+$'}
+        password: {type: string, maxLength: 64, minLength: 8}
+        displayName: {type: string, maxLength: 50, minLength: 1}
+        mode: {type: string, enum: [personal, school]}
+        role: {type: string, enum: [student, teacher], description: school 模式必填}
+        inviteCode: {type: string, maxLength: 128, minLength: 1, description: school+student 模式必填}
+        createClass: {type: boolean, description: school+teacher 模式，是否创建班级}
+      required:
+      - username
+      - password
+      - displayName
+      - mode
+      description: 双模式注册。personal 模式统一学生身份并自动关联个人课程；school 模式需选择角色，学生通过邀请码加入班级，教师可创建班级。密码至少含大小写字母与数字各一个。
+      examples:
+      - {username: newuser, password: NewUser123, displayName: 新用户, mode: personal}
+      - {username: student1, password: Student123, displayName: 学生一, mode: school, role: student, inviteCode: P1A-DB-DEMO-2026}
+      - {username: teacher1, password: Teacher123, displayName: 教师一, mode: school, role: teacher, createClass: true}
+    RegisterDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        user: {$ref: '#/components/schemas/UserDTO'}
+        csrfToken: {type: string, maxLength: 512, minLength: 1}
+      required:
+      - user
+      - csrfToken
+      examples:
+      - user: {id: 00000000-0000-4000-8000-123456789012, username: newuser, displayName: 新用户, roles: [student]}
         csrfToken: example-csrf-token
     LogoutDTO:
       type: object
@@ -7394,6 +7470,19 @@ components:
       required:
       - error
       - requestId
+    Error_USERNAME_TAKEN:
+      type: object
+      additionalProperties: false
+      properties:
+        code: {type: string, const: USERNAME_TAKEN}
+        message: {type: string, maxLength: 1000, minLength: 1}
+        details: {$ref: '#/components/schemas/Empty'}
+      required:
+      - code
+      - message
+      - details
+      description: 该用户名已被占用。
+      x-http-status: 400
     Error_INVALID_CREDENTIALS:
       type: object
       additionalProperties: false
@@ -7412,6 +7501,15 @@ components:
       additionalProperties: false
       properties:
         error: {$ref: '#/components/schemas/Error_INVALID_CREDENTIALS'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - error
+      - requestId
+    Failure_USERNAME_TAKEN:
+      type: object
+      additionalProperties: false
+      properties:
+        error: {$ref: '#/components/schemas/Error_USERNAME_TAKEN'}
         requestId: {type: string, maxLength: 64, minLength: 1}
       required:
       - error
@@ -8197,6 +8295,15 @@ components:
       additionalProperties: false
       properties:
         data: {$ref: '#/components/schemas/LoginDTO'}
+        requestId: {type: string, maxLength: 64, minLength: 1}
+      required:
+      - data
+      - requestId
+    Response_register:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/RegisterDTO'}
         requestId: {type: string, maxLength: 64, minLength: 1}
       required:
       - data
@@ -9382,6 +9489,26 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Response_login'}
+    register_201:
+      description: 201 `{user:UserDTO,csrfToken}`；注册成功并自动登录
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+        Set-Cookie: {$ref: '#/components/headers/SetCookie'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_register'}
+    register_400:
+      description: USERNAME_TAKEN 或 INVALID_INVITE_CODE
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - {$ref: '#/components/schemas/Failure_USERNAME_TAKEN'}
+            - {$ref: '#/components/schemas/Failure_INVALID_INVITE_CODE'}
     login_401:
       description: INVALID_CREDENTIALS
       headers:

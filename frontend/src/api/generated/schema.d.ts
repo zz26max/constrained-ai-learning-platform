@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * register
+         * @description 权限：匿名，需 CSRF。请求约定：`{username,password,displayName,mode,role?,inviteCode?,createClass?}`。结果约定：201 `{user:UserDTO,csrfToken}`；注册成功自动登录并建立会话。业务规则以 DEVELOPMENT.md 为准。 双模式注册：personal 模式统一学生身份并自动关联个人课程；school 模式需选择角色（student/teacher），学生通过邀请码加入班级，教师可创建班级。
+         */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -1097,7 +1117,7 @@ export interface paths {
         };
         /**
          * getAssignmentStats
-         * @description 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1 `commonIssues:[]`。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues` 按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间，`knowledgePointId` 当前恒为 null。业务规则以 DEVELOPMENT.md 为准。
          */
         get: operations["getAssignmentStats"];
         put?: never;
@@ -1624,6 +1644,64 @@ export interface components {
          *     }
          */
         LoginDTO: {
+            user: components["schemas"]["UserDTO"];
+            csrfToken: string;
+        };
+        /**
+         * @description 双模式注册。personal 模式统一学生身份并自动关联个人课程；school 模式需选择角色，学生通过邀请码加入班级，教师可创建班级。密码至少含大小写字母与数字各一个。
+         * @example {
+         *       "username": "newuser",
+         *       "password": "NewUser123",
+         *       "displayName": "新用户",
+         *       "mode": "personal"
+         *     }
+         * @example {
+         *       "username": "student1",
+         *       "password": "Student123",
+         *       "displayName": "学生一",
+         *       "mode": "school",
+         *       "role": "student",
+         *       "inviteCode": "P1A-DB-DEMO-2026"
+         *     }
+         * @example {
+         *       "username": "teacher1",
+         *       "password": "Teacher123",
+         *       "displayName": "教师一",
+         *       "mode": "school",
+         *       "role": "teacher",
+         *       "createClass": true
+         *     }
+         */
+        RegisterWrite: {
+            username: string;
+            password: string;
+            displayName: string;
+            /** @enum {string} */
+            mode: "personal" | "school";
+            /**
+             * @description school 模式必填
+             * @enum {string}
+             */
+            role?: "student" | "teacher";
+            /** @description school+student 模式必填 */
+            inviteCode?: string;
+            /** @description school+teacher 模式，是否创建班级 */
+            createClass?: boolean;
+        };
+        /**
+         * @example {
+         *       "user": {
+         *         "id": "00000000-0000-4000-8000-123456789012",
+         *         "username": "newuser",
+         *         "displayName": "新用户",
+         *         "roles": [
+         *           "student"
+         *         ]
+         *       },
+         *       "csrfToken": "example-csrf-token"
+         *     }
+         */
+        RegisterDTO: {
             user: components["schemas"]["UserDTO"];
             csrfToken: string;
         };
@@ -3356,6 +3434,13 @@ export interface components {
             error: components["schemas"]["Error_UNAUTHENTICATED"];
             requestId: string;
         };
+        /** @description 该用户名已被占用。 */
+        Error_USERNAME_TAKEN: {
+            /** @constant */
+            code: "USERNAME_TAKEN";
+            message: string;
+            details: components["schemas"]["Empty"];
+        };
         /** @description 用户名或密码错误；禁用账户使用相同公开结果。 */
         Error_INVALID_CREDENTIALS: {
             /** @constant */
@@ -3365,6 +3450,10 @@ export interface components {
         };
         Failure_INVALID_CREDENTIALS: {
             error: components["schemas"]["Error_INVALID_CREDENTIALS"];
+            requestId: string;
+        };
+        Failure_USERNAME_TAKEN: {
+            error: components["schemas"]["Error_USERNAME_TAKEN"];
             requestId: string;
         };
         /** @description 缺少模块角色或教学班权限。 */
@@ -3763,6 +3852,10 @@ export interface components {
         };
         Response_login: {
             data: components["schemas"]["LoginDTO"];
+            requestId: string;
+        };
+        Response_register: {
+            data: components["schemas"]["RegisterDTO"];
             requestId: string;
         };
         Response_logout: {
@@ -4599,6 +4692,29 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Response_login"];
+            };
+        };
+        /** @description 201 `{user:UserDTO,csrfToken}`；注册成功并自动登录 */
+        register_201: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                "Set-Cookie": components["headers"]["SetCookie"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_register"];
+            };
+        };
+        /** @description USERNAME_TAKEN 或 INVALID_INVITE_CODE */
+        register_400: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Failure_USERNAME_TAKEN"] | components["schemas"]["Failure_INVALID_INVITE_CODE"];
             };
         };
         /** @description INVALID_CREDENTIALS */
@@ -5538,7 +5654,7 @@ export interface components {
                 "application/json": components["schemas"]["Response_getOfferingKnowledgeMastery"];
             };
         };
-        /** @description 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1 `commonIssues:[]` */
+        /** @description 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues` 按当前词表版本返回计数非零的标签，字段含义见 CommonIssue */
         getAssignmentStats_200: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
@@ -5931,6 +6047,34 @@ export interface operations {
             200: components["responses"]["login_200"];
             400: components["responses"]["getCsrfToken_400"];
             401: components["responses"]["login_401"];
+            403: components["responses"]["login_403"];
+            406: components["responses"]["getCsrfToken_406"];
+            415: components["responses"]["login_415"];
+            422: components["responses"]["getCsrfToken_422"];
+            429: components["responses"]["login_429"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Request-ID"?: string;
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterWrite"];
+            };
+        };
+        responses: {
+            201: components["responses"]["register_201"];
+            400: components["responses"]["register_400"];
             403: components["responses"]["login_403"];
             406: components["responses"]["getCsrfToken_406"];
             415: components["responses"]["login_415"];
