@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 
@@ -80,9 +81,14 @@ class DatabaseIntegrationIT {
     private MockMvc mockMvc;
 
     @BeforeEach
-    void clearTestTerms() {
-        // 只清理本测试临时库的学期数据，绝不访问开发数据库。
-        jdbcTemplate.update("DELETE FROM terms");
+    void clearSeededContent() {
+        // 只清理本测试临时库的数据，绝不访问开发数据库。
+        // V16 会随迁移带入学期、课程、班级与章节，按外键顺序先清子表再清学期。
+        jdbcTemplate.update("UPDATE offering_members SET last_chapter_id=NULL");
+        for (String table : List.of("chapter_progress", "resources", "knowledge_points", "chapters",
+                "course_invites", "offering_members", "course_offerings", "courses", "terms")) {
+            jdbcTemplate.update("DELETE FROM " + table);
+        }
     }
 
     @Test

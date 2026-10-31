@@ -1,18 +1,26 @@
 -- V16: 导入真实 Web 开发基础课程数据（基于 MDN Web Docs 结构手动编写）
 -- 所有 INSERT 使用 INSERT IGNORE 保证幂等性；固定 UUID 便于前后端对齐。
 -- 迁移不创建账号：个人学习 offering 没有人类创建者，因此 created_by 允许 NULL。
+-- 个人学习 offering 需要一个学期承载；空库没有学期时由本迁移补一个当前学期，
+-- 已有当前学期时保持原样（个人课程挂到既有当前学期）。
 
 -- 1. 个人学习 offering 不再要求创建者（课程内容随迁移分发，不引入系统账号）
 ALTER TABLE course_offerings
     MODIFY created_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL;
 
--- 2. 基础课程：Web 开发基础
+-- 2. 空库兜底当前学期：仅在没有任何当前学期时插入，不覆盖既有学期配置
+INSERT IGNORE INTO terms (id, label, starts_at, ends_at, is_current, created_at, updated_at)
+SELECT '00000000-0000-4000-8000-000000000010', '个人学习学期', '2026-01-01 00:00:00.000000',
+       '2030-01-01 00:00:00.000000', 1, '2026-01-01 00:00:00.000000', '2026-01-01 00:00:00.000000'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM terms WHERE is_current = 1);
+
+-- 3. 基础课程：Web 开发基础
 INSERT IGNORE INTO courses (id, code, mark, title, description, status, created_by, created_at, updated_at)
 VALUES ('00000000-0000-4000-8000-000000000110', 'WEB-101', 'WEB', 'Web 开发基础',
         '本课程涵盖 HTML、CSS、JavaScript 核心知识，适合零基础学习者。内容参考 MDN Web Docs 结构，手动编写原创 Markdown 教程。',
         'active', NULL, '2026-01-01 00:00:00.000000', '2026-01-01 00:00:00.000000');
 
--- 3. 个人课程 offering（所有个人模式用户自动关联）
+-- 4. 个人课程 offering（所有个人模式用户自动关联）
 INSERT IGNORE INTO course_offerings (id, course_id, term_id, title, group_name, progress_unit, status, created_by, created_at, updated_at)
 SELECT '00000000-0000-4000-8000-000000000210', '00000000-0000-4000-8000-000000000110', t.id,
        'Web 开发基础（个人学习）', '个人学习', 'chapter', 'active',
