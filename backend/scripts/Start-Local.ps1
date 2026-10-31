@@ -126,7 +126,8 @@ $configuredProfile = $env:SPRING_PROFILES_ACTIVE
 Push-Location $backendDirectory
 try {
     # Docker Desktop 需已启动。--wait 等待账号与数据库真正可查询后再启动 API。
-    $composeExitCode = Invoke-NativeCommand { docker compose --env-file .env up -d --wait --wait-timeout 120 db }
+    # Out-Host 把子命令输出直接打印，避免它进入函数输出流、把退出码变成数组而误判失败。
+    $composeExitCode = Invoke-NativeCommand { docker compose --env-file .env up -d --wait --wait-timeout 120 db | Out-Host }
     if ($composeExitCode -ne 0) { throw '本地数据库启动失败，请检查 Docker Desktop 和 3307 端口。' }
     if ($DatabaseOnly) {
         Write-Host 'MySQL 已就绪，监听 127.0.0.1:3307；可按 README 配置 IDEA 启动。'
@@ -141,7 +142,7 @@ try {
     $env:SERVER_PORT = [string]$Port
     if ($InitializeAccounts) { $env:SPRING_PROFILES_ACTIVE = 'local-accounts' }
     if ($InitializeDemoData) { $env:SPRING_PROFILES_ACTIVE = 'local-demo-data' }
-    $serverExitCode = Invoke-NativeCommand { .\mvnw.cmd spring-boot:run }
+    $serverExitCode = Invoke-NativeCommand { .\mvnw.cmd spring-boot:run | Out-Host }
     if ($serverExitCode -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
 } finally {
     # 避免一次性命令影响同一终端后续启动的 API。
