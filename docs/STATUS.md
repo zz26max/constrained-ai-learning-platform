@@ -12,7 +12,7 @@
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。
 
-- **契约状态**：1.2.0，85 个业务操作 + 2 个健康检查；业务操作为 12 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 已返回真实 `commonIssues`，但契约描述仍写 P1 空数组，见未决事项。
+- **契约状态**：1.2.0，85 个业务操作 + 2 个健康检查；业务操作为 12 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。
 
 - **门禁现状**（2026-10-31）：后端全量 `./mvnw.cmd --batch-mode verify` 通过 458 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 44 文件/382 项通过；`validate_contract.py` PASS。真实浏览器证据覆盖教师学习分析页（14 天活跃卡片与摘要、两张 SVG 图表、四态掌握分布、无障碍明细）与学生掌握概览（四色图例、分段条、说明）；页面收到的数据与接口夹具、SQL 事实逐项一致，截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`。本地 3307 已迁移到 V15（两个读索引），演示数据经产品接口创建。
 
@@ -20,8 +20,7 @@
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
   2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
   3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
-  4. `getAssignmentStats` 的契约描述（操作说明与 200 响应说明）仍写"P1 `commonIssues:[]`"，与 P2 起的真实返回不一致；修正描述需用户授权，本次未改。
-  5. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
+  4. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
 
 ### 0.1 接手前必读
 
@@ -257,6 +256,7 @@
 - **交付提交**：`f5a95e4` 契约新增两个操作、schema 与示例；`08096ba` 后端新增分析控制器/服务/Mapper、V15 两个读索引，并让教师作业统计返回真实的 `pendingHelpCount` 与 `commonIssues`；`5103351` 前端 ECharts 懒加载图表、教师学习分析页、作业共性问题、学生掌握概览及路由/测试；`f2eaeb9` 修复学生掌握图例色块缺少 `data-state` 导致透明。
 - **口径**：活跃度按 Asia/Shanghai 最近 14 个自然日（含今日）以 `received_at` 分桶并补零，活跃学生按去重用户；掌握度复用 knowledge-v2，`basically_mastered` 需至少两个不同作业给出 `meets_expectation`，"学习中"取在途作业；`masteryRate` 仅展示，不参与任何判定。
 - **验证**：后端全量 `./mvnw.cmd --batch-mode verify` 为 458 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 44 文件/382 项，定向 vitest 6/6。真实浏览器用 `teacher.demo`/`student.demo` 登录正式页面，教师分析页与学生学习记录页收到的 payload 与接口夹具、SQL 查询逐项一致；截图为 `D:/tmp/lp/stage2-evidence/` 下 `teacher-analytics.png`、`teacher-issues.png`、`student-records.png`。4 个知识点、4 份已发布作业（其中 2 份给出 `meets_expectation`）均经产品接口创建，未直接写业务表。控制台仅有登录前 401 `/api/v1/me` 与 favicon 404，无业务错误。
+- **契约描述修正**：2026-10-31 经用户授权，`getAssignmentStats` 的操作说明与 200 响应说明不再写 P1 `commonIssues:[]`，改为当前词表版本下按学生求助自报与已发布教师确认汇总的真实口径；仅描述变化，路径、字段、状态与实现未改。
 - **限制**：只验证单教师单班演示数据；未执行真实供应商调用；ECharts 仅在分析页按需加载；未新增共性问题到知识点的映射。
 
 ## 2. 交接说明（2026-10-15）

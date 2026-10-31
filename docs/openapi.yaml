@@ -2600,8 +2600,8 @@ paths:
     get:
       operationId: getAssignmentStats
       summary: getAssignmentStats
-      description: 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1
-        `commonIssues:[]`。业务规则以 DEVELOPMENT.md 为准。
+      description: 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues`
+        按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间，`knowledgePointId` 当前恒为 null。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - teacher
       x-phase: P1
@@ -10156,7 +10156,7 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Response_getOfferingKnowledgeMastery'}
     getAssignmentStats_200:
-      description: 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；P1 `commonIssues:[]`
+      description: 200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues` 按当前词表版本返回计数非零的标签，字段含义见 CommonIssue
       headers:
         X-Request-ID: {$ref: '#/components/headers/XRequestID'}
         Cache-Control: {$ref: '#/components/headers/CacheControl'}
