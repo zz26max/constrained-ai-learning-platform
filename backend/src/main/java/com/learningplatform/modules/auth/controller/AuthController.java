@@ -20,6 +20,8 @@ import com.learningplatform.modules.auth.dto.FeaturesDTO;
 import com.learningplatform.modules.auth.dto.LoginDTO;
 import com.learningplatform.modules.auth.dto.LoginWrite;
 import com.learningplatform.modules.auth.dto.LogoutDTO;
+import com.learningplatform.modules.auth.dto.RegisterDTO;
+import com.learningplatform.modules.auth.dto.RegisterWrite;
 import com.learningplatform.modules.auth.dto.TermDTO;
 import com.learningplatform.modules.auth.dto.UserDTO;
 import com.learningplatform.modules.auth.model.SessionGrant;
@@ -27,6 +29,7 @@ import com.learningplatform.modules.auth.model.SessionIdentity;
 import com.learningplatform.modules.auth.security.CsrfTokenService;
 import com.learningplatform.modules.auth.security.LoginRateLimiter;
 import com.learningplatform.modules.auth.service.DatabaseSessionService;
+import com.learningplatform.modules.auth.service.RegisterService;
 import com.learningplatform.modules.courses.model.Term;
 import com.learningplatform.modules.courses.service.TermQueryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +38,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,6 +57,7 @@ public class AuthController {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthController.class);
 
     private final DatabaseSessionService sessions;
+    private final RegisterService registerService;
     private final CsrfTokenService csrfTokens;
     private final LoginRateLimiter loginRateLimiter;
     private final AuditService auditService;
@@ -61,12 +66,14 @@ public class AuthController {
     private final Clock clock;
     private final com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider;
 
-    public AuthController(DatabaseSessionService sessions, CsrfTokenService csrfTokens,
-                          LoginRateLimiter loginRateLimiter, AuditService auditService,
-                          TermQueryService termQueryService, AuthHttpProperties properties, Clock clock,
+    public AuthController(DatabaseSessionService sessions, RegisterService registerService,
+                          CsrfTokenService csrfTokens, LoginRateLimiter loginRateLimiter,
+                          AuditService auditService, TermQueryService termQueryService,
+                          AuthHttpProperties properties, Clock clock,
                           com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider) {
         this.tutoringProvider=tutoringProvider;
         this.sessions = sessions;
+        this.registerService = registerService;
         this.csrfTokens = csrfTokens;
         this.loginRateLimiter = loginRateLimiter;
         this.auditService = auditService;
@@ -122,6 +129,19 @@ public class AuthController {
             // 成功和凭据错误已结算；数据库故障等其他路径只释放预占，不记为错误密码。
             admission.close();
         }
+    }
+
+    /** 双模式注册：个人自学自动关联默认课程，学校模式按角色处理邀请码或创建班级；成功后自动登录。 */
+    @PostMapping("/auth/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<RegisterDTO> register(@Valid @RequestBody RegisterWrite body,
+                                             HttpServletRequest request, HttpServletResponse response) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        RegisterService.RegisterResult result = registerService.register(body, requestId);
+        long maxAge = Math.max(Duration.between(clock.instant(), result.expiresAt()).getSeconds(), 0);
+        response.addHeader("Set-Cookie", AuthCookies.session(result.sessionToken(), maxAge, properties.cookieSecure()));
+        response.addHeader("Set-Cookie", AuthCookies.clear(AuthCookies.PRE_AUTH, properties.cookieSecure()));
+        return new ApiResponse<>(new RegisterDTO(result.user(), result.csrfToken()), requestId);
     }
 
     /** 退出撤销会话并清除 Cookie；重复退出或未知令牌安全结束。 */

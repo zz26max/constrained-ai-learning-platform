@@ -16,6 +16,7 @@ import com.learningplatform.modules.auth.mapper.UserMapper;
 import com.learningplatform.modules.auth.model.AuthSession;
 import com.learningplatform.modules.auth.model.User;
 import com.learningplatform.modules.auth.security.LoginRateLimiter;
+import com.learningplatform.modules.courses.mapper.CourseMapper;
 import com.learningplatform.modules.courses.mapper.TermMapper;
 import com.learningplatform.modules.courses.model.Term;
 import jakarta.servlet.http.Cookie;
@@ -77,6 +78,8 @@ class AuthHttpContractTest {
     @MockitoBean
     private UserMapper userMapper;
     @MockitoBean
+    private CourseMapper courseMapper;
+    @MockitoBean
     private AuthSessionMapper sessionMapper;
     @MockitoBean
     private AuditLogMapper auditLogMapper;
@@ -88,6 +91,8 @@ class AuthHttpContractTest {
 
     private final Map<String, AuthSession> byHash = new ConcurrentHashMap<>();
     private final Map<String, AuthSession> byId = new ConcurrentHashMap<>();
+    // 注册用例写入的新用户：会话续期按用户 ID 反查时从这里取，模拟真实 users 表。
+    private final Map<String, User> registeredUsers = new ConcurrentHashMap<>();
     // @Transactional 服务方法需要真实连接开启事务；mapper 全部被 mock，事务空转，不连接真实数据库。
     private final Connection connection = mock(Connection.class);
 
@@ -95,6 +100,7 @@ class AuthHttpContractTest {
     void setUp() throws SQLException {
         byHash.clear();
         byId.clear();
+        registeredUsers.clear();
         when(dataSource.getConnection()).thenReturn(connection);
         // 限流器是单例，跨测试共享；每个用例前清空固定账号+本机 IP 的失败计数，避免互相污染。
         loginRateLimiter.onSuccess(loginRateLimiter.key("student.demo", "127.0.0.1"));
@@ -107,8 +113,15 @@ class AuthHttpContractTest {
                 Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-10-01T00:00:00Z"));
         when(userMapper.findByUsername(anyString())).thenAnswer(invocation ->
                 "student.demo".equals(invocation.getArgument(0)) ? Optional.of(student) : Optional.empty());
-        when(userMapper.findByIdForShare(anyString())).thenAnswer(invocation ->
-                USER_ID.equals(invocation.getArgument(0)) ? Optional.of(student) : Optional.empty());
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User created = invocation.getArgument(0);
+            registeredUsers.put(created.id(), created);
+            return 1;
+        });
+        when(userMapper.findByIdForShare(anyString())).thenAnswer(invocation -> {
+            String id = invocation.getArgument(0);
+            return USER_ID.equals(id) ? Optional.of(student) : Optional.ofNullable(registeredUsers.get(id));
+        });
 
         when(sessionMapper.insert(any())).thenAnswer(invocation -> {
             AuthSession session = invocation.getArgument(0);
@@ -199,6 +212,37 @@ class AuthHttpContractTest {
         mockMvc.perform(get("/api/v1/me").cookie(new Cookie("lp_session", sessionCookie)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.username").value("student.demo"));
+    }
+
+    @Test
+    @DisplayName("完整注册：201 + 会话 Cookie，注册后 /me 立即可用")
+    void registerFullFlow() throws Exception {
+        PreAuth preAuth = preAuth();
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Origin", ORIGIN)
+                        .header("X-CSRF-Token", preAuth.token())
+                        .cookie(new Cookie("lp_pre_auth", preAuth.cookie()))
+                        .content("""
+                                {"username":"regnew","password":"Register123","displayName":"注册用户","mode":"personal"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.user.username").value("regnew"))
+                .andExpect(jsonPath("$.data.user.displayName").value("注册用户"))
+                .andExpect(jsonPath("$.data.user.roles[0]").value("student"))
+                .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
+                .andExpect(jsonPath("$.requestId").isNotEmpty())
+                .andReturn();
+
+        String sessionCookie = cookieValue(result, "lp_session");
+        assertThat(sessionCookie).matches("[0-9a-f]{64}");
+        assertThat(cookieValue(result, "lp_pre_auth")).isEmpty();
+        verify(auditLogMapper).insert(any(AuditLog.class));
+
+        // 注册即登录：会话指纹必须与登录链路一致，否则这里返回 401 并撤销会话。
+        mockMvc.perform(get("/api/v1/me").cookie(new Cookie("lp_session", sessionCookie)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").value("regnew"));
     }
 
     @Test

@@ -65,7 +65,7 @@ class NoticeRecipientMigrationIT {
         expected.put(wrongAction,null);
 
         var after=Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load();
-        assertThat(after.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(after.migrate().migrationsExecuted).isEqualTo(3);
         expected.forEach((notice,count) -> assertThat(jdbc.queryForObject("SELECT recipient_count FROM notices WHERE id=?",Integer.class,notice)).isEqualTo(count));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notices",Integer.class)).isEqualTo(expected.size());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications",Integer.class)).isZero();

@@ -18,6 +18,7 @@ import com.learningplatform.modules.auth.model.AuthSession;
 import com.learningplatform.modules.auth.model.SessionGrant;
 import com.learningplatform.modules.auth.model.SessionIdentity;
 import com.learningplatform.modules.auth.model.User;
+import com.learningplatform.modules.auth.security.SessionFingerprint;
 import com.learningplatform.modules.auth.security.SessionTokenCodec;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -167,9 +168,7 @@ public class DatabaseSessionService {
     }
 
     private String credentialFingerprint(User user) {
-        // 密码或平台角色变更后要求重新登录；角色是集合，排序变化不代表权限变化。
-        String roles = String.join(",", new TreeSet<>(user.roles()));
-        return tokens.digest(user.passwordHash() + "\n" + roles);
+        return SessionFingerprint.of(tokens, user);
     }
 
     private BusinessException unauthenticated() {

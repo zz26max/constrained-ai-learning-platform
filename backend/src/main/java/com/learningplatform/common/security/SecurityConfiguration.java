@@ -39,7 +39,7 @@ public class SecurityConfiguration {
                 .exceptionHandling(exceptions ->
                         exceptions.authenticationEntryPoint(errors).accessDeniedHandler(errors))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/csrf-token", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/csrf-token", "/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/v1/teacher/**").hasRole("TEACHER")
                         .requestMatchers("/api/v1/me/courses", "/api/v1/me/enrollments").hasRole("STUDENT")
                         .requestMatchers("/api/v1/offerings/**").hasAnyRole("STUDENT", "TEACHER")

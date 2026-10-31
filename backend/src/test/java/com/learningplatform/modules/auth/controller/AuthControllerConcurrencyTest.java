@@ -45,7 +45,8 @@ class AuthControllerConcurrencyTest {
         DatabaseSessionService sessions = mock(DatabaseSessionService.class);
         LoginRateLimiter limiter = new LoginRateLimiter(
                 new LoginRateLimitProperties(Duration.ofMinutes(5), 5), clock);
-        AuthController controller = new AuthController(sessions, mock(CsrfTokenService.class), limiter,
+        AuthController controller = new AuthController(sessions, mock(com.learningplatform.modules.auth.service.RegisterService.class),
+                mock(CsrfTokenService.class), limiter,
                 mock(AuditService.class), mock(TermQueryService.class),
                 new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock,
                 mock(com.learningplatform.modules.tutoring.provider.TutoringProvider.class));
@@ -70,7 +71,8 @@ class AuthControllerConcurrencyTest {
         DatabaseSessionService sessions = mock(DatabaseSessionService.class);
         LoginRateLimiter limiter = new LoginRateLimiter(
                 new LoginRateLimitProperties(Duration.ofMinutes(5), 5), clock);
-        AuthController controller = new AuthController(sessions, mock(CsrfTokenService.class), limiter,
+        AuthController controller = new AuthController(sessions, mock(com.learningplatform.modules.auth.service.RegisterService.class),
+                mock(CsrfTokenService.class), limiter,
                 mock(AuditService.class), mock(TermQueryService.class),
                 new AuthHttpProperties(Duration.ofMinutes(10), "", List.of("http://localhost:5173"), false), clock,
                 mock(com.learningplatform.modules.tutoring.provider.TutoringProvider.class));
