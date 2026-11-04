@@ -20,7 +20,8 @@ npm run build          # 生产构建（强制真实模式；发现 mock 配置�
 npm run check:no-mock  # 扫描 dist，确认 mock 层未进入生产包
 npm run test           # vitest 全量测试
 npm run contract:types # 从 ../docs/openapi.yaml 重新生成契约类型
-npm run verify         # typecheck + build + check:no-mock + test
+npm run verify         # browser config + typecheck + build + check:no-mock + test
+npm run test:browser:config # 无需服务/浏览器，验证配置拒绝、凭据解析与夹具归属规则
 npm run test:browser:real   # 真实服务已启动时，创建独立验收班走三类作业闭环
 npm run test:browser:boundaries # 主流程脚本成功后，使用其验收班验证冲突/网络/会话/归档等边界
 npm run test:browser:student # 真实学生现有数据：筛选分页、六页面及1440/1024/320/375/430视口，无新增样例
@@ -58,4 +59,41 @@ npm run test:browser:student # 真实学生现有数据：筛选分页、六页�
 
 首页 V3 系列探索（design=a/b/bplus 预览参数）已随 V3.6.1 正式采纳而移除路由，正式首页为 `/student/home`，现行视觉规范见 `docs/FRONTEND.md` 第 9 节；各轮候选的交付记录归档于 `docs/archive/V3*-DELIVERY.md`。
 
-浏览器脚本使用本机Edge，依赖playwright-core（仅开发依赖，不下载浏览器）。真实脚本在内存读取已忽略的`backend/.env`中的本地演示账号，不输出口令；会创建单独命名的验收教学班和作业，保留供复核。截图和结果存入已忽略的`.cache/zhixue/`；边界脚本会编辑该验收班中的练习工作区，并归档其文字作业。真实脚本不是所有安全/竞态场景的替代品，未覆盖项以STATUS记录为准。
+## 真实浏览器验收（写入边界与复跑）
+
+`test:browser:real` 与 `test:browser:boundaries` 必须指向**专用、可丢弃的真实测试环境**，由操作者先准备同源前端/API、已迁移到当前版本的隔离数据库，以及独立教师/学生账号。脚本不启动或迁移数据库，不读取数据库凭据，不配置或启用外部供应商。不要指向用户日常使用的 3307 数据库或生产环境。只改前端端口不能隔离数据，须确认其 `/api/v1` 代理实际指向隔离 API/数据库。
+
+两项脚本不再默认读取 `backend/.env` 或固定使用 Edge；缺少目标、写入确认或密码时，在启动浏览器和写结果前退出。`test:browser:student` 仍保留原本的本机配置，不属于下面的新配置流程。
+
+| 环境变量 | 用途 |
+| --- | --- |
+| `BROWSER_ACCEPTANCE_BASE_URL` | 必填，同源前端 HTTP(S) origin，例如 `http://127.0.0.1:49173`；不接受路径、查询、hash 或内嵌凭据 |
+| `BROWSER_ACCEPTANCE_ALLOW_WRITES` | 必填，确认为隔离测试环境后设为 `isolated-fixtures`；这是持久写入确认，不是只读模式 |
+| `BROWSER_ACCEPTANCE_STUDENT_USERNAME` / `BROWSER_ACCEPTANCE_TEACHER_USERNAME` | 专用测试账号，默认 `student.demo` / `teacher.demo`，不能相同 |
+| `BROWSER_ACCEPTANCE_STUDENT_PASSWORD` / `BROWSER_ACCEPTANCE_TEACHER_PASSWORD` | 通过当前进程环境提供密码，不在命令行写明文 |
+| `BROWSER_ACCEPTANCE_ENV_FILE` | 可选，显式选择本机已忽略的凭据文件；只读取 `LOCAL_STUDENT_PASSWORD`、`LOCAL_TEACHER_PASSWORD`，进程环境密码优先；不做 shell 展开 |
+| `BROWSER_ACCEPTANCE_CHANNEL` | 本机浏览器 channel，例如 `msedge`、`chrome`；默认 `chromium`，需提前安装可用浏览器 |
+| `BROWSER_ACCEPTANCE_EXECUTABLE_PATH` | 可选，浏览器绝对路径，例如 `/usr/bin/chromium`；不能与 channel 同时设置 |
+| `BROWSER_ACCEPTANCE_TIMEOUT_MS` | 可选，操作超时，默认 45000，允许 1000～180000 |
+| `BROWSER_ACCEPTANCE_OUTPUT_DIR` | 可选，证据根目录，默认忽略的 `frontend/.cache/zhixue/`；自定义目录也须避免提交截图/账号/业务正文 |
+| `BROWSER_ACCEPTANCE_FIXTURE` | 边界验收必填，主流程本次成功生成的 `result.json` 路径；旧格式、失败和中断的结果会被拒绝 |
+
+例如在 `frontend/` 下，用 POSIX shell 选择已准备好的隔离环境（Windows PowerShell 用 `$env:变量名='值'` 设置同名变量）。密码预先通过受控环境注入，或者显式选择仅含隔离测试账号的本机文件：
+
+```sh
+export BROWSER_ACCEPTANCE_BASE_URL=http://127.0.0.1:49173
+export BROWSER_ACCEPTANCE_ALLOW_WRITES=isolated-fixtures
+export BROWSER_ACCEPTANCE_ENV_FILE=/absolute/path/to/isolated-acceptance.env
+export BROWSER_ACCEPTANCE_EXECUTABLE_PATH=/usr/bin/chromium
+npm run test:browser:config
+npm run test:browser:real
+# 从上一步打印的独立运行目录选择 result.json；不使用旧的根目录结果。
+export BROWSER_ACCEPTANCE_FIXTURE='/absolute/path/to/frontend/.cache/zhixue/<run-id>/result.json'
+npm run test:browser:boundaries
+```
+
+主流程每次生成新的 UUID 前缀验收班，创建/发布章节、邀请码、Web/SQL/文字作业，学生加入、阅读、保存、提交，再保存/发布教师反馈。会产生会话、审计、学习事件、通知和正常学习进度；不自动删除数据。邀请码、密码不会写入 manifest。结果按运行 UUID 分目录，创建班级/章节/作业后立即记录 ID；失败保留部分夹具和截图供复核。日期从运行时间向后推 14 天，避免固定截止时间过期。
+
+边界流程只接受相同 origin 和相同账号的成功 manifest；登录后再次读取服务端班级与三份作业，核对 UUID 前缀、归属和类型后，才开始编辑该夹具的 Web 工作区及归档文字作业。它还会建立/撤销测试登录会话并产生正常审计/学习事件。每次边界运行另建证据目录；重复运行保留已归档文字作业的只读验证。网络故障注入只延迟或中断真实写请求，不返回模拟成功。找不到可用于越权读取的他班时，结果为 `PASS_WITH_SKIPS`，在 `skipped` 中说明，不能计作该场景通过。
+
+只有脚本完整执行后的 `PASS` 才证明报告列出的场景在该次真实环境运行通过；`IN_PROGRESS`、`FAIL`、配置单测和语法检查均不证明页面联调。截图含虚构作品/测试账号，复核后按隔离环境的数据保留约定清理整个测试环境，不对已有业务数据执行自动清理。学校注册的页面分支、P2 主动共享求助→教师回复→消息，以及含知识点快照的评价发布不在这两个原有脚本覆盖范围，仍需另行正式页面验收。

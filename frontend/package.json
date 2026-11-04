@@ -22,7 +22,8 @@
     "test:browser:student": "node scripts/verify-student-workbench.mjs",
     "contract:types": "openapi-typescript ../docs/openapi.yaml -o src/api/generated/schema.d.ts",
     "check:no-mock": "node scripts/check-no-mock.mjs",
-    "verify": "npm run typecheck && npm run build && npm run check:no-mock && npm run test"
+    "verify": "npm run test:browser:config && npm run typecheck && npm run build && npm run check:no-mock && npm run test",
+    "test:browser:config": "node --test scripts/browser-acceptance-config.test.mjs"
   },
   "dependencies": {
     "echarts": "^6.1.0",
