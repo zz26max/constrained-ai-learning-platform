@@ -117,6 +117,7 @@ function goToPage(next: number): void {
             <li><strong>{{ recordsQuery.data.value.summary.completedLabCount }}</strong> 个实验已完成</li>
             <li><strong>{{ recordsQuery.data.value.summary.publishedFeedbackCount }}</strong> 份评价已发布</li>
             <li v-if="recordsQuery.data.value.summary.needsPracticeCount !== null"><strong>{{ recordsQuery.data.value.summary.needsPracticeCount }}</strong> 个待加强知识点</li>
+            <li v-else class="muted">待加强知识点暂无统计，不能据此判断已掌握。</li>
           </ul>
         </section>
 

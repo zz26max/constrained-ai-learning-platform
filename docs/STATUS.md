@@ -24,6 +24,8 @@
   5. 学校模式注册的邀请码入班已有真实 HTTP 端到端证据（`scripts/demo-seed.mjs` 成功注册两名学生），但注册页的学校分支与教师建班分支仍无浏览器验收；个人模式已由使用者验收并标记 verified。
   6. V16 自带「个人学习学期」是迁移写业务配置的折中；若真实环境要求学期只能由管理流程创建，应改为注册时按需创建个人 offering，并同步迁移与文档。
 
+- **本轮接手核实（2026-11-07）**：HEAD 为 `5462351`，fetch 后与 origin/master 一致，初始工作区干净。前端基线 verify 实测 47 文件/408 用例通过；学习汇总补充 null 统计提示。补丁库链接只返回登录页，尚未审查补丁；注册限流、归档并发与截止刷新本轮尚未完成。契约检查因缺 openapi_spec_validator 未运行成功；后端、真实数据库并发和浏览器本轮未验证。
+
 ### 0.1 接手前必读
 
 - 端口：MySQL 3307（Docker，Flyway 到 V16）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。本地库已按改写后的 V16 重建；后端与数据库统一用 `backend/scripts/Start-Local.ps1 -JdkPath <JDK21 目录>` 启动，首次建账户加 `-InitializeAccounts`。
