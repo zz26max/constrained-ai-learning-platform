@@ -56,6 +56,7 @@ const courseOptions = computed(() => [
   ...(selecting.value || !currentCourse.value ? [{ value: '', label: '选择课程' }] : []),
   ...(offeringsQuery.data.value?.items ?? []).map(course => ({ value: course.offeringId, label: course.title, hint: course.groupName })),
 ])
+const progressLabel = computed(() => currentCourse.value?.progress.unit === 'assignment' ? '作业进度' : currentCourse.value?.progress.unit === 'chapter' ? '章节进度' : '课程进度')
 const courseProgress = computed(() => {
   const progress = currentCourse.value?.progress
   return progress && !progress.notConfigured && progress.total > 0 ? { completed: progress.completed, total: progress.total } : null
@@ -135,10 +136,10 @@ function chooseCourse(offeringId: string): void {
       <ApiState :status="recordsQuery.status.value" :error="recordsQuery.error.value" @retry="recordsQuery.load" />
       <template v-if="recordsQuery.status.value === 'success' && records">
         <dl class="stats vx-results" aria-label="学习概览">
-          <div><dt>章节进度</dt><dd><template v-if="courseProgress"><b>{{ courseProgress.completed }}</b>/{{ courseProgress.total }}</template><span v-else class="stat-note">未配置</span></dd></div>
+          <div><dt>{{ progressLabel }}</dt><dd><template v-if="courseProgress"><b>{{ courseProgress.completed }}</b>/{{ courseProgress.total }}</template><span v-else class="stat-note">未配置</span></dd></div>
           <div><dt>已完成实验</dt><dd><b>{{ records.summary.completedLabCount ?? 0 }}</b><small>个</small></dd></div>
           <div><dt>已发布评价</dt><dd><b>{{ records.summary.publishedFeedbackCount ?? 0 }}</b><small>份</small></dd></div>
-          <div><dt>需要练习的知识点</dt><dd><template v-if="records.summary.needsPracticeCount !== null"><b>{{ records.summary.needsPracticeCount }}</b></template><span v-else class="stat-note">未配置</span></dd></div>
+          <div><dt>需要练习的知识点</dt><dd><template v-if="records.summary.needsPracticeCount !== null"><b>{{ records.summary.needsPracticeCount }}</b></template><span v-else class="stat-note">暂无统计</span></dd></div>
         </dl>
 
         <section v-if="records.nextRecommendation" class="reco" aria-labelledby="reco-title">
@@ -165,7 +166,7 @@ function chooseCourse(offeringId: string): void {
                 <ul class="mastery-legend">
                   <li v-for="segment in masteryLegend" :key="segment.state" :data-state="segment.state"><i :data-state="segment.state" aria-hidden="true"></i>{{ segment.label }}<b>{{ segment.count }}</b></li>
                 </ul>
-                <p class="mastery-note">共 {{ knowledge.length }} 个知识点，颜色越深表示掌握程度越高。</p>
+                <p class="mastery-note">共 {{ knowledge.length }} 个知识点。“证据不足”表示评价信息不足，不代表尚未掌握。</p>
               </div>
               <div class="kp-list">
                 <details v-for="item in knowledge" :key="item.knowledgePointId" class="kp">

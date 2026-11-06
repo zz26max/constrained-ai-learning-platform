@@ -243,13 +243,13 @@ describe('作业常见问题', () => {
 })
 
 describe('学生知识点掌握概览', () => {
-  it('按四种状态计数并渲染单色阶图例', async () => {
+  it.each(['chapter', 'assignment'] as const)('按四种状态计数并正确展示 %s 进度单位', async unit => {
     const course = {
       offeringId: OFFERING, courseId: '00000000-0000-4000-8000-000000000101', title: 'Web 前端开发技术',
       mark: 'WEB', groupName: '计算机 2301 班', termId: null,
       termLabel: '2026 秋季学期', status: 'active',
       teachers: [{ id: DEMO_USER.id, displayName: '李老师' }],
-      currentChapter: null, progress: { unit: 'chapter', completed: 1, total: 2, percent: 50, notConfigured: false, asOf: '2026-10-14T02:00:00Z' },
+      currentChapter: null, progress: { unit, completed: 1, total: 2, percent: 50, notConfigured: false, asOf: '2026-10-14T02:00:00Z' },
       lastStudiedAt: null, pendingAssignmentCount: 0, unreadFeedbackCount: 0,
     }
     const assessment = (id: string, title: string, state: string) => ({
@@ -284,6 +284,7 @@ describe('学生知识点掌握概览', () => {
     expect(wrapper.findAll('.mastery-bar span')).toHaveLength(4)
     expect(wrapper.findAll('.mastery-legend i').map(swatch => swatch.attributes('data-state')))
       .toEqual(['basically_mastered', 'learning', 'needs_practice', 'insufficient_evidence'])
-    expect(wrapper.text()).toContain('共 4 个知识点，颜色越深表示掌握程度越高。')
+    expect(wrapper.text()).toContain('评价信息不足，不代表尚未掌握')
+    expect(wrapper.get('.stats dt').text()).toBe(unit === 'assignment' ? '作业进度' : '章节进度')
   })
 })

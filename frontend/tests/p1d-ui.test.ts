@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, type Router } from 'vue-router'
@@ -161,9 +161,38 @@ afterEach(() => {
   wrapper = undefined
   router = undefined
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
 
 describe('P1-D 路由与首页', () => {
+  it.each(['dueAt', 'lateUntil'] as const)('服务器时钟驱动倒计时，跨过 %s 后刷新资格并清理定时器', async boundary => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date('2020-01-01T00:00:00Z'))
+    const serverStart = Date.parse('2026-10-14T02:00:00Z')
+    const deadline = new Date(serverStart + 125000).toISOString()
+    let allowed = true
+    scripted.setHandler(request => request.operationId === 'getAssignment'
+      ? okEnvelope({ ...summary(ASSIGNMENT_2),
+        dueAt: boundary === 'dueAt' ? deadline : new Date(serverStart - 1000).toISOString(),
+        lateUntil: boundary === 'lateUntil' ? deadline : null,
+        canSubmit: allowed, submissionBlockedReason: allowed ? null : 'SUBMISSION_CLOSED' })
+      : normalResponse(request))
+    const page = await open('/student/home')
+    const initial = requestsOf('getAssignment').length
+    if (boundary === 'dueAt') expect(page.get('.due-value').text()).toBe('2 分钟')
+    await vi.advanceTimersByTimeAsync(60000)
+    if (boundary === 'dueAt') expect(page.get('.due-value').text()).toBe('1 分钟')
+    expect(requestsOf('getAssignment')).toHaveLength(initial)
+    allowed = false
+    await vi.advanceTimersByTimeAsync(65000)
+    await flushPromises()
+    expect(requestsOf('getAssignment')).toHaveLength(initial + 1)
+    expect(page.text()).toContain('当前没有可提交的待办')
+    page.unmount()
+    wrapper = undefined
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('知学导航只高亮当前栏目，单角色无演示切换，调试入口不出现在菜单', async () => {
     const page = await open('/student/home')
     expect(page.find('.workspace-brand').text()).toContain('知学')

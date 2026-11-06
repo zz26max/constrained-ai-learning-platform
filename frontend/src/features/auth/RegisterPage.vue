@@ -44,6 +44,9 @@ const failureNoticeClass = computed(() => {
   return 'notice-warn'
 })
 
+const stepNumber = computed(() => step.value === 'basic' ? 1 : step.value === 'mode' ? 2 : step.value === 'personal-confirm' || step.value === 'school-role' ? 3 : 4)
+const totalSteps = computed(() => mode.value === 'personal' ? 3 : 4)
+
 const stepTitle = computed(() => {
   switch (step.value) {
     case 'basic': return '创建账号'
@@ -64,10 +67,10 @@ function validateBasic(): boolean {
   if (username.value.length < 3 || username.value.length > 32) {
     errors.push('用户名须为 3-32 字符')
   }
-  if (!/^[a-z0-9._-]+$/i.test(username.value)) {
-    errors.push('用户名只能包含字母、数字、点、下划线和连字符')
+  if (!/^[a-z0-9._-]+$/.test(username.value)) {
+    errors.push('用户名只能包含小写字母、数字、点、下划线和连字符')
   }
-  if (displayName.value.length < 1 || displayName.value.length > 50) {
+  if (!displayName.value.trim() || displayName.value.length > 50) {
     errors.push('显示名称须为 1-50 字符')
   }
   if (password.value.length < 8 || password.value.length > 64) {
@@ -112,8 +115,25 @@ function prevStep(): void {
   }
 }
 
+function onEnter(event: KeyboardEvent): void {
+  if (event.isComposing || !(event.target instanceof HTMLInputElement)) return
+  event.preventDefault()
+  void submit()
+}
+
 async function submit(): Promise<void> {
   if (submitting.value) return
+  // Enter advances the current step; it must not bypass mode/role confirmation.
+  if (step.value === 'basic' || step.value === 'mode' || step.value === 'school-role') {
+    nextStep()
+    return
+  }
+  if (!validateBasic()) {
+    step.value = 'basic'
+    await nextTick()
+    document.getElementById('register-username')?.focus()
+    return
+  }
   
   const ok = await auth.register({
     username: username.value,
@@ -126,13 +146,26 @@ async function submit(): Promise<void> {
   })
   
   if (!ok) {
-    if (failure.value?.kind === 'username-taken' || failure.value?.kind === 'invalid-invite') {
-      await nextTick()
-      if (failure.value.kind === 'username-taken') {
-        document.getElementById('register-username')?.focus()
-      } else {
-        document.getElementById('register-invite-code')?.focus()
+    let focusId: string | undefined
+    if (failure.value?.kind === 'username-taken') {
+      step.value = 'basic'
+      focusId = 'register-username'
+    } else if (failure.value?.kind === 'invalid-invite') {
+      step.value = 'school-student'
+      focusId = 'register-invite-code'
+    } else if (failure.value?.kind === 'validation') {
+      const fields = fieldErrors.value.map(item => item.field)
+      if (fields.some(field => ['username', 'password', 'displayName'].includes(field))) {
+        step.value = 'basic'
+        focusId = fields.includes('username') ? 'register-username' : fields.includes('password') ? 'register-password' : 'register-display-name'
+      } else if (fields.includes('inviteCode')) {
+        step.value = 'school-student'
+        focusId = 'register-invite-code'
       }
+    }
+    if (focusId) {
+      await nextTick()
+      document.getElementById(focusId)?.focus()
     }
     return
   }
@@ -195,10 +228,10 @@ async function submit(): Promise<void> {
 
     <main class="register-pane">
       <section class="register-card" aria-labelledby="register-title">
-        <p class="register-eyebrow">步骤 {{ step === 'basic' ? '1' : step === 'mode' ? '2' : step === 'personal-confirm' || step === 'school-role' ? '3' : '4' }} / 4</p>
+        <p class="register-eyebrow">步骤 {{ stepNumber }} / {{ totalSteps }}</p>
         <h1 id="register-title" tabindex="-1">{{ stepTitle }}</h1>
 
-        <form class="auth-form register-form" novalidate @submit.prevent="submit">
+        <form class="auth-form register-form" novalidate @submit.prevent="submit" @keydown.enter="onEnter">
           <p
             v-if="failure !== null && failure.kind !== 'validation'"
             class="notice notice-top"

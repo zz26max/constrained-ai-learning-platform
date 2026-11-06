@@ -3,7 +3,8 @@ import IntegratedTaskStatus from './CraftTaskState.vue'
 import {taskContentTone} from './content-presentation'
 import {chapterEntry} from './refinement'
 
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted, onUnmounted } from 'vue'
+import { useServerClock } from '../../dashboard/use-server-clock'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { coursesApi } from '../../../api'
 import { useStudentHome } from '../../../features/dashboard/use-student-home'
@@ -20,6 +21,31 @@ import { useAuthStore } from '../../../stores/auth'
 const auth = useAuthStore()
 const home = useStudentHome()
 const { query, tasksQuery, nextTask, recentTasks, TYPE_LABELS, excerpt } = home
+const now = useServerClock(computed(() => query.data.value?.serverTime))
+let boundaryRefreshPending = false
+watch(tasksQuery.status, status => {
+  if (status === 'success' && boundaryRefreshPending) {
+    boundaryRefreshPending = false
+    void tasksQuery.load()
+  }
+})
+watch(now, (current, previous) => {
+  const crossedBoundary = tasksQuery.data.value?.actionable.some(task =>
+    [task.dueAt, task.lateUntil].some(value => {
+      const boundary = value ? Date.parse(value) : NaN
+      return previous < boundary && current >= boundary
+    }))
+  if (!crossedBoundary) return
+  if (tasksQuery.status.value === 'loading') boundaryRefreshPending = true
+  else void tasksQuery.load()
+})
+function refreshOnReturn() {
+  if (document.visibilityState !== 'visible') return
+  if (query.status.value !== 'loading') void query.load()
+  if (tasksQuery.status.value !== 'loading') void tasksQuery.load()
+}
+onMounted(() => document.addEventListener('visibilitychange', refreshOnReturn))
+onUnmounted(() => document.removeEventListener('visibilitychange', refreshOnReturn))
 const selectedCourse = computed(() => tasksQuery.data.value?.classes[0])
 const chaptersQuery = usePageQuery(async signal => {
   const id = selectedCourse.value?.offeringId
@@ -62,13 +88,13 @@ const greeting = computed(() => {
 const displayName = computed(() => auth.identity?.displayName ?? null)
 
 const upcomingTasks = computed(() => recentTasks.value
-  .filter(task => !task.overdue && Date.parse(task.dueAt) > Date.now())
+  .filter(task => !task.overdue && Date.parse(task.dueAt) > now.value)
   .slice(0, 3))
 
 const dueCountdown = computed(() => nextTask.value ? countdown(nextTask.value.dueAt) : null)
 type Tone = '' | 'urgent' | 'late'
 function countdown(value: string): { label: string; value: string; tone: Tone } {
-  const diff = Date.parse(value) - Date.now()
+  const diff = Date.parse(value) - now.value
   if (!Number.isFinite(diff)) return { label: '截止时间', value: '待确认', tone: '' }
   if (diff <= 0) {
     return { label: '已逾期', value: `${Math.max(1, Math.ceil(-diff / 86400000))} 天`, tone: 'late' }
