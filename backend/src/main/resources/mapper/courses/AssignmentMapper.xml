@@ -53,6 +53,9 @@
 <arg name="createdAt" column="created_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 </constructor></resultMap>
 
+<!-- Lifecycle lock order: offering, assignment, workspace, submission, feedback. -->
+<select id="lockAssignmentShared" resultType="string" flushCache="true" useCache="false">SELECT id FROM assignments WHERE id=#{id} FOR SHARE</select>
+<select id="lockAssignmentExclusive" resultType="string" flushCache="true" useCache="false">SELECT id FROM assignments WHERE id=#{id} FOR UPDATE</select>
 <!-- 作业查询 -->
 <select id="findAssignment" resultMap="assignment">
 SELECT id,offering_id,chapter_id,title,description,estimated_minutes,type,status,is_required,due_at,late_until,allow_resubmit,max_attempts,max_score,content_version,current_ai_policy_id,published_at,created_by,created_at,updated_at FROM assignments WHERE id=#{id}
@@ -310,6 +313,12 @@ WHERE id=#{id} AND status='draft'
 UPDATE assignments SET status='archived',updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
 WHERE id=#{id} AND status='published'
 </update>
+
+<select id="countOfferingPendingReviews" resultType="int">
+SELECT COUNT(*) FROM submissions s JOIN assignments a ON a.id=s.assignment_id
+WHERE a.offering_id=#{offeringId} AND s.is_current=1
+AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.submission_id=s.id AND f.status='published')
+</select>
 
 <select id="countPendingReviews" resultType="int">
 SELECT COUNT(*) FROM submissions s WHERE s.assignment_id=#{assignmentId} AND s.is_current=1

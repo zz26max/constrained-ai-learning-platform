@@ -215,6 +215,27 @@ class AuthHttpContractTest {
     }
 
     @Test
+    void registrationQuotaCountsSuccessesAndReturnsRetryAfterBeforeMoreWrites() throws Exception {
+        PreAuth preAuth = preAuth();
+        for (int i = 0; i <= 10; i++) {
+            var result = mockMvc.perform(post("/api/v1/auth/register")
+                    .with(request -> { request.setRemoteAddr("192.0.2.80"); return request; })
+                    .header("X-Forwarded-For", "198.51.100." + i)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Origin", ORIGIN)
+                    .header("X-CSRF-Token", preAuth.token())
+                    .cookie(new Cookie("lp_pre_auth", preAuth.cookie()))
+                    .content("{\"username\":\"quota" + i + "\",\"password\":\"Register123\",\"displayName\":\"Quota\",\"mode\":\"personal\"}"));
+            if (i < 10) result.andExpect(status().isCreated());
+            else result.andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.error.code").value("RATE_LIMITED"))
+                    .andExpect(header().exists("Retry-After"));
+        }
+        verify(userMapper, times(10)).insert(any(User.class));
+        verify(sessionMapper, times(10)).insert(any());
+    }
+
+    @Test
     @DisplayName("完整注册：201 + 会话 Cookie，注册后 /me 立即可用")
     void registerFullFlow() throws Exception {
         PreAuth preAuth = preAuth();

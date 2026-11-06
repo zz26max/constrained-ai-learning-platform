@@ -30,6 +30,11 @@ public class CourseAccess {
         if(!"student".equals(context.member().role())) throw notFound();
         if(write) active(context.offering()); return context;
     }
+    /** Must be called inside the caller's write transaction, before workspace/submission locks. */
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockOfferingShared(String offeringId) {
+        mapper.lockOfferingShared(offeringId);
+    }
     public static void role(UserDTO user,String role) { if(!user.roles().contains(role)) throw forbidden(); }
     public static void active(CourseRows.Offering offering) {
         if(!"active".equals(offering.status())) throw new BusinessException(HttpStatus.CONFLICT,"OFFERING_ARCHIVED","教学班已归档。");
@@ -37,4 +42,3 @@ public class CourseAccess {
     public static BusinessException notFound() { return new BusinessException(HttpStatus.NOT_FOUND,"NOT_FOUND","请求的资源不存在。"); }
     public static BusinessException forbidden() { return new BusinessException(HttpStatus.FORBIDDEN,"FORBIDDEN","权限不足。"); }
 }
-

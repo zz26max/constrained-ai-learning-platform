@@ -63,6 +63,8 @@ public class CourseService {
     }
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public OfferingDTO archiveOffering(UserDTO user,String offeringId,String requestId) {
+        access.requireTeacher(user,offeringId,false);
+        mapper.lockOfferingExclusive(offeringId);
         Offering offering=access.requireTeacher(user,offeringId,false).offering();
         if("active".equals(offering.status())) {
             archiveGuard.checkPendingReviews(offeringId);
@@ -458,4 +460,3 @@ public class CourseService {
     }
     private BusinessException invalidInvite() { return new BusinessException(HttpStatus.BAD_REQUEST,"INVALID_INVITE_CODE","邀请码不可用。"); }
 }
-

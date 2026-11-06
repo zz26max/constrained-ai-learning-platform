@@ -70,6 +70,7 @@ class AssignmentIntegrationIT {
     @Autowired private AssignmentService assignmentService;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private InviteCodeCodec codes;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
 
     @BeforeEach
     void reset() {
@@ -1086,6 +1087,61 @@ class AssignmentIntegrationIT {
         assertThatThrownBy(() -> assignmentService.submitAssignment(STUDENT, c.assignment().id(),
                 new HashMap<>(Map.of("workspaceRevision", 2, "reflection", "x")), "blocked"))
                 .satisfies(t -> assertCode(t, 409, "RESUBMIT_AFTER_REVIEW"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void archiveAndSubmitSerializeAcrossBothCommitOrders(boolean wholeOffering, boolean submitFirst) throws Exception {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        TeacherAssignmentDTO assignment = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create");
+        assignmentService.publishAssignment(TEACHER, assignment.id(), "publish");
+        assignmentService.saveWorkspace(STUDENT, assignment.id(), new HashMap<>(Map.of(
+                "baseRevision", 0, "files", List.of(Map.of("path", "index.html", "content", "V1")),
+                "activeFile", "index.html")), "save");
+        Runnable submit = () -> assignmentService.submitAssignment(STUDENT, assignment.id(),
+                new HashMap<>(Map.of("workspaceRevision", 1, "reflection", "race")), "submit");
+        Runnable archive = () -> {
+            if (wholeOffering) courseService.archiveOffering(TEACHER, offering.id(), "archive");
+            else assignmentService.archiveAssignment(TEACHER, assignment.id(), "archive");
+        };
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        CountDownLatch firstWritten = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> transaction.executeWithoutResult(status -> {
+                (submitFirst ? submit : archive).run();
+                firstWritten.countDown();
+                try { assertThat(commit.await(10, TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            }));
+            assertThat(firstWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = pool.submit(() -> {
+                secondStarted.countDown();
+                try { (submitFirst ? archive : submit).run(); return "unexpected-success"; }
+                catch (BusinessException e) { return e.getCode(); }
+            });
+            assertThat(secondStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            // A completed competing operation before commit would expose the stale-read race.
+            assertThatThrownBy(() -> second.get(300, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+            commit.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(submitFirst ? "ARCHIVE_PENDING_REVIEWS"
+                    : wholeOffering ? "OFFERING_ARCHIVED" : "ASSIGNMENT_ARCHIVED");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM submissions WHERE assignment_id=?",
+                    Integer.class, assignment.id())).isEqualTo(submitFirst ? 1 : 0);
+            assertThat(jdbc.queryForObject("SELECT status FROM " + (wholeOffering ? "course_offerings" : "assignments") + " WHERE id=?",
+                    String.class, wholeOffering ? offering.id() : assignment.id()))
+                    .isEqualTo(submitFirst ? (wholeOffering ? "active" : "published") : "archived");
+        } finally {
+            commit.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Test

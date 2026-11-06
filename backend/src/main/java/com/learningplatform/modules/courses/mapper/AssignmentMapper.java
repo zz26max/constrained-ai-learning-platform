@@ -16,6 +16,8 @@ public interface AssignmentMapper {
     @org.apache.ibatis.annotations.Update("UPDATE assignments SET current_ai_policy_id=#{policy},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} WHERE id=#{id} AND current_ai_policy_id <=> #{expected} AND status<>'archived'")
     int bindPolicy(@Param("id") String id,@Param("policy") String policy,@Param("expected") String expected,@Param("now") Instant now);
     // 作业查询
+    String lockAssignmentShared(String id);
+    String lockAssignmentExclusive(String id);
     Assignment findAssignment(String id);
     List<AssignmentSummaryDTO> listStudentAssignments(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
             @Param("termId") String termId,@Param("filter") String filter,@Param("now") Instant now,
@@ -104,6 +106,7 @@ public interface AssignmentMapper {
     int publishAssignment(@Param("id") String id,@Param("now") Instant now);
     int archiveAssignment(@Param("id") String id,@Param("now") Instant now);
     int countPendingReviews(String assignmentId);
+    int countOfferingPendingReviews(String offeringId);
     /** feedbackStatus 为 null 表示不过滤；latestOnly=true 只含当前提交。 */
     List<TeacherSubmissionRow> listAssignmentSubmissions(@Param("assignmentId") String assignmentId,
             @Param("feedbackStatus") String feedbackStatus,@Param("latestOnly") boolean latestOnly,

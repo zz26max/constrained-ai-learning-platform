@@ -28,6 +28,7 @@ import com.learningplatform.modules.auth.model.SessionGrant;
 import com.learningplatform.modules.auth.model.SessionIdentity;
 import com.learningplatform.modules.auth.security.CsrfTokenService;
 import com.learningplatform.modules.auth.security.LoginRateLimiter;
+import com.learningplatform.modules.auth.security.RegistrationRateLimiter;
 import com.learningplatform.modules.auth.service.DatabaseSessionService;
 import com.learningplatform.modules.auth.service.RegisterService;
 import com.learningplatform.modules.courses.model.Term;
@@ -60,6 +61,7 @@ public class AuthController {
     private final RegisterService registerService;
     private final CsrfTokenService csrfTokens;
     private final LoginRateLimiter loginRateLimiter;
+    private final RegistrationRateLimiter registrationRateLimiter;
     private final AuditService auditService;
     private final TermQueryService termQueryService;
     private final AuthHttpProperties properties;
@@ -67,7 +69,7 @@ public class AuthController {
     private final com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider;
 
     public AuthController(DatabaseSessionService sessions, RegisterService registerService,
-                          CsrfTokenService csrfTokens, LoginRateLimiter loginRateLimiter,
+                          CsrfTokenService csrfTokens, LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
                           AuditService auditService, TermQueryService termQueryService,
                           AuthHttpProperties properties, Clock clock,
                           com.learningplatform.modules.tutoring.provider.TutoringProvider tutoringProvider) {
@@ -76,6 +78,7 @@ public class AuthController {
         this.registerService = registerService;
         this.csrfTokens = csrfTokens;
         this.loginRateLimiter = loginRateLimiter;
+        this.registrationRateLimiter = registrationRateLimiter;
         this.auditService = auditService;
         this.termQueryService = termQueryService;
         this.properties = properties;
@@ -137,6 +140,7 @@ public class AuthController {
     public ApiResponse<RegisterDTO> register(@Valid @RequestBody RegisterWrite body,
                                              HttpServletRequest request, HttpServletResponse response) {
         String requestId = RequestIdFilter.getRequestId(request);
+        registrationRateLimiter.check(request.getRemoteAddr());
         RegisterService.RegisterResult result = registerService.register(body, requestId);
         long maxAge = Math.max(Duration.between(clock.instant(), result.expiresAt()).getSeconds(), 0);
         response.addHeader("Set-Cookie", AuthCookies.session(result.sessionToken(), maxAge, properties.cookieSecure()));

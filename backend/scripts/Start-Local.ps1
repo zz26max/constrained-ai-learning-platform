@@ -119,7 +119,11 @@ try {
     }
 } finally { $configStream.Dispose() }
 foreach ($key in $allowedKeys) {
-    [System.Environment]::SetEnvironmentVariable($key, $configValues[$key], 'Process')
+    if (-not $configValues.ContainsKey($key) -or ($key -in $optionalKeys -and [string]::IsNullOrWhiteSpace($configValues[$key]))) {
+        Remove-Item -LiteralPath ('Env:' + $key) -ErrorAction SilentlyContinue
+    } else {
+        [System.Environment]::SetEnvironmentVariable($key, $configValues[$key], 'Process')
+    }
 }
 $configuredProfile = $env:SPRING_PROFILES_ACTIVE
 

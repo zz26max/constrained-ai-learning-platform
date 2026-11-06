@@ -134,13 +134,17 @@ public class AssignmentService {
     public SubmissionCreatedResponse submitAssignment(UserDTO user,String assignmentId,Map<String,Object> body,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
         // 不在此处用 write=true：归档拦截要放在幂等检查之后，同 revision 重复提交即使班级已归档也应返回原提交。
+        access.requireStudent(user,assignment.offeringId(),false);
+        access.lockOfferingShared(assignment.offeringId());
+        mapper.lockAssignmentShared(assignment.id());
+        // Re-read after waiting: the archive transaction may have committed while we waited.
+        assignment=assignmentOr404(assignmentId);
         CourseAccess.Context context=access.requireStudent(user,assignment.offeringId(),false);
         if("draft".equals(assignment.status())) throw CourseAccess.notFound();
         AssignmentInput.validateSubmissionWrite(body);
         int workspaceRevision=AssignmentInput.integer(body,"workspaceRevision");
         String reflection=AssignmentInput.text(body,"reflection",8000);
-        Instant now=now();
-        // 锁顺序：工作区行 → 当前提交行。同一学生同一作业的并发提交在工作区行上排队；
+        // 锁顺序：教学班共享锁 → 作业共享锁 → 工作区行 → 当前提交行。同一学生同一作业的并发提交在工作区行上排队；
         // 与 saveFeedback/publishFeedback（submission 行 → feedback 行）没有交叉锁序。
         Workspace workspace=mapper.findWorkspaceForUpdate(assignment.id(),user.id());
         if(workspace!=null) {
@@ -152,6 +156,7 @@ public class AssignmentService {
         Feedback currentFeedback=currentSubmission==null?null:mapper.findFeedbackBySubmission(currentSubmission.id());
         boolean reviewed=currentFeedback!=null&&"published".equals(currentFeedback.status());
         int attemptsUsed=mapper.countSubmissions(assignment.id(),user.id());
+        Instant now=now(); // Evaluate the deadline after waiting for all submission locks.
         String blocked=submitBlockedReason(assignment,context,attemptsUsed,reviewed,now);
         if(blocked!=null) throw blockedException(blocked);
         // 提交的必须是服务器当前已保存的 revision；否则 WORKSPACE_CONFLICT 并带回当前版本。
@@ -304,6 +309,10 @@ public class AssignmentService {
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public TeacherAssignmentDTO archiveAssignment(UserDTO user,String assignmentId,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
+        access.requireTeacher(user,assignment.offeringId(),true);
+        access.lockOfferingShared(assignment.offeringId());
+        mapper.lockAssignmentExclusive(assignment.id());
+        assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),true);
         if("draft".equals(assignment.status())) {
             throw new BusinessException(HttpStatus.CONFLICT,"ASSIGNMENT_NOT_PUBLISHED","草稿作业不能归档。");

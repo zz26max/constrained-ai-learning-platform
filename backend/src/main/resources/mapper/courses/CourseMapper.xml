@@ -43,6 +43,9 @@
 <arg name="joinedAt" column="joined_at" javaType="java.time.Instant" typeHandler="com.learningplatform.common.mybatis.UtcInstantTypeHandler"/>
 </constructor></resultMap>
 
+<!-- Lifecycle locks only lock the offering row, not joined course/term rows. -->
+<select id="lockOfferingShared" resultType="string" flushCache="true" useCache="false">SELECT id FROM course_offerings WHERE id=#{id} FOR SHARE</select>
+<select id="lockOfferingExclusive" resultType="string" flushCache="true" useCache="false">SELECT id FROM course_offerings WHERE id=#{id} FOR UPDATE</select>
 <sql id="offeringColumns">o.id,o.course_id,o.term_id,o.title,c.mark,o.group_name,t.label AS term_label,o.progress_unit,o.status,o.created_by,o.created_at</sql>
 <sql id="offeringFrom">FROM course_offerings o JOIN courses c ON c.id=o.course_id JOIN terms t ON t.id=o.term_id</sql>
 <sql id="memberScope">JOIN offering_members m ON m.offering_id=o.id WHERE m.user_id=#{userId} AND m.role=#{role} AND m.status='active' AND o.term_id=#{termId}

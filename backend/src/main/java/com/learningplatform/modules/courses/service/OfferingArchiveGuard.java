@@ -1,11 +1,23 @@
 package com.learningplatform.modules.courses.service;
+
+import com.learningplatform.common.exception.BusinessException;
+import com.learningplatform.modules.courses.mapper.AssignmentMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-/** 归档前的待批阅检查扩展点。 */
+
+/** Called while holding the offering lifecycle lock in the archive transaction. */
 @Component
 public class OfferingArchiveGuard {
+    private final AssignmentMapper assignments;
+
+    public OfferingArchiveGuard(AssignmentMapper assignments) {
+        this.assignments = assignments;
+    }
+
     public void checkPendingReviews(String offeringId) {
-        // P1-C 建立提交/评价表后，在这里查询当前且未发布评价的提交，
-        // 若存在则抛出契约 ARCHIVE_PENDING_REVIEWS；P1-A 不建假表、不声称已检查不存在的提交。
+        if (assignments.countOfferingPendingReviews(offeringId) > 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "ARCHIVE_PENDING_REVIEWS",
+                    "教学班仍有待批阅提交，暂不能归档。");
+        }
     }
 }
-

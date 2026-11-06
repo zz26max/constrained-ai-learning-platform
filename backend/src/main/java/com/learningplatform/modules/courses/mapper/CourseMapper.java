@@ -14,6 +14,8 @@ public interface CourseMapper {
     String currentTermId();
     int termExists(String id);
     Offering findOffering(String id);
+    String lockOfferingShared(String id);
+    String lockOfferingExclusive(String id);
     Member findMember(@Param("offeringId") String offeringId,@Param("userId") String userId);
     List<Offering> offerings(@Param("userId") String userId,@Param("role") String role,@Param("termId") String termId,
             @Param("status") String status,@Param("offset") long offset,@Param("size") int size);
