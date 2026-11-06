@@ -14,17 +14,17 @@
 
 - **契约状态**：1.2.0，86 个业务操作 + 2 个健康检查；业务操作为 13 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式的邀请码入班与教师建班仍只有自动化测试证据。
 
-- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）。本地 3307 已重建并在新 V16 上重放迁移：terms/courses/course_offerings 为 1/1/1、章节 5、资源 10、知识点 12，演示账号 3 个；真实 HTTP 端到端 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用的 `e2e.reg.*` 账号已清理；学校模式（邀请码入班）由 `scripts/demo-seed.mjs` 真实注册两名学生验证通过。本地演示数据经产品接口备齐：教学班 1、章节 3、知识点 4、作业 1（含待批阅提交）、演示学生 2。注册页本身仍只有前端测试证据，没有浏览器操作记录。
+- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）。本地 3307 已重建并在新 V16 上重放迁移：terms/courses/course_offerings 为 1/1/1、章节 5、资源 10、知识点 12，演示账号 3 个；真实 HTTP 端到端 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用的 `e2e.reg.*` 账号已清理；学校模式（邀请码入班）由 `scripts/demo-seed.mjs` 真实注册两名学生验证通过。本地演示数据经产品接口备齐：教学班 1、章节 3、知识点 4、作业 1（含待批阅提交）、演示学生 2。注册页历史验证边界已由本轮浏览器记录补充。
 
 - **未决事项**（2026-10-31 更新）：
   1. §4 接受的 5 个低概率竞态，其中"归档与提交竞态"会在归档后留下一篇无法再批阅的提交。
   2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
   3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
   4. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
-  5. 学校模式注册的邀请码入班已有真实 HTTP 端到端证据（`scripts/demo-seed.mjs` 成功注册两名学生），但注册页的学校分支与教师建班分支仍无浏览器验收；个人模式已由使用者验收并标记 verified。
+  5. 学校模式注册入班和教师注册建班现有本轮真实浏览器证据；未扩大接口 verified 状态。
   6. V16 自带「个人学习学期」是迁移写业务配置的折中；若真实环境要求学期只能由管理流程创建，应改为注册时按需创建个人 offering，并同步迁移与文档。
 
-- **本轮验证**：前端本地 verify 47 文件 / 414 用例、类型检查、构建及生产 mock 隔离通过；Node 24.17.0 / npm 11.13.0 低于固定工具链，不等同 CI。契约检查已使用 .contract-venv 通过。后端完整验证与真实浏览器检查进行中，结论随后回填。
+- **本轮验证**：前端本地 verify 47 文件 / 415 用例、类型检查、构建及生产 mock 隔离通过；Node 24.17.0 / npm 11.13.0 低于固定工具链，不等同 CI。契约检查已使用 .contract-venv 通过。真实浏览器个人注册、教师注册建班、邀请码学生注册及用户名冲突纠错已通过；后端完整验证进行中。
 
 ### 0.1 接手前必读
 
@@ -40,6 +40,8 @@
 > **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；§4 已知限制是被 §0 引用的现行清单，同样不属日志；判断某条缺陷是否已修，先看 §0、§3 与 §4，再对照本节是否有更晚的条目。历史条目中的旧文件路径按 2026-10-24 归档迁移对照：`frontend/DESIGN.md` → `docs/archive/frontend-DESIGN.md`、`frontend/V3*-DELIVERY.md` 等报告 → `docs/archive/`、`frontend/scripts` 一次性验收脚本 → `frontend/scripts/archive/`。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
+
+> **2026-11-07 前端补充验证**：新增请求跨截止时间补刷回归，全量 verify 47 文件 / 415 用例通过。真实 Edge + Vite + 本地 API/MySQL：输入框 Enter 不提前发送注册、真实用户名冲突保留输入并聚焦、390px 无横向溢出、个人注册 201 → /me 200 → 课程关联、教师页面注册建班 → API 生成邀请码 → 学生页面注册入同班均通过。脚本及截图在系统临时目录 lms-browser-review.mjs、lms-school-review.mjs、lms-register-review.png。保留测试账号 review.1793982419882、review.1793982543018.teacher、review.1793982543018.student 与新建班级供复核，不含外部 AI 调用。
 
 > **2026-11-07 补丁审查与前端修复**：补丁包已解压到项目外临时目录并阅读 diff；未执行 git am。注册校验/错误回跳、服务器展示时钟、进度单位与证据不足说明适合当前代码；另补输入框真实 Enter 事件与请求期间跨截止后的补刷。现有视觉设计与上一轮统计提示保留。包内云端状态日志未导入；注册限流与生命周期锁另行验证。前端 verify 47 文件 / 414 用例通过，工具链差异见 §0。
 

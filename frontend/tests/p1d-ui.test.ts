@@ -165,6 +165,37 @@ afterEach(() => {
 })
 
 describe('P1-D 路由与首页', () => {
+  it('刷新请求跨过截止时间后补刷服务端资格', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    vi.setSystemTime(new Date('2026-10-14T02:00:00Z'))
+    const deadline = '2026-10-14T02:00:02Z'
+    let hold = false
+    let allowed = true
+    let release: (() => void) | undefined
+    scripted.setHandler(async request => {
+      if (request.operationId !== 'getAssignment') return normalResponse(request)
+      const snapshot = allowed
+      if (hold) {
+        hold = false
+        await new Promise<void>(resolve => { release = resolve })
+      }
+      return okEnvelope({ ...summary(ASSIGNMENT_2), dueAt: deadline, lateUntil: null,
+        canSubmit: snapshot, submissionBlockedReason: snapshot ? null : 'SUBMISSION_CLOSED' })
+    })
+    const page = await open('/student/home')
+    hold = true
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(release).toBeTypeOf('function')
+    allowed = false
+    await vi.advanceTimersByTimeAsync(3000)
+    release!()
+    await flushPromises()
+    expect(page.text()).toContain('当前没有可提交的待办')
+    vi.restoreAllMocks()
+  })
+
   it.each(['dueAt', 'lateUntil'] as const)('服务器时钟驱动倒计时，跨过 %s 后刷新资格并清理定时器', async boundary => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
     vi.setSystemTime(new Date('2020-01-01T00:00:00Z'))
