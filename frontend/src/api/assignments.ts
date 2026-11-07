@@ -5,6 +5,9 @@ type Schemas = components['schemas']
 
 export type AssignmentSummaryDTO = Schemas['AssignmentSummaryDTO']
 export type AssignmentDetailDTO = Schemas['AssignmentDetailDTO']
+export type CheckDTO = Schemas['CheckDTO']
+export type CheckPolicyConfig = Schemas['CheckPolicyConfig']
+export type CheckPolicyWrite = NonNullable<operations['updateCheckPolicy']['requestBody']>['content']['application/json']
 export type WorkspaceDTO = Schemas['WorkspaceDTO']
 export type TeacherAssignmentDTO = Schemas['TeacherAssignmentDTO']
 export type AssignmentWriteDTO = Schemas['AssignmentWriteDTO']
@@ -28,6 +31,11 @@ export type AssignmentRequestOptions = Pick<RequestOptions, 'signal' | 'csrfToke
 export type AssignmentOperationId = keyof Pick<operations,
   | 'listMyAssignments'
   | 'getAssignment'
+  | 'getCheckPolicy'
+  | 'updateCheckPolicy'
+  | 'getAssignmentCheck'
+  | 'createCheck'
+  | 'getCheck'
   | 'getWorkspace'
   | 'saveWorkspace'
   | 'submitAssignment'
@@ -48,12 +56,24 @@ export type AssignmentOperationId = keyof Pick<operations,
   | 'readMessage'
 >
 
-type AssignmentPayloads = { [K in AssignmentOperationId]: Schemas[`Response_${K}`]['data'] }
+type CheckPayloads = {
+  getCheckPolicy: Schemas['Response_CheckPolicy']['data']
+  updateCheckPolicy: Schemas['Response_CheckPolicy']['data']
+  getAssignmentCheck: Schemas['Response_AssignmentCheck']['data']
+}
+type AssignmentPayloads = CheckPayloads & {
+  [K in Exclude<AssignmentOperationId, keyof CheckPayloads>]: Schemas[`Response_${K}`]['data']
+}
 type AssignmentSpecs = { [K in AssignmentOperationId]: OperationSpec & { id: K; path: keyof paths } }
 
 export const ASSIGNMENT_SPECS = {
   listMyAssignments: { id: 'listMyAssignments', method: 'GET', path: '/api/v1/me/assignments', csrf: false },
   getAssignment: { id: 'getAssignment', method: 'GET', path: '/api/v1/assignments/{assignmentId}', csrf: false },
+  getCheckPolicy: { id: 'getCheckPolicy', method: 'GET', path: '/api/v1/teacher/assignments/{assignmentId}/check-policy', csrf: false },
+  updateCheckPolicy: { id: 'updateCheckPolicy', method: 'PUT', path: '/api/v1/teacher/assignments/{assignmentId}/check-policy', csrf: true },
+  getAssignmentCheck: { id: 'getAssignmentCheck', method: 'GET', path: '/api/v1/assignments/{assignmentId}/checks', csrf: false },
+  createCheck: { id: 'createCheck', method: 'POST', path: '/api/v1/assignments/{assignmentId}/checks', csrf: true },
+  getCheck: { id: 'getCheck', method: 'GET', path: '/api/v1/checks/{checkId}', csrf: false },
   getWorkspace: { id: 'getWorkspace', method: 'GET', path: '/api/v1/assignments/{assignmentId}/workspace', csrf: false },
   saveWorkspace: { id: 'saveWorkspace', method: 'PUT', path: '/api/v1/assignments/{assignmentId}/workspace', csrf: true },
   submitAssignment: { id: 'submitAssignment', method: 'POST', path: '/api/v1/assignments/{assignmentId}/submissions', csrf: true },
@@ -107,6 +127,26 @@ export class AssignmentsApi {
 
   getAssignment(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getAssignment']>> {
     return this.request('getAssignment', options, id)
+  }
+
+  getCheckPolicy(id: string, options: AssignmentRequestOptions = {}) {
+    return this.request('getCheckPolicy', options, id)
+  }
+
+  updateCheckPolicy(id: string, body: CheckPolicyWrite, options: AssignmentRequestOptions = {}) {
+    return this.request('updateCheckPolicy', options, id, body)
+  }
+
+  getAssignmentCheck(id: string, workspaceRevision: number, options: AssignmentRequestOptions = {}) {
+    return this.request('getAssignmentCheck', options, id, undefined, { workspaceRevision })
+  }
+
+  createCheck(id: string, workspaceRevision: number, options: AssignmentRequestOptions = {}) {
+    return this.request('createCheck', options, id, { workspaceRevision })
+  }
+
+  getCheck(id: string, options: AssignmentRequestOptions = {}) {
+    return this.request('getCheck', options, id)
   }
 
   getWorkspace(id: string, options: AssignmentRequestOptions = {}): Promise<ApiResult<AssignmentPayloads['getWorkspace']>> {

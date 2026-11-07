@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter, type RouteLocationNormalized } from 'vue-router'
+import { API_MODE } from '../../app/api-mode'
 import { assignmentsApi } from '../../api'
 import type { WorkspaceWrite } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
@@ -11,6 +12,7 @@ import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAssignmentActions } from './use-assignment-actions'
 import { useDebouncedSave } from './use-debounced-save'
+import { useWorkspaceCheck } from './use-workspace-check'
 import { useAuthStore } from '../../stores/auth'
 import { assignmentStateLabel, assignmentTypeLabel, dueInfo, isUuid } from './format'
 import { formatShortTime } from '../courses/format'
@@ -156,7 +158,33 @@ const submitBlockedText = computed(() => {
 
 const hasUnsavedEdits = computed(() =>
   saveState.value.pendingSave || saveState.value.saving || saveState.value.error !== null)
-const frozen = computed(() => submitting.value || actions.pending.value)
+const canRunChecks = computed(() => auth.config?.features.serverChecks === true)
+const check = useWorkspaceCheck(
+  () => assignmentId.value,
+  () => query.status.value === 'success' && query.data.value?.assignmentId === assignmentId.value
+    ? query.data.value.revision : null,
+  () => API_MODE === 'real'
+    && assignmentQuery.status.value === 'success' && detail.value?.id === assignmentId.value
+    && (detail.value?.type === 'web_lab' || detail.value?.type === 'sql_text'),
+)
+const frozen = computed(() => submitting.value || actions.pending.value || check.preparing.value)
+const checkIsStale = computed(() => check.checkedRevision.value !== null
+  && (hasUnsavedEdits.value || check.checkedRevision.value !== saveState.value.lastSavedRevision))
+
+function startCheck(): void {
+  if (!canRunChecks.value || !canSave.value || frozen.value || saveState.value.paused) return
+  void check.start(async () => {
+    const version = saveState.value.lastSavedRevision
+    const retryFailedVersion = check.status.value === 'error' && check.checkedRevision.value === version
+    if ((version === 0 || retryFailedVersion) && !hasUnsavedEdits.value) {
+      scheduleSave(currentDraft())
+    }
+    if (!await flush() || saveState.value.lastSavedRevision <= 0) {
+      throw new Error('最新作品未能保存，请恢复保存后再运行自动检查。')
+    }
+    return saveState.value.lastSavedRevision
+  })
+}
 
 function currentDraft(): WorkspaceWrite {
   return { baseRevision: saveState.value.lastSavedRevision, activeFile: activeTab.value as WorkspaceWrite['activeFile'],
@@ -192,7 +220,7 @@ function restoreServer(): void {
 }
 
 const canSubmit = computed(() => {
-  return canSave.value && submissionEligible.value && !actions.pending.value
+  return canSave.value && submissionEligible.value && !frozen.value
     && (saveState.value.lastSavedRevision > 0 || hasUnsavedEdits.value)
 })
 
@@ -340,7 +368,15 @@ onBeforeUnmount(() => {
         >
           题目
         </UiButton>
-        <UiButton v-if="isWebLab" variant="secondary" @click="runPreview">运行</UiButton>
+        <UiButton v-if="isWebLab" variant="secondary" title="预览网页效果" @click="runPreview">运行</UiButton>
+        <UiButton
+          v-if="check.configured.value"
+          variant="secondary"
+          :disabled="!canRunChecks || !canSave || frozen || saveState.paused || check.running.value"
+          @click="startCheck"
+        >
+          {{ check.preparing.value ? '准备检查…' : check.status.value === 'error' ? '重新检查' : '自动检查' }}
+        </UiButton>
         <UiButton
           variant="quiet"
           :disabled="frozen"
@@ -364,6 +400,33 @@ onBeforeUnmount(() => {
     <ApiState :status="query.status.value" :error="query.error.value" @retry="query.load" />
     <ApiState v-if="assignmentQuery.status.value === 'error'" :status="assignmentQuery.status.value" :error="assignmentQuery.error.value" @retry="assignmentQuery.load" />
     <ActionNotice :error="actions.error.value" :message="actions.message.value" />
+
+    <section v-if="check.configured.value !== null || check.error.value" class="surface ws-check" aria-label="自动检查结果">
+      <h2>自动检查</h2>
+      <p v-if="isWebLab && check.configured.value" class="meta">检查 HTML/CSS 静态结构与样式，不执行 JavaScript。</p>
+      <p v-if="check.configured.value && !canRunChecks" class="meta">自动检查服务当前不可用。</p>
+      <p v-if="check.checkedRevision.value !== null" class="meta">
+        检查版本 r{{ check.checkedRevision.value }}。{{ checkIsStale ? '工作区已有更新，此结果对应旧版本。' : '' }}
+      </p>
+      <ApiState v-if="check.error.value" status="error" :error="check.error.value" @retry="check.retry" />
+      <p v-else-if="check.status.value === 'queued'" role="status">排队中…</p>
+      <p v-else-if="check.status.value === 'running'" role="status">正在检查…</p>
+      <UiNotice v-else-if="check.result.value?.error" tone="error" role="alert">
+        检查未完成。{{ check.result.value.error.message }}
+        <span v-if="canRunChecks && canSave">可重新检查当前作品。</span>
+      </UiNotice>
+      <template v-else-if="check.result.value?.result">
+        <p role="status">通过 {{ check.result.value.result.passed }} / {{ check.result.value.result.total }} 项。正式成绩以教师评价为准。</p>
+        <ul>
+          <li v-for="item in check.result.value.result.items" :key="item.ruleId">
+            {{ item.status === 'pass' ? '通过' : '未通过' }} · {{ item.message }}
+          </li>
+        </ul>
+        <pre v-if="check.result.value.result.output">{{ check.result.value.result.output }}</pre>
+        <p v-if="check.result.value.result.truncated" class="meta">输出已截断。</p>
+      </template>
+      <p v-else-if="check.configured.value === false">此作业尚未配置自动检查。</p>
+    </section>
 
     <UiNotice v-if="saveState.error" tone="error">
       {{ saveState.error }}
@@ -558,3 +621,18 @@ onBeforeUnmount(() => {
     </dialog>
   </div>
 </template>
+
+<style scoped>
+.ws-head-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ws-check {
+  overflow-wrap: anywhere;
+}
+.ws-check pre {
+  white-space: pre-wrap;
+  max-height: 12rem;
+  overflow: auto;
+}
+</style>

@@ -16,6 +16,7 @@ import { createScriptedTransport, DEMO_CONFIG, DEMO_USER, failEnvelope, okEnvelo
 
 const ASSIGNMENT = '00000000-0000-4000-8000-000000000701'
 const ASSIGNMENT_B = '00000000-0000-4000-8000-000000000702'
+const CHECK_ID = '00000000-0000-4000-8000-000000000801'
 const TUTOR_SESSION = '00000000-0000-4000-8000-000000000901'
 const TUTOR_REQUEST = '00000000-0000-4000-8000-000000000902'
 
@@ -27,13 +28,14 @@ let saveFails = false
 
 function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
   const body = request.body ? JSON.parse(request.body) as Record<string, unknown> : {}
+  const assignment = request.path.includes(ASSIGNMENT_B) ? ASSIGNMENT_B : ASSIGNMENT
   switch (request.operationId) {
     case 'getWorkspace': return okEnvelope({
-      assignmentId: ASSIGNMENT, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
+      assignmentId: assignment, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
       savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null,
     })
     case 'getAssignment': return okEnvelope({
-      id: ASSIGNMENT, canSubmit: true, submissionBlockedReason: null,
+      id: assignment, canSubmit: true, submissionBlockedReason: null,
       offeringId: '00000000-0000-4000-8000-000000000801', offeringStatus: 'active', publicationState: 'published',
       title: '卡片布局练习', type: 'web_lab', isRequired: true, estimatedMinutes: 30, maxScore: 100,
       description: '把卡片改成两列，窄屏时单列且不溢出。',
@@ -43,6 +45,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
       assignmentState: 'IN_PROGRESS', attemptsUsed: 0, maxAttempts: 3, allowResubmit: true,
       ...assignmentOverride,
     })
+    case 'getAssignmentCheck': return okEnvelope({ configured: false, check: null })
     case 'getAiPolicy': return okEnvelope({
       assignmentId: ASSIGNMENT, version: 1, enabled: true,
       allowedActions: ['ask', 'concept', 'next_hint'], allowedModes: ['concept', 'debug_hint', 'guided_question'],
@@ -76,12 +79,12 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
 const requestsOf = (operationId: string) => scripted.requests.filter(request => request.operationId === operationId)
 const bodyOf = (request: { body?: string }) => JSON.parse(request.body ?? '{}') as Record<string, unknown>
 
-async function openWorkspace(): Promise<VueWrapper> {
+async function openWorkspace(serverChecks = false): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().$patch({
     phase: 'authenticated', bootStatus: 'success', csrfToken: 'csrf-student',
-    identity: { ...DEMO_USER, roles: ['student'] }, config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms] },
+    identity: { ...DEMO_USER, roles: ['student'] }, config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms], features: { ...DEMO_CONFIG.features, serverChecks } },
   })
   router = createAppRouter(createMemoryHistory())
   await router.push(`/student/workspaces/${ASSIGNMENT}`)
@@ -122,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   wrapper?.unmount()
+  vi.useRealTimers()
   router?.options.history.destroy()
   wrapper = undefined
   router = undefined
@@ -330,5 +334,161 @@ describe('工作区题面与实时求助', () => {
 
     expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
     expect(page.find('.ws-tutor-inline .field-error').text()).toContain('最新修改尚未保存，暂不能请求 AI 辅导。')
+  })
+})
+
+describe('工作区自动检查', () => {
+  function checkResponse(status: 'queued' | 'running' | 'completed', workspaceRevision = 2) {
+    const completed = status === 'completed'
+    return okEnvelope({
+      id: CHECK_ID, assignmentId: ASSIGNMENT, workspaceRevision, checkerVersion: 'mvp-v1',
+      status, result: completed ? {
+        passed: 0, total: 1, items: [{ ruleId: 'title', status: 'fail', message: '标题缺失' }], output: '', truncated: false,
+      } : null, error: null, createdAt: '2026-10-14T02:00:00Z', completedAt: completed ? '2026-10-14T02:00:01Z' : null,
+    })
+  }
+
+  function withCheck(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
+    if (request.operationId === 'getAssignmentCheck') return okEnvelope({ configured: true, check: null })
+    if (request.operationId === 'createCheck') return {
+      status: 202, body: { data: { checkId: CHECK_ID, status: 'queued' }, requestId: 'req-check' },
+    }
+    if (request.operationId === 'getCheck') return checkResponse('completed')
+    return normalResponse(request)
+  }
+
+  it('立即检查先落最新修改，再检查服务端版本，随后编辑时标明旧结果', async () => {
+    scripted.setHandler(withCheck)
+    const page = await openWorkspace(true)
+    await page.get('textarea.workspace-editor').setValue('latest code')
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+
+    const save = requestsOf('saveWorkspace')[0]!
+    const check = requestsOf('createCheck')[0]!
+    expect(scripted.requests.indexOf(save)).toBeLessThan(scripted.requests.indexOf(check))
+    expect(bodyOf(check)).toEqual({ workspaceRevision: 2 })
+    expect(page.text()).toContain('通过 0 / 1 项')
+    expect(page.text()).toContain('标题缺失')
+    await page.get('textarea.workspace-editor').setValue('new edit')
+    expect(page.text()).toContain('此结果对应旧版本')
+  })
+
+  it('保存冲突时不创建检查', async () => {
+    scripted.setHandler(withCheck)
+    saveFails = true
+    const page = await openWorkspace(true)
+    await page.get('textarea.workspace-editor').setValue('unconfirmed code')
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+    expect(requestsOf('saveWorkspace')).toHaveLength(1)
+    expect(requestsOf('createCheck')).toHaveLength(0)
+    expect(page.text()).toContain('最新作品未能保存')
+  })
+
+  it('切换作业时忽略迟到的检查响应', async () => {
+    let resolveCheck: ((response: ScriptedResponse) => void) | undefined
+    scripted.setHandler(request => request.operationId === 'getCheck'
+      ? new Promise(resolve => { resolveCheck = resolve })
+      : withCheck(request))
+    const page = await openWorkspace(true)
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+    expect(requestsOf('getCheck')).toHaveLength(1)
+    await router!.push(`/student/workspaces/${ASSIGNMENT_B}`)
+    await flushPromises()
+    expect(requestsOf('getAssignmentCheck').map(request => request.path)).toEqual([
+      `/api/v1/assignments/${ASSIGNMENT}/checks?workspaceRevision=1`,
+      `/api/v1/assignments/${ASSIGNMENT_B}/checks?workspaceRevision=1`,
+    ])
+    resolveCheck?.(withCheck(requestsOf('getCheck')[0]!))
+    await flushPromises()
+    expect(router!.currentRoute.value.params.id).toBe(ASSIGNMENT_B)
+    expect(page.text()).not.toContain('标题缺失')
+  })
+
+  it('排队后进入执行，读取失败可恢复原检查且不重新提交', async () => {
+    const responses = [
+      checkResponse('queued'), checkResponse('running'),
+      failEnvelope(503, 'SERVICE_UNAVAILABLE'), checkResponse('completed'),
+    ]
+    scripted.setHandler(request => request.operationId === 'getCheck'
+      ? responses.shift() ?? checkResponse('completed')
+      : withCheck(request))
+    const page = await openWorkspace(true)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+    const result = page.get('.ws-check')
+    expect(result.text()).toContain('排队中')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(result.text()).toContain('正在检查')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(result.text()).toContain('暂时无法完成请求')
+    await result.get('button').trigger('click')
+    await flushPromises()
+    expect(result.text()).toContain('通过 0 / 1 项')
+    expect(requestsOf('createCheck')).toHaveLength(1)
+    expect(requestsOf('getCheck')).toHaveLength(4)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(requestsOf('getCheck')).toHaveLength(4)
+  })
+
+  it('没有规则时明确显示不可检查，并保留网页预览', async () => {
+    scripted.setHandler(request => request.operationId === 'getAssignmentCheck'
+      ? okEnvelope({ configured: false, check: null })
+      : normalResponse(request))
+    const page = await openWorkspace(true)
+    expect(page.get('.ws-check').text()).toContain('此作业尚未配置自动检查')
+    expect(page.findAll('button').some(button => button.text() === '自动检查')).toBe(false)
+    expect(page.findAll('button').some(button => button.text() === '运行')).toBe(true)
+  })
+
+  it('隔离执行错误显示未完成，不显示规则得分', async () => {
+    scripted.setHandler(request => request.operationId === 'getCheck' ? okEnvelope({
+      id: CHECK_ID, assignmentId: ASSIGNMENT, workspaceRevision: 1, checkerVersion: 'mvp-v1',
+      status: 'error', result: null, error: { code: 'RUNNER_UNAVAILABLE', message: '运行服务暂不可用' },
+      createdAt: '2026-10-14T02:00:00Z', completedAt: '2026-10-14T02:00:01Z',
+    }) : withCheck(request))
+    const page = await openWorkspace(true)
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+    expect(page.text()).toContain('检查未完成。运行服务暂不可用')
+    expect(page.text()).not.toMatch(/通过 \d+ \/ \d+ 项/)
+  })
+
+  it('服务关闭仍显示已有结果，并禁止创建新检查', async () => {
+    const completed = checkResponse('completed', 1).body as { data: unknown }
+    scripted.setHandler(request => request.operationId === 'getAssignmentCheck'
+      ? okEnvelope({ configured: true, check: completed.data })
+      : normalResponse(request))
+    const page = await openWorkspace(false)
+    expect(page.get('.ws-check').text()).toContain('通过 0 / 1 项')
+    expect(page.get('.ws-check').text()).toContain('自动检查服务当前不可用')
+    expect(page.findAll('button').find(button => button.text() === '自动检查')?.attributes('disabled')).toBeDefined()
+    expect(requestsOf('createCheck')).toHaveLength(0)
+  })
+
+  it('执行失败后重新检查会先保存新版本', async () => {
+    scripted.setHandler(request => {
+      if (request.operationId === 'getCheck' && requestsOf('createCheck').length === 1) {
+        return okEnvelope({
+          id: CHECK_ID, assignmentId: ASSIGNMENT, workspaceRevision: 1, checkerVersion: 'mvp-v1',
+          status: 'error', result: null, error: { code: 'RUNNER_UNAVAILABLE', message: '运行服务暂不可用' },
+          createdAt: '2026-10-14T02:00:00Z', completedAt: '2026-10-14T02:00:01Z',
+        })
+      }
+      return withCheck(request)
+    })
+    const page = await openWorkspace(true)
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+    await page.findAll('button').find(button => button.text() === '重新检查')!.trigger('click')
+    await flushPromises()
+    expect(requestsOf('saveWorkspace').map(bodyOf)).toEqual([{
+      baseRevision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
+    }])
+    expect(requestsOf('createCheck').map(bodyOf)).toEqual([{ workspaceRevision: 1 }, { workspaceRevision: 2 }])
+    expect(page.get('.ws-check').text()).toContain('通过 0 / 1 项')
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { API_MODE } from '../../app/api-mode'
 import { assignmentsApi, coursesApi } from '../../api'
 import type { AssignmentWriteDTO } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
@@ -10,6 +11,7 @@ import { useAssignmentActions } from './use-assignment-actions'
 import { isUuid } from './format'
 import { assignmentBody, localDateTime, templateFiles } from './assignment-form'
 import TeacherSubmissionList from './TeacherSubmissionList.vue'
+import TeacherCheckPolicyPanel from './TeacherCheckPolicyPanel.vue'
 import TeacherAiPolicyPanel from '../tutoring/TeacherAiPolicyPanel.vue'
 
 const route = useRoute()
@@ -270,6 +272,13 @@ function addCriterion(): void {
       <label v-for="file in form.initialFiles" :key="file.path">{{ file.path }}<textarea v-model="file.content" rows="8" spellcheck="false" /></label>
       </fieldset>
     </fieldset>
+    <TeacherCheckPolicyPanel
+      v-if="API_MODE === 'real' && assignmentId && query.status.value === 'success' && query.data.value && query.data.value.type !== 'text'"
+      :key="assignmentId + ':' + query.data.value.type"
+      :assignment-id="assignmentId"
+      :kind="query.data.value.type"
+      :read-only="locked || published || form.type !== query.data.value.type"
+    />
     <TeacherAiPolicyPanel v-if="assignmentId && published" :assignment-id="assignmentId" />
     <p v-else-if="assignmentId && !published && query.data.value?.publicationState === 'draft'" class="notice notice-info" role="note">AI 辅导政策在作业发布后配置。</p>
     <TeacherSubmissionList v-if="assignmentId && query.status.value === 'success' && query.data.value?.publicationState !== 'draft'" :assignment-id="assignmentId" />

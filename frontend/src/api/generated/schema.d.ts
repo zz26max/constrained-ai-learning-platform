@@ -1444,6 +1444,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teacher/assignments/{assignmentId}/check-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取教师检查配置 */
+        get: operations["getCheckPolicy"];
+        /**
+         * 保存草稿作业检查配置
+         * @description 仅草稿可编辑；config=null清除配置；发布后冻结，版本冲突返回currentVersion。
+         */
+        put: operations["updateCheckPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments/{assignmentId}/checks": {
         parameters: {
             query?: never;
@@ -1451,11 +1472,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 获取本人指定作品版本的检查状态
+         * @description 已发布作业本人可读；归档历史可读。revision=0表示尚未保存，check=null。不返回教师规则或标准答案。
+         */
+        get: operations["getAssignmentCheck"];
         put?: never;
         /**
          * createCheck
-         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status:'queued'}`；同一 workspaceRevision 已有检查时返回原检查（自然幂等）。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status}`；同一作业/学生/workspaceRevision已有检查返回原checkId与真实当前status（自然幂等）。未配置返回CHECK_NOT_CONFIGURED。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["createCheck"];
         delete?: never;
@@ -3187,13 +3212,146 @@ export interface components {
             acceptedCount: number;
             duplicateCount: number;
         };
+        WebCheckRule: {
+            id: string;
+            selector: string;
+            /** @enum {string} */
+            check: "exists" | "text" | "css";
+            expected: string | null;
+            property: string | null;
+            width: number;
+        };
+        /** @description HTML/CSS 静态结构、文本与计算样式检查；执行器禁用学生 JavaScript，不验证动态交互。 */
+        WebCheckPolicy: {
+            /** @constant */
+            kind: "web_lab";
+            rules: components["schemas"]["WebCheckRule"][];
+        };
+        SqlCheckPolicy: {
+            /** @constant */
+            kind: "sql_text";
+            /** @enum {string} */
+            mode: "query" | "mutation";
+            seedSql: string;
+            verificationSql: string | null;
+            expectedRows: (string | null)[][];
+            ordered: boolean;
+        };
+        /** @description 教师专用；Web规则id唯一，exists时expected/property为null，text需expected且property=null，css需两者。SQL query的verificationSql=null，mutation则非空；unordered比较包含重复行的多重集。发布后冻结。 */
+        CheckPolicyConfig: components["schemas"]["WebCheckPolicy"] | components["schemas"]["SqlCheckPolicy"];
+        CheckPolicyDTO: {
+            version: number;
+            config: components["schemas"]["CheckPolicyConfig"] | null;
+        };
+        /**
+         * @example {
+         *       "baseVersion": 0,
+         *       "config": {
+         *         "kind": "web_lab",
+         *         "rules": [
+         *           {
+         *             "id": "main-heading",
+         *             "selector": "h1",
+         *             "check": "text",
+         *             "expected": "Hello",
+         *             "property": null,
+         *             "width": 390
+         *           }
+         *         ]
+         *       }
+         *     }
+         * @example {
+         *       "baseVersion": 0,
+         *       "config": {
+         *         "kind": "sql_text",
+         *         "mode": "query",
+         *         "seedSql": "CREATE TABLE scores (id INT PRIMARY KEY, score INT); INSERT INTO scores VALUES (1,80),(2,90);",
+         *         "verificationSql": null,
+         *         "expectedRows": [
+         *           [
+         *             "1",
+         *             "80"
+         *           ],
+         *           [
+         *             "2",
+         *             "90"
+         *           ]
+         *         ],
+         *         "ordered": true
+         *       }
+         *     }
+         * @example {
+         *       "baseVersion": 0,
+         *       "config": {
+         *         "kind": "sql_text",
+         *         "mode": "mutation",
+         *         "seedSql": "CREATE TABLE scores (id INT PRIMARY KEY, score INT); INSERT INTO scores VALUES (1,80);",
+         *         "verificationSql": "SELECT id, score FROM scores ORDER BY id;",
+         *         "expectedRows": [
+         *           [
+         *             "1",
+         *             "90"
+         *           ]
+         *         ],
+         *         "ordered": true
+         *       }
+         *     }
+         */
+        CheckPolicyWrite: {
+            baseVersion: number;
+            config: components["schemas"]["CheckPolicyConfig"] | null;
+        };
+        AssignmentCheckDTO: {
+            configured: boolean;
+            check: components["schemas"]["CheckDTO"] | null;
+        };
+        Error_CHECK_POLICY_CONFLICT: {
+            /** @constant */
+            code: "CHECK_POLICY_CONFLICT";
+            message: string;
+            details: {
+                currentVersion: number;
+            };
+        };
+        Error_CHECK_POLICY_FROZEN: {
+            /** @constant */
+            code: "CHECK_POLICY_FROZEN";
+            message: string;
+            details: components["schemas"]["Empty"];
+        };
+        Error_CHECK_NOT_CONFIGURED: {
+            /** @constant */
+            code: "CHECK_NOT_CONFIGURED";
+            message: string;
+            details: components["schemas"]["Empty"];
+        };
+        Failure_CHECK_POLICY_CONFLICT: {
+            error: components["schemas"]["Error_CHECK_POLICY_CONFLICT"];
+            requestId: string;
+        };
+        Failure_CHECK_POLICY_FROZEN: {
+            error: components["schemas"]["Error_CHECK_POLICY_FROZEN"];
+            requestId: string;
+        };
+        Failure_CHECK_NOT_CONFIGURED: {
+            error: components["schemas"]["Error_CHECK_NOT_CONFIGURED"];
+            requestId: string;
+        };
+        Response_CheckPolicy: {
+            data: components["schemas"]["CheckPolicyDTO"];
+            requestId: string;
+        };
+        Response_AssignmentCheck: {
+            data: components["schemas"]["AssignmentCheckDTO"];
+            requestId: string;
+        };
         CheckWrite: {
             workspaceRevision: number;
         };
         CheckAcceptedDTO: {
             checkId: components["schemas"]["UUID"];
-            /** @constant */
-            status: "queued";
+            /** @enum {string} */
+            status: "queued" | "running" | "completed" | "error";
         };
         CheckItem: {
             ruleId: string;
@@ -4615,6 +4773,39 @@ export interface components {
         };
     };
     responses: {
+        /** @description 检查配置，初始version=0/config=null。 */
+        checkPolicy_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_CheckPolicy"];
+            };
+        };
+        /** @description 本人检查配置可用性与指定版本已有检查。 */
+        assignmentCheck_200: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Response_AssignmentCheck"];
+            };
+        };
+        /** @description OFFERING_ARCHIVED / CHECK_POLICY_CONFLICT / CHECK_POLICY_FROZEN */
+        checkPolicy_409: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestID"];
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_CHECK_POLICY_CONFLICT"] | components["schemas"]["Failure_CHECK_POLICY_FROZEN"];
+            };
+        };
         /** @description 200 `{csrfToken}`；匿名时设置签名预登录 Cookie，登录后返回会话绑定令牌 */
         getCsrfToken_200: {
             headers: {
@@ -5940,7 +6131,7 @@ export interface components {
                 "application/json": components["schemas"]["Response_createCheck"];
             };
         };
-        /** @description OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED */
+        /** @description OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED / CHECK_NOT_CONFIGURED */
         createCheck_409: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];
@@ -5948,7 +6139,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"];
+                "application/json": components["schemas"]["Failure_OFFERING_ARCHIVED"] | components["schemas"]["Failure_WORKSPACE_CONFLICT"] | components["schemas"]["Failure_ASSIGNMENT_ARCHIVED"] | components["schemas"]["Failure_CHECK_NOT_CONFIGURED"];
             };
         };
         /** @description 200 `{id,assignmentId,workspaceRevision,checkerVersion,status,result,error,createdAt,completedAt}` */
@@ -8338,6 +8529,82 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["getHelpRequest_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["getMe_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    getCheckPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignmentId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["checkPolicy_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["getMe_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    updateCheckPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path: {
+                assignmentId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckPolicyWrite"];
+            };
+        };
+        responses: {
+            200: components["responses"]["checkPolicy_200"];
+            400: components["responses"]["getCsrfToken_400"];
+            401: components["responses"]["logout_401"];
+            403: components["responses"]["logout_403"];
+            404: components["responses"]["logout_404"];
+            406: components["responses"]["getCsrfToken_406"];
+            409: components["responses"]["checkPolicy_409"];
+            415: components["responses"]["login_415"];
+            422: components["responses"]["getCsrfToken_422"];
+            500: components["responses"]["getCsrfToken_500"];
+            503: components["responses"]["getCsrfToken_503"];
+        };
+    };
+    getAssignmentCheck: {
+        parameters: {
+            query: {
+                workspaceRevision: number;
+            };
+            header?: never;
+            path: {
+                assignmentId: components["schemas"]["UUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["assignmentCheck_200"];
             400: components["responses"]["getCsrfToken_400"];
             401: components["responses"]["logout_401"];
             403: components["responses"]["getMe_403"];
