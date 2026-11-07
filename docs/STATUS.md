@@ -8,23 +8,21 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`465a39f`（本地前端修复与真实注册验证；补丁审查前工作区干净），须为 HEAD 祖先且落后不超过 3 个提交。远端基线为 `5462351`；本轮仅本地提交，未推送。
+- **代码基线**：`3f49eac`（注册与归档修复后的本轮全量验收基线），须为 HEAD 祖先且落后不超过 3 个提交。远端基线为 `5462351`；本轮仅本地提交，未推送。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。P3 自动检查、建议、路径与预测未实现。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；不做服务端自动判题（P3 planned）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
-- **契约状态**：1.2.0，86 个业务操作 + 2 个健康检查；业务操作为 13 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式的邀请码入班与教师建班仍只有自动化测试证据。
+- **契约状态**：1.2.0，86 个业务操作 + 2 个健康检查；业务操作为 13 verified、69 implemented、4 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式邀请码入班与教师注册建班也已取得真实浏览器证据，未额外更改接口状态。
 
-- **门禁现状**（2026-10-31）：后端 `./mvnw.cmd --batch-mode verify` 通过 469 单元/HTTP + 259 MySQL 8.4.11 IT，0 失败/错误/跳过，BUILD SUCCESS；前端 `npm run verify` 通过 47 文件/408 用例（typecheck + build + check:no-mock + vitest）；`validate_contract.py` PASS。真实浏览器证据为此前的教师学习分析页、学生掌握概览与工作区 IDE 分栏（截图与脚本在仓库外 `D:/tmp/lp/stage2-evidence/`、`D:/tmp/lp/stage2_browser.js`）。本地 3307 已重建并在新 V16 上重放迁移：terms/courses/course_offerings 为 1/1/1、章节 5、资源 10、知识点 12，演示账号 3 个；真实 HTTP 端到端 `POST /api/v1/auth/register` → 201、`GET /api/v1/me` → 200、`GET /api/v1/me/courses` 返回个人课程 1 条，验证用的 `e2e.reg.*` 账号已清理；学校模式（邀请码入班）由 `scripts/demo-seed.mjs` 真实注册两名学生验证通过。本地演示数据经产品接口备齐：教学班 1、章节 3、知识点 4、作业 1（含待批阅提交）、演示学生 2。注册页历史验证边界已由本轮浏览器记录补充。
+- **门禁现状**：固定工具链 Node 24.21.0 / npm 11.19.0 的前端 verify 全通过（47 文件 / 415 用例、typecheck、build、生产 mock 隔离）。本轮真实浏览器完成三类作业提交、评价草稿隔离、发布反馈、学习记录、待批阅归档拒绝、批阅后归档和历史只读；1440/1024/390px 无横向溢出。后端全量 verify 正在复验；此前 472 单元/HTTP + 51 相关 MySQL IT 通过，其他 212 项最终版本全量证据尚待本轮结果。契约检查通过，接口状态不变。
 
-- **未决事项**（2026-10-31 更新）：
+- **未决事项**（2026-11-07 更新）：
   1. §4 原归档与提交竞态已通过生命周期锁、真实待批阅检查及四组 MySQL 并发测试修复；其余四项既有限制保留。
   2. 慢网络、会话失效、作业归档只读的真实浏览器证据仍限于既有记录，不将作业归档证据等同于公告归档验证。
   3. 历史公告如无唯一可信的创建审计，收件人数沿用按时间和标题匹配的估算，可能不精确；新公告的 V14 冻结人数不受此限制。
   4. 共性问题与知识点的映射、P3 自动检查/建议/路径/预测均未实现，属后续阶段范围。
   5. 学校模式注册入班和教师注册建班现有本轮真实浏览器证据；未扩大接口 verified 状态。
   6. V16 自带「个人学习学期」是迁移写业务配置的折中；若真实环境要求学期只能由管理流程创建，应改为注册时按需创建个人 offering，并同步迁移与文档。
-
-- **本轮验证**：前端本地 verify 47 文件 / 415 用例、类型检查、构建及生产 mock 隔离通过；Node 24.17.0 / npm 11.13.0 低于固定工具链，不等同 CI。契约检查已使用 .contract-venv 通过。真实浏览器个人注册、教师注册建班、邀请码学生注册及用户名冲突纠错已通过；后端首轮 verify：472 单元/HTTP 通过，263 MySQL IT 中 1 项失败（教学班归档 guard 为空）；修复后再次运行全部 472 单元/HTTP 与相关 51 MySQL IT，全部通过、BUILD SUCCESS。未在最终修复后重跑其余 212 IT，不把首轮全量写成通过。
 
 ### 0.1 接手前必读
 
@@ -40,6 +38,10 @@
 > **本节是日志，不是现状。** 带日期条目只代表当时的事实与结论；判断现状只看 §0。§3 是验证记录（含带日期的历史结论，引用时注意日期），不是日志；§4 已知限制是被 §0 引用的现行清单，同样不属日志；判断某条缺陷是否已修，先看 §0、§3 与 §4，再对照本节是否有更晚的条目。历史条目中的旧文件路径按 2026-10-24 归档迁移对照：`frontend/DESIGN.md` → `docs/archive/frontend-DESIGN.md`、`frontend/V3*-DELIVERY.md` 等报告 → `docs/archive/`、`frontend/scripts` 一次性验收脚本 → `frontend/scripts/archive/`。
 
 契约基线 1.1.0（2026-10-13 按课程演示规模简化，见 [DEVELOPMENT 第 14 节](DEVELOPMENT.md#14-决策与变更记录)）。
+
+> **2026-11-07 固定工具链与教学闭环验收**：从 Node 官方下载便携 24.21.0 并核对 SHASUMS256，内置 npm 11.19.0，仅设置本轮进程 PATH，不替换系统 Node；前端 verify 47 文件 / 415 用例、类型、构建和生产 mock 隔离全部通过。扩展 frontend/scripts/verify-zhixue.mjs：到期日按运行时间动态生成；三类作业提交后各验证教学班归档返回 409 ARCHIVE_PENDING_REVIEWS；评价发布后验证学习记录、归档 200、学生历史反馈可读、canSubmit=false/OFFERING_ARCHIVED、工作区编辑器及提交按钮禁用。脚本写入 RUNNING/PASS/FAIL 防止旧成功记录被误读，失败记录保留夹具 ID。
+>
+> 首轮脚本新增断言误用了 /teacher/offerings/{id} 详情路径，归档已成功但后续断言 404；按契约改为直接校验归档响应后重跑通过，无对应产品缺陷。最终真实 Edge 验收 PASS，网页/SQL/文本三类保存提交和反馈隔离、1440/1024/390px 布局均通过。证据在 frontend/.cache/zhixue/result.json 和截图（Git 忽略）。本轮只创建独立验收班级，不清理已有用户数据；最终班级 44c35fcd-c6b3-434c-be17-bdab6ad9e76f 已归档，三份作业均已发布评价。契约检查通过；后端全量结果随后追加。
 
 > **2026-11-07 后端审查修复与复验**：采用补丁中注册 IP 限流及教学班 → 作业 → 工作区 → 提交锁序；READ_COMMITTED 短事务、MyBatis 缓存清除、等待后状态与截止时间重读，原 revision 幂等保留。首轮真实 MySQL 测试揭露 OfferingArchiveGuard 是空实现，补上 countOfferingPendingReviews 查询及 ARCHIVE_PENDING_REVIEWS；补丁本身不足以修复该场景。Start-Local.ps1 修正缺失/空白可选配置被传为空环境值导致布尔绑定失败的问题，保留 UTF-8 BOM。文件包括 AuthController、RegistrationRateLimiter、CourseAccess、AssignmentService、CourseService、OfferingArchiveGuard、两个 Mapper 及 XML、相关 HTTP/限流/并发测试；BACKEND/DEVELOPMENT 同步锁规则，无 schema/路由/接口状态变更。
 >

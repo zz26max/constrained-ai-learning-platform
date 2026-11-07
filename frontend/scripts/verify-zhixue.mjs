@@ -14,7 +14,26 @@ async function login(role){const ctx=await browser.newContext({viewport:{width:1
 async function nav(p,path){await p.goto(base+'#'+path);await p.locator('main h1').waitFor()}
 async function api(p,path,method='GET',body){return p.evaluate(async({path,method,body})=>{let token='';if(method!=='GET'){const r=await fetch('/api/v1/auth/csrf-token');token=(await r.json()).data.csrfToken}const r=await fetch('/api/v1'+path,{method,credentials:'include',headers:method==='GET'?{}:{'Content-Type':'application/json','X-CSRF-Token':token},...(body===undefined?{}:{body:JSON.stringify(body)})});const value=await r.json();if(!r.ok)throw new Error(method+' '+path+' '+r.status+' '+value.error?.code);return value.data},{path,method,body})}
 let teacher,student,offering,chapter,assignments=[]
-const prefix='知学迁移验收 '+new Date().toISOString().replace(/[:.]/g,'-')
+const prefix='教学闭环验收 '+new Date().toISOString().replace(/[:.]/g,'-')
+const dueDate=new Date(Date.now()+14*86400000)
+const localDateTime=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)
+async function archiveOffering(expectedStatus) {
+  await nav(teacher,'/teacher/offerings/'+offering)
+  await teacher.getByRole('button',{name:'归档教学班',exact:true}).click()
+  const dialog=teacher.getByRole('dialog')
+  await dialog.getByLabel('我确认归档这个教学班',{exact:true}).check()
+  const response=teacher.waitForResponse(r=>r.url().endsWith('/'+offering+'/archive')&&r.request().method()==='POST')
+  await dialog.getByRole('button',{name:'确认归档',exact:true}).click()
+  const result=await response;assert.equal(result.status(),expectedStatus)
+  if(expectedStatus===409){
+    assert.equal((await result.json()).error.code,'ARCHIVE_PENDING_REVIEWS')
+    await dialog.getByRole('button',{name:'取消',exact:true}).click()
+  } else {
+    await dialog.waitFor({state:'hidden'})
+    assert.equal((await result.json()).data.status,'archived')
+  }
+}
+writeFileSync(new URL('result.json',out),JSON.stringify({at:new Date().toISOString(),result:'RUNNING'},null,2))
 try {
   teacher=await login('teacher')
   await teacher.getByRole('button',{name:'创建教学班',exact:true}).click()
@@ -34,7 +53,7 @@ try {
   const chapters=await api(teacher,'/teacher/offerings/'+offering+'/chapters');chapter=chapters.items[0].id
   await teacher.getByRole('button',{name:'邀请码',exact:true}).click()
   await teacher.getByRole('button',{name:'创建邀请码',exact:true}).click()
-  await teacher.locator('#invite-expiry').fill('2027-10-18T23:59')
+  await teacher.locator('#invite-expiry').fill(localDateTime(dueDate))
   await teacher.getByRole('dialog').getByRole('button',{name:'创建邀请码',exact:true}).click()
   const invite=await teacher.locator('.teacher-secret code').innerText()
   await teacher.getByRole('button',{name:'已保存，关闭',exact:true}).click()
@@ -53,7 +72,7 @@ try {
     await teacher.locator('#description').fill('使用真实接口验证 '+type+' 保存、提交与批阅。')
     await teacher.locator('#chapter').selectOption(chapter)
     await teacher.locator('fieldset.surface>fieldset').first().locator('textarea').last().fill('完成作品并说明学习过程。')
-    await teacher.locator('#dueAt').fill('2026-11-20T23:59')
+    await teacher.locator('#dueAt').fill(localDateTime(dueDate))
     await teacher.getByRole('button',{name:'保存',exact:true}).click()
     await teacher.waitForURL(/teacher\/assignments\/[a-f0-9-]+$/)
     const id=teacher.url().split('/assignments/')[1];assignments.push(id)
@@ -67,6 +86,7 @@ try {
     await student.getByLabel('我确认提交这个版本',{exact:true}).check()
     await student.getByRole('button',{name:'确认提交',exact:true}).click()
     await student.waitForURL(/student\/assignments\/[a-f0-9-]+$/)
+    await archiveOffering(409)
     await nav(teacher,'/teacher/assignments/'+id)
     await teacher.getByRole('button',{name:'查看与批阅',exact:true}).click()
     await teacher.locator('dialog.feedback-drawer[open]').waitFor()
@@ -83,7 +103,7 @@ try {
   }
   for(const width of [1440,1024,390]) {
     await teacher.setViewportSize({width,height:1000});await student.setViewportSize({width,height:1000})
-    for(const [p,path,label] of [[student,'/student/home','home'],[student,'/course/'+offering,'course'],[student,'/student/calendar?date=2026-11-20','calendar'],[teacher,'/teacher/offerings/'+offering,'teacher'],[teacher,'/teacher/assignments/'+assignments[0],'submission']]){
+    for(const [p,path,label] of [[student,'/student/home','home'],[student,'/course/'+offering,'course'],[student,'/student/calendar?date='+localDateTime(dueDate).slice(0,10),'calendar'],[teacher,'/teacher/offerings/'+offering,'teacher'],[teacher,'/teacher/assignments/'+assignments[0],'submission']]){
       await nav(p,path);await p.waitForFunction(()=>!Array.from(document.querySelectorAll('[role="status"]')).some(n=>n.textContent?.trim()==='正在加载…'));await p.mouse.move(0,0)
       assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),label+' overflow '+width)
       assert.equal(await p.locator('nav[aria-label="主导航"] [aria-current="page"]').count(),1)
@@ -92,10 +112,24 @@ try {
     await teacher.getByRole('button',{name:'查看与批阅',exact:true}).click();await teacher.locator('dialog.feedback-drawer[open]').waitFor();await teacher.locator('#feedback-score').waitFor();const footer=await teacher.locator('.feedback-actions').boundingBox();assert.ok(footer.y+footer.height<=1001);await teacher.screenshot({path:shotPath('drawer-'+width+'.png'),fullPage:false});await teacher.keyboard.press('Escape')
   }
   await nav(student,'/student/messages');await student.getByText('反馈',{exact:false}).first().waitFor()
+  await nav(student,'/student/progress/'+offering)
+  await student.getByText('知学迁移验收反馈：作品完整，继续保持。',{exact:true}).first().waitFor()
+  await archiveOffering(200)
+  await nav(student,'/student/assignments/'+assignments[0])
+  await student.getByText('知学迁移验收反馈：作品完整，继续保持。',{exact:true}).waitFor()
+  const archivedDetail=await api(student,'/assignments/'+assignments[0])
+  assert.equal(archivedDetail.canSubmit,false)
+  assert.equal(archivedDetail.submissionBlockedReason,'OFFERING_ARCHIVED')
+  await student.screenshot({path:shotPath('archived-feedback.png'),fullPage:true})
+  await nav(student,'/student/workspaces/'+assignments[0])
+  await student.locator('textarea.workspace-editor').waitFor()
+  assert.equal(await student.locator('textarea.workspace-editor').isDisabled(),true)
+  assert.equal(await student.getByRole('button',{name:'提交作业',exact:true}).isDisabled(),true)
   assert.deepEqual(errors,[])
-  writeFileSync(new URL('result.json',out),JSON.stringify({at:new Date().toISOString(),offering,chapter,assignments,result:'PASS',scenarios:['teacher creates offering/chapter and publishes','student joins and completes chapter','web/sql/text immediate submit','draft isolation and published feedback','calendar real data','1440/1024/390 no overflow','drawer footer and Escape'],browserErrors:errors},null,2))
+  writeFileSync(new URL('result.json',out),JSON.stringify({at:new Date().toISOString(),offering,chapter,assignments,result:'PASS',scenarios:['teacher creates offering/chapter and publishes','student joins and completes chapter','web/sql/text immediate submit','draft isolation and published feedback','calendar real data','1440/1024/390 no overflow','drawer footer and Escape','pending reviews reject offering archive via UI','learning records show published feedback','reviewed offering archives via UI; historical feedback remains readable and new submission is blocked','archived workspace disables editor and submit'],browserErrors:errors},null,2))
   console.log('PASS: real teaching/student flows, three workspace types, draft/publication, calendar and responsive screenshots. Fixture IDs saved in ignored .cache/zhixue/result.json.')
 } catch(error) {
+  writeFileSync(new URL('result.json',out),JSON.stringify({at:new Date().toISOString(),offering,chapter,assignments,result:'FAIL',error:error.message,browserErrors:errors},null,2))
   console.error('Acceptance step error:',error.message)
   if(teacher) await teacher.screenshot({path:shotPath('failure-teacher.png'),fullPage:true}).catch(()=>{})
   if(student) await student.screenshot({path:shotPath('failure-student.png'),fullPage:true}).catch(()=>{})
