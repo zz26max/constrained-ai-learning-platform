@@ -3227,6 +3227,7 @@ export interface components {
             kind: "web_lab";
             rules: components["schemas"]["WebCheckRule"][];
         };
+        /** @description 查询题和验证查询仅执行单条 SQL，使用全新 UTF-8 会话；修改题允许多条 INSERT/UPDATE/DELETE。结果最多100行、30列，每格2000字符，超限返回资源错误。 */
         SqlCheckPolicy: {
             /** @constant */
             kind: "sql_text";
@@ -8556,6 +8557,7 @@ export interface operations {
             403: components["responses"]["getMe_403"];
             404: components["responses"]["logout_404"];
             406: components["responses"]["getCsrfToken_406"];
+            422: components["responses"]["getCsrfToken_422"];
             500: components["responses"]["getCsrfToken_500"];
             503: components["responses"]["getCsrfToken_503"];
         };
