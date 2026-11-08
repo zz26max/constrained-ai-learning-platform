@@ -16,7 +16,7 @@
 
 - **契约状态**：1.3.0，89 个业务操作 + 2 个健康检查；业务操作为 18 verified、69 implemented、2 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式邀请码入班与教师注册建班也已取得真实浏览器证据，未额外更改接口状态。
 
-- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（48 文件 / 426 用例、typecheck、build、生产 mock 隔离）；单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
+- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（48 文件 / 426 用例、`test:browser:config` 13 例、typecheck、build、生产 mock 隔离）；单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
 
 - **未决事项**（2026-11-08 更新）：
   1. §4 原归档与提交竞态已通过生命周期锁、真实待批阅检查及四组 MySQL 并发测试修复；其余四项既有限制保留。
@@ -28,6 +28,8 @@
 
   7. Docker 守护进程在查询中途失联后的恢复与清理尚未实测；已验证镜像缺失、执行超时、资源超限、任务过期及每次执行后的容器删除。多实例负载未验收，前端仍有构建大分包提示。
 
+  8. 真实浏览器验收脚本自 2026-11-08 起要求 `BROWSER_ACCEPTANCE_*` 隔离目标与写入确认，不再读取 `backend/.env`、不再固定 Edge；本轮只做离线配置验证与失败即退验证，未在隔离环境实跑，2026-11-07 的既有浏览器证据由改造前脚本产生。
+
 ### 0.1 接手前必读
 
 - 端口：MySQL 3307（Docker，Flyway 到 V17）、后端 8080、Vite 4173（同源代理）。健康检查是 `/health/live`、`/health/ready`，不是 `/actuator/health`。本轮在原有数据基础上升级至 V17，未重建本地库；后端与数据库统一用 `backend/scripts/Start-Local.ps1 -JdkPath <JDK21 目录>` 启动，首次建账户加 `-InitializeAccounts`。
@@ -38,6 +40,10 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-08 合并浏览器验收隔离配置**：把远端分支 `frontend/browser-acceptance-isolation`（`a067bcf`）的隔离思路合入 master，但按当前脚本内容重写，未整体采用分支文件（分支的三类题脚本与按钮标签已过期）。新增 `frontend/scripts/browser-acceptance-config.mjs`：显式 HTTP(S) origin、`BROWSER_ACCEPTANCE_ALLOW_WRITES=isolated-fixtures` 持久写入确认、按角色取凭据（进程环境或显式凭据文件，不做 shell 展开）、超时、channel/可执行路径互斥、输出根目录、夹具路径；同目录测试 13 例。`verify-zhixue.mjs` 改为按 runId 建目录并逐步写 `RUNNING`/`PASS`/`FAIL`，记录 offering/chapter/assignments/calendarDate；`verify-zhixue-boundaries.mjs` 先用 `validateFixture` 与 `validateFixtureRecords` 确认主流程夹具与本环境真实记录一致，不一致即拒绝任何写入，证据写 `boundaries-<uuid>`。两项脚本不再读取 `backend/.env`、不再固定 Edge，缺配置时在启动浏览器前退出。`package.json` 增加 `test:browser:config` 并置于 verify 首位；README 补环境变量表与运行隔离说明。
+>
+> 检查：固定 Node 24.21.0 / npm 11.19.0 执行 `npm run verify` 全通过——`test:browser:config` 13/13、typecheck、build、`check:no-mock`、vitest 48 文件 / 426 用例；三个脚本 `node --check` 通过。无配置直接运行两项脚本会在导入 Playwright 前退出、不创建输出目录（由 `test:browser:config` 的第 13 例断言）。未做：未在本机实跑真实浏览器流程（本机 3307 是日常库，脚本会写持久数据，需另备隔离环境）；因此本次没有新增跨端验收证据，2026-11-07 的浏览器证据仍由改造前脚本产生。合并后该远端分支不再包含独有内容，随本次删除。
 
 > **2026-11-08 推送与分支清理**：`master` 的 11 个提交（`2b50166`…`139d36a`）已推送，`origin/master` 由 `5462351` 前移至 `139d36a`。删除完全合并的本地分支 `stage2/analytics`（`d4900c9`，0 个独有提交）与远端分支 `docs/update-2026-10-27`（0 个独有提交）。保留 `origin/frontend/browser-acceptance-isolation`：含 1 个未合并提交 `a067bcf`（新增 `frontend/scripts/browser-acceptance-config.mjs`、其测试与 `test:browser:config` 脚本），master 无对应文件，待决定合并或删除。推送前检查：`git diff --check` 通过；`scripts/validate_contract.py` PASS（89 业务 + 2 健康检查、354 schema、18 verified / 71 implemented / 2 planned）。本轮未改业务代码。
 > **2026-11-08 自动判题交付与最终验收**：依据用户确认，同时实现 Web 与 SQL（SELECT、INSERT、UPDATE、DELETE），文本作业继续人工评价。OpenAPI 升级 1.3.0，新增教师配置读写与本人版本状态查询、实现原 createCheck/getCheck；教师草稿配置、发布冻结、类型切换清除、版本冲突；学生保存版本快照、幂等、额度、租约过期及错误重试。V17 建立规则、任务和队列互斥行；沿用教学班→作业→工作区→队列锁顺序，独立执行不持业务事务。Web 使用声明式 HTML/CSS 检查并禁用学生脚本；SQL 使用独立 MySQL 8.4.11 容器与角色分权，可信驱动无损 JSON、单查询 UTF-8 会话、结果行列/字符/字节限额，修改题用教师查询检查最终状态。人工成绩和知识评价规则未变，真实 AI 供应商未开启。

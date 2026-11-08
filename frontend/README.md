@@ -20,7 +20,8 @@ npm run build          # 生产构建（强制真实模式；发现 mock 配置�
 npm run check:no-mock  # 扫描 dist，确认 mock 层未进入生产包
 npm run test           # vitest 全量测试
 npm run contract:types # 从 ../docs/openapi.yaml 重新生成契约类型
-npm run verify         # typecheck + build + check:no-mock + test
+npm run verify         # test:browser:config + typecheck + build + check:no-mock + test
+npm run test:browser:config # 无需服务与浏览器：校验验收配置、凭据解析与夹具归属规则
 npm run test:browser:real   # 真实服务已启动时，创建独立验收班走三类作业闭环
 npm run test:browser:boundaries # 主流程脚本成功后，使用其验收班验证冲突/网络/会话/归档等边界
 npm run test:browser:student # 真实学生现有数据：筛选分页、六页面及1440/1024/320/375/430视口，无新增样例
@@ -58,4 +59,22 @@ npm run test:browser:student # 真实学生现有数据：筛选分页、六页�
 
 首页 V3 系列探索（design=a/b/bplus 预览参数）已随 V3.6.1 正式采纳而移除路由，正式首页为 `/student/home`，现行视觉规范见 `docs/FRONTEND.md` 第 9 节；各轮候选的交付记录归档于 `docs/archive/V3*-DELIVERY.md`。
 
-浏览器脚本使用本机Edge，依赖playwright-core（仅开发依赖，不下载浏览器）。真实脚本在内存读取已忽略的`backend/.env`中的本地演示账号，不输出口令；会创建单独命名的验收教学班和作业，保留供复核。截图和结果存入已忽略的`.cache/zhixue/`；边界脚本会编辑该验收班中的练习工作区，并归档其文字作业。真实脚本不是所有安全/竞态场景的替代品，未覆盖项以STATUS记录为准。
+## 真实浏览器验收（隔离目标与写入确认）
+
+`test:browser:real` 与 `test:browser:boundaries` 必须指向**专用、可丢弃的真实测试环境**：同源前端与 API、已迁移到当前版本的隔离数据库、独立的教师/学生账号。脚本不启动或迁移数据库、不读取数据库凭据、不配置或启用外部供应商；不要指向日常使用的 3307 库或生产环境。只改前端端口不能隔离数据，须确认其 `/api/v1` 代理实际指向隔离 API。`test:browser:student` 仍使用本机既有配置，不属于这套流程。
+
+依赖 playwright-core（仅开发依赖，不下载浏览器）。两项脚本不再默认读取 `backend/.env`，也不再固定使用 Edge；缺少目标、写入确认或口令时，在启动浏览器和写结果之前退出。
+
+| 变量 | 说明 |
+| --- | --- |
+| `BROWSER_ACCEPTANCE_BASE_URL` | 必填，同源前端 HTTP(S) origin；不接受路径、查询、hash 或内嵌凭据 |
+| `BROWSER_ACCEPTANCE_ALLOW_WRITES` | 必填，确认是隔离环境后设为 `isolated-fixtures`（持久写入确认，不是只读模式） |
+| `BROWSER_ACCEPTANCE_STUDENT_USERNAME` / `BROWSER_ACCEPTANCE_TEACHER_USERNAME` | 专用测试账号，默认 `student.demo` / `teacher.demo`，两者不能相同 |
+| `BROWSER_ACCEPTANCE_STUDENT_PASSWORD` / `BROWSER_ACCEPTANCE_TEACHER_PASSWORD` | 通过当前进程环境提供，不写进命令行 |
+| `BROWSER_ACCEPTANCE_ENV_FILE` | 可选，显式指定本机已忽略的凭据文件；只读 `LOCAL_STUDENT_PASSWORD`、`LOCAL_TEACHER_PASSWORD`，进程环境优先 |
+| `BROWSER_ACCEPTANCE_CHANNEL` / `BROWSER_ACCEPTANCE_EXECUTABLE_PATH` | 浏览器 channel（如 `msedge`，默认 `chromium`）或绝对可执行路径，两者互斥 |
+| `BROWSER_ACCEPTANCE_TIMEOUT_MS` | 可选，操作超时，默认 45000，允许 1000～180000 |
+| `BROWSER_ACCEPTANCE_OUTPUT_DIR` | 可选，证据根目录，默认忽略的 `.cache/zhixue/`；每次运行写入独立 runId 子目录 |
+| `BROWSER_ACCEPTANCE_FIXTURE` | 边界脚本必填：主流程本次成功生成的 `result.json` 路径；失败、中断或旧格式会被拒绝 |
+
+证据按运行隔离：主流程在 `<输出目录>/<runId>/result.json` 依次写入 `RUNNING`/`PASS`/`FAIL`、夹具 ID 与页面错误，并打印该 runId 目录；边界脚本先校验夹具确属本环境的班级与三份作业，不匹配就拒绝任何写入，结果与截图写在同一 runId 下的 `boundaries-*` 目录。所有证据目录均被 Git 忽略。真实脚本不是所有安全/竞态场景的替代品，未覆盖项以 STATUS 记录为准。
