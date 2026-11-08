@@ -9,12 +9,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.modules.auth.dto.UserDTO;
+import com.learningplatform.modules.checks.CheckRunner;
+import com.learningplatform.modules.checks.CheckService;
+import com.learningplatform.modules.checks.CheckStore;
+import com.learningplatform.modules.checks.CheckWorker;
 import com.learningplatform.modules.courses.dto.AssignmentDTOs.*;
 import com.learningplatform.modules.courses.dto.CourseDTOs.*;
 import com.learningplatform.modules.courses.security.InviteCodeCodec;
@@ -30,6 +36,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -37,8 +46,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
-@SpringBootTest(properties = "AUTH_INVITE_SIGNING_KEY=test-only-invite-signing-key-at-least-32-characters")
+@SpringBootTest(properties = {
+        "AUTH_INVITE_SIGNING_KEY=test-only-invite-signing-key-at-least-32-characters", "checks.enabled=true"
+})
 @Testcontainers
 @Import(AssignmentIntegrationIT.FixedClockConfiguration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -68,6 +80,11 @@ class AssignmentIntegrationIT {
 
     @Autowired private CourseService courseService;
     @Autowired private AssignmentService assignmentService;
+    @Autowired private CheckService checks;
+    @Autowired private CheckStore checkStore;
+    @Autowired private CheckRunner checkRunner;
+    @Autowired private Clock clock;
+    @MockitoBean private CheckWorker scheduledCheckWorker;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private InviteCodeCodec codes;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
@@ -143,6 +160,172 @@ class AssignmentIntegrationIT {
         assertThat(submission.assignmentId()).isEqualTo(assignment.id());
         assertThat(assignmentService.getTeacherAssignment(TEACHER, assignment.id()).title()).isEqualTo(title);
         assertThat(jdbc.queryForObject("SELECT assignment_title_snapshot FROM submissions WHERE id=?", String.class, submission.id())).isEqualTo(title);
+    }
+
+    @Test
+    void checkPolicyRejectsStaleWritesAndFreezesOnPublish() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String id = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create").id();
+        assertThat(checks.policy(TEACHER, id)).isEqualTo(new CheckStore.Policy(0, null));
+        assertThatThrownBy(() -> checks.policy(STUDENT, id)).satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+        assertThatThrownBy(() -> checks.policy(OTHER_TEACHER, id)).satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+
+        assertThat(checks.savePolicy(TEACHER, id, checkPolicy(0)).version()).isEqualTo(1);
+        assertThatThrownBy(() -> checks.savePolicy(TEACHER, id, checkPolicy(0)))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertCode(e, 409, "CHECK_POLICY_CONFLICT");
+                    assertThat(e.getDetails()).containsEntry("currentVersion", 1);
+                });
+        assertThatThrownBy(() -> checks.availability(STUDENT, id, 0)).satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+
+        assignmentService.publishAssignment(TEACHER, id, "publish");
+        assertThatThrownBy(() -> checks.savePolicy(TEACHER, id, checkPolicy(1)))
+                .satisfies(t -> assertCode(t, 409, "CHECK_POLICY_FROZEN"));
+        assertThat(checks.policy(TEACHER, id).version()).isEqualTo(1);
+        assertThat(checks.availability(STUDENT, id, 0)).isEqualTo(new CheckService.Availability(true, null));
+    }
+
+    @Test
+    void checkKeepsOriginalRevisionAndSnapshotPrivateAndExpiresInterruptedJobs() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        enrollStudent(offering.id(), OTHER_STUDENT);
+        String id = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create").id();
+        checks.savePolicy(TEACHER, id, checkPolicy(0));
+        assignmentService.publishAssignment(TEACHER, id, "publish");
+        saveCheckWorkspace(STUDENT, id, 0, "<h1>First</h1>");
+        var request = Map.<String, Object>of("workspaceRevision", 1);
+        var accepted = checks.create(STUDENT, id, request);
+        assertThat(accepted.status()).isEqualTo("queued");
+        assertThat(checks.create(STUDENT, id, request)).isEqualTo(accepted);
+        assertThat(checks.availability(STUDENT, id, 1).check().id()).isEqualTo(accepted.checkId());
+        assertThat(checks.availability(OTHER_STUDENT, id, 1)).isEqualTo(new CheckService.Availability(true, null));
+        assertThatThrownBy(() -> checks.get(OTHER_STUDENT, accepted.checkId()))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThatThrownBy(() -> checks.get(TEACHER, accepted.checkId()))
+                .satisfies(t -> assertCode(t, 403, "FORBIDDEN"));
+
+        saveCheckWorkspace(STUDENT, id, 1, "<h1>Second</h1>");
+        assertThat(checks.create(STUDENT, id, request)).isEqualTo(accepted);
+        assertThatThrownBy(() -> checks.create(STUDENT, id, Map.of("workspaceRevision", 3)))
+                .satisfies(t -> assertCode(t, 409, "WORKSPACE_CONFLICT"));
+        assertThatThrownBy(() -> checks.create(STUDENT, id, Map.of("workspaceRevision", 2)))
+                .satisfies(t -> assertCode(t, 429, "RATE_LIMITED"));
+        assertThat(jdbc.queryForObject("""
+                SELECT JSON_UNQUOTE(JSON_EXTRACT(file_snapshot, '$."index.html"'))
+                FROM assignment_checks WHERE id=?
+                """, String.class, accepted.checkId())).isEqualTo("<h1>First</h1>");
+        assertThat(jdbc.queryForObject("""
+                SELECT JSON_UNQUOTE(JSON_EXTRACT(policy_snapshot, '$.rules[0].expected'))
+                FROM assignment_checks WHERE id=?
+                """, String.class, accepted.checkId())).isEqualTo("First");
+
+        jdbc.update("UPDATE assignment_checks SET status='running', lease_token=?, lease_until=? WHERE id=?",
+                UUID.randomUUID().toString(), ts(NOW.minusSeconds(1)), accepted.checkId());
+        new CheckWorker(checkStore, checkRunner, clock, true).scan();
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            var interrupted = checks.get(STUDENT, accepted.checkId());
+            assertThat(interrupted.status()).isEqualTo("error");
+            assertThat(interrupted.result()).isNull();
+            assertThat(interrupted.error()).containsEntry("code", "RUNNER_UNAVAILABLE");
+            assertThat(interrupted.completedAt()).isEqualTo(NOW);
+        });
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM assignment_checks WHERE id=? AND policy_snapshot IS NULL
+                    AND file_snapshot IS NULL AND lease_token IS NULL AND lease_until IS NULL
+                """, Integer.class, accepted.checkId())).isEqualTo(1);
+        assertThat(checks.create(STUDENT, id, request).status()).isEqualTo("error");
+    }
+
+    private static Map<String, Object> checkPolicy(int baseVersion) {
+        Map<String, Object> rule = new HashMap<>(Map.of(
+                "id", "heading", "selector", "h1", "check", "text", "expected", "First", "width", 390));
+        rule.put("property", null);
+        return Map.of("baseVersion", baseVersion, "config", Map.of("kind", "web_lab", "rules", List.of(rule)));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void checkPolicySaveAndPublishSerializeAcrossBothCommitOrders(boolean publishFirst) throws Exception {
+        OfferingDTO offering = createOffering();
+        String id = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create").id();
+        checks.savePolicy(TEACHER, id, checkPolicy(0));
+
+        Runnable publish = () -> assignmentService.publishAssignment(TEACHER, id, "publish");
+        Runnable update = () -> checks.savePolicy(TEACHER, id, checkPolicy(1));
+        String secondOutcome = overlapCheckTransactions(publishFirst ? publish : update, () -> {
+            try {
+                (publishFirst ? update : publish).run();
+                return "success";
+            } catch (BusinessException e) {
+                return e.getCode();
+            }
+        });
+        assertThat(secondOutcome).isEqualTo(publishFirst ? "CHECK_POLICY_FROZEN" : "success");
+        assertThat(checks.policy(TEACHER, id).version()).isEqualTo(publishFirst ? 1 : 2);
+        assertThat(assignmentService.getTeacherAssignment(TEACHER, id).publicationState()).isEqualTo("published");
+    }
+
+    @Test
+    void concurrentRequestsForSameRevisionEnqueueOneCheck() throws Exception {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String id = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create").id();
+        checks.savePolicy(TEACHER, id, checkPolicy(0));
+        assignmentService.publishAssignment(TEACHER, id, "publish");
+        saveCheckWorkspace(STUDENT, id, 0, "<h1>First</h1>");
+        var request = Map.<String, Object>of("workspaceRevision", 1);
+
+        var retry = overlapCheckTransactions(() -> {
+            var first = checks.create(STUDENT, id, request);
+            assertThat(first.status()).isEqualTo("queued");
+        }, () -> checks.create(STUDENT, id, request));
+        assertThat(retry.status()).isEqualTo("queued");
+        assertThat(jdbc.queryForList("""
+                SELECT id FROM assignment_checks WHERE assignment_id=? AND student_id=? AND workspace_revision=1
+                """, String.class, id, STUDENT.id())).containsExactly(retry.checkId());
+    }
+
+    private <T> T overlapCheckTransactions(Runnable firstWrite, Callable<T> secondWrite) throws Exception {
+        var transaction = new TransactionTemplate(transactions);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        var firstWritten = new CountDownLatch(1);
+        var commit = new CountDownLatch(1);
+        var secondStarted = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> transaction.executeWithoutResult(status -> {
+                firstWrite.run();
+                firstWritten.countDown();
+                try {
+                    assertThat(commit.await(10, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }));
+            assertThat(firstWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = pool.submit(() -> {
+                secondStarted.countDown();
+                return secondWrite.call();
+            });
+            assertThat(secondStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> second.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            commit.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            return second.get(10, TimeUnit.SECONDS);
+        } finally {
+            commit.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private void saveCheckWorkspace(UserDTO student, String assignmentId, int baseRevision, String html) {
+        assignmentService.saveWorkspace(student, assignmentId,
+                Map.of("baseRevision", baseRevision, "files", List.of(Map.of("path", "index.html", "content", html)),
+                        "activeFile", "index.html"), "workspace");
     }
 
     @Test

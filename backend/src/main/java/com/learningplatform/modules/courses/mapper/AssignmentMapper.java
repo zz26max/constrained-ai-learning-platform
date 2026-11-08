@@ -16,6 +16,8 @@ public interface AssignmentMapper {
     @org.apache.ibatis.annotations.Update("UPDATE assignments SET current_ai_policy_id=#{policy},updated_at=#{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler} WHERE id=#{id} AND current_ai_policy_id <=> #{expected} AND status<>'archived'")
     int bindPolicy(@Param("id") String id,@Param("policy") String policy,@Param("expected") String expected,@Param("now") Instant now);
     // 作业查询
+    @org.apache.ibatis.annotations.Update("UPDATE assignment_check_policies SET config=NULL,version=version+1 WHERE assignment_id=#{id} AND config IS NOT NULL")
+    int clearCheckPolicy(String id);
     String lockAssignmentShared(String id);
     String lockAssignmentExclusive(String id);
     Assignment findAssignment(String id);

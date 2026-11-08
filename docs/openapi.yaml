@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 个性化学习平台接口契约
-  version: 1.2.0
+  version: 1.3.0
   description: 设计基线 2026-10-11。实现状态以各 operation 的 x-implementation-status 为准，并由后端生产路由测试双向核对；本段不重复维护接口状态数量。
     x-contract-status：reviewed 表示静态契约审计，draft 表示尚未审定的草案，均不等于运行验收；implemented 不表示联调环境已部署。字段以此文件为唯一结构源；运行规则见 DEVELOPMENT.md，存储见 BACKEND.md。
 servers:
@@ -3452,17 +3452,96 @@ paths:
         '422': {$ref: '#/components/responses/getCsrfToken_422'}
         '500': {$ref: '#/components/responses/getCsrfToken_500'}
         '503': {$ref: '#/components/responses/getCsrfToken_503'}
+  /api/v1/teacher/assignments/{assignmentId}/check-policy:
+    get:
+      operationId: getCheckPolicy
+      summary: 获取教师检查配置
+      tags: [teacher]
+      x-phase: P1
+      x-implementation-status: verified
+      x-contract-status: reviewed
+      x-permission: 本班授课教师
+      x-csrf-required: false
+      x-idempotency: none
+      parameters:
+      - {name: assignmentId, in: path, required: true, schema: {$ref: '#/components/schemas/UUID'}}
+      responses:
+        '200': {$ref: '#/components/responses/checkPolicy_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/getMe_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
+    put:
+      operationId: updateCheckPolicy
+      summary: 保存草稿作业检查配置
+      description: 仅草稿可编辑；config=null清除配置；发布后冻结，版本冲突返回currentVersion。
+      tags: [teacher]
+      x-phase: P1
+      x-implementation-status: verified
+      x-contract-status: reviewed
+      x-permission: 本班授课教师
+      x-csrf-required: true
+      x-idempotency: none
+      parameters:
+      - {name: assignmentId, in: path, required: true, schema: {$ref: '#/components/schemas/UUID'}}
+      - {name: X-CSRF-Token, in: header, required: true, schema: {type: string, maxLength: 512, minLength: 1}}
+      - {name: Origin, in: header, required: true, schema: {type: string, format: uri}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CheckPolicyWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/checkPolicy_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/logout_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '409': {$ref: '#/components/responses/checkPolicy_409'}
+        '415': {$ref: '#/components/responses/login_415'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
   /api/v1/assignments/{assignmentId}/checks:
+    get:
+      operationId: getAssignmentCheck
+      summary: 获取本人指定作品版本的检查状态
+      description: 已发布作业本人可读；归档历史可读。revision=0表示尚未保存，check=null。不返回教师规则或标准答案。
+      tags: [student]
+      x-phase: P1
+      x-implementation-status: verified
+      x-contract-status: reviewed
+      x-permission: 本班学生本人
+      x-csrf-required: false
+      x-idempotency: none
+      parameters:
+      - {name: assignmentId, in: path, required: true, schema: {$ref: '#/components/schemas/UUID'}}
+      - {name: workspaceRevision, in: query, required: true, schema: {type: integer, minimum: 0, maximum: 2147483647}}
+      responses:
+        '200': {$ref: '#/components/responses/assignmentCheck_200'}
+        '400': {$ref: '#/components/responses/getCsrfToken_400'}
+        '401': {$ref: '#/components/responses/logout_401'}
+        '403': {$ref: '#/components/responses/getMe_403'}
+        '404': {$ref: '#/components/responses/logout_404'}
+        '406': {$ref: '#/components/responses/getCsrfToken_406'}
+        '422': {$ref: '#/components/responses/getCsrfToken_422'}
+        '500': {$ref: '#/components/responses/getCsrfToken_500'}
+        '503': {$ref: '#/components/responses/getCsrfToken_503'}
     post:
       operationId: createCheck
       summary: createCheck
-      description: 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status:'queued'}`；同一 workspaceRevision 已有检查时返回原检查（自然幂等）。业务规则以
+      description: 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status}`；同一作业/学生/workspaceRevision已有检查返回原checkId与真实当前status（自然幂等）。未配置返回CHECK_NOT_CONFIGURED。业务规则以
         DEVELOPMENT.md 为准。
       tags:
       - student
-      x-phase: P3
-      x-implementation-status: planned
-      x-contract-status: draft
+      x-phase: P1
+      x-implementation-status: verified
+      x-contract-status: reviewed
       x-permission: 本班学生本人，需 CSRF
       x-csrf-required: true
       x-idempotency: natural
@@ -3509,9 +3588,9 @@ paths:
         DEVELOPMENT.md 为准。
       tags:
       - student
-      x-phase: P3
-      x-implementation-status: planned
-      x-contract-status: draft
+      x-phase: P1
+      x-implementation-status: verified
+      x-contract-status: reviewed
       x-permission: 检查本人
       x-csrf-required: false
       x-idempotency: none
@@ -6940,6 +7019,159 @@ components:
       required:
       - acceptedCount
       - duplicateCount
+    WebCheckRule:
+      type: object
+      additionalProperties: false
+      properties:
+        id: {type: string, minLength: 1, maxLength: 64}
+        selector: {type: string, minLength: 1, maxLength: 200}
+        check: {type: string, enum: [exists, text, css]}
+        expected: {type: [string, 'null'], maxLength: 1000}
+        property: {type: [string, 'null'], maxLength: 100}
+        width: {type: integer, minimum: 320, maximum: 1920}
+      required: [id, selector, check, expected, property, width]
+    WebCheckPolicy:
+      type: object
+      description: HTML/CSS 静态结构、文本与计算样式检查；执行器禁用学生 JavaScript，不验证动态交互。
+      additionalProperties: false
+      properties:
+        kind: {type: string, const: web_lab}
+        rules: {type: array, minItems: 1, maxItems: 20, items: {$ref: '#/components/schemas/WebCheckRule'}}
+      required: [kind, rules]
+    SqlCheckPolicy:
+      type: object
+      description: 查询题和验证查询仅执行单条 SQL，使用全新 UTF-8 会话；修改题允许多条 INSERT/UPDATE/DELETE。结果最多100行、30列，每格2000字符，超限返回资源错误。
+      additionalProperties: false
+      properties:
+        kind: {type: string, const: sql_text}
+        mode: {type: string, enum: [query, mutation]}
+        seedSql: {type: string, minLength: 1, maxLength: 32000}
+        verificationSql: {type: [string, 'null'], maxLength: 8000}
+        expectedRows:
+          type: array
+          maxItems: 100
+          items:
+            type: array
+            minItems: 1
+            maxItems: 30
+            items: {type: [string, 'null'], maxLength: 2000}
+        ordered: {type: boolean}
+      required: [kind, mode, seedSql, verificationSql, expectedRows, ordered]
+    CheckPolicyConfig:
+      description: 教师专用；Web规则id唯一，exists时expected/property为null，text需expected且property=null，css需两者。SQL query的verificationSql=null，mutation则非空；unordered比较包含重复行的多重集。发布后冻结。
+      oneOf:
+      - {$ref: '#/components/schemas/WebCheckPolicy'}
+      - {$ref: '#/components/schemas/SqlCheckPolicy'}
+    CheckPolicyDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        version: {type: integer, minimum: 0}
+        config: {anyOf: [{$ref: '#/components/schemas/CheckPolicyConfig'}, {type: 'null'}]}
+      required: [version, config]
+    CheckPolicyWrite:
+      type: object
+      additionalProperties: false
+      properties:
+        baseVersion: {type: integer, minimum: 0}
+        config: {anyOf: [{$ref: '#/components/schemas/CheckPolicyConfig'}, {type: 'null'}]}
+      required: [baseVersion, config]
+      examples:
+      - baseVersion: 0
+        config:
+          kind: web_lab
+          rules:
+          - {id: main-heading, selector: h1, check: text, expected: Hello, property: null, width: 390}
+      - baseVersion: 0
+        config:
+          kind: sql_text
+          mode: query
+          seedSql: 'CREATE TABLE scores (id INT PRIMARY KEY, score INT); INSERT INTO scores VALUES (1,80),(2,90);'
+          verificationSql: null
+          expectedRows: [['1', '80'], ['2', '90']]
+          ordered: true
+      - baseVersion: 0
+        config:
+          kind: sql_text
+          mode: mutation
+          seedSql: 'CREATE TABLE scores (id INT PRIMARY KEY, score INT); INSERT INTO scores VALUES (1,80);'
+          verificationSql: 'SELECT id, score FROM scores ORDER BY id;'
+          expectedRows: [['1', '90']]
+          ordered: true
+    AssignmentCheckDTO:
+      type: object
+      additionalProperties: false
+      properties:
+        configured: {type: boolean}
+        check: {anyOf: [{$ref: '#/components/schemas/CheckDTO'}, {type: 'null'}]}
+      required: [configured, check]
+    Error_CHECK_POLICY_CONFLICT:
+      type: object
+      additionalProperties: false
+      x-http-status: 409
+      properties:
+        code: {type: string, const: CHECK_POLICY_CONFLICT}
+        message: {type: string, minLength: 1, maxLength: 1000}
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            currentVersion: {type: integer, minimum: 0}
+          required: [currentVersion]
+      required: [code, message, details]
+    Error_CHECK_POLICY_FROZEN:
+      type: object
+      additionalProperties: false
+      x-http-status: 409
+      properties:
+        code: {type: string, const: CHECK_POLICY_FROZEN}
+        message: {type: string, minLength: 1, maxLength: 1000}
+        details: {$ref: '#/components/schemas/Empty'}
+      required: [code, message, details]
+    Error_CHECK_NOT_CONFIGURED:
+      type: object
+      additionalProperties: false
+      x-http-status: 409
+      properties:
+        code: {type: string, const: CHECK_NOT_CONFIGURED}
+        message: {type: string, minLength: 1, maxLength: 1000}
+        details: {$ref: '#/components/schemas/Empty'}
+      required: [code, message, details]
+    Failure_CHECK_POLICY_CONFLICT:
+      type: object
+      additionalProperties: false
+      properties:
+        error: {$ref: '#/components/schemas/Error_CHECK_POLICY_CONFLICT'}
+        requestId: {type: string, minLength: 1, maxLength: 64}
+      required: [error, requestId]
+    Failure_CHECK_POLICY_FROZEN:
+      type: object
+      additionalProperties: false
+      properties:
+        error: {$ref: '#/components/schemas/Error_CHECK_POLICY_FROZEN'}
+        requestId: {type: string, minLength: 1, maxLength: 64}
+      required: [error, requestId]
+    Failure_CHECK_NOT_CONFIGURED:
+      type: object
+      additionalProperties: false
+      properties:
+        error: {$ref: '#/components/schemas/Error_CHECK_NOT_CONFIGURED'}
+        requestId: {type: string, minLength: 1, maxLength: 64}
+      required: [error, requestId]
+    Response_CheckPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/CheckPolicyDTO'}
+        requestId: {type: string, minLength: 1, maxLength: 64}
+      required: [data, requestId]
+    Response_AssignmentCheck:
+      type: object
+      additionalProperties: false
+      properties:
+        data: {$ref: '#/components/schemas/AssignmentCheckDTO'}
+        requestId: {type: string, minLength: 1, maxLength: 64}
+      required: [data, requestId]
     CheckWrite:
       type: object
       additionalProperties: false
@@ -6952,7 +7184,7 @@ components:
       additionalProperties: false
       properties:
         checkId: {$ref: '#/components/schemas/UUID'}
-        status: {type: string, const: queued}
+        status: {type: string, enum: [queued, running, completed, error]}
       required:
       - checkId
       - status
@@ -9421,6 +9653,34 @@ components:
       required:
       - status
   responses:
+    checkPolicy_200:
+      description: 检查配置，初始version=0/config=null。
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_CheckPolicy'}
+    assignmentCheck_200:
+      description: 本人检查配置可用性与指定版本已有检查。
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Response_AssignmentCheck'}
+    checkPolicy_409:
+      description: OFFERING_ARCHIVED / CHECK_POLICY_CONFLICT / CHECK_POLICY_FROZEN
+      headers:
+        X-Request-ID: {$ref: '#/components/headers/XRequestID'}
+        Cache-Control: {$ref: '#/components/headers/CacheControl'}
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - {$ref: '#/components/schemas/Failure_OFFERING_ARCHIVED'}
+            - {$ref: '#/components/schemas/Failure_CHECK_POLICY_CONFLICT'}
+            - {$ref: '#/components/schemas/Failure_CHECK_POLICY_FROZEN'}
     getCsrfToken_200:
       description: 200 `{csrfToken}`；匿名时设置签名预登录 Cookie，登录后返回会话绑定令牌
       headers:
@@ -10516,7 +10776,7 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Response_createCheck'}
     createCheck_409:
-      description: OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED
+      description: OFFERING_ARCHIVED / WORKSPACE_CONFLICT / ASSIGNMENT_ARCHIVED / CHECK_NOT_CONFIGURED
       headers:
         X-Request-ID: {$ref: '#/components/headers/XRequestID'}
         Cache-Control: {$ref: '#/components/headers/CacheControl'}
@@ -10527,6 +10787,7 @@ components:
             - {$ref: '#/components/schemas/Failure_OFFERING_ARCHIVED'}
             - {$ref: '#/components/schemas/Failure_WORKSPACE_CONFLICT'}
             - {$ref: '#/components/schemas/Failure_ASSIGNMENT_ARCHIVED'}
+            - {$ref: '#/components/schemas/Failure_CHECK_NOT_CONFIGURED'}
     getCheck_200:
       description: 200 `{id,assignmentId,workspaceRevision,checkerVersion,status,result,error,createdAt,completedAt}`
       headers:

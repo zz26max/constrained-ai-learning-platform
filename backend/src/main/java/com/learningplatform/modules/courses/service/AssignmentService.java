@@ -245,6 +245,10 @@ public class AssignmentService {
     public TeacherAssignmentDTO patchAssignment(UserDTO user,String assignmentId,Map<String,Object> body,String requestId) {
         Assignment assignment=assignmentOr404(assignmentId);
         access.requireTeacher(user,assignment.offeringId(),true);
+        access.lockOfferingShared(assignment.offeringId());
+        mapper.lockAssignmentExclusive(assignment.id());
+        assignment=assignmentOr404(assignmentId);
+        access.requireTeacher(user,assignment.offeringId(),true);
         if("archived".equals(assignment.status())) throw assignmentArchived();
         AssignmentInput.checkPatchBody(body);
         Instant now=now();
@@ -256,6 +260,7 @@ public class AssignmentService {
             if(mapper.updateAssignmentDraft(assignment.id(),draft.chapterId(),draft.title(),draft.description(),
                     draft.estimatedMinutes(),draft.type(),draft.isRequired(),draft.dueAt(),draft.lateUntil(),
                     draft.allowResubmit(),draft.maxAttempts(),draft.maxScore(),now)==0) throw assignmentAlreadyPublished();
+            if(!assignment.type().equals(draft.type())) mapper.clearCheckPolicy(assignment.id());
             if(body.containsKey("requirements")) { mapper.deleteRequirements(assignment.id());insertRequirements(assignment.id(),draft); }
             if(body.containsKey("rubric")) { mapper.deleteRubric(assignment.id());insertRubric(assignment.id(),draft); }
             if(body.containsKey("initialFiles")||body.containsKey("type")) {
