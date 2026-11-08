@@ -1,6 +1,6 @@
 # 后端开发手册
 
-基线：1.2.0。当前实现进度见 [STATUS](STATUS.md)。
+基线：1.3.0。当前实现进度见 [STATUS](STATUS.md)。
 
 先读 [DEVELOPMENT](DEVELOPMENT.md) 的架构及本次业务规则，对外结构只读 [OpenAPI](openapi.yaml)。本文件拥有后端分层、数据库、事务和保留约定。当前阶段、未决事项与待修复问题见 [STATUS §0](STATUS.md)。
 
@@ -114,7 +114,7 @@ erDiagram
 | `audit_logs` | `id, actor_id, action, target_type, target_id, metadata, request_id, created_at` | 不记录口令/凭证/完整正文；用户删除可匿名化 actor；只允许追加 |
 | `terms` | `id, label, starts_at, ends_at, is_current, current_slot` | 学期由管理员维护；ends_at > starts_at；current_slot 为可空 STORED 生成列，唯一索引保证最多一个当前学期；label 为展示文本 |
 
-已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql) 及 [V4__create_audit_logs.sql](../backend/src/main/resources/db/migration/V4__create_audit_logs.sql)，包含 audit_logs。教学内容、作业、评价通知与公告相关表由后续迁移 V5～V8 建立，见本手册第 4 节与第 5 节。V9 为 `notices` 增加公告跳转目标列（`target_type/target_id`，多态无外键）并把量规评语放宽到 8000；V10 为 `notifications` 增加同构的通用跳转目标列（P1 由 `notice_published` 消息继承公告目标写入，其余消息类型为 NULL；P2 沿用每收件人一条通知，回复使用唯一来源键）。V11～V13 对应 P2：V11 辅导政策与请求，V12 求助与通知来源，V13 学习事件、知识评价与证据；详细范围与联调边界见 [P2 后端联调说明](features/p2-backend-integration.md)。V14 冻结公告收件人数并回填历史审计，V15 补阶段二分析读索引，V16 导入 Web 开发基础课程内容（5 章、10 资源、12 知识点；迁移不建账号，`course_offerings.created_by` 允许为空，空库时补一个个人学习学期）。本地库已到 V16，见 [STATUS §0](STATUS.md)。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。`/me/config` 已实现；未初始化学期时 currentTermId=null、terms=[]，不能把此空态当成接口未实现。
+已实现 [V1__create_terms.sql](../backend/src/main/resources/db/migration/V1__create_terms.sql)、[V2__create_users.sql](../backend/src/main/resources/db/migration/V2__create_users.sql) 与 [V3__create_auth_sessions.sql](../backend/src/main/resources/db/migration/V3__create_auth_sessions.sql) 及 [V4__create_audit_logs.sql](../backend/src/main/resources/db/migration/V4__create_audit_logs.sql)，包含 audit_logs。教学内容、作业、评价通知与公告相关表由后续迁移 V5～V8 建立，见本手册第 4 节与第 5 节。V9 为 `notices` 增加公告跳转目标列（`target_type/target_id`，多态无外键）并把量规评语放宽到 8000；V10 为 `notifications` 增加同构的通用跳转目标列（P1 由 `notice_published` 消息继承公告目标写入，其余消息类型为 NULL；P2 沿用每收件人一条通知，回复使用唯一来源键）。V11～V13 对应 P2：V11 辅导政策与请求，V12 求助与通知来源，V13 学习事件、知识评价与证据；详细范围与联调边界见 [P2 后端联调说明](features/p2-backend-integration.md)。V14 冻结公告收件人数并回填历史审计，V15 补阶段二分析读索引，V16 导入 Web 开发基础课程内容（5 章、10 资源、12 知识点；迁移不建账号，`course_offerings.created_by` 允许为空，空库时补一个个人学习学期）。V17 新建自动判题配置与任务队列。实际本地库版本见 [STATUS §0](STATUS.md)。`terms.label` 采用 `VARCHAR(200)`，`created_at/updated_at` 为必填 UTC `DATETIME(6)`，由管理功能显式写入，不设置依赖服务器时区的默认时间。迁移不初始化学期、账户或会话；开发账户通过独立命令创建，不设置通用默认口令。`/me/config` 已实现；未初始化学期时 currentTermId=null、terms=[]，不能把此空态当成接口未实现。
 
 `users` 的具体存储约定如下：
 
@@ -348,13 +348,15 @@ P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有�
 
 教师已发布知识评价是当前 `knowledge-v2` 的唯一掌握证据；分析不引用草稿评价。学生有关联任务真正进行中可以决定 learning，但不是通过证据；历史只有一次 meets_expectation 且没有进行中任务时仍为 insufficient_evidence，不能无限期称为正在学习。对外状态引用 [KnowledgeAssessment.assessmentState](openapi.yaml#/components/schemas/KnowledgeAssessment/properties/assessmentState)，不与教师单条 result 混用；具体优先级及 freshness 按 DEVELOPMENT 8.2 计算，不添加可任意写入的状态列。P1 未保存知识评价，没有历史知识结论可回填；P2 从后续发布的知识评价生成证据。
 
-## 6. P3：自动检查
+## 6. 课设 MVP 自动判题
 
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
-| `check_runs` | `id, assignment_id, student_id, workspace_revision, files_snapshot, submission_id, checker_version, status, result, error_code, started_at, finished_at` | status queued/running/completed/error；result记录规则ID与pass/fail；无密钥；student_id由登录态取得 |
+| `assignment_check_policies` | `assignment_id, version, config` | 仅草稿可改；发布后冻结；类型改变时清除配置并递增版本 |
+| `assignment_checks` | `id, assignment_id, student_id, workspace_revision, checker_version, status, policy_snapshot, file_snapshot, result, error, lease_token, lease_until, created_at, completed_at` | 作业、学生与工作区版本唯一；终态清除快照及租约；student_id 由登录态取得 |
+| `check_queue_guard` | `id` | 入队额度判断串行化；不持锁执行学生代码 |
 
-检查任务只能从本人服务器保存版本或授课教师可访问提交取快照。后台执行把快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
+学生只能对本人已保存的当前工作区版本创建检查，重复请求返回已有任务。后台执行把快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
 
 P3 将检查转为知识证据时需更新分析规则版本，并标注 source=checker、检查规则与可信度。不要在尚无检查服务时填充“通过检查”的种子事实。
 
@@ -438,7 +440,7 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 ## 10. 迁移、归档与删除
 
-迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 已有个人站内通知与审计；P2 补齐 learning_events、后续可信服务端事件，并引入 AI、求助、客户端事件入口和知识证据，P3 增加隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
+迁移按 P0→P1→P2→P3 建立实体。P0 包括学期与账户基础；P1 已有个人站内通知与审计；P2 补齐 learning_events、后续可信服务端事件，并引入 AI、求助、客户端事件入口和知识证据，课设 MVP 补齐隔离检查。使用版本化 SQL 迁移明确声明 MySQL 方言、InnoDB、字符集与复合约束；不要在应用启动时用 ORM 自动更新表结构，生成列必须以数据库表达式迁移管理。每次部署执行明确版本迁移，演示数据脚本仅在开发环境使用。MySQL DDL 可能隐式提交，迁移失败按实际已执行步骤恢复，不假设完整 DDL 批次可随事务整体回滚。
 
 成员退出/失活后保留作品和评价归属，阻止新写入；作业、教学班用归档保留链路，不级联删除考核作品。管理员按已确认策略清除用户数据时，先撤销会话，再删除/匿名化事件、聊天、求助、证据及关联作品；日志中的身份做匿名化，通知接收者按关联删除。备份过期也应符合保留周期。
 
@@ -453,8 +455,17 @@ P3 将检查转为知识证据时需更新分析规则版本，并标注 source=
 
 每个工作包报告实现的 operationId、实际运行的测试、数据库迁移与回滚/恢复边界、尚未实现项。修改接口状态前确认生产 Controller、DTO、授权与失败响应均到位；内部 Service 的测试不能代替 HTTP 可用性。每个工作包完成后按 [AGENTS.md](../AGENTS.md) 的提交约定提交，并更新 [STATUS](STATUS.md)。
 
-阶段建立表的数量不作为进度目标，以可验收流程为准。P2 起学习事件与业务同事务落库；P1 仅空知识评价，无可回填知识证据，不伪造历史；P2 启用 AI 后台执行；P3 的 runner 只保留设计接口，不在 API 中临时执行学生代码凑验收。
+阶段建立表的数量不作为进度目标，以可验收流程为准。P2 起学习事件与业务同事务落库；P1 仅空知识评价，无可回填知识证据，不伪造历史；P2 启用 AI 后台执行；自动判题 runner 独立执行，API 不直接执行学生代码。
 
 ### 注册频率保护（2026-11-06）
 
 匿名注册在密码哈希和数据库写入前按服务端观察到的客户端 IP 限流，通过请求体校验后进入注册流程的成功和失败均消耗名额，不以更换用户名重置。默认每 60 秒 10 次；配置项 `auth.registration-rate-limit.max-requests`、`auth.registration-rate-limit.window-seconds`。超限使用既有契约 `429 RATE_LIMITED` 与 `Retry-After`，不改变接口结构。单节点内存窗口最多保留 10000 个地址，容量占满时拒绝新地址并返回重试提示；到期条目可回收。反向代理必须配置可信来源的客户端地址解析，不能直接相信请求携带的 X-Forwarded-For；否则同一代理后的用户会共用额度。多实例需共享限流存储，本轮不引入该依赖。
+
+
+## 课设自动判题实现约束
+
+查询题及教师验证查询只执行单条 SQL，使用全新 UTF-8 会话，禁止先执行会话设置再返回结果。初始化及修改题可执行多条语句，权限限制在各自练习库。可信驱动在容器内限制结果最多 100 行、30 列及每格 2000 字符，再交由主服务解析，避免大量短行绕过字节配额。
+
+本地启用前构建 `docker build -t lms-web-check:1 backend/check-runner`，以及 `docker build -f backend/check-runner/sql.Dockerfile -t lms-sql-check:1 backend/check-runner`（MySQL 8.4.11）；在忽略的本地配置中设置 `CHECKS_ENABLED=true` 后重启后端。默认关闭，不影响预览与人工批阅。执行器禁止自动拉取镜像；缺少镜像返回服务错误。Web 仅检查 HTML/CSS 静态结果，禁用学生 JavaScript，避免学生覆盖检查使用的浏览器 API。SQL 通过可信驱动传输无损 JSON，区分 NULL、NUL 与换行；输出上限 40 MiB，覆盖契约最大预期表的转义；超限属于资源错误，不作为答案错误。
+
+范围与评分含义见 DEVELOPMENT §15。检查入队事务冻结本人工作区与已发布机器规则，执行器不得持有业务事务跨进程运行。MySQL 练习库与平台数据库必须是不同的临时容器；学生身份仅有练习库 SELECT/INSERT/UPDATE/DELETE 权限，初始化身份与验证身份分离。Web 执行器不携带会话、数据库口令或 Docker socket。队列领取须原子，重启不能让 running 永久悬挂；超时、异常及正常退出均清理专属容器。不得通过拼接 shell 命令传递学生代码。
