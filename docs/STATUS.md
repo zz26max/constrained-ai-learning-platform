@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`8c2bf8b`（辅导配额与供应商重试修复；实验语料见 `ad8ecb2`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 已合并推送至 `5898da2`，无未推送提交。
+- **代码基线**：`556d466`（L1 召回兜底与 L4 提示深化；配额修复见 `8c2bf8b`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 已推送至 `1b3ec0c`，分支 `feat/ai-depth` 尚未合并。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。自动检查已实现并通过本轮验证，动态学习路径与预测未实现；P2 基础规则建议已实现（nextRecommendation），不应统称为“建议未实现”。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；本轮按用户授权补充服务端自动判题（Web 静态 HTML/CSS 与 SQL 查询/增删改，已完成真实联调）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
@@ -40,6 +40,10 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-09 功能地图与 AI 辅导深化（分支 `feat/ai-depth`）**：新增 [功能地图与 AI 辅导设计](features/feature-map.md)——按学生/教师/管理员梳理功能与证据、五层机制现状、L4「错误类型 → 反馈动作」表、检索与引用策略、消融映射与缺口排序。代码两处深化：① L1 召回兜底，作业未关联知识点/章节时回退本班全部 active 讲义（新增 `OFFERING_RESOURCES`），解决「有 RAG 但无可召回资料、`citations` 恒空」——当前演示班 `5d125cf5…` 正是这种情况（resources=0、关联知识点=0、chapter 为空）；② L4 提示约束，`checkFindings` 非空时要求先点名失败规则、再给一个可验证的下一步，不倾倒清单。
+>
+> 检查：`TutoringHttpContractTest` 24、`TutoringProviderTest` 5、`TutoringRetrievalTest` 5、`TutoringWorkerTest` 3 全通过；`validate_contract.py` PASS（39 份文档已登记）。未做：L4 的「错误类型 → 反馈动作」仍是提示词层，未落到代码映射与输出校验；`citations` 尚未做成可点击的资料链接；E1/软著/论文按用户要求暂缓。
 
 > **2026-11-09 辅导配额与供应商重试修复（分支 `fix/ai-quota`）**：定位「问三次就没额度」是三处设计叠加：① 每分钟 3 次上限写死在 `TutoringService`，第 4 次直接 429；② 平台侧失败（`PROVIDER_UNAVAILABLE` 等）也计入每日配额，当天 3 次失败白吃掉同作业 12 次额度里的 1/4；③ 文案统一写成「辅导额度已用完」，分不清是频率限制还是当日额度。修复：预算查询排除 `PROVIDER_UNAVAILABLE`/`PROVIDER_RESULT_UNKNOWN`/`INTERNAL_ERROR`；每日与每分钟上限改为可配置 `AI_DAILY_USER_LIMIT` / `AI_MINUTE_LIMIT`（演示设 60 / 10，默认仍 30 / 3）；按 `scope` 区分「请求过于频繁」与「今日额度已用完」；供应商对 429/5xx 重试一次，并修掉「`HttpRequest` 不可复用导致重试实际无效」的缺陷；新增 `AI_PROVIDER_SESSION_HEADER`，支持 OpenCode Go 必需的 `x-opencode-session`。
 >
