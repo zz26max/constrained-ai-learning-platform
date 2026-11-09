@@ -66,15 +66,15 @@ class TutoringIntegrationIT {
  @Test void policyCompositeForeignKeysRejectCrossAssignment(){String second=assignments.createAssignment(teacher,offering,assignmentBody,"it").id();String firstPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,assignment);assertThatThrownBy(()->jdbc.update("UPDATE assignments SET current_ai_policy_id=? WHERE id=?",firstPolicy,second)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);service.updatePolicy(teacher,second,policy(0));String otherPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,second);assignments.saveWorkspace(student,assignment,Map.of("baseRevision",0,"files",List.of(Map.of("path","answer.md","content","reflection")),"activeFile","answer.md"),"it");var submission=assignments.submitAssignment(student,assignment,Map.of("workspaceRevision",1,"reflection","分析空间"),"it").submission();assertThatThrownBy(()->jdbc.update("UPDATE submissions SET ai_policy_id=? WHERE id=?",otherPolicy,submission.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);}
  @Test void expiredQueuedBodyIsNeverTransmitted(){String r=send("ask","如何观察",null);jdbc.update("UPDATE tutoring_requests SET content_expires_at=? WHERE id=?",ts(NOW),r);worker.execute(r);assertThat(provider.calls).isZero();assertThat(service.request(student,r).get("status")).isEqualTo("failed");}
  @Test void configuredHttpProviderCompletesThroughAuthenticatedPolling() throws Exception {
-  configuredProviderRoundTrip(200,false,"completed",null);
+  configuredProviderRoundTrip(200,false,"completed",null,1);
  }
  @Test void configuredHttpProviderFailureExposesNoAnswerOrUpstreamBody() throws Exception {
-  configuredProviderRoundTrip(503,false,"failed","PROVIDER_UNAVAILABLE");
+  configuredProviderRoundTrip(503,false,"failed","PROVIDER_UNAVAILABLE",2);
  }
  @Test void malformedProviderReplyFailsWithoutRetryOrAssistantMessage() throws Exception {
-  configuredProviderRoundTrip(200,true,"failed","PROVIDER_UNAVAILABLE");
+  configuredProviderRoundTrip(200,true,"failed","PROVIDER_UNAVAILABLE",1);
  }
- private void configuredProviderRoundTrip(int upstreamStatus,boolean malformed,String expectedStatus,String errorCode) throws Exception {
+ private void configuredProviderRoundTrip(int upstreamStatus,boolean malformed,String expectedStatus,String errorCode,int expectedCalls) throws Exception {
   var json=tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();
   var calls=new java.util.concurrent.atomic.AtomicInteger();
   var received=new java.util.concurrent.atomic.AtomicReference<String>();
@@ -99,9 +99,9 @@ class TutoringIntegrationIT {
    String body=polled.getResponse().getContentAsString();
    TutoringSchemaAssertions.response("Response_getTutoringRequest",body);
    assertThat(body).doesNotContain("UPSTREAM_PRIVATE_DIAGNOSTIC","test-only-provider-key",password);
-   assertThat(calls.get()).isEqualTo(1);
+   assertThat(calls.get()).isEqualTo(expectedCalls);
    assertThat(received.get()).contains("test-model").doesNotContain(student.id(),student.username(),grant.token());
-   assertThat(jdbc.queryForObject("SELECT provider_call_count FROM tutoring_requests WHERE id=?",Integer.class,requestId)).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT provider_call_count FROM tutoring_requests WHERE id=?",Integer.class,requestId)).isEqualTo(1); // HTTP 重试发生在一次 generate 内，不计入 provider_call_count
    var data=json.readTree(body).path("data");
    if(errorCode==null){
     assertThat(data.path("result").path("content").asText()).isEqualTo(answer);

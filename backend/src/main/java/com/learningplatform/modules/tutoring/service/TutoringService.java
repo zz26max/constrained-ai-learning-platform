@@ -17,6 +17,9 @@ import com.learningplatform.modules.tutoring.mapper.TutoringMapper;
 import static com.learningplatform.modules.tutoring.service.TutoringJson.map;
 @Service
 public class TutoringService {
+ /** 演示/实验可调：每用户每日、每分钟上限；默认值与 DEVELOPMENT 第 7.1 节一致。 */
+ @org.springframework.beans.factory.annotation.Value("${AI_DAILY_USER_LIMIT:30}") private int dailyUserLimit=30;
+ @org.springframework.beans.factory.annotation.Value("${AI_MINUTE_LIMIT:3}") private int minuteLimit=3;
  final TutoringMapper db;final TutoringJson json;final Clock clock;final AssignmentMapper assignments;final CourseAccess access;
  private final AssignmentPolicyBindingService policyBinding;
  public TutoringService(TutoringMapper db,TutoringJson json,Clock clock,AssignmentMapper assignments,CourseAccess access,AssignmentPolicyBindingService policyBinding){this.db=db;this.json=json;this.clock=clock;this.assignments=assignments;this.access=access;this.policyBinding=policyBinding;}
@@ -60,7 +63,11 @@ public class TutoringService {
   int level="concept".equals(action)?1:"next_hint".equals(action)?highest+1:Math.max(1,highest);if(level>((Number)policy.get("maxHintLevel")).intValue())throw conflict("HINT_LIMIT_REACHED");
   String attempt=(String)body.get("studentAttempt");if(level>=((Number)policy.get("requireAttemptFromLevel")).intValue()&&(attempt==null||attempt.isBlank()))throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY,"ATTEMPT_REQUIRED","请描述实际尝试。");
   Instant now=clock.instant(),day=now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate().atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant();
-  if(db.count(COUNT_USER_BUDGET,user.id(),day)>=30||db.count(COUNT_ASSIGNMENT_BUDGET,user.id(),aid,day)>=((Number)policy.get("dailyAssignmentLimit")).intValue()||db.count(COUNT_MINUTE_BUDGET,user.id(),now.minusSeconds(60))>=3)throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS,"RATE_LIMITED","辅导额度已用完，请稍后再试。",Map.of(),60);
+  int minuteUsed=db.count(COUNT_MINUTE_BUDGET,user.id(),now.minusSeconds(60));
+  long dayUsed=db.count(COUNT_USER_BUDGET,user.id(),day);
+  long assignmentUsed=db.count(COUNT_ASSIGNMENT_BUDGET,user.id(),aid,day);
+  if(minuteUsed>=minuteLimit)throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS,"RATE_LIMITED","请求过于频繁，请等待约 1 分钟后再试。",Map.of("scope","minute"),60);
+  if(dayUsed>=dailyUserLimit||assignmentUsed>=((Number)policy.get("dailyAssignmentLimit")).intValue())throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS,"RATE_LIMITED","今日辅导额度已用完，请明天再试或向教师求助。",Map.of("scope","daily"),3600);
   Integer revision=body.get("workspaceRevision")==null?null:AssignmentInput.integer(body,"workspaceRevision");String snapshot=null;
   if(revision!=null){var w=assignments.findWorkspaceForUpdate(aid,user.id());if(w==null||w.revision()!=revision)throw new BusinessException(HttpStatus.CONFLICT,"WORKSPACE_CONFLICT","工作区版本已变化。",Map.of("currentRevision",w==null?0:w.revision()));var files=assignments.getWorkspaceFiles(w.id());snapshot=json.write(files.stream().map(f->map("path",f.filePath(),"content",f.content())).toList());if(snapshot.getBytes(StandardCharsets.UTF_8).length>16384)throw AssignmentInput.invalid();}
   String id=uuid();try{db.update(INSERT_REQUEST,id,sessionId,user.id(),aid,action,body.get("content"),attempt,revision,snapshot,level,now.plus(90,ChronoUnit.DAYS),now,now);}catch(DuplicateKeyException e){var p=db.one(FIND_PENDING_AFTER_CONFLICT,user.id(),aid);if(p==null)throw e;throw pending((String)p.get("id"));}
