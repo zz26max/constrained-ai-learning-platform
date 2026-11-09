@@ -2977,6 +2977,10 @@ export interface components {
             /** @constant */
             status: "queued";
         };
+        CitationDTO: {
+            resourceId: components["schemas"]["UUID"];
+            title: string;
+        };
         TutoringMessageDTO: {
             id: components["schemas"]["UUID"];
             sequence: number;
@@ -2989,6 +2993,8 @@ export interface components {
             hintLevel: number | null;
             policyVersion: number | null;
             contentUnavailableReason: components["schemas"]["ContentUnavailableReason"] | null;
+            /** @description 本次回复依据的课程资料（服务端检索得出）；学生消息与固定模板回退为空数组。 */
+            citations: components["schemas"]["CitationDTO"][];
         } & (unknown & unknown & unknown);
         TutoringResult: {
             /** @enum {string} */
@@ -3000,6 +3006,8 @@ export interface components {
             /** @enum {string} */
             nextAction: "try_and_report" | "review_concept" | "request_teacher_help" | "none";
             contentUnavailableReason: components["schemas"]["ContentUnavailableReason"] | null;
+            /** @description 本次回复依据的课程资料；固定模板回退与历史内容过期时为空数组。 */
+            citations: components["schemas"]["CitationDTO"][];
         } & unknown;
         /** @description AI 异步终态原因；POLICY_REJECTED 包含外发数据检查不通过，供应商调用前即停止。有固定安全提示时 fallback，否则 failed 且 result=null；不推进提示层次。 */
         TaskError: {
@@ -3019,7 +3027,8 @@ export interface components {
          *         "generationPolicyVersion": 1,
          *         "contentUnavailableReason": null,
          *         "content": "先检查菜单是否允许换行，再比较菜单总宽度和容器可用空间。",
-         *         "nextAction": "try_and_report"
+         *         "nextAction": "try_and_report",
+         *         "citations": []
          *       },
          *       "error": null,
          *       "createdAt": "2026-10-02T02:10:00Z",

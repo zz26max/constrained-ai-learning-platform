@@ -131,8 +131,8 @@ export function resetMockTutoringState(): void {
     createdAt: fixtureTime, status: 'active', pendingRequestId: null, lastMessageAt: fixtureTime,
     nextSequence: 3,
     messages: [
-      { id: randomUUID(), sequence: 1, role: 'student', content: '窄屏时菜单溢出，应该检查哪里？', createdAt: fixtureTime, tutoringRequestId: P2_IDS.seededRequest, mode: null, hintLevel: null, policyVersion: null, contentUnavailableReason: null },
-      { id: randomUUID(), sequence: 2, role: 'assistant', content: '先观察溢出发生的具体断点；再检查容器的宽度约束与子项的 min-width。你注意到溢出从哪个宽度开始了吗？', createdAt: fixtureTime, tutoringRequestId: P2_IDS.seededRequest, mode: 'guided_question', hintLevel: 1, policyVersion: 1, contentUnavailableReason: null },
+      { id: randomUUID(), sequence: 1, role: 'student', content: '窄屏时菜单溢出，应该检查哪里？', createdAt: fixtureTime, tutoringRequestId: P2_IDS.seededRequest, mode: null, hintLevel: null, policyVersion: null, contentUnavailableReason: null, citations: [] },
+      { id: randomUUID(), sequence: 2, role: 'assistant', content: '先观察溢出发生的具体断点；再检查容器的宽度约束与子项的 min-width。你注意到溢出从哪个宽度开始了吗？', createdAt: fixtureTime, tutoringRequestId: P2_IDS.seededRequest, mode: 'guided_question', hintLevel: 1, policyVersion: 1, contentUnavailableReason: null, citations: MOCK_CITATIONS },
     ],
   }
   sessions.set(seeded.id, seeded)
@@ -140,7 +140,7 @@ export function resetMockTutoringState(): void {
   requests.set(P2_IDS.seededRequest, {
     dto: {
       id: P2_IDS.seededRequest, sessionId: seeded.id, status: 'completed',
-      result: { mode: 'guided_question', hintLevel: 1, policyVersion: 1, generationPolicyVersion: 1, content: seeded.messages[1]!.content ?? '', nextAction: 'try_and_report', contentUnavailableReason: null },
+      result: { mode: 'guided_question', hintLevel: 1, policyVersion: 1, generationPolicyVersion: 1, content: seeded.messages[1]!.content ?? '', nextAction: 'try_and_report', contentUnavailableReason: null, citations: MOCK_CITATIONS },
       error: null, createdAt: fixtureTime, completedAt: fixtureTime,
     },
     studentId: MOCK_STUDENT.id, sessionId: seeded.id, action: 'ask',
@@ -170,7 +170,7 @@ function wantsCompleteSolution(content: string): boolean {
 }
 
 /** 终态结果按意图决定：索答走 fallback，concept 固定第 1 层，ask 维持最高层，next_hint 升一层。 */
-function buildResult(action: TutoringWrite['action'], content: string, highest: number, policy: AiPolicyDTO): TutoringResult {
+function buildResultBase(action: TutoringWrite['action'], content: string, highest: number, policy: AiPolicyDTO): Omit<TutoringResult, 'citations'> {
   if (wantsCompleteSolution(content)) {
     return { mode: 'fallback', hintLevel: highest, policyVersion: policy.version, generationPolicyVersion: policy.version, content: FALLBACK_CONTENT, nextAction: 'try_and_report', contentUnavailableReason: null }
   }
@@ -187,6 +187,15 @@ function buildResult(action: TutoringWrite['action'], content: string, highest: 
     return { mode: 'debug_hint', hintLevel: level, policyVersion: policy.version, generationPolicyVersion: policy.version, content: hints[level] ?? hints[1]!, nextAction: 'try_and_report', contentUnavailableReason: null }
   }
   return { mode: 'guided_question', hintLevel: Math.max(highest, 1), policyVersion: policy.version, generationPolicyVersion: policy.version, content: '你已经在缩小间距上做了一次尝试。如果仍然超出，问题更可能出在某个子项不可收缩；你觉得哪个子项最可疑，为什么？', nextAction: 'try_and_report', contentUnavailableReason: null }
+}
+
+const MOCK_CITATIONS: TutoringMessageDTO['citations'] = [
+  { resourceId: '00000000-0000-4000-8000-0000000000c1', title: 'CSS 尺寸约束与溢出' },
+]
+
+function buildResult(action: TutoringWrite['action'], content: string, highest: number, policy: AiPolicyDTO): TutoringResult {
+  const result = buildResultBase(action, content, highest, policy)
+  return { ...result, citations: result.mode === 'fallback' ? [] : MOCK_CITATIONS }
 }
 
 /** 请求状态机：第 1 次轮询 queued→running，第 2 次轮询出终态并落助手消息；终态不再变化。 */
@@ -216,7 +225,7 @@ function advanceRequest(request: StoredRequest): void {
       id: randomUUID(), sequence: session.nextSequence++, role: 'assistant', content: result.content,
       createdAt: request.dto.completedAt, tutoringRequestId: request.dto.id,
       mode: result.mode, hintLevel: result.mode === 'fallback' ? null : result.hintLevel,
-      policyVersion: result.policyVersion, contentUnavailableReason: result.contentUnavailableReason,
+      policyVersion: result.policyVersion, contentUnavailableReason: result.contentUnavailableReason, citations: result.citations,
     }
     session.messages.push(assistant)
     session.lastMessageAt = assistant.createdAt
@@ -321,7 +330,7 @@ const handleSendMessage: MockHandler = context => {
   const requestId = randomUUID()
   const message: TutoringMessageDTO = {
     id: randomUUID(), sequence: session.nextSequence++, role: 'student', content,
-    createdAt: now(), tutoringRequestId: requestId, mode: null, hintLevel: null, policyVersion: null, contentUnavailableReason: null,
+    createdAt: now(), tutoringRequestId: requestId, mode: null, hintLevel: null, policyVersion: null, contentUnavailableReason: null, citations: [],
   }
   session.messages.push(message)
   session.lastMessageAt = message.createdAt
