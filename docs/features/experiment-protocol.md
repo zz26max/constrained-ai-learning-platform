@@ -51,8 +51,19 @@
 | B-L5b | 输出代码检测与改写 | 完整代码给出率上升 |
 | B-L2 | 分级递进（固定为第 1 层） | 轮次与完成率变化，用于验证「逐级解锁」的必要性 |
 
-消融开关的约定（下一工作包实现，默认全部关闭，仅实验环境可开）：
-`AI_ABLATION_DISABLE=rag,static,intercept_input,intercept_output,graded_hints`。生产语义不变，开关存在时必须记录到实验日志。
+消融开关（2026-11-09 已实现，默认空＝全部生效；仅实验环境可开）：
+
+`AI_ABLATION_DISABLE=static,intercept_input,intercept_output,graded_hints`（逗号分隔，未知值忽略；改后需重启后端）
+
+| 取值 | 关闭的层 | 可观测变化 |
+| --- | --- | --- |
+| `static` | L3 静态分析 | `checkFindings` 恒为空，模型只看题面与工作区快照 |
+| `intercept_input` | L5 输入拦截 | 索要答案/注入文本不再被规则拦截，模型直接收到原文 |
+| `intercept_output` | L5 输出拦截 | 跳过 `TutoringSafety.acceptable`，代码块与整段实现可被交付 |
+| `graded_hints` | L2 分级递进 | 请求层级强制为 1，`next_hint` 不再升级 |
+| `rag` | L1 课程知识库 | 保留占位，待 L1 上线后生效 |
+
+> 安全边界：以上开关只在后端进程环境变量里生效，仓库默认值恒为空；实验结束后必须清空并重启。生产演示不得开启 `intercept_input`/`intercept_output`。
 
 ### E3 小样本用户测试（必做，n=6–10）
 
@@ -168,7 +179,7 @@ node scripts/experiment-export.mjs --offering <教学班 UUID>
 | 语料 | 40 题测试集（含金标准标注） | 待编写 |
 | 装置 | `experiment-export.mjs` 导出脚本 | 本包完成 |
 | 装置 | `ai-provider-smoke.mjs` 供应商连通与 JSON 契约自检 | 本包完成 |
-| 装置 | 消融开关 `AI_ABLATION_DISABLE` | 下一工作包（随 RAG/静态分析落地） |
+| 装置 | 消融开关 `AI_ABLATION_DISABLE` | 已完成（`rag` 占位待 L1） |
 | E1 | 240 次调用 + 判定结果 | 待 AI 供应商开通后执行 |
 | E2 | 6 组 × 120 次 | 待消融开关落地 |
 | E3 | 6–10 人问卷与任务记录 | 待组织 |
