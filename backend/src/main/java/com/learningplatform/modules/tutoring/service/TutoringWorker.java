@@ -50,6 +50,8 @@ public class TutoringWorker {
    var history=new ArrayList<String>();for(var row:historyRows)if(!service.expired(row)){var value=json.read(row.get("result"));if(value!=null&&value.get("content") instanceof String text)history.add(Objects.toString(row.get("content"),"")+"\n"+Objects.toString(row.get("student_attempt"),"")+"\n"+text);}
    String question=(String)request.get("content"),attempt=(String)request.get("student_attempt"),workspace=(String)request.get("workspace_snapshot");
    var materials=new ArrayList<String>();materials.add(a.description());for(var requirement:assignments.getRequirements(a.id()))materials.add(requirement.requirementText());
+   var selection=disabled("rag")?TutoringRetrieval.EMPTY:retrieve(a,Objects.toString(question,""),Objects.toString(attempt,""));
+   materials.addAll(selection.materials());
    String all=String.join("\n",materials)+Objects.toString(question,"")+Objects.toString(attempt,"")+Objects.toString(workspace,"")+String.join("\n",history);
    if(db.count(COUNT_DISCLOSED_CHARACTERS,request.get("student_id"),request.get("assignment_id"))>=12000){deliver(id,pid,policy,null,"OUTPUT_REJECTED");return;}
    if(expired){deliver(id,pid,policy,null,"HISTORY_EXPIRED");return;}
@@ -65,7 +67,7 @@ public class TutoringWorker {
     TutoringProvider.Output output;
     try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){logFailure(id,"provider_generate","PROVIDER_RESULT_UNKNOWN",e);fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){logFailure(id,"provider_generate","PROVIDER_UNAVAILABLE",e);fail(id,"PROVIDER_UNAVAILABLE");return;}
     if(output!=null)db.update(ACCUMULATE_USAGE,output.inputTokens(),output.inputTokens(),output.inputTokens(),output.outputTokens(),output.outputTokens(),output.outputTokens(),id);
-    if(disabled("intercept_output")||TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null);return;}
+    if(disabled("intercept_output")||TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null,selection.citations());return;}
    }
    deliver(id,pid,policy,null,"OUTPUT_REJECTED");
   }catch(Exception e){logFailure(id,"execute","INTERNAL_ERROR",e);fail(id,"INTERNAL_ERROR");}
@@ -94,6 +96,16 @@ public class TutoringWorker {
   if(!"published".equals(a.status()))return "ASSIGNMENT_ARCHIVED";return null;
  }
  private void deliver(String id,String generatedPolicyId,Map<String,Object> generatedPolicy,TutoringProvider.Output output,String error){
+  deliver(id,generatedPolicyId,generatedPolicy,output,error,List.of());
+ }
+ /** 课程资料召回；无候选或解析失败时静默返回空，不影响辅导主流程。 */
+ private TutoringRetrieval.Selection retrieve(com.learningplatform.modules.courses.model.AssignmentRows.Assignment a,String question,String attempt){
+  try{
+   var rows=db.list(ASSIGNMENT_RESOURCES,a.offeringId(),a.id(),a.id());
+   return TutoringRetrieval.select(rows,Objects.toString(question,"")+"\n"+Objects.toString(attempt,"")+"\n"+Objects.toString(a.description(),""));
+  }catch(RuntimeException unusable){return TutoringRetrieval.EMPTY;}
+ }
+ private void deliver(String id,String generatedPolicyId,Map<String,Object> generatedPolicy,TutoringProvider.Output output,String error,List<Map<String,Object>> citations){
   tx.executeWithoutResult(status->{var r=db.one(FIND_DELIVERY_REQUEST,id);if(r==null||!"running".equals(r.get("status")))return;
    var a=service.assignment((String)r.get("assignment_id"));String blocked=deliveryBlocked(r,a);if(blocked!=null){fail(id,blocked);return;}
    var policy=service.currentPolicy(a);if(!Boolean.TRUE.equals(policy.get("enabled"))||a.currentAiPolicyId()==null){fail(id,"POLICY_REJECTED");return;}
@@ -103,7 +115,7 @@ public class TutoringWorker {
    String mode=fallback?"fallback":output.mode(),content=fallback?TutoringSafety.TEMPLATE:output.content();Instant now=clock.instant();
    if(!TutoringService.time(r,"content_expires_at").isAfter(now)){fail(id,"HISTORY_EXPIRED");return;}
    var generation=r.get("generation_policy_id");Integer generationVersion=generation==null?null:((Number)db.one(FIND_GENERATION_POLICY_VERSION,generation).get("version")).intValue();
-   var result=map("mode",mode,"hintLevel",level,"policyVersion",policy.get("version"),"generationPolicyVersion",generationVersion,"content",content,"nextAction",fallback?"request_teacher_help":output.nextAction(),"contentUnavailableReason",null);
+   var result=map("mode",mode,"hintLevel",level,"policyVersion",policy.get("version"),"generationPolicyVersion",generationVersion,"content",content,"nextAction",fallback?"request_teacher_help":output.nextAction(),"contentUnavailableReason",null,"citations",fallback?List.of():citations);
    int changedRows=db.update(DELIVER_REQUEST,fallback?"fallback":"completed",json.write(result),reason,reason,a.currentAiPolicyId(),now,now,now,id,a.currentAiPolicyId());
    if(changedRows!=1){fail(id,"POLICY_REJECTED");return;}
    service.addMessage((String)r.get("session_id"),id,"assistant",content,mode,level,a.currentAiPolicyId(),now);
