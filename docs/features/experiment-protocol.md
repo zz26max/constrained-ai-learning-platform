@@ -61,7 +61,7 @@
 | `intercept_input` | L5 输入拦截 | 索要答案/注入文本不再被规则拦截，模型直接收到原文 |
 | `intercept_output` | L5 输出拦截 | 跳过 `TutoringSafety.acceptable`，代码块与整段实现可被交付 |
 | `graded_hints` | L2 分级递进 | 请求层级强制为 1，`next_hint` 不再升级 |
-| `rag` | L1 课程知识库 | 保留占位，待 L1 上线后生效 |
+| `rag` | L1 课程知识库 | 不再召回讲义片段，`citations` 恒为空数组 |
 
 > 安全边界：以上开关只在后端进程环境变量里生效，仓库默认值恒为空；实验结束后必须清空并重启。生产演示不得开启 `intercept_input`/`intercept_output`。
 
@@ -179,7 +179,8 @@ node scripts/experiment-export.mjs --offering <教学班 UUID>
 | 语料 | 40 题测试集（含金标准标注） | 待编写 |
 | 装置 | `experiment-export.mjs` 导出脚本 | 本包完成 |
 | 装置 | `ai-provider-smoke.mjs` 供应商连通与 JSON 契约自检 | 本包完成 |
-| 装置 | 消融开关 `AI_ABLATION_DISABLE` | 已完成（`rag` 占位待 L1） |
+| 装置 | 消融开关 `AI_ABLATION_DISABLE` | 已完成 |
+| 装置 | 课程资料检索与出处 `citations`（契约 1.4.0） | 已完成（确定性关键词召回，非向量检索） |
 | E1 | 240 次调用 + 判定结果 | 待 AI 供应商开通后执行 |
 | E2 | 6 组 × 120 次 | 待消融开关落地 |
 | E3 | 6–10 人问卷与任务记录 | 待组织 |

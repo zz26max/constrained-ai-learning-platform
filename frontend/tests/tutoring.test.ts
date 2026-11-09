@@ -185,6 +185,10 @@ describe('P2-A mock：请求状态机与分层约束', () => {
     const assistant = messages.body.data.items.at(-1)
     expect(assistant.mode).toBe('fallback')
     expect(assistant.hintLevel).toBeNull()
+    expect(assistant.citations).toEqual([])
+    expect(fallback.body.data.result.citations).toEqual([])
+    const seededAssistant = messages.body.data.items.find(item => item.role === 'assistant' && item.sequence === 2)
+    expect(seededAssistant.citations[0]?.title).toBe('CSS 尺寸约束与溢出')
 
     const [, stillLow] = await sendAndWait({ action: 'ask', content: '那我该先检查什么？' })
     expect(stillLow.body.data.result.hintLevel).toBe(1)
