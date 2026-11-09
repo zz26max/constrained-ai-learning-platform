@@ -147,6 +147,14 @@ try {
     if ($InitializeAccounts) { $env:SPRING_PROFILES_ACTIVE = 'local-accounts' }
     if ($InitializeDemoData) { $env:SPRING_PROFILES_ACTIVE = 'local-demo-data' }
     $serverExitCode = Invoke-NativeCommand { .\mvnw.cmd spring-boot:run | Out-Host }
+    # mvnw 的发行版缓存被清理后 wrapper 无法启动；有系统 Maven 时回退，避免本地环境整块不可用。
+    if ($serverExitCode -ne 0 -and $env:MAVEN_HOME) {
+        $systemMaven = Join-Path $env:MAVEN_HOME 'bin/mvn.cmd'
+        if (Test-Path -LiteralPath $systemMaven) {
+            Write-Host ('mvnw 不可用，回退到系统 Maven：' + $systemMaven)
+            $serverExitCode = Invoke-NativeCommand { & $systemMaven spring-boot:run | Out-Host }
+        }
+    }
     if ($serverExitCode -ne 0) { throw '后端启动失败，请检查 Maven 输出与 JDK 版本。' }
 } finally {
     # 避免一次性命令影响同一终端后续启动的 API。
