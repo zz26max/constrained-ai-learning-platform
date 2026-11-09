@@ -50,6 +50,7 @@ export function validateFile(name, data) {
       seen.add(item.id)
     }
     if (typeof item?.title !== 'string' || item.title.trim() === '') fail(`${where}: 缺少 title`)
+    if (item?.level !== undefined && !['basic', 'advanced'].includes(item.level)) fail(`${where}: level 只能是 basic 或 advanced`)
     if (typeof item?.prompt !== 'string' || item.prompt.trim() === '') fail(`${where}: 缺少 prompt`)
     if (!item?.files || typeof item.files !== 'object' || Object.keys(item.files).length === 0) fail(`${where}: files 不能为空`)
     const defect = item?.defect
@@ -104,7 +105,9 @@ export function summary(corpus) {
   const byCategory = Object.fromEntries(corpus.map(entry => [entry.category, entry.items.length]))
   const total = corpus.reduce((sum, entry) => sum + entry.items.length, 0)
   const variants = corpus.reduce((sum, entry) => sum + entry.items.reduce((inner, item) => inner + 2 + item.variants.multiTurn.length, 0), 0)
-  return { byCategory, total, variants }
+  const basic = corpus.reduce((sum, entry) => sum + entry.items.filter(item => item.level === 'basic').length, 0)
+  const advanced = corpus.reduce((sum, entry) => sum + entry.items.filter(item => item.level === 'advanced').length, 0)
+  return { byCategory, total, variants, basic, advanced }
 }
 
 export function selfTest() {
@@ -192,9 +195,10 @@ export function main(argv = process.argv.slice(2)) {
     for (const error of result.errors) console.error(`  - ${error}`)
     return 1
   }
-  const { byCategory, total, variants } = summary(result.corpus)
+  const { byCategory, total, variants, basic, advanced } = summary(result.corpus)
   console.log(`OK: ${result.files.length} 个文件、${total} 题、${variants} 个用例（每题 = 提示/直答/多轮各计）`)
   console.log('分类：' + Object.entries(byCategory).map(([key, value]) => `${key}=${value}`).join('  '))
+  console.log(`难度：basic=${basic}  advanced=${advanced}`)
   const missing = CATEGORIES.filter(category => !result.files.includes(`${category}.json`))
   if (missing.length) console.log(`提示：缺少文件 ${missing.join(', ')}`)
   if (total < 40) console.log(`提示：目标 40 题，当前 ${total} 题；补齐前不开始 E1 正式采集。`)
