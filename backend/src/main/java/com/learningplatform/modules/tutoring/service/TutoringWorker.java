@@ -24,6 +24,10 @@ public class TutoringWorker {
  private final ThreadPoolExecutor pool=new ThreadPoolExecutor(2,2,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(16),r->{Thread t=new Thread(r,"tutoring-worker");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
  private volatile boolean ready;
  @Value("${AI_WORKER_ENABLED:true}") private boolean enabled=true;
+ /** 消融开关：AI_ABLATION_DISABLE=static,intercept_input,... 只用于实验，默认空。 */
+ @Value("${AI_ABLATION_DISABLE:}") private String ablation="";
+ private volatile Set<String> ablationLayers;
+ static final Set<String> ABLATION_LAYERS=Set.of("rag","static","intercept_input","intercept_output","graded_hints");
  private final com.learningplatform.modules.analytics.service.LearningEventService events;
  public TutoringWorker(TutoringService service,TutoringMapper db,TutoringJson json,Clock clock,com.learningplatform.modules.courses.mapper.AssignmentMapper assignments,TutoringProvider provider,PlatformTransactionManager manager,com.learningplatform.modules.analytics.service.LearningEventService events,@Value("${AI_RETENTION_CLEANUP_ENABLED:false}") boolean cleanup){this.assignments=assignments;this.events=events;this.service=service;this.db=db;this.json=json;this.clock=clock;this.provider=provider;this.cleanup=cleanup;tx=new TransactionTemplate(manager);tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);}
  @EventListener(ApplicationReadyEvent.class) public synchronized void recover(){if(!enabled||ready)return;try{recoverRunning();ready=true;}catch(RuntimeException unavailable){ready=false;logFailure(null,"startup_recovery","INTERNAL_ERROR",unavailable);}}
@@ -39,7 +43,7 @@ public class TutoringWorker {
    if(service.expired(request)){fail(id,"HISTORY_EXPIRED");return;}
    String blocked=deliveryBlocked(request,a);if(blocked!=null){fail(id,blocked);return;}
    if(!Boolean.TRUE.equals(policy.get("enabled"))||pid==null){fail(id,"POLICY_REJECTED");return;}
-   int requestedLevel=((Number)request.get("hint_level")).intValue();String savedAttempt=(String)request.get("student_attempt");
+   int requestedLevel=((Number)request.get("hint_level")).intValue();if(disabled("graded_hints"))requestedLevel=1;String savedAttempt=(String)request.get("student_attempt");
    if(!((List<?>)policy.get("allowedActions")).contains(request.get("action"))||requestedLevel>((Number)policy.get("maxHintLevel")).intValue()||(requestedLevel>=((Number)policy.get("requireAttemptFromLevel")).intValue()&&(savedAttempt==null||savedAttempt.isBlank()))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
    var historyRows=db.list(LIST_REVIEWED_HISTORY,request.get("student_id"),request.get("assignment_id"));
    boolean expired=db.count(COUNT_EXPIRED_HISTORY,request.get("student_id"),request.get("assignment_id"),clock.instant())>0;
@@ -49,22 +53,40 @@ public class TutoringWorker {
    String all=String.join("\n",materials)+Objects.toString(question,"")+Objects.toString(attempt,"")+Objects.toString(workspace,"")+String.join("\n",history);
    if(db.count(COUNT_DISCLOSED_CHARACTERS,request.get("student_id"),request.get("assignment_id"))>=12000){deliver(id,pid,policy,null,"OUTPUT_REJECTED");return;}
    if(expired){deliver(id,pid,policy,null,"HISTORY_EXPIRED");return;}
-   if(TutoringSafety.prohibited(all)||TutoringSafety.sensitive(all)){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
+   if(!disabled("intercept_input")&&(TutoringSafety.prohibited(all)||TutoringSafety.sensitive(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
    if(!provider.available()){fail(id,"PROVIDER_UNAVAILABLE");return;}
-   int level=((Number)request.get("hint_level")).intValue();var modes=(List<String>)policy.get("allowedModes");
-   var context=new TutoringProvider.Context((String)request.get("action"),level,((Number)policy.get("maxOutputTokens")).intValue(),modes,TutoringService.boundary(),question,attempt,workspace,materials,history);
+   int level=requestedLevel;var modes=(List<String>)policy.get("allowedModes");
+   var findings=staticFindings(a.id(),Objects.toString(request.get("student_id"),null),request.get("workspace_revision") instanceof Number revision?revision.intValue():null);
+   var context=new TutoringProvider.Context((String)request.get("action"),level,((Number)policy.get("maxOutputTokens")).intValue(),modes,TutoringService.boundary(),question,attempt,workspace,materials,history,findings);
    for(int call=0;call<2;call++){
     // Repeat the exact same transmission gate before each controlled generation.
-    if(TutoringSafety.sensitive(all)||TutoringSafety.prohibited(all)){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
+    if(!disabled("intercept_input")&&(TutoringSafety.sensitive(all)||TutoringSafety.prohibited(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
     if(db.update(RESERVE_PROVIDER_CALL,pid,clock.instant(),id)!=1)return;
     TutoringProvider.Output output;
     try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){logFailure(id,"provider_generate","PROVIDER_RESULT_UNKNOWN",e);fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){logFailure(id,"provider_generate","PROVIDER_UNAVAILABLE",e);fail(id,"PROVIDER_UNAVAILABLE");return;}
     if(output!=null)db.update(ACCUMULATE_USAGE,output.inputTokens(),output.inputTokens(),output.inputTokens(),output.outputTokens(),output.outputTokens(),output.outputTokens(),id);
-    if(TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null);return;}
+    if(disabled("intercept_output")||TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null);return;}
    }
    deliver(id,pid,policy,null,"OUTPUT_REJECTED");
   }catch(Exception e){logFailure(id,"execute","INTERNAL_ERROR",e);fail(id,"INTERNAL_ERROR");}
  }
+ /** 最近一次已完成自动检查的未通过项；缺数据或解析失败时静默返回空，不影响辅导主流程。 */
+ private List<String> staticFindings(String assignmentId,String studentId,Integer requestRevision){
+  if(disabled("static")||assignmentId==null||studentId==null)return List.of();
+  try{
+   var row=db.one(STATIC_CHECK_SNAPSHOT,assignmentId,studentId);if(row==null)return List.of();
+   int revision=((Number)row.get("workspace_revision")).intValue();
+   return TutoringFindings.build(json.read(row.get("policy_snapshot")),json.read(row.get("result")),revision,requestRevision);
+  }catch(RuntimeException unusable){return List.of();}
+ }
+ static Set<String> parseLayers(String raw){
+  if(raw==null||raw.isBlank())return Set.of();
+  var layers=new HashSet<String>();
+  for(var part:raw.split(",")){var name=part.trim().toLowerCase(Locale.ROOT);if(ABLATION_LAYERS.contains(name))layers.add(name);}
+  return Set.copyOf(layers);
+ }
+ private Set<String> layers(){var value=ablationLayers;if(value==null){value=parseLayers(ablation);ablationLayers=value;}return value;}
+ private boolean disabled(String layer){return layers().contains(layer);}
  private String deliveryBlocked(Map<String,Object> r,com.learningplatform.modules.courses.model.AssignmentRows.Assignment a){
   var membership=db.one(FIND_DELIVERY_MEMBERSHIP,r.get("student_id"),a.offeringId());
   if(membership==null||!"active".equals(membership.get("member_status")))return "MEMBERSHIP_REVOKED";
