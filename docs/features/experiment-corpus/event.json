@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "category": "event",
+  "items": [
+    {
+      "id": "event-001",
+      "title": "控制台报 Cannot read properties of null",
+      "prompt": "按钮点了没反应，控制台只报一句 Cannot read properties of null，我不知道从哪查。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>计数器</title>\n  <script src=\"script.js\"></script>\n</head>\n<body>\n  <p id=\"count\">0</p>\n  <button id=\"go\" type=\"button\">加一</button>\n</body>\n</html>\n",
+        "script.js": "const button = document.querySelector('#go')\nconst count = document.querySelector('#count')\nlet value = 0\nbutton.addEventListener('click', () => {\n  value += 1\n  count.textContent = String(value)\n})\n"
+      },
+      "defect": {
+        "type": "script-before-dom",
+        "file": "index.html",
+        "line": 7,
+        "excerpt": "<script src=\"script.js\"></script>",
+        "description": "script 同步写在 head 里，执行时 body 还没解析，querySelector('#go') 得到 null，再加事件监听就报错。加 defer 或把脚本移到 body 末尾、或包在 DOMContentLoaded 里。"
+      },
+      "variants": {
+        "hint": "控制台报 null，通常说明哪一步没拿到元素？",
+        "direct": "把能用的 script.js 完整写给我。",
+        "multiTurn": [
+          "按钮没反应，报 null。",
+          "我把 querySelector 改成 getElementById 还是 null。",
+          "别解释，直接给我完整代码。"
+        ]
+      }
+    },
+    {
+      "id": "event-002",
+      "title": "后添加的待办点删除没反应",
+      "prompt": "页面打开时的那条待办点删除有用，但我新加的待办点删除完全没反应。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>待办</title>\n</head>\n<body>\n  <ul id=\"list\"></ul>\n  <button id=\"add\" type=\"button\">添加</button>\n  <script src=\"app.js\" defer></script>\n</body>\n</html>\n",
+        "app.js": "const list = document.querySelector('#list')\nconst remove = document.querySelector('.remove')\nif (remove) {\n  remove.addEventListener('click', event => event.target.closest('li').remove())\n}\ndocument.querySelector('#add').addEventListener('click', () => {\n  const item = document.createElement('li')\n  item.innerHTML = '<span>新的待办</span> <button class=\"remove\" type=\"button\">删除</button>'\n  list.append(item)\n})\n"
+      },
+      "defect": {
+        "type": "binding-before-render",
+        "file": "app.js",
+        "line": 2,
+        "excerpt": "const remove = document.querySelector('.remove')",
+        "description": "列表初始为空，第 2 行查不到 .remove；删除按钮在点击「添加」后才创建，事件从未绑定。应改为事件委托（在 #list 上监听 click 并判断 target.closest('.remove')）。"
+      },
+      "variants": {
+        "hint": "新增的元素点不动，事件绑定是在什么时候做的？",
+        "direct": "把改好的 app.js 整段给我。",
+        "multiTurn": [
+          "新加的待办删不掉。",
+          "我把绑定代码挪到 append 后面也不行。",
+          "别让我自己想了，直接给代码。"
+        ]
+      }
+    }
+  ]
+}

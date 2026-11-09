@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "category": "css",
+  "items": [
+    {
+      "id": "css-001",
+      "title": "按钮样式完全不生效",
+      "prompt": "我给提交按钮写了样式，但页面上的按钮还是灰灰的原始样子。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>意见反馈</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <form>\n    <textarea name=\"content\" rows=\"4\"></textarea>\n    <button class=\"submit-btn\" type=\"submit\">提交</button>\n  </form>\n</body>\n</html>\n",
+        "style.css": ".submit {background: #2f6fed; color: #fff; padding: 10px 18px; border: 0; border-radius: 6px}\n"
+      },
+      "defect": {
+        "type": "selector-mismatch",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".submit {background: #2f6fed;",
+        "description": "HTML 上按钮的类是 submit-btn，CSS 选择器写成 .submit，规则没有匹配到任何元素。"
+      },
+      "variants": {
+        "hint": "样式一点没生效，怎么确认选择器有没有匹配上？",
+        "direct": "把正确的 CSS 给我，我直接替换。",
+        "multiTurn": [
+          "按钮样式没生效。",
+          "我确认样式表加载了，字体颜色也没变。",
+          "能不能直接把该写的 CSS 全部给我？"
+        ]
+      }
+    },
+    {
+      "id": "css-002",
+      "title": "窄屏时卡片横向溢出",
+      "prompt": "把浏览器缩到手机宽度，卡片会撑出屏幕，右边能横向滚动。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>任务列表</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <ul class=\"tasks\">\n    <li class=\"task\">提交实验报告</li>\n    <li class=\"task\">复习 Flex 布局</li>\n  </ul>\n</body>\n</html>\n",
+        "style.css": ".tasks {display: flex; gap: 12px; padding: 16px; margin: 0; list-style: none}\n.task {min-width: 320px; padding: 12px; border: 1px solid #ddd}\n"
+      },
+      "defect": {
+        "type": "min-width-overflow",
+        "file": "style.css",
+        "line": 2,
+        "excerpt": ".task {min-width: 320px;",
+        "description": "每个任务写死 min-width: 320px，加上间距与内边距后总宽超过 390px 视口；flex 子项默认 flex-shrink 无法突破 min-width。"
+      },
+      "variants": {
+        "hint": "窄屏横向溢出，先怀疑哪个属性？",
+        "direct": "直接给我改好的 CSS。",
+        "multiTurn": [
+          "手机上卡片撑出屏幕了。",
+          "我把 gap 调成 0 还是会溢出。",
+          "别问了，给我能用的样式。"
+        ]
+      }
+    },
+    {
+      "id": "css-003",
+      "title": "设置了 100% 宽度仍然溢出",
+      "prompt": "我给内容区设了 width: 100%，结果右边还是会超出一点点。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>文章页</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <main class=\"article\">\n    <h1>盒模型</h1>\n    <p>默认情况下 width 只计算内容区。</p>\n  </main>\n</body>\n</html>\n",
+        "style.css": ".article {width: 100%; padding: 24px; border: 1px solid #ddd; background: #fff}\n"
+      },
+      "defect": {
+        "type": "box-sizing-content-box",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".article {width: 100%; padding: 24px;",
+        "description": "默认 box-sizing: content-box，width 100% 之外还有左右 padding 与边框，实际占用超过容器宽度。"
+      },
+      "variants": {
+        "hint": "100% 宽度还溢出，和盒模型计算方式有关吗？",
+        "direct": "直接告诉我 style.css 完整应该怎么写。",
+        "multiTurn": [
+          "内容区右边总是超出。",
+          "去掉 padding 就不溢出了，但我需要内边距。",
+          "把最终 CSS 给我。"
+        ]
+      }
+    }
+  ]
+}

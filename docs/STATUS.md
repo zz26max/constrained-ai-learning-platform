@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`6b90abb`（课程资料检索 L1、出处 `citations` 与契约 1.4.0；L3 静态分析见 `1c75fd7`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 已合并推送至 `eeeffe6`，无未推送提交。
+- **代码基线**：`ed441f1`（实验语料校验器与 10 题样板；L1 检索见 `d61302f`、L3 静态分析见 `1c75fd7`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 已推送至 `18f846d`，分支 `experiment/corpus` 尚未合并。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。自动检查已实现并通过本轮验证，动态学习路径与预测未实现；P2 基础规则建议已实现（nextRecommendation），不应统称为“建议未实现”。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；本轮按用户授权补充服务端自动判题（Web 静态 HTML/CSS 与 SQL 查询/增删改，已完成真实联调）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
@@ -40,6 +40,10 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-09 实验语料样板与校验器（分支 `experiment/corpus`）**：新增 [实验语料](features/experiment-corpus/README.md)（`docs/features/experiment-corpus/` 下 `html.json`/`css.json`/`event.json`/`sql.json`），按单题格式收录 **10 题样板**：每题含学生代码、一个主缺陷的金标准定位（文件＋行号＋该行必含片段＋说明）、三档问法（提示／直答／三轮拆解），并标注 10/40 进度与「未补齐不开始 E1 正式采集」。新增 [experiment-corpus.mjs](../scripts/experiment-corpus.mjs)：校验 JSON 结构、id 唯一与前缀、`defect.file` 存在、行号范围、该行是否包含 `excerpt`、三档问法完整性；`--self-test` 用 6 个负例自检校验器本身。
+>
+> 检查：`node scripts/experiment-corpus.mjs` → OK（4 文件 / 10 题 / 50 个用例，html=3 css=3 event=2 sql=2）；`--self-test` 6 项 PASS；`validate_contract.py` PASS（38 份文档登记、§0 基线可解析）。未做：其余 30 题未编写；E1 运行器尚未接入语料；未执行任何真实模型调用。
 
 > **2026-11-09 课程资料检索（L1）与出处，契约 1.4.0（分支 `feature/rag-citations`）**：辅导生成前按作业知识点与所属章节召回 `resources`（最多 20 条候选），用「问题＋尝试描述」做确定性打分（英文按词、中文按二元组）取前 2 条，每条截 900 字进上下文；交付时把 `citations[{resourceId,title}]` 写入结果，`listTutoringMessages` 与 `getTutoringRequest` 一并返回；固定模板回退、历史过期、学生消息均为空数组。`AI_ABLATION_DISABLE=rag` 可关闭该层。契约由 1.3.0 升到 **1.4.0**（`TutoringResult` 与 `TutoringMessageDTO` 新增必填 `citations`，新增 `CitationDTO`）。
 >

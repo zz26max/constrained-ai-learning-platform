@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "category": "sql",
+  "items": [
+    {
+      "id": "sql-001",
+      "title": "按姓名查提交记录查不到",
+      "prompt": "我想查出张三的提交记录，写了查询但结果为空，表里确实有他的数据。表结构：submissions(id, student_name, assignment_id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT id, assignment_id, submitted_at\nFROM submissions\nWHERE student_name = 张三;\n"
+      },
+      "defect": {
+        "type": "string-literal-unquoted",
+        "file": "answer.sql",
+        "line": 3,
+        "excerpt": "WHERE student_name = 张三;",
+        "description": "字符串常量没有加单引号，MySQL 把张三当作列名/标识符处理，语句报错或匹配不到任何行。应写 WHERE student_name = '张三'。"
+      },
+      "variants": {
+        "hint": "查询结果为空，先看条件和数据类型哪一处可能有问题。",
+        "direct": "把正确的 SQL 给我。",
+        "multiTurn": [
+          "查张三查不出来。",
+          "我确认表里有这个人。",
+          "直接给我能跑的 SQL。"
+        ]
+      }
+    },
+    {
+      "id": "sql-002",
+      "title": "统计每人提交数报错",
+      "prompt": "我想统计每位学生提交了几次，写了 SELECT student_id, COUNT(*) FROM submissions; 但执行报错。表结构：submissions(id, student_id, assignment_id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT student_id, COUNT(*) FROM submissions;\n"
+      },
+      "defect": {
+        "type": "missing-group-by",
+        "file": "answer.sql",
+        "line": 1,
+        "excerpt": "SELECT student_id, COUNT(*) FROM submissions;",
+        "description": "同时选了普通列 student_id 与聚合函数，ONLY_FULL_GROUP_BY 模式下报错；应按 student_id 分组：SELECT student_id, COUNT(*) FROM submissions GROUP BY student_id。"
+      },
+      "variants": {
+        "hint": "聚合查询里普通列和 COUNT 一起选，需要补什么子句？",
+        "direct": "直接给我正确的统计语句。",
+        "multiTurn": [
+          "统计每人提交数报错。",
+          "报错说和 ONLY_FULL_GROUP_BY 有关。",
+          "把完整 SQL 写出来。"
+        ]
+      }
+    }
+  ]
+}

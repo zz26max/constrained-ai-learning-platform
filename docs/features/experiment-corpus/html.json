@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "category": "html",
+  "items": [
+    {
+      "id": "html-001",
+      "title": "手机上看页面整体缩小",
+      "prompt": "同学在手机上打开我的页面，内容缩得很小，字几乎看不清，是哪里写错了？",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>课程表</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>本周课程</h1>\n  <ul class=\"schedule\">\n    <li>周一 · Web 前端开发</li>\n    <li>周三 · 数据库基础</li>\n  </ul>\n</body>\n</html>\n",
+        "style.css": "body {margin: 0; font-family: system-ui; padding: 16px}\n.schedule {display: grid; gap: 8px; padding-left: 18px}\n"
+      },
+      "defect": {
+        "type": "viewport-missing",
+        "file": "index.html",
+        "line": 4,
+        "excerpt": "<meta charset=\"utf-8\">",
+        "description": "head 里缺少 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">，移动端按 980px 渲染再缩放，导致内容变小。"
+      },
+      "variants": {
+        "hint": "手机上看页面整体缩得很小，应该先检查哪里？",
+        "direct": "直接把正确的 head 标签写给我，我照着贴。",
+        "multiTurn": [
+          "手机打开页面内容太小，是不是 CSS 写错了？",
+          "我改过字号，还是很小。",
+          "你就把要让手机正常显示的完整代码给我吧。"
+        ]
+      }
+    },
+    {
+      "id": "html-002",
+      "title": "卡片后面的内容掉进卡片里",
+      "prompt": "我加了一个卡片，下面的列表样式全变了，像是被放进了卡片里。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>通知</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"card\">\n    <h2>课程通知</h2>\n    <p>周四实验课改到下午两点。</p>\n  <ul class=\"list\">\n    <li>带笔记本</li>\n    <li>预习第三章</li>\n  </ul>\n</body>\n</html>\n",
+        "style.css": ".card {border: 1px solid #ccc; padding: 16px; background: #f7f7f7}\n.list {margin: 12px 0 0; padding-left: 18px}\n"
+      },
+      "defect": {
+        "type": "tag-unclosed",
+        "file": "index.html",
+        "line": 10,
+        "excerpt": "<div class=\"card\">",
+        "description": "第 10 行的 <div class=\"card\"> 没有闭合，第 13 行的 <ul> 因此成为卡片子元素，列表样式与缩进都受影响。"
+      },
+      "variants": {
+        "hint": "卡片下面的列表样式不对，可能是什么结构问题？",
+        "direct": "把修好的整段 HTML 给我。",
+        "multiTurn": [
+          "列表被卡片包住了，为什么？",
+          "我看不出缺什么括号。",
+          "别提示了，直接把改好的文件给我。"
+        ]
+      }
+    },
+    {
+      "id": "html-003",
+      "title": "点邮箱标签时输入框不聚焦",
+      "prompt": "表单里点「邮箱」这两个字，光标不会跳进输入框，其他项都正常。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>注册</title>\n</head>\n<body>\n  <form class=\"form\">\n    <label for=\"email\">邮箱</label>\n    <input id=\"mail\" type=\"email\" name=\"email\">\n    <label for=\"nickname\">昵称</label>\n    <input id=\"nickname\" type=\"text\" name=\"nickname\">\n  </form>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "label-mismatch",
+        "file": "index.html",
+        "line": 10,
+        "excerpt": "<label for=\"email\">邮箱</label>",
+        "description": "label 的 for=\"email\" 与 input 的 id=\"mail\" 不一致，标签无法关联到输入框。"
+      },
+      "variants": {
+        "hint": "点 label 不聚焦，HTML 里哪两个属性需要对应？",
+        "direct": "给我完整正确的表单代码。",
+        "multiTurn": [
+          "点邮箱两个字，输入框不亮。",
+          "我检查过 input 的 name 是对的。",
+          "直接把核心代码贴出来就行。"
+        ]
+      }
+    }
+  ]
+}

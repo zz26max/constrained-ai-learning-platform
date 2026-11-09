@@ -78,7 +78,7 @@
 ## 4. 材料与语料
 
 - **课程材料**：V16 迁移导入的《Web 开发基础》5 章、10 份 Markdown 资源、12 个知识点，作为 L1 知识库的唯一来源。
-- **测试集**：`docs/features/experiment-corpus/` 下按 `html/`、`css/`、`event/`、`sql/` 四类各 10 题。每题包含：题面、学生代码（含一个已知缺陷）、期望缺陷定位、三类问法文本。语料入库前需人工复核，缺一题不得开始 E1。
+- **测试集**：`docs/features/experiment-corpus/`，`html.json`、`css.json`、`event.json`、`sql.json` 四类各 10 题，单题格式见该目录 `README.md`。每题包含：题面、学生代码（一个主缺陷）、金标准定位（文件＋行号＋必含片段）、三档问法（提示／直答／三轮拆解）。**当前 10/40 样板**，口径确认后补齐，未补齐不开始 E1 正式采集；`node scripts/experiment-corpus.mjs` 负责结构校验（行号与片段自动核对），失败即退出 1。
 - **对照组提示词**：A 组使用同一模型与同一题面，仅移除系统约束和拦截；提示词全文与 B 组一同归档，保证可复现。
 
 ## 5. 指标定义
@@ -176,7 +176,7 @@ node scripts/experiment-export.mjs --offering <教学班 UUID>
 
 | 阶段 | 交付 | 状态 |
 | --- | --- | --- |
-| 语料 | 40 题测试集（含金标准标注） | 待编写 |
+| 语料 | 40 题测试集（含金标准标注） | 样板完成 10 题，校验脚本就绪 |
 | 装置 | `experiment-export.mjs` 导出脚本 | 本包完成 |
 | 装置 | `ai-provider-smoke.mjs` 供应商连通与 JSON 契约自检 | 本包完成 |
 | 装置 | 消融开关 `AI_ABLATION_DISABLE` | 已完成 |
