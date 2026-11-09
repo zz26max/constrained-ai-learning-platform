@@ -58,8 +58,8 @@ public class TutoringWorker {
    if(!disabled("intercept_input")&&(TutoringSafety.prohibited(all)||TutoringSafety.sensitive(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
    if(!provider.available()){fail(id,"PROVIDER_UNAVAILABLE");return;}
    int level=requestedLevel;var modes=(List<String>)policy.get("allowedModes");
-   var findings=staticFindings(a.id(),Objects.toString(request.get("student_id"),null),request.get("workspace_revision") instanceof Number revision?revision.intValue():null);
-   var context=new TutoringProvider.Context((String)request.get("action"),level,((Number)policy.get("maxOutputTokens")).intValue(),modes,TutoringService.boundary(),question,attempt,workspace,materials,history,findings);
+   var findings=staticContext(a.id(),Objects.toString(request.get("student_id"),null),request.get("workspace_revision") instanceof Number revision?revision.intValue():null);
+   var context=new TutoringProvider.Context((String)request.get("action"),level,((Number)policy.get("maxOutputTokens")).intValue(),modes,TutoringService.boundary(),question,attempt,workspace,materials,history,findings.findings(),findings.directives());
    for(int call=0;call<2;call++){
     // Repeat the exact same transmission gate before each controlled generation.
     if(!disabled("intercept_input")&&(TutoringSafety.sensitive(all)||TutoringSafety.prohibited(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
@@ -67,19 +67,23 @@ public class TutoringWorker {
     TutoringProvider.Output output;
     try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){logFailure(id,"provider_generate","PROVIDER_RESULT_UNKNOWN",e);fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){logFailure(id,"provider_generate","PROVIDER_UNAVAILABLE",e);fail(id,"PROVIDER_UNAVAILABLE");return;}
     if(output!=null)db.update(ACCUMULATE_USAGE,output.inputTokens(),output.inputTokens(),output.inputTokens(),output.outputTokens(),output.outputTokens(),output.outputTokens(),id);
-    if(disabled("intercept_output")||TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)){deliver(id,pid,policy,output,null,selection.citations());return;}
+    if(disabled("intercept_output")||(TutoringSafety.acceptable(output,level,modes,context.maxOutputTokens(),history)&&TutoringFeedback.accepts(output.content(),findings.tokens()))){deliver(id,pid,policy,output,null,selection.citations());return;}
    }
    deliver(id,pid,policy,null,"OUTPUT_REJECTED");
   }catch(Exception e){logFailure(id,"execute","INTERNAL_ERROR",e);fail(id,"INTERNAL_ERROR");}
  }
- /** 最近一次已完成自动检查的未通过项；缺数据或解析失败时静默返回空，不影响辅导主流程。 */
- private List<String> staticFindings(String assignmentId,String studentId,Integer requestRevision){
-  if(disabled("static")||assignmentId==null||studentId==null)return List.of();
+ /** 最近一次已完成自动检查：失败项、对应的引导动作与校验词；缺数据或解析失败时返回空。 */
+ record StaticCheck(List<String> findings,List<String> directives,List<String> tokens){
+  static final StaticCheck EMPTY=new StaticCheck(List.of(),List.of(),List.of());
+ }
+ private StaticCheck staticContext(String assignmentId,String studentId,Integer requestRevision){
+  if(disabled("static")||assignmentId==null||studentId==null)return StaticCheck.EMPTY;
   try{
-   var row=db.one(STATIC_CHECK_SNAPSHOT,assignmentId,studentId);if(row==null)return List.of();
+   var row=db.one(STATIC_CHECK_SNAPSHOT,assignmentId,studentId);if(row==null)return StaticCheck.EMPTY;
    int revision=((Number)row.get("workspace_revision")).intValue();
-   return TutoringFindings.build(json.read(row.get("policy_snapshot")),json.read(row.get("result")),revision,requestRevision);
-  }catch(RuntimeException unusable){return List.of();}
+   var policy=json.read(row.get("policy_snapshot"));var result=json.read(row.get("result"));
+   return new StaticCheck(TutoringFindings.build(policy,result,revision,requestRevision),TutoringFeedback.directives(policy,result),TutoringFeedback.tokens(policy,result));
+  }catch(RuntimeException unusable){return StaticCheck.EMPTY;}
  }
  static Set<String> parseLayers(String raw){
   if(raw==null||raw.isBlank())return Set.of();
