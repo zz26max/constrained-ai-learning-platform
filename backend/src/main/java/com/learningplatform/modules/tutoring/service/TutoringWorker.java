@@ -98,11 +98,13 @@ public class TutoringWorker {
  private void deliver(String id,String generatedPolicyId,Map<String,Object> generatedPolicy,TutoringProvider.Output output,String error){
   deliver(id,generatedPolicyId,generatedPolicy,output,error,List.of());
  }
- /** 课程资料召回；无候选或解析失败时静默返回空，不影响辅导主流程。 */
+ /** 课程资料召回；作业未关联知识点/章节时回退到本班全部 active 讲义；失败静默返回空。 */
  private TutoringRetrieval.Selection retrieve(com.learningplatform.modules.courses.model.AssignmentRows.Assignment a,String question,String attempt){
   try{
-   var rows=db.list(ASSIGNMENT_RESOURCES,a.offeringId(),a.id(),a.id());
-   return TutoringRetrieval.select(rows,Objects.toString(question,"")+"\n"+Objects.toString(attempt,"")+"\n"+Objects.toString(a.description(),""));
+   String query=Objects.toString(question,"")+"\n"+Objects.toString(attempt,"")+"\n"+Objects.toString(a.description(),"");
+   var selection=TutoringRetrieval.select(db.list(ASSIGNMENT_RESOURCES,a.offeringId(),a.id(),a.id()),query);
+   if(!selection.materials().isEmpty())return selection;
+   return TutoringRetrieval.select(db.list(OFFERING_RESOURCES,a.offeringId()),query);
   }catch(RuntimeException unusable){return TutoringRetrieval.EMPTY;}
  }
  private void deliver(String id,String generatedPolicyId,Map<String,Object> generatedPolicy,TutoringProvider.Output output,String error,List<Map<String,Object>> citations){
