@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`a0ab13e`（分支 `experiment/eval-harness`：课程实验方案、只读导出与供应商自检；自动判题后端 `45e4377`、前端 `beea84b`/`eb6815c`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 基线为 `c56f0c7`（已推送、无未推送提交），本分支已推送远端、尚未合并。
+- **代码基线**：`f86e21a`（分支 `feature/static-analysis`：辅导接入自动检查与消融开关；此前 `a0ab13e` 的实验装置已合并 master `83d8862`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 基线为 `83d8862`（已推送），本分支尚未合并。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商调用未启用，外部调用按用户确认保持关闭。自动检查已实现并通过本轮验证，动态学习路径与预测未实现；P2 基础规则建议已实现（nextRecommendation），不应统称为“建议未实现”。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；本轮按用户授权补充服务端自动判题（Web 静态 HTML/CSS 与 SQL 查询/增删改，已完成真实联调）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
@@ -40,6 +40,10 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-09 辅导接入自动检查（L3）与消融开关（分支 `feature/static-analysis`）**：`TutoringWorker` 在生成提示前读取该生该作业最近一条已完成的 `assignment_checks` 快照，把未通过规则压缩为最多 6 条、1200 字以内的发现项（规则 id、选择器、期望值；检查版本早于请求版本时标注），作为 `checkFindings` 进入供应商上下文；缺数据或解析失败时静默返回空，不影响主流程。新增 `TutoringFindings` 与 `STATIC_CHECK_SNAPSHOT` 查询，`ConfiguredTutoringProvider` 系统提示追加「checkFindings 非空时以其为依据」。新增实验开关 `AI_ABLATION_DISABLE`（`static`、`intercept_input`、`intercept_output`、`graded_hints`，`rag` 占位），默认空＝全部生效，`Start-Local.ps1` 白名单已同步，`.env.example` 有注释。
+>
+> 检查：`mvnw --batch-mode test` 486 用例 0 失败（原 481 + 新增 5 例 `TutoringFindingsTest`：只列失败项、过期标注、长值截断、空数据、消融层解析）；`validate_contract.py` PASS；`Start-Local.ps1` 的 UTF-8 BOM 复核存在。契约未变——`checkFindings` 只进内部上下文，不出现在响应体。未做：RAG（L1）未实现；`BACKEND.md` 尚未同步（需授权）；未用真实供应商验证行为（key 待提供）。
 
 > **2026-11-09 实验装置与 AI 供应商自检（分支 `experiment/eval-harness`）**：依据 19 页 PPT 第 1/14/15/17/18 页建立 [课程实验方案](features/experiment-protocol.md)：E1 对照（通用直答 vs 受限辅导，40 题 × 3 问法 × 2 组 ＝ 240 次）、E2 消融（六组，约定 `AI_ABLATION_DISABLE`，开关尚未实现）、E3 小样本用户测试（n=6–10、10 题问卷）；定义 M1–M11 指标、负权重 rubric（泄题/给出可提交代码各 −5）与统计口径（Fisher、Mann-Whitney、McNemar）。新增只读导出 [experiment-export.mjs](../scripts/experiment-export.mjs)：经 `docker exec` 只读 SELECT，输出 `student-assignment.csv`／`tutoring-requests.csv`／`export.json` 到 Git 忽略的 `.cache/experiments/`，不读 `backend/.env`、不接受任意 SQL。新增 [ai-provider-smoke.mjs](../scripts/ai-provider-smoke.mjs)：与 `ConfiguredTutoringProvider` 同构的请求体、4 字段与层级校验，并镜像 `TutoringSafety` 的可交付判定。
 >
