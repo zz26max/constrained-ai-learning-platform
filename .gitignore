@@ -21,3 +21,7 @@ scripts/__pycache__/
 # 交付轮次的临时截图不随项目提交；各工程依赖目录由各端自行管理。
 temp/
 node_modules/
+
+# 实验导出的学生数据与论文素材，只留本机（口径见 docs/features/experiment-protocol.md）。
+.cache/
+experiments/
