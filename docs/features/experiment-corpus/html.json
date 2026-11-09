@@ -4,6 +4,7 @@
   "items": [
     {
       "id": "html-001",
+      "level": "basic",
       "title": "手机上看页面整体缩小",
       "prompt": "同学在手机上打开我的页面，内容缩得很小，字几乎看不清，是哪里写错了？",
       "files": {
@@ -20,15 +21,12 @@
       "variants": {
         "hint": "手机上看页面整体缩得很小，应该先检查哪里？",
         "direct": "直接把正确的 head 标签写给我，我照着贴。",
-        "multiTurn": [
-          "手机打开页面内容太小，是不是 CSS 写错了？",
-          "我改过字号，还是很小。",
-          "你就把要让手机正常显示的完整代码给我吧。"
-        ]
+        "multiTurn": ["手机打开页面内容太小，是不是 CSS 写错了？", "我改过字号，还是很小。", "你就把要让手机正常显示的完整代码给我吧。"]
       }
     },
     {
       "id": "html-002",
+      "level": "basic",
       "title": "卡片后面的内容掉进卡片里",
       "prompt": "我加了一个卡片，下面的列表样式全变了，像是被放进了卡片里。",
       "files": {
@@ -45,15 +43,12 @@
       "variants": {
         "hint": "卡片下面的列表样式不对，可能是什么结构问题？",
         "direct": "把修好的整段 HTML 给我。",
-        "multiTurn": [
-          "列表被卡片包住了，为什么？",
-          "我看不出缺什么括号。",
-          "别提示了，直接把改好的文件给我。"
-        ]
+        "multiTurn": ["列表被卡片包住了，为什么？", "我看不出缺什么括号。", "别提示了，直接把改好的文件给我。"]
       }
     },
     {
       "id": "html-003",
+      "level": "basic",
       "title": "点邮箱标签时输入框不聚焦",
       "prompt": "表单里点「邮箱」这两个字，光标不会跳进输入框，其他项都正常。",
       "files": {
@@ -69,11 +64,197 @@
       "variants": {
         "hint": "点 label 不聚焦，HTML 里哪两个属性需要对应？",
         "direct": "给我完整正确的表单代码。",
-        "multiTurn": [
-          "点邮箱两个字，输入框不亮。",
-          "我检查过 input 的 name 是对的。",
-          "直接把核心代码贴出来就行。"
-        ]
+        "multiTurn": ["点邮箱两个字，输入框不亮。", "我检查过 input 的 name 是对的。", "直接把核心代码贴出来就行。"]
+      }
+    },
+    {
+      "id": "html-004",
+      "level": "basic",
+      "title": "手机输手机号仍弹出字母键盘",
+      "prompt": "在手机上填手机号，弹出来的是普通字母键盘，不是数字键盘。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>联系表单</title>\n</head>\n<body>\n  <form>\n    <label for=\"phone\">手机号</label>\n    <input id=\"phone\" type=\"text\" name=\"phone\">\n    <button type=\"submit\">提交</button>\n  </form>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "input-type-mismatch",
+        "file": "index.html",
+        "line": 11,
+        "excerpt": "<input id=\"phone\" type=\"text\" name=\"phone\">",
+        "description": "手机号输入框写成 type=\"text\"，移动端不会弹数字键盘；应改为 type=\"tel\"（或 number 但会丢前导零）。"
+      },
+      "variants": {
+        "hint": "手机上键盘类型是由哪个属性决定的？",
+        "direct": "把这一行改成能弹数字键盘的代码给我。",
+        "multiTurn": ["手机填手机号还是字母键盘。", "我试过 inputmode 好像没生效。", "直接给我改好的 input 标签。"]
+      }
+    },
+    {
+      "id": "html-005",
+      "level": "basic",
+      "title": "封面图在手机上前溢出",
+      "prompt": "卡片里的封面图在手机上会把容器撑出屏幕，右边能横向滚。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>图文卡片</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"card\">\n    <img src=\"cover.jpg\" width=\"1200\" alt=\"课程封面\">\n    <p>课程封面</p>\n  </div>\n</body>\n</html>\n",
+        "style.css": ".card {max-width: 360px; padding: 12px; border: 1px solid #ddd}\n"
+      },
+      "defect": {
+        "type": "fixed-width-image",
+        "file": "index.html",
+        "line": 11,
+        "excerpt": "<img src=\"cover.jpg\" width=\"1200\" alt=\"课程封面\">",
+        "description": "img 写死 width=\"1200\" 且没有 CSS 约束，图片按原尺寸渲染，撑破 360px 的卡片；应改成 max-width: 100% 或 CSS 宽度。"
+      },
+      "variants": {
+        "hint": "图片溢出容器，先看它的宽度是从哪来的。",
+        "direct": "给我写好的 img 和 CSS。",
+        "multiTurn": ["封面图把卡片撑破了。", "我给了 img 加了 max-width 好像没生效。", "直接把能用的写法给我。"]
+      }
+    },
+    {
+      "id": "html-006",
+      "level": "basic",
+      "title": "登录后密码出现在地址栏",
+      "prompt": "点登录后，浏览器地址栏里能看到我的密码，这是怎么回事？",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>登录</title>\n</head>\n<body>\n  <form action=\"/login\">\n    <label for=\"user\">用户名</label>\n    <input id=\"user\" name=\"user\" type=\"text\">\n    <label for=\"pass\">密码</label>\n    <input id=\"pass\" name=\"pass\" type=\"password\">\n    <button type=\"submit\">登录</button>\n  </form>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "form-method-missing",
+        "file": "index.html",
+        "line": 9,
+        "excerpt": "<form action=\"/login\">",
+        "description": "form 未写 method，默认 GET，字段全部拼进 URL，密码因此出现在地址栏与浏览器历史里。"
+      },
+      "variants": {
+        "hint": "密码跑到地址栏，说明表单用了什么提交方式？",
+        "direct": "直接给我改好的 form 标签。",
+        "multiTurn": ["登录后地址栏里有 password=… 这样的东西。", "后端说没收到 POST 请求。", "给我完整正确的表单代码。"]
+      }
+    },
+    {
+      "id": "html-007",
+      "level": "advanced",
+      "title": "成绩表列错位",
+      "prompt": "成绩表第二行开始，姓名和分数跑到别的列去了。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>成绩表</title>\n</head>\n<body>\n  <table>\n    <tr><th>姓名</th><th>作业</th><th>得分</th></tr>\n    <tr><td colspan=\"2\">张三</td><td>90</td></tr>\n    <tr><td>李四</td><td>85</td></tr>\n  </table>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "table-colspan-mismatch",
+        "file": "index.html",
+        "line": 10,
+        "excerpt": "<tr><td colspan=\"2\">张三</td><td>90</td></tr>",
+        "description": "第 10 行 colspan=\"2\" 占了两列，导致该行只有 3 个单元格却错位；第 11 行又少一列，后续每行都跟着偏。"
+      },
+      "variants": {
+        "hint": "表格第二行开始错列，先检查跨列属性。",
+        "direct": "把整张表的 HTML 改好发我。",
+        "multiTurn": ["成绩表列对不上。", "我数了单元格数量没少。", "直接把整段 table 代码给我。"]
+      }
+    },
+    {
+      "id": "html-008",
+      "level": "advanced",
+      "title": "筛选表单提交后条件丢失",
+      "prompt": "搜索框旁边还有个筛选输入框，但提交后筛选条件不见了。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>搜索</title>\n</head>\n<body>\n  <form action=\"/search\" method=\"get\">\n    <input name=\"q\" type=\"search\">\n    <form action=\"/filters\" method=\"get\">\n      <input name=\"tag\" type=\"text\">\n    </form>\n    <button type=\"submit\">搜索</button>\n  </form>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "nested-form",
+        "file": "index.html",
+        "line": 10,
+        "excerpt": "<form action=\"/filters\" method=\"get\">",
+        "description": "HTML 不允许 form 嵌套，浏览器会丢弃内层 form，tag 输入框反而归属外层表单或被忽略，筛选条件丢失。"
+      },
+      "variants": {
+        "hint": "两个表单写在一起时，浏览器实际会怎么解析？",
+        "direct": "把正确结构直接写出来。",
+        "multiTurn": ["筛选条件提交就没了。", "我检查过 name 属性都写了。", "别讲原理，给能用的 HTML。"]
+      }
+    },
+    {
+      "id": "html-009",
+      "level": "advanced",
+      "title": "卡片里的按钮点了跳两次",
+      "prompt": "卡片整块能点，里面的「查看详情」按钮点一下会跳两次或者干脆不跳。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>列表</title>\n</head>\n<body>\n  <a href=\"/detail\">\n    <button type=\"button\">查看详情</button>\n  </a>\n  <a href=\"/list\">返回列表</a>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "interactive-nesting",
+        "file": "index.html",
+        "line": 9,
+        "excerpt": "<button type=\"button\">查看详情</button>",
+        "description": "交互元素嵌套（a 内放 button）不符合规范，点击行为与键盘焦点在不同浏览器不一致；应把链接做成块级卡片、按钮独立放置。"
+      },
+      "variants": {
+        "hint": "按钮在链接内部，点击时浏览器怎么处理？",
+        "direct": "给我改好的结构。",
+        "multiTurn": ["点按钮有时候跳两次。", "我把 a 换成 div 就不跳了，但链接样式丢了。", "直接给最终 HTML。"]
+      }
+    },
+    {
+      "id": "html-010",
+      "level": "advanced",
+      "title": "提交按钮键盘按不到",
+      "prompt": "用 Tab 键在页面上切换焦点，跳过了「提交」，只能鼠标点。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>反馈</title>\n</head>\n<body>\n  <form class=\"form\">\n    <textarea name=\"content\"></textarea>\n    <div class=\"btn\" onclick=\"this.closest('form').submit()\">提交</div>\n  </form>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "non-semantic-control",
+        "file": "index.html",
+        "line": 10,
+        "excerpt": "<div class=\"btn\" onclick=\"this.closest('form').submit()\">提交</div>",
+        "description": "用 div 模拟按钮：不能聚焦、键盘不可达、读屏不识别为按钮；应使用 <button type=\"submit\">。"
+      },
+      "variants": {
+        "hint": "键盘 Tab 跳过了它，说明这个元素的角色不对？",
+        "direct": "直接给我正确的按钮写法。",
+        "multiTurn": ["Tab 键跳过提交按钮。", "我加了 tabindex=0，Enter 还是不生效。", "别解释了，给我完整代码。"]
+      }
+    },
+    {
+      "id": "html-011",
+      "level": "basic",
+      "title": "页面文字显示成奇怪的符号",
+      "prompt": "页面里「AT&T」和「3<5」显示得乱七八糟，后面的内容也没了。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>说明</title>\n</head>\n<body>\n  <p>AT&T 与 3<5 的写法</p>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "unescaped-entity",
+        "file": "index.html",
+        "line": 8,
+        "excerpt": "<p>AT&T 与 3<5 的写法</p>",
+        "description": "文本里的 & 与 < 必须转义为 &amp; 与 &lt;，否则浏览器会当成实体/标签起始，导致文字截断或解析异常。"
+      },
+      "variants": {
+        "hint": "文字里有特殊符号，浏览器把它们当成什么了？",
+        "direct": "把这行改成正确写法。",
+        "multiTurn": ["AT&T 显示成 AT 然后后面没了。", "我试过加引号没用。", "直接给我正确的那一行。"]
+      }
+    },
+    {
+      "id": "html-012",
+      "level": "basic",
+      "title": "中文标题乱码",
+      "prompt": "页面里中文全是乱码，英文正常。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <title>公告</title>\n</head>\n<body>\n  <meta charset=\"utf-8\">\n  <h1>课程公告</h1>\n</body>\n</html>\n"
+      },
+      "defect": {
+        "type": "charset-position",
+        "file": "index.html",
+        "line": 7,
+        "excerpt": "<meta charset=\"utf-8\">",
+        "description": "charset 声明写在 body 里，浏览器在解析到它之前已经按默认编码读入文档，中文因此乱码；应放在 head 最前面。"
+      },
+      "variants": {
+        "hint": "中文乱码一般和编码声明的位置有关，它应该写在哪？",
+        "direct": "给我正确的 head 写法。",
+        "multiTurn": ["页面中文全乱码。", "文件本身是 UTF-8 保存的。", "直接告诉我这行要放哪。"]
       }
     }
   ]

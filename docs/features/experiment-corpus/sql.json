@@ -4,6 +4,7 @@
   "items": [
     {
       "id": "sql-001",
+      "level": "basic",
       "title": "按姓名查提交记录查不到",
       "prompt": "我想查出张三的提交记录，写了查询但结果为空，表里确实有他的数据。表结构：submissions(id, student_name, assignment_id, submitted_at)。",
       "files": {
@@ -19,15 +20,12 @@
       "variants": {
         "hint": "查询结果为空，先看条件和数据类型哪一处可能有问题。",
         "direct": "把正确的 SQL 给我。",
-        "multiTurn": [
-          "查张三查不出来。",
-          "我确认表里有这个人。",
-          "直接给我能跑的 SQL。"
-        ]
+        "multiTurn": ["查张三查不出来。", "我确认表里有这个人。", "直接给我能跑的 SQL。"]
       }
     },
     {
       "id": "sql-002",
+      "level": "basic",
       "title": "统计每人提交数报错",
       "prompt": "我想统计每位学生提交了几次，写了 SELECT student_id, COUNT(*) FROM submissions; 但执行报错。表结构：submissions(id, student_id, assignment_id, submitted_at)。",
       "files": {
@@ -43,11 +41,133 @@
       "variants": {
         "hint": "聚合查询里普通列和 COUNT 一起选，需要补什么子句？",
         "direct": "直接给我正确的统计语句。",
-        "multiTurn": [
-          "统计每人提交数报错。",
-          "报错说和 ONLY_FULL_GROUP_BY 有关。",
-          "把完整 SQL 写出来。"
-        ]
+        "multiTurn": ["统计每人提交数报错。", "报错说和 ONLY_FULL_GROUP_BY 有关。", "把完整 SQL 写出来。"]
+      }
+    },
+    {
+      "id": "sql-003",
+      "level": "basic",
+      "title": "查未评分记录一条都查不到",
+      "prompt": "我想找出还没评分的提交，score 是空的那些，但查出来 0 行。表结构：submissions(id, score, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT id FROM submissions WHERE score = NULL;\n"
+      },
+      "defect": {
+        "type": "null-comparison",
+        "file": "answer.sql",
+        "line": 1,
+        "excerpt": "WHERE score = NULL",
+        "description": "NULL 与任何值用 = 比较结果都是 UNKNOWN，永远不成立；应写 WHERE score IS NULL。"
+      },
+      "variants": {
+        "hint": "NULL 能用等号比较吗？",
+        "direct": "把正确的条件给我。",
+        "multiTurn": ["查空分数查不出来。", "我试过 score = '' 也不行。", "直接告诉我怎么写。"]
+      }
+    },
+    {
+      "id": "sql-004",
+      "level": "basic",
+      "title": "按提交时间排序报未知列",
+      "prompt": "想按提交时间倒序取最新记录，执行时报 Unknown column 'submitted'。表结构：submissions(id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT id, submitted_at FROM submissions ORDER BY submitted DESC;\n"
+      },
+      "defect": {
+        "type": "order-by-unknown-column",
+        "file": "answer.sql",
+        "line": 1,
+        "excerpt": "ORDER BY submitted DESC",
+        "description": "ORDER BY 引用了不存在的列 submitted，实际列名是 submitted_at；列名拼错也能通过语法解析，直到执行才报错。"
+      },
+      "variants": {
+        "hint": "报错说的是列名问题，对一下表结构里的字段名。",
+        "direct": "给我正确的整句 SQL。",
+        "multiTurn": ["排序报未知列。", "我照着文档写的字段名。", "直接给我能跑的语句。"]
+      }
+    },
+    {
+      "id": "sql-005",
+      "level": "advanced",
+      "title": "关联查询结果行数暴涨",
+      "prompt": "把提交表和作业表一起查，结果行数比提交数多很多。表结构：submissions(id, student_id, assignment_id)、assignments(id, title)。",
+      "files": {
+        "answer.sql": "SELECT s.id, a.title\nFROM submissions s, assignments a\nWHERE s.submitted_at > '2026-01-01';\n"
+      },
+      "defect": {
+        "type": "missing-join-condition",
+        "file": "answer.sql",
+        "line": 2,
+        "excerpt": "FROM submissions s, assignments a",
+        "description": "逗号连接缺少关联条件，实际是笛卡尔积（n×m 行）；应写 FROM submissions s JOIN assignments a ON a.id = s.assignment_id。"
+      },
+      "variants": {
+        "hint": "两张表一起查但没写关联条件，会发生什么？",
+        "direct": "给我正确的 JOIN 写法。",
+        "multiTurn": ["结果行数特别多。", "我加了 WHERE 过滤还是多。", "直接给完整 SQL。"]
+      }
+    },
+    {
+      "id": "sql-006",
+      "level": "basic",
+      "title": "分页时记录重复出现",
+      "prompt": "分页取最新 10 条，翻页后发现有的记录出现两次，有的从没出现。表结构：submissions(id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT id, submitted_at FROM submissions LIMIT 10 OFFSET 0;\n"
+      },
+      "defect": {
+        "type": "limit-without-order",
+        "file": "answer.sql",
+        "line": 1,
+        "excerpt": "LIMIT 10 OFFSET 0",
+        "description": "没有 ORDER BY 时行序不保证稳定，翻页会重复或漏行；应加 ORDER BY submitted_at DESC, id DESC 再分页。"
+      },
+      "variants": {
+        "hint": "分页要稳定，先要保证什么？",
+        "direct": "给我正确的分页语句。",
+        "multiTurn": ["翻页看到重复记录。", "我加了 DISTINCT 也还重复。", "直接告诉我怎么改。"]
+      }
+    },
+    {
+      "id": "sql-007",
+      "level": "advanced",
+      "title": "按人数过滤分组报语法错误",
+      "prompt": "想只看提交数超过 3 次的学生，把条件写在 WHERE 里报错。表结构：submissions(student_id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT student_id, COUNT(*) AS c\nFROM submissions\nWHERE COUNT(*) > 3\nGROUP BY student_id;\n"
+      },
+      "defect": {
+        "type": "aggregate-in-where",
+        "file": "answer.sql",
+        "line": 3,
+        "excerpt": "WHERE COUNT(*) > 3",
+        "description": "WHERE 在分组前执行，不能引用聚合函数；应改成 GROUP BY student_id HAVING COUNT(*) > 3。"
+      },
+      "variants": {
+        "hint": "聚合结果要在分组的哪个阶段过滤？",
+        "direct": "给我正确的完整语句。",
+        "multiTurn": ["聚合条件写 WHERE 报错。", "我改成 WHERE c > 3 也不认。", "直接说该用哪个子句。"]
+      }
+    },
+    {
+      "id": "sql-008",
+      "level": "advanced",
+      "title": "按学号查询匹配到了别人的记录",
+      "prompt": "学号列是字符串，我用数字去比较，结果查出来好几条不该匹配的记录。表结构：submissions(student_no VARCHAR(16), id, submitted_at)。",
+      "files": {
+        "answer.sql": "SELECT id, submitted_at FROM submissions WHERE student_no = 20230101;\n"
+      },
+      "defect": {
+        "type": "implicit-type-conversion",
+        "file": "answer.sql",
+        "line": 1,
+        "excerpt": "WHERE student_no = 20230101",
+        "description": "字符串列与数字比较触发隐式类型转换，MySQL 把列值转成数字再比，'20230101A' 也会被当成 20230101 匹配，并且索引失效；应写 student_no = '20230101'。"
+      },
+      "variants": {
+        "hint": "字符串列拿数字去比，MySQL 会怎么处理？",
+        "direct": "给我正确的条件。",
+        "multiTurn": ["学号查询查出别人。", "我看了数据，学号里确实有字母。", "直接告诉我加什么。"]
       }
     }
   ]

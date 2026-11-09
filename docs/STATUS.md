@@ -41,6 +41,10 @@
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
 
+> **2026-11-09 实验语料补齐至 40 题（分支 `experiment/corpus-40`）**：按课程重心定配比 **HTML 12 / CSS 12 / 事件 8 / SQL 8**（Web 三类占 80%，SQL 保留 8 题以保证分类对比有统计意义），并按难度分层 **基础 24 / 进阶 16**（新增可选 `level` 字段）。新增题目覆盖：viewport/标签闭合/label 关联/input type/固定宽图/form 方法/表格跨列/嵌套表单/交互嵌套/语义控件/实体转义/charset 位置；选择器优先级/flex 方向/浮动塌陷/媒体查询顺序/z-index 前提/vh/rem 基准/grid 跨列；表单默认提交/事件冒泡/var 闭包/重复绑定/keyCode/异步竞态；NULL 比较/未知列排序/笛卡尔积/分页无排序/聚合写进 WHERE/隐式类型转换。语料 README 与实验方案 §4、§9 同步更新，并把结果表口径写死（主表组别×类别、附表组别×难度、消融表只报 M1/M4/M7）。
+>
+> 检查：`node scripts/experiment-corpus.mjs` → OK（4 文件 / **40 题 / 200 个用例**，basic=24、advanced=16）；`--self-test` 6 项 PASS；`validate_contract.py` PASS。未做：E1 运行器与判定脚本未写；未跑真实模型调用。
+
 > **2026-11-09 智谱免费模型实测与提示收紧（分支 `feature/provider-prompt`）**：用项目实际请求体（`response_format: json_object` + 系统提示 + context JSON）实测智谱模型：`glm-4.7-flash` 默认开启 thinking，会把 800 token 预算耗尽（`finish_reason=length`、content 为空），设 `AI_PROVIDER_THINKING=disabled` 后 **2.9s** 返回合规四字段且命中语料金标准；`glm-4.5-flash` 关思考仍需 8–24s 且偶有枚举越界；`glm-4-flash` 2.6–3.2s 合规但内容偏空泛；`glm-5.3-flash` 返回余额不足。据此把系统提示收紧为「恰好四个字段 + 枚举清单 + JSON 示例 + 中文 200 字内不含代码」，并新增可选 `AI_PROVIDER_THINKING`（智谱取 `disabled`）。`scripts/ai-provider-smoke.mjs` 同步新提示、新增 `--thinking`，并修掉 Windows 上 `AbortSignal.timeout` 导致的 libuv 退出断言（改 AbortController + clearTimeout，不再 `process.exit`）。
 >
 > 检查：五组 tutoring 测试共 40 例通过（Provider/HttpContract/Worker/Retrieval/Findings）；smoke `--self-test` 7 项通过；真实调用 `glm-4.7-flash + thinking=disabled` → HTTP 200、2.9s、4 字段、判定 PASS，内容为「确认代码是否在 DOM 加载完成后执行」，命中语料 `event-001` 的金标准。未做：未写入 `backend/.env`（含密钥，按约定由使用者填写）；未重启后端做页面级联调；40 题语料与 E1 运行器仍未完成。
