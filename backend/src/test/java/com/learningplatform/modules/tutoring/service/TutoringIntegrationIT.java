@@ -85,7 +85,7 @@ class TutoringIntegrationIT {
   server.createContext("/chat",exchange->{calls.incrementAndGet();received.set(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));byte[] bytes=response.getBytes(java.nio.charset.StandardCharsets.UTF_8);exchange.getResponseHeaders().add("Content-Type","application/json");exchange.sendResponseHeaders(upstreamStatus,bytes.length);try(var body=exchange.getResponseBody()){body.write(bytes);}exchange.close();});
   server.start();
   try {
-   provider.delegate=new com.learningplatform.modules.tutoring.provider.ConfiguredTutoringProvider(json,true,true,"http://127.0.0.1:"+server.getAddress().getPort()+"/chat","test-only-provider-key","test-model");
+   provider.delegate=new com.learningplatform.modules.tutoring.provider.ConfiguredTutoringProvider(json,true,true,"http://127.0.0.1:"+server.getAddress().getPort()+"/chat","test-only-provider-key","test-model","");
    String password="tutoring-http-test-only-password";
    jdbc.update("UPDATE users SET password_hash=? WHERE id=?",passwords.encode(password),student.id());
    var grant=authSessions.login(student.username(),password,null,"tutoring-http");
