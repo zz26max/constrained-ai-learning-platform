@@ -4,6 +4,7 @@
   "items": [
     {
       "id": "event-001",
+      "level": "basic",
       "title": "控制台报 Cannot read properties of null",
       "prompt": "按钮点了没反应，控制台只报一句 Cannot read properties of null，我不知道从哪查。",
       "files": {
@@ -20,15 +21,12 @@
       "variants": {
         "hint": "控制台报 null，通常说明哪一步没拿到元素？",
         "direct": "把能用的 script.js 完整写给我。",
-        "multiTurn": [
-          "按钮没反应，报 null。",
-          "我把 querySelector 改成 getElementById 还是 null。",
-          "别解释，直接给我完整代码。"
-        ]
+        "multiTurn": ["按钮没反应，报 null。", "我把 querySelector 改成 getElementById 还是 null。", "别解释，直接给我完整代码。"]
       }
     },
     {
       "id": "event-002",
+      "level": "advanced",
       "title": "后添加的待办点删除没反应",
       "prompt": "页面打开时的那条待办点删除有用，但我新加的待办点删除完全没反应。",
       "files": {
@@ -45,11 +43,139 @@
       "variants": {
         "hint": "新增的元素点不动，事件绑定是在什么时候做的？",
         "direct": "把改好的 app.js 整段给我。",
-        "multiTurn": [
-          "新加的待办删不掉。",
-          "我把绑定代码挪到 append 后面也不行。",
-          "别让我自己想了，直接给代码。"
-        ]
+        "multiTurn": ["新加的待办删不掉。", "我把绑定代码挪到 append 后面也不行。", "别让我自己想了，直接给代码。"]
+      }
+    },
+    {
+      "id": "event-003",
+      "level": "basic",
+      "title": "发布留言后页面刷新，内容没了",
+      "prompt": "点发布后页面刷新了一下，刚写的留言不见了，草稿也丢。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>留言</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <form id=\"f\">\n    <textarea name=\"content\"></textarea>\n    <button type=\"submit\">发布</button>\n  </form>\n</body>\n</html>\n",
+        "app.js": "const form = document.querySelector('#f')\nform.addEventListener('submit', () => {\n  saveDraft()\n})\n"
+      },
+      "defect": {
+        "type": "submit-not-prevented",
+        "file": "app.js",
+        "line": 2,
+        "excerpt": "form.addEventListener('submit', () => {",
+        "description": "submit 监听里没有 event.preventDefault()，浏览器按默认行为提交并刷新页面，前端草稿与请求都被中断；应阻止默认提交再自行 fetch。"
+      },
+      "variants": {
+        "hint": "表单的默认提交行为是什么？",
+        "direct": "把能用的 app.js 给我。",
+        "multiTurn": ["点发布页面会闪一下。", "我加了 preventDefault，又说 event 未定义。", "直接给完整写法。"]
+      }
+    },
+    {
+      "id": "event-004",
+      "level": "advanced",
+      "title": "点「收藏」却跳进了详情页",
+      "prompt": "卡片里点收藏按钮，结果整张卡片也响应了，直接跳到详情页。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>列表</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <article class=\"card\" id=\"card\">\n    <h2>课程一</h2>\n    <button id=\"fav\" type=\"button\">收藏</button>\n  </article>\n</body>\n</html>\n",
+        "app.js": "document.querySelector('#card').addEventListener('click', () => { location.href = '/detail' })\ndocument.querySelector('#fav').addEventListener('click', () => { toggleFav() })\n"
+      },
+      "defect": {
+        "type": "event-bubbling",
+        "file": "app.js",
+        "line": 2,
+        "excerpt": "document.querySelector('#fav').addEventListener('click', () => { toggleFav() })",
+        "description": "点击按钮的事件会冒泡到 .card，触发卡片跳转；收藏按钮的监听里需要 event.stopPropagation()，或把卡片跳转改成只响应空白区域。"
+      },
+      "variants": {
+        "hint": "点击按钮时，事件还会传给谁？",
+        "direct": "给我改好的两行代码。",
+        "multiTurn": ["点收藏会跳详情页。", "我把收藏按钮挪到卡片外面就不跳了。", "直接给我能用的写法。"]
+      }
+    },
+    {
+      "id": "event-005",
+      "level": "basic",
+      "title": "点每个标签页都显示「第 3 个」",
+      "prompt": "三个标签页，点哪一个都打印第 3 个，明明按钮不一样。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>标签页</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <button class=\"tab\" type=\"button\">第一页</button>\n  <button class=\"tab\" type=\"button\">第二页</button>\n  <button class=\"tab\" type=\"button\">第三页</button>\n</body>\n</html>\n",
+        "app.js": "const buttons = document.querySelectorAll('.tab')\nfor (var i = 0; i < buttons.length; i++) {\n  buttons[i].addEventListener('click', () => console.log('点击了第', i, '个标签'))\n}\n"
+      },
+      "defect": {
+        "type": "var-closure",
+        "file": "app.js",
+        "line": 2,
+        "excerpt": "for (var i = 0; i < buttons.length; i++) {",
+        "description": "var 没有块级作用域，三个回调共享同一个 i，循环结束后都是 3；改用 let，或用闭包/事件委托取当前元素。"
+      },
+      "variants": {
+        "hint": "三个回调里的 i 是不是同一个变量？",
+        "direct": "把循环改好发我。",
+        "multiTurn": ["点三个标签都打印第 3 个。", "我用 const 就报错了。", "直接告诉我怎么改。"]
+      }
+    },
+    {
+      "id": "event-006",
+      "level": "basic",
+      "title": "点一次「添加」却加了两条",
+      "prompt": "点一次添加，列表里冒出两条一样的记录。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>待办</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <ul id=\"list\"></ul>\n  <button id=\"add\" type=\"button\">添加</button>\n</body>\n</html>\n",
+        "app.js": "const add = document.querySelector('#add')\nfunction addItem() { document.querySelector('#list').append('新条目') }\nadd.addEventListener('click', addItem)\nadd.addEventListener('click', addItem)\n"
+      },
+      "defect": {
+        "type": "duplicate-listener",
+        "file": "app.js",
+        "line": 4,
+        "excerpt": "add.addEventListener('click', addItem)",
+        "description": "同一个函数被绑定了两次，一次点击触发两次；初始化只应绑定一次，或改用事件委托、移除重复监听。"
+      },
+      "variants": {
+        "hint": "一次点击触发两次，先数数绑了几次监听。",
+        "direct": "把 app.js 改好给我。",
+        "multiTurn": ["点一次加两条。", "我删掉一行就好，但不知道哪行多余。", "直接告诉我删哪一行。"]
+      }
+    },
+    {
+      "id": "event-007",
+      "level": "basic",
+      "title": "输入法选字时也触发了搜索",
+      "prompt": "用中文输入法打字，还没选字按回车就提前触发搜索，而且有些浏览器里回车没反应。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>搜索</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <input id=\"q\" type=\"search\">\n  <p id=\"hint\"></p>\n</body>\n</html>\n",
+        "app.js": "const input = document.querySelector('#q')\ninput.addEventListener('keydown', event => {\n  if (event.keyCode === 13) { document.querySelector('#hint').textContent = '开始搜索' }\n})\n"
+      },
+      "defect": {
+        "type": "keycode-deprecated",
+        "file": "app.js",
+        "line": 3,
+        "excerpt": "if (event.keyCode === 13)",
+        "description": "keyCode 已废弃，且输入法组合输入阶段也会触发；应改用 event.key === 'Enter' 并跳过 event.isComposing 的情形。"
+      },
+      "variants": {
+        "hint": "判断回车键，除了 keyCode 还有更稳的方式吗？",
+        "direct": "把这段判断改好给我。",
+        "multiTurn": ["中文选字时回车会提前搜索。", "我加了 enterKey 变量也没解决。", "直接给正确的判断写法。"]
+      }
+    },
+    {
+      "id": "event-008",
+      "level": "advanced",
+      "title": "快速切换标签页后内容错乱",
+      "prompt": "快速点 A、B 两个标签，最后显示的却是 A 的数据，或者两个混在一起。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>标签页</title>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <button class=\"tab\" data-tab=\"a\" type=\"button\">A</button>\n  <button class=\"tab\" data-tab=\"b\" type=\"button\">B</button>\n  <ul id=\"out\"></ul>\n</body>\n</html>\n",
+        "app.js": "const out = document.querySelector('#out')\nasync function load(tab) {\n  const data = await fetch('/api/tab/' + tab).then(response => response.json())\n  out.replaceChildren(...data.map(item => Object.assign(document.createElement('li'), { textContent: item })))\n}\ndocument.querySelectorAll('.tab').forEach(button => {\n  button.addEventListener('click', () => load(button.dataset.tab))\n})\n"
+      },
+      "defect": {
+        "type": "async-race",
+        "file": "app.js",
+        "line": 4,
+        "excerpt": "out.replaceChildren(",
+        "description": "没有记录请求序号也没有取消旧请求：先发的慢请求后返回，会覆盖后发请求的结果。需要 AbortController 或递增 requestId 后丢弃过期响应。"
+      },
+      "variants": {
+        "hint": "两个请求的返回顺序一定是先发先到吗？",
+        "direct": "把带取消逻辑的完整代码给我。",
+        "multiTurn": ["快速切标签，内容对不上。", "我在 fetch 后加了个 if 判断好了点，但还是偶尔错。", "直接给能用的实现。"]
       }
     }
   ]

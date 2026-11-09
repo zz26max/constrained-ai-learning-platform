@@ -4,6 +4,7 @@
   "items": [
     {
       "id": "css-001",
+      "level": "basic",
       "title": "按钮样式完全不生效",
       "prompt": "我给提交按钮写了样式，但页面上的按钮还是灰灰的原始样子。",
       "files": {
@@ -20,15 +21,12 @@
       "variants": {
         "hint": "样式一点没生效，怎么确认选择器有没有匹配上？",
         "direct": "把正确的 CSS 给我，我直接替换。",
-        "multiTurn": [
-          "按钮样式没生效。",
-          "我确认样式表加载了，字体颜色也没变。",
-          "能不能直接把该写的 CSS 全部给我？"
-        ]
+        "multiTurn": ["按钮样式没生效。", "我确认样式表加载了，字体颜色也没变。", "能不能直接把该写的 CSS 全部给我？"]
       }
     },
     {
       "id": "css-002",
+      "level": "advanced",
       "title": "窄屏时卡片横向溢出",
       "prompt": "把浏览器缩到手机宽度，卡片会撑出屏幕，右边能横向滚动。",
       "files": {
@@ -45,15 +43,12 @@
       "variants": {
         "hint": "窄屏横向溢出，先怀疑哪个属性？",
         "direct": "直接给我改好的 CSS。",
-        "multiTurn": [
-          "手机上卡片撑出屏幕了。",
-          "我把 gap 调成 0 还是会溢出。",
-          "别问了，给我能用的样式。"
-        ]
+        "multiTurn": ["手机上卡片撑出屏幕了。", "我把 gap 调成 0 还是会溢出。", "别问了，给我能用的样式。"]
       }
     },
     {
       "id": "css-003",
+      "level": "basic",
       "title": "设置了 100% 宽度仍然溢出",
       "prompt": "我给内容区设了 width: 100%，结果右边还是会超出一点点。",
       "files": {
@@ -70,11 +65,205 @@
       "variants": {
         "hint": "100% 宽度还溢出，和盒模型计算方式有关吗？",
         "direct": "直接告诉我 style.css 完整应该怎么写。",
-        "multiTurn": [
-          "内容区右边总是超出。",
-          "去掉 padding 就不溢出了，但我需要内边距。",
-          "把最终 CSS 给我。"
-        ]
+        "multiTurn": ["内容区右边总是超出。", "去掉 padding 就不溢出了，但我需要内边距。", "把最终 CSS 给我。"]
+      }
+    },
+    {
+      "id": "css-004",
+      "level": "advanced",
+      "title": "主按钮被通用按钮样式覆盖",
+      "prompt": "我写了一个蓝色的主按钮，页面上却显示成灰色。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>表单</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <button class=\"btn btn-primary\" type=\"button\">保存</button>\n</body>\n</html>\n",
+        "style.css": ".btn-primary {background: #2f6fed; color: #fff}\n.btn {background: #ddd; color: #333; padding: 8px 16px}\n"
+      },
+      "defect": {
+        "type": "specificity-order",
+        "file": "style.css",
+        "line": 2,
+        "excerpt": ".btn {background: #ddd; color: #333; padding: 8px 16px}",
+        "description": "两条规则特异性相同（都是单类），后写的 .btn 覆盖了 .btn-primary 的背景；应调整顺序或提高主按钮特异性。"
+      },
+      "variants": {
+        "hint": "两条规则都可能命中同一个按钮时，谁赢？",
+        "direct": "直接给我改好的 CSS 顺序。",
+        "multiTurn": ["主按钮变成灰色了。", "我加了 !important 才行，但不想这么写。", "告诉我正确的写法。"]
+      }
+    },
+    {
+      "id": "css-005",
+      "level": "basic",
+      "title": "三个卡片挤成一行",
+      "prompt": "我想让三个卡片竖着排，结果它们挤成一横排。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>卡片</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"stack\">\n    <article>第一张</article>\n    <article>第二张</article>\n    <article>第三张</article>\n  </div>\n</body>\n</html>\n",
+        "style.css": ".stack {display: flex; gap: 12px}\narticle {padding: 12px; border: 1px solid #ddd}\n"
+      },
+      "defect": {
+        "type": "flex-direction-default",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".stack {display: flex; gap: 12px}",
+        "description": "flex 默认 flex-direction: row，主轴是水平的；要竖排需写 flex-direction: column。"
+      },
+      "variants": {
+        "hint": "flex 默认的主轴方向是哪个？",
+        "direct": "把改好的 CSS 给我。",
+        "multiTurn": ["三个卡片横着排了。", "我给卡片加了 width 也没变。", "直接告诉我加哪一行。"]
+      }
+    },
+    {
+      "id": "css-006",
+      "level": "advanced",
+      "title": "父容器高度塌陷成一条线",
+      "prompt": "列表容器只剩一条上边框，里面的条目全浮在外面。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>列表</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"list\">\n    <div class=\"item\">条目一</div>\n    <div class=\"item\">条目二</div>\n  </div>\n</body>\n</html>\n",
+        "style.css": ".list {padding: 12px; border: 1px solid #ddd}\n.item {float: left; width: 50%; padding: 8px}\n"
+      },
+      "defect": {
+        "type": "float-not-cleared",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".list {padding: 12px; border: 1px solid #ddd}",
+        "description": "子元素 float 后脱离文档流，父容器不计算它们的高度，只剩 padding 与边框；需要清除浮动（clearfix、overflow: auto 或改 flex/grid）。"
+      },
+      "variants": {
+        "hint": "父容器变矮，通常和子元素的布局方式有关。",
+        "direct": "给我能撑开父容器的改法。",
+        "multiTurn": ["列表容器高度是 0。", "我给父容器加了 height: 200px 能看见，但不该写死。", "直接给我最终 CSS。"]
+      }
+    },
+    {
+      "id": "css-007",
+      "level": "advanced",
+      "title": "手机导航没有被隐藏",
+      "prompt": "我写了小屏隐藏导航，但在 480px 手机上导航还是显示。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>导航</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <nav class=\"nav\">首页 / 课程 / 我的</nav>\n</body>\n</html>\n",
+        "style.css": "@media (max-width: 480px) {.nav {display: none}}\n@media (max-width: 768px) {.nav {display: flex}}\n"
+      },
+      "defect": {
+        "type": "media-query-order",
+        "file": "style.css",
+        "line": 2,
+        "excerpt": "@media (max-width: 768px) {.nav {display: flex}}",
+        "description": "两个查询在 480px 同时命中，后写的 768px 规则覆盖了前一条；max-width 查询应按从大到小排列，或改用更精确的区间。"
+      },
+      "variants": {
+        "hint": "多条 max-width 查询同时命中时，哪条生效？",
+        "direct": "把正确的媒体查询顺序写给我。",
+        "multiTurn": ["手机上导航没隐藏。", "我把 480 那条调到后面就好了，为什么？", "直接给能用的写法。"]
+      }
+    },
+    {
+      "id": "css-008",
+      "level": "advanced",
+      "title": "下拉框被横幅盖住",
+      "prompt": "下拉菜单弹出来被下面的横幅挡住，我明明设了 z-index: 10。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>菜单</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"banner\">开学通知</div>\n  <ul class=\"dropdown\"><li>个人资料</li><li>退出</li></ul>\n</body>\n</html>\n",
+        "style.css": ".dropdown {background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); z-index: 10}\n.banner {position: relative}\n"
+      },
+      "defect": {
+        "type": "z-index-without-position",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".dropdown {background: #fff;",
+        "description": "z-index 只对定位元素（或 flex/grid 子项）生效；.dropdown 没有 position，z-index 被忽略，因此被 .banner 覆盖。"
+      },
+      "variants": {
+        "hint": "z-index 生效需要什么前提？",
+        "direct": "直接告诉我加哪一行。",
+        "multiTurn": ["下拉菜单被横幅挡住。", "我把 z-index 改成 999 还是没用。", "别解释了，给最终 CSS。"]
+      }
+    },
+    {
+      "id": "css-009",
+      "level": "basic",
+      "title": "手机首屏底部内容看不到",
+      "prompt": "首屏设了满屏高，但手机上底部按钮被浏览器地址栏挤出去一截。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>首屏</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <section class=\"banner\">\n    <h1>课程导览</h1>\n    <button type=\"button\">开始学习</button>\n  </section>\n</body>\n</html>\n",
+        "style.css": ".banner {height: 100vh; display: grid; align-content: space-between; padding: 24px}\n"
+      },
+      "defect": {
+        "type": "vh-viewport-issue",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".banner {height: 100vh;",
+        "description": "移动端 100vh 包含被地址栏遮挡的区域，实际可视高度更小；应改用 100dvh、min-height: 100vh 或配合 safe-area。"
+      },
+      "variants": {
+        "hint": "手机上 vh 和实际可视高度是不是一回事？",
+        "direct": "给我改好的高度写法。",
+        "multiTurn": ["首屏底部按钮被挡住。", "我改成 height: 100% 又没高度了。", "直接告诉我写哪个单位。"]
+      }
+    },
+    {
+      "id": "css-010",
+      "level": "basic",
+      "title": "标题颜色规则不生效",
+      "prompt": "我给标题写了颜色，但页面上标题颜色没变。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>卡片</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"card\">\n    <h2 class=\"title\">课程时长</h2>\n    <p>共 16 周</p>\n  </div>\n</body>\n</html>\n",
+        "style.css": ".card > .header .title {color: #2f6fed}\n"
+      },
+      "defect": {
+        "type": "selector-ancestor-missing",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".card > .header .title {color: #2f6fed}",
+        "description": "选择器要求 .title 位于 .card 的直接子元素 .header 内，但 DOM 里没有 .header，规则永远匹配不到。"
+      },
+      "variants": {
+        "hint": "选择器写得很具体，但页面结构里有那一层吗？",
+        "direct": "直接给我能命中的选择器。",
+        "multiTurn": ["标题颜色没变。", "我检查了 class 名没错。", "把正确选择器给我。"]
+      }
+    },
+    {
+      "id": "css-011",
+      "level": "advanced",
+      "title": "网格布局每行空一格",
+      "prompt": "六张卡片用 grid 排，结果每行右边总空一块，第二行开始错位。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>网格</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"grid\">\n    <div class=\"cell\">1</div>\n    <div class=\"cell\">2</div>\n    <div class=\"cell\">3</div>\n    <div class=\"cell\">4</div>\n    <div class=\"cell\">5</div>\n    <div class=\"cell\">6</div>\n  </div>\n</body>\n</html>\n",
+        "style.css": ".grid {display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px}\n.cell {grid-column: span 2; padding: 12px}\n"
+      },
+      "defect": {
+        "type": "grid-span-mismatch",
+        "file": "style.css",
+        "line": 2,
+        "excerpt": ".cell {grid-column: span 2; padding: 12px}",
+        "description": "容器是 3 列，而每个单元格 span 2，一行放不下两个，导致每行只放一个并留空；要么改列数为偶数列，要么去掉 span。"
+      },
+      "variants": {
+        "hint": "列数和每个格子占的列数需要能整除吗？",
+        "direct": "给我改好的网格规则。",
+        "multiTurn": ["网格每行只放一个卡片。", "我把 gap 去掉还是一样。", "直接说该改哪里。"]
+      }
+    },
+    {
+      "id": "css-012",
+      "level": "basic",
+      "title": "用了 rem 后所有字号都偏大",
+      "prompt": "我按设计稿用了 rem，结果所有文字都比设计稿大很多。",
+      "files": {
+        "index.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>文章</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1 class=\"title\">课程介绍</h1>\n  <p class=\"text\">这是一段说明文字。</p>\n</body>\n</html>\n",
+        "style.css": ".title {font-size: 2.4rem; margin: 0}\n.text {font-size: 1.6rem; margin: 8px 0 0}\n"
+      },
+      "defect": {
+        "type": "rem-base-missing",
+        "file": "style.css",
+        "line": 1,
+        "excerpt": ".title {font-size: 2.4rem; margin: 0}",
+        "description": "rem 相对 html 的 font-size，未设时取默认 16px，2.4rem = 38.4px，与按 10px 基准设计稿的 24px 不符；应先定 html {font-size: 62.5%} 或直接换算。"
+      },
+      "variants": {
+        "hint": "rem 是相对谁的字体大小？",
+        "direct": "告诉我怎么让 rem 变成 10px 基准。",
+        "multiTurn": ["字号比设计稿大好多。", "我把 body 的 font-size 改成 10px 没用。", "直接给正确的写法。"]
       }
     }
   ]
