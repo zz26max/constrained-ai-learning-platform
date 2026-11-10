@@ -20,6 +20,7 @@ const password = ref('')
 const confirmPassword = ref('')
 const inviteCode = ref('')
 const createClass = ref(true)
+const className = ref('')
 const showPassword = ref(false)
 const basicErrors = ref<string[]>([])
 
@@ -143,6 +144,9 @@ async function submit(): Promise<void> {
     role: mode.value === 'school' ? role.value : undefined,
     inviteCode: mode.value === 'school' && role.value === 'student' ? inviteCode.value : undefined,
     createClass: mode.value === 'school' && role.value === 'teacher' ? createClass.value : undefined,
+    className: mode.value === 'school' && role.value === 'teacher' && createClass.value
+      ? className.value.trim() || undefined
+      : undefined,
   })
   
   if (!ok) {
@@ -449,6 +453,21 @@ async function submit(): Promise<void> {
                 <span>创建我的第一个班级</span>
               </label>
               <p class="field-hint">注册后可以立即创建一个班级，并生成邀请码给学生加入。</p>
+            </div>
+
+            <div v-if="createClass" class="form-field">
+              <label for="register-class-name">班级名称（可选）</label>
+              <input
+                id="register-class-name"
+                v-model="className"
+                type="text"
+                name="className"
+                maxlength="60"
+                placeholder="我的班级"
+                autocomplete="off"
+                :readonly="submitting"
+              />
+              <p class="field-hint">留空时默认叫「我的班级」，注册后也能在班级设置里改。</p>
             </div>
 
             <div class="button-group">

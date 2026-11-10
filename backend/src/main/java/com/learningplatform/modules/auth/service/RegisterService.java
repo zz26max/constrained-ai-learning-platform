@@ -77,6 +77,7 @@ public class RegisterService {
     public RegisterResult register(RegisterWrite body, String requestId) {
         // 1. 输入校验
         validateInput(body);
+        validateClassName(body);
 
         // 2. 用户名规范化与唯一性检查
         String normalizedUsername = normalizeUsername(body.username());
@@ -130,7 +131,7 @@ public class RegisterService {
         // 8. 学校+教师+创建班级
         if ("school".equals(body.mode()) && "teacher".equals(body.role())
                 && Boolean.TRUE.equals(body.createClass())) {
-            createTeacherOffering(userId, now);
+            createTeacherOffering(userId, now, body.className());
         }
 
         // 9. 自动登录：创建会话
@@ -181,6 +182,25 @@ public class RegisterService {
         return username.strip().toLowerCase(Locale.ROOT);
     }
 
+    /** 班级名称只在「学校模式 + 教师 + 创建班级」时可填；留空按默认「我的班级」处理。 */
+    private void validateClassName(RegisterWrite body) {
+        if (body.className() == null) return;
+        String name = body.className().strip();
+        if (name.codePointCount(0, name.length()) > 60) {
+            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR",
+                    "班级名称须为 1-60 字。",
+                    Map.of("fields", List.of(Map.of("field", "className", "message", "班级名称须为 1-60 字。"))));
+        }
+        boolean createsClass = "school".equals(body.mode()) && "teacher".equals(body.role())
+                && Boolean.TRUE.equals(body.createClass());
+        if (!name.isEmpty() && !createsClass) {
+            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR",
+                    "只有「学校模式 + 教师 + 创建班级」时才能填写班级名称。",
+                    Map.of("fields", List.of(Map.of("field", "className",
+                            "message", "只有创建班级时才能填写班级名称。"))));
+        }
+    }
+
     /** 个人模式：关联默认个人课程 offering（固定 UUID）。 */
     private void enrollPersonalOffering(String userId, Instant now) {
         String offeringPersonalId = "00000000-0000-4000-8000-000000000210";
@@ -221,8 +241,9 @@ public class RegisterService {
         }
     }
 
-    /** 学校+教师模式：创建新班级并关联教师。 */
-    private void createTeacherOffering(String userId, Instant now) {
+    /** 学校+教师模式：创建新班级并关联教师；班级名可选，省略时用「我的班级」。 */
+    private void createTeacherOffering(String userId, Instant now, String className) {
+        String title = className == null || className.isBlank() ? "我的班级" : className.strip();
         String currentTermId = courseMapper.currentTermId();
         if (currentTermId == null) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "NO_CURRENT_TERM", "当前学期未配置，无法创建班级。");
@@ -231,7 +252,7 @@ public class RegisterService {
         String personalCourseId = "00000000-0000-4000-8000-000000000110";
         String offeringId = UUID.randomUUID().toString();
         courseMapper.insertOffering(offeringId, personalCourseId, currentTermId,
-                "我的班级", "默认班级", "chapter", userId, now);
+                title, "默认班级", "chapter", userId, now);
         courseMapper.insertMember(UUID.randomUUID().toString(), offeringId, userId, "teacher", now);
     }
 
