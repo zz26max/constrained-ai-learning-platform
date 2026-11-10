@@ -244,7 +244,7 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                 <p v-if="message.content !== null" class="msg-text">{{ message.content }}</p>
                 <p v-else class="msg-text meta">内容已过保留期限，不可查看。</p>
                 <p v-if="message.role === 'assistant' && message.citations.length > 0" class="msg-cites">
-                  依据课程资料：<span v-for="(citation, index) in message.citations" :key="citation.resourceId" class="cite">{{ index > 0 ? '；' : '' }}《{{ citation.title }}》</span>
+                  依据课程资料：<template v-for="(citation, index) in message.citations" :key="citation.resourceId"><template v-if="index > 0">；</template><RouterLink class="cite" :to="`/resource/${citation.resourceId}`">《{{ citation.title }}》</RouterLink></template>
                 </p>
                 <span v-if="message.role === 'student'" class="meta msg-time">{{ clock(message.createdAt) }}</span>
               </li>
