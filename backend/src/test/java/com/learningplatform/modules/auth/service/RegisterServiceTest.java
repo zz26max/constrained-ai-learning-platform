@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,7 +142,40 @@ class RegisterServiceTest {
         RegisterService.RegisterResult result = service.register(body, "request-id-3");
 
         assertThat(result.user().roles()).containsExactly("teacher");
-        verify(courseMapper).insertOffering(anyString(), eq("00000000-0000-4000-8000-000000000110"), eq("term-1"), anyString(), anyString(), anyString(), anyString(), any(Instant.class));
+        verify(courseMapper).insertOffering(anyString(), eq("00000000-0000-4000-8000-000000000110"), eq("term-1"), eq("我的班级"), anyString(), anyString(), anyString(), any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("学校+教师模式：班级名可自定义")
+    void schoolTeacherModeUsesCustomClassName() {
+        RegisterWrite body = new RegisterWrite("teacher2", "Teacher123", "教师二", "school", "teacher", null, true, "数据结构 2026 春");
+        when(userMapper.findByUsername("teacher2")).thenReturn(Optional.empty());
+        when(userMapper.insert(any(User.class))).thenReturn(1);
+        when(courseMapper.currentTermId()).thenReturn("term-1");
+        when(courseMapper.insertOffering(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), any(Instant.class))).thenReturn(1);
+        when(courseMapper.insertMember(anyString(), anyString(), anyString(), anyString(), any(Instant.class))).thenReturn(1);
+        when(sessionMapper.insert(any())).thenReturn(1);
+        when(csrfTokens.sessionToken(anyString(), anyString())).thenReturn("csrf-token-790");
+
+        service.register(body, "request-id-3b");
+
+        verify(courseMapper).insertOffering(anyString(), eq("00000000-0000-4000-8000-000000000110"), eq("term-1"), eq("数据结构 2026 春"), anyString(), anyString(), anyString(), any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("非建班场景填写班级名返回 422 VALIDATION_ERROR")
+    void classNameOutsideTeacherClassCreationIsRejected() {
+        RegisterWrite body = new RegisterWrite("newuser2", "Password123", "用户二", "personal", null, null, null, "多余的班名");
+        when(userMapper.findByUsername("newuser2")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.register(body, "request-id-3c"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException be = (BusinessException) ex;
+                    assertThat(be.getCode()).isEqualTo("VALIDATION_ERROR");
+                    assertThat(be.getStatus()).isEqualTo(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY);
+                });
+        verify(userMapper, never()).insert(any(User.class));
     }
 
     @Test
