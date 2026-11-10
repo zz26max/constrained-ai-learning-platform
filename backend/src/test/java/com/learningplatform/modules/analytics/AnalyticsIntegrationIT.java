@@ -85,10 +85,11 @@ class AnalyticsIntegrationIT {
 
     @BeforeEach
     void reset() {
+        jdbc.update("UPDATE assignments SET current_ai_policy_id=NULL");
         for (String table : List.of("knowledge_evidence", "feedback_knowledge_evaluations", "feedback_issue_tags", "submission_knowledge_snapshot", "learning_events", "notifications", "help_replies", "help_requests", "tutoring_messages", "tutoring_requests", "tutoring_sessions", "notices", "feedback_rubric_scores", "feedback",
                 "submission_rubric_snapshot", "submission_requirements_snapshot", "submission_files", "submissions",
                 "workspace_files", "workspaces", "assignment_knowledge_points", "assignment_initial_files",
-                "assignment_rubric_criteria", "assignment_requirements", "assignments", "chapter_progress")) {
+                "assignment_rubric_criteria", "assignment_requirements", "ai_policies", "assignments", "chapter_progress")) {
             jdbc.update("DELETE FROM " + table);
         }
         jdbc.update("UPDATE offering_members SET last_chapter_id=NULL");
@@ -424,7 +425,8 @@ class AnalyticsIntegrationIT {
         assertThat(issue.get("reportedStudentCount")).isEqualTo(2);
         assertThat(issue.get("confirmedStudentCount")).isEqualTo(1);
         assertThat(issue.get("distinctStudentCount")).isEqualTo(2);
-        assertThat(issue.get("knowledgePointId")).isNull();
+        assertThat(issue.get("knowledgePointId")).isEqualTo(kp);
+        assertThat(issue.get("knowledgePointTitle")).isNotNull();
         assertThat(stats.getOfferingStats(o.id(),TEACHER).pendingHelpCount()).isEqualTo(2);
     }
 

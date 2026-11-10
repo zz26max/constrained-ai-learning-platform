@@ -39,4 +39,6 @@ public interface KnowledgeMapper {
     List<Map<String,Object>> confirmed(String assignment);
     @Select("SELECT student_id AS studentId,issue_tags AS tags,issue_tag_version AS version,created_at AS occurredAt FROM help_requests WHERE assignment_id=#{assignment}")
     List<Map<String,Object>> reported(String assignment);
+    @Select("SELECT t.tag AS tag,e.knowledge_point_id AS knowledgePointId,k.title AS title,COUNT(*) AS matches FROM feedback f JOIN feedback_issue_tags t ON t.feedback_id=f.id JOIN feedback_knowledge_evaluations e ON e.feedback_id=f.id JOIN knowledge_points k ON k.id=e.knowledge_point_id WHERE f.assignment_id=#{assignment} AND f.status='published' AND f.issue_tag_version=#{version} GROUP BY t.tag,e.knowledge_point_id,k.title ORDER BY t.tag,matches DESC,e.knowledge_point_id")
+    List<Map<String,Object>> knowledgeByTag(String assignment,int version);
 }

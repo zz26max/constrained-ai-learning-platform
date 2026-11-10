@@ -110,6 +110,8 @@ public class KnowledgeService {
     public List<Object> commonIssues(String assignment,String offering) {
         var config=tags.configuration(offering);int current=((Number)config.get("version")).intValue();
         var confirmed=mapper.confirmed(assignment);var reported=mapper.reported(assignment);var result=new ArrayList<Object>();
+        // 共现推导：同一份已发布评价里既有问题标签、又有知识点评估时，把该知识点作为标签的关联知识点。
+        var mapped=new HashMap<String,Map<String,Object>>();for(var row:mapper.knowledgeByTag(assignment,current))mapped.putIfAbsent((String)row.get("tag"),row);
         for(Object item:(List<?>)config.get("items")) {
             var tag=(Map<String,Object>)item;String code=(String)tag.get("tag");
             var c=new HashSet<String>();var r=new HashSet<String>();var times=new ArrayList<Instant>();
@@ -117,7 +119,7 @@ public class KnowledgeService {
             for(var row:reported) if(row.get("version") instanceof Number n&&n.intValue()==current&&json.readValue(row.get("tags").toString(),List.class).contains(code)) {r.add((String)row.get("studentId"));times.add(instant(row.get("occurredAt")));}
             var union=new HashSet<>(c);union.addAll(r);if(union.isEmpty()) continue;
             var sources=new ArrayList<String>();if(!r.isEmpty()) sources.add("student_help");if(!c.isEmpty()) sources.add("teacher_feedback");
-            var issue=new LinkedHashMap<String,Object>();issue.put("issueTag",code);issue.put("title",tag.get("title"));issue.put("reportedStudentCount",r.size());issue.put("confirmedStudentCount",c.size());issue.put("distinctStudentCount",union.size());issue.put("description","按当前词表版本 "+current+" 汇总；学生自报与教师确认分别计数。");issue.put("sources",sources);issue.put("timeRange",Map.of("from",Collections.min(times),"to",Collections.max(times)));issue.put("knowledgePointId",null);result.add(issue);
+            var issue=new LinkedHashMap<String,Object>();issue.put("issueTag",code);issue.put("title",tag.get("title"));issue.put("reportedStudentCount",r.size());issue.put("confirmedStudentCount",c.size());issue.put("distinctStudentCount",union.size());issue.put("description","按当前词表版本 "+current+" 汇总；学生自报与教师确认分别计数。");issue.put("sources",sources);issue.put("timeRange",Map.of("from",Collections.min(times),"to",Collections.max(times)));var linked=mapped.get(code);issue.put("knowledgePointId",linked==null?null:linked.get("knowledgePointId"));issue.put("knowledgePointTitle",linked==null?null:linked.get("title"));result.add(issue);
         }
         return result;
     }
