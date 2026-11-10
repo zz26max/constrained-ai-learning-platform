@@ -38,6 +38,7 @@ export interface RegisterForm {
   role?: 'student' | 'teacher'
   inviteCode?: string
   createClass?: boolean
+  className?: string
 }
 
 /** 身份只在内存保存；CSRF 恢复遵循契约 1.1.0，不自动重放写请求。 */
@@ -266,6 +267,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: form.role,
         inviteCode: form.inviteCode,
         createClass: form.createClass,
+        className: form.className,
       }, token)
       registerAccepted = true
       csrfToken.value = result.data.csrfToken

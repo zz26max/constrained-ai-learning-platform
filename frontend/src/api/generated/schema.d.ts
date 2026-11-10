@@ -1712,6 +1712,8 @@ export interface components {
             inviteCode?: string;
             /** @description school+teacher 模式，是否创建班级 */
             createClass?: boolean;
+            /** @description school+teacher+createClass 模式可选；班级名称，省略或留空时用「我的班级」。其他模式下填写返回 422。 */
+            className?: string;
         };
         /**
          * @example {
