@@ -8,7 +8,7 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`661ba66`（辅导出处可点击；V18 个人示例作业见 `04e2aa4`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 合并推送后无未推送提交。
+- **代码基线**：`a0265e5`（常见问题共现映射知识点，契约 1.5.0；出处可点击见 `661ba66`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 合并推送后无未推送提交。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商已接通（OpenCode Go / `glm-5.3-flash`，经使用者授权并提供 key），外部调用不再关闭；配额与 429 重试已修，示例作业的默认 AI 政策随 V18 分发。自动检查已实现并通过本轮验证，动态学习路径与预测未实现；P2 基础规则建议已实现（nextRecommendation），不应统称为“建议未实现”。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；本轮按用户授权补充服务端自动判题（Web 静态 HTML/CSS 与 SQL 查询/增删改，已完成真实联调）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
@@ -40,6 +40,10 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-11 常见问题关联知识点（分支 `feat/issue-kp-mapping`）**：契约升 **1.5.0**，`CommonIssue` 新增可空 `knowledgePointTitle`。`KnowledgeMapper.knowledgeByTag` 在同一份**已发布**评价内统计「问题标签 × 知识点评估」的共现次数，`KnowledgeService.commonIssues` 取每个标签的最高频知识点回填 `knowledgePointId` 与标题；没有共现证据时两者保持 null（行为兼容）。教师端「常见问题」条目下显示「关联知识点：…」。同时修测试基建：五个集成测试的清理顺序补 `ai_policies`，并在重置前执行 `UPDATE assignments SET current_ai_policy_id=NULL`——`assignments.current_ai_policy_id` 与 `ai_policies.assignment_id` 构成循环外键；迁移计数断言由 17 更新为 18。
+>
+> 检查：`AnalyticsIntegrationIT` 14、`DatabaseIntegrationIT` 7、`TutoringIntegrationIT` 25 共 46 例通过；`Assignment` 46、`Dashboard` 23、`NoticeStats` 30、`Help` 5 共 104 例通过；前端 `vue-tsc` 通过、`vitest` 48 文件 426 例通过；`validate_contract.py` PASS。未做：未做页面级视觉走查；共现只覆盖教师评价来源，学生求助标签暂不参与推导。
 
 > **2026-11-10 个人模式闭环验收脚本（分支 `feat/loop-verify`）**：新增 [verify-personal-loop.mjs](../scripts/verify-personal-loop.mjs)——注册一次性个人账号 → 读取个人课程与 2 份示例作业 → 建会话、发一次 `next_hint` → 轮询终态并打印 `status/mode/hintLevel/citations/正文`；`--cleanup` 通过 `docker exec` 按外键顺序清理账号（消息 → 请求 → 会话 → 进度 → 学习事件 → 成员 → 会话凭据 → 用户）。
 >

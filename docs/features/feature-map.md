@@ -65,7 +65,7 @@
 | 教师活动看板（近 14 天） | verified |
 | 知识点掌握度（`knowledge-v2` 规则 + 证据链） | verified（数据薄） |
 | 规则版个性化建议（`nextRecommendation`） | implemented |
-| 共性问题统计 | implemented（不映射知识点） |
+| 共性问题统计 | implemented（按「同一份评价内的标签×知识点评估」共现映射知识点，无证据时为 null） |
 
 ### 2.7 AI 辅导（受限式）
 
