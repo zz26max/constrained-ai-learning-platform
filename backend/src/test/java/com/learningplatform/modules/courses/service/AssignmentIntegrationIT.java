@@ -91,6 +91,7 @@ class AssignmentIntegrationIT {
 
     @BeforeEach
     void reset() {
+        jdbc.update("UPDATE assignments SET current_ai_policy_id=NULL");
         // P2 子记录先于课程、作品与评价清理，保留外键验证。
         for (String table : List.of("knowledge_evidence", "feedback_knowledge_evaluations", "feedback_issue_tags",
                 "submission_knowledge_snapshot", "learning_events")) {
@@ -110,6 +111,8 @@ class AssignmentIntegrationIT {
         jdbc.update("DELETE FROM assignment_initial_files");
         jdbc.update("DELETE FROM assignment_rubric_criteria");
         jdbc.update("DELETE FROM assignment_requirements");
+        jdbc.update("DELETE FROM assignment_check_policies");
+        jdbc.update("DELETE FROM ai_policies");
         jdbc.update("DELETE FROM assignments");
         jdbc.update("DELETE FROM chapter_progress");
         jdbc.update("UPDATE offering_members SET last_chapter_id=NULL");

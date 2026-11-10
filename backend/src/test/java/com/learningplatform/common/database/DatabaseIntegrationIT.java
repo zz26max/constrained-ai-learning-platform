@@ -84,6 +84,10 @@ class DatabaseIntegrationIT {
     void clearSeededContent() {
         // 只清理本测试临时库的数据，绝不访问开发数据库。
         // V16 会随迁移带入学期、课程、班级与章节，按外键顺序先清子表再清学期。
+        jdbcTemplate.update("UPDATE assignments SET current_ai_policy_id=NULL");
+        for (String table : List.of("ai_policies", "assignment_check_policies", "assignment_initial_files", "assignment_requirements", "assignment_knowledge_points", "assignments")) {
+            jdbcTemplate.update("DELETE FROM " + table);
+        }
         jdbcTemplate.update("UPDATE offering_members SET last_chapter_id=NULL");
         for (String table : List.of("chapter_progress", "resources", "knowledge_points", "chapters",
                 "course_invites", "offering_members", "course_offerings", "courses", "terms")) {
@@ -97,9 +101,9 @@ class DatabaseIntegrationIT {
     void migrationIsAppliedOnceAndValidatedAgain() {
         assertThat(jdbcTemplate.queryForObject("SELECT VERSION()", String.class))
                 .startsWith("8.4.11");
-        assertThat(flyway.info().applied()).hasSize(17)
+        assertThat(flyway.info().applied()).hasSize(18)
                 .extracting(migration -> migration.getVersion().getVersion())
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18");
         Integer checksum = flyway.info().applied()[0].getChecksum();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(flyway.info().applied()[0].getChecksum()).isEqualTo(checksum);
