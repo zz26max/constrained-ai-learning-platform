@@ -49,6 +49,7 @@ function onToggle(event: Event): void {
               <span class="tag">{{ sourceText(issue.sources) }}</span>
             </div>
             <p>{{ issue.description }}</p>
+            <p v-if="issue.knowledgePointTitle" class="assignment-issue-kp">关联知识点：{{ issue.knowledgePointTitle }}</p>
             <p class="assignment-issue-meta">
               学生自报 {{ issue.reportedStudentCount }} · 教师确认 {{ issue.confirmedStudentCount }} · 涉及 {{ issue.distinctStudentCount }} 名学生
               · {{ formatShortTime(issue.timeRange.from) }} 至 {{ formatShortTime(issue.timeRange.to) }}
@@ -111,6 +112,10 @@ function onToggle(event: Event): void {
   color: var(--muted);
 }
 .assignment-issues-list .assignment-issue-meta {
+  font-size: 12px;
+}
+.assignment-issues-list .assignment-issue-kp {
+  color: var(--blue-text);
   font-size: 12px;
 }
 </style>

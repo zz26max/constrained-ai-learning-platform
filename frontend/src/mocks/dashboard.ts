@@ -191,7 +191,7 @@ function handleAssignmentStats(context: MockRequestContext): MockResult {
     return [{
       issueTag: tag.tag, title: tag.title, reportedStudentCount: 0, confirmedStudentCount: tagged.length,
       distinctStudentCount: tagged.length, description: tag.description, sources: ['teacher_feedback'],
-      timeRange: { from: times[0]!, to: times[times.length - 1]! }, knowledgePointId: null,
+      timeRange: { from: times[0]!, to: times[times.length - 1]! }, knowledgePointId: null, knowledgePointTitle: null,
     }]
   })
   return ok(context, {

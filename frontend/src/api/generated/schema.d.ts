@@ -2849,6 +2849,8 @@ export interface components {
             sources: ("student_help" | "teacher_feedback" | "checker")[];
             timeRange: components["schemas"]["TimeRange"];
             knowledgePointId: components["schemas"]["UUID"] | null;
+            /** @description 由同一份评价里的知识点评估推导；没有共现证据时为 null。 */
+            knowledgePointTitle: string | null;
         };
         AssignmentStatsDTO: {
             studentCount: number;
