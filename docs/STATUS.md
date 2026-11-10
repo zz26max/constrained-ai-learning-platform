@@ -41,6 +41,10 @@
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
 
+> **2026-11-10 个人模式闭环验收脚本（分支 `feat/loop-verify`）**：新增 [verify-personal-loop.mjs](../scripts/verify-personal-loop.mjs)——注册一次性个人账号 → 读取个人课程与 2 份示例作业 → 建会话、发一次 `next_hint` → 轮询终态并打印 `status/mode/hintLevel/citations/正文`；`--cleanup` 通过 `docker exec` 按外键顺序清理账号（消息 → 请求 → 会话 → 进度 → 学习事件 → 成员 → 会话凭据 → 用户）。
+>
+> 实测两次：① `status=completed`、`mode=debug_hint`、`citations=2`（《HTML 文档结构》《常用 HTML 标签》）、正文指出缺少 viewport 声明；② `mode=guided_question`、`citations=2`、正文以反问结尾（“head 里是否缺少一个关于 viewport 的 meta 声明？”）。两次 `--cleanup` 均把临时账号清理干净。这证明 V18 的个人课程、L1 召回与 AI 链路在真实供应商下可用。未做：SQL 示例作业的检查链路未纳入脚本。
+
 > **2026-11-10 辅导出处可点击（分支 `feat/citation-links`）**：`TutoringPanel` 的 `citations` 从纯文本改为指向 `/resource/:resourceId` 的 `RouterLink`，点击即可打开该讲义（路由要求登录且后端校验资源访问权）；样式补 `color: inherit` 保持与正文一致。检查：`vue-tsc` 通过；`tutoring` + `register-page` 共 17 例通过。未做：未做浏览器视觉走查（引用链接的可读性与窄屏换行）。
 
 > **2026-11-10 个人模式补示例作业（V18）与启动脚本回退**：个人课程 `…000210` 原先只有 5 章讲义、0 份作业，个人自学者无法走「学 → 练 → 判 → AI」。V18 迁移给该课程补 2 份示例作业：① Web 静态检查（初始页面缺 `viewport`，检查必失败，用来触发 L4 的先反问）；② SQL 查询（初始 `SELECT *` 与预期行数不符）。同时补初始文件、作业要求、知识点关联、判题规则（`assignment_check_policies`）与启用的默认 AI 政策（`ai_policies`）。延续「迁移不建账号」：示例内容无人类创建者，因此 `assignments.created_by` 与 `ai_policies.created_by` 改为可空（与 V16 对 `course_offerings` 的处理一致）。另修：`mvnw` 的发行版缓存被清理后 wrapper 无法启动，`Start-Local.ps1` 增加「有系统 Maven 时回退」的分支；注册页个人模式文案补上「含示例作业与 AI 辅导」。

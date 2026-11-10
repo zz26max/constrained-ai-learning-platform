@@ -79,6 +79,7 @@
 | 输入 / 输出拦截与模板回退 | verified |
 | 预算与频率 | implemented（可配置：`AI_DAILY_USER_LIMIT` / `AI_MINUTE_LIMIT`） |
 | 真实供应商 | 已接通 OpenCode Go（`glm-5.3-flash`） |
+| 个人模式闭环验收 | `scripts/verify-personal-loop.mjs`：注册 → 示例作业 → AI 求助 → 断言 `completed` 与 `citations` |
 
 ## 3. 受限式 AI 辅导设计（深化）
 
