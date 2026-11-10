@@ -25,12 +25,19 @@
 ### 1.1 一键准备（推荐）
 
 ```powershell
-# 1) Docker 运行、MySQL 3307 就绪后启动后端
-backend/scripts/Start-Local.ps1 -JdkPath 'C:\Program Files\Java\latest\jdk-21'
-# 2) 另开一个终端启动前端
-cd frontend; npm run dev
-# 3) 准备演示数据（读取 backend/.env 里的教师口令，不打印任何口令）
+# 1) 一条命令拉起数据库、后端与前端（会等待就绪并打印地址）
+powershell -ExecutionPolicy Bypass -File scripts/Start-Demo.ps1 -JdkPath 'C:\Program Files\Java\latest\jdk-21'
+# 2) 准备演示数据（读取 backend/.env 里的教师口令，不打印任何口令）
 node scripts/demo-seed.mjs
+# 3) 演示结束后停止（数据库保留；要一并停数据库加 -StopDb）
+powershell -ExecutionPolicy Bypass -File scripts/Stop-Demo.ps1
+```
+
+`Start-Demo.ps1` 会检查 Docker 是否运行（未运行则尝试启动 Docker Desktop）、拉起 3307 容器、在最小化窗口启动后端与前端、等待 `/health/ready` 与 4173 就绪；端口已被占用时跳过启动，可重复执行。手动方式（两个终端）仍可用：
+
+```powershell
+backend/scripts/Start-Local.ps1 -JdkPath 'C:\Program Files\Java\latest\jdk-21'
+cd frontend; npm run dev
 ```
 
 脚本走的是产品 HTTP 接口，产出的是**真实数据**（不是 mock、不是直接写库）：
