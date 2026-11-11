@@ -297,10 +297,13 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return
   }
   if (event.key === 'Tab') {
-    if (tabEscape) { tabEscape = false; return }
+    const leave = tabEscape
+    tabEscape = false
+    // 只读或冻结时不能改内容，这时必须放行 Tab，否则焦点被永久困在编辑器里。
+    if (leave || readOnly.value || frozen.value) return
     event.preventDefault()
     const element = editorRef.value
-    if (!element || readOnly.value || frozen.value) return
+    if (!element) return
     applyEdit(event.shiftKey
       ? outdent(element.value, element.selectionStart, element.selectionEnd)
       : indent(element.value, element.selectionStart, element.selectionEnd))

@@ -520,6 +520,19 @@ describe('编辑器只读语义与按键（C1）', () => {
     expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('<p>  </p>')
   })
 
+  it('只读时不拦截 Tab，焦点可以正常移出编辑器', async () => {
+    workspaceOverride = { canSave: false, saveBlockedReason: 'OFFERING_ARCHIVED' }
+    const page = await openWorkspace()
+    const editor = page.find('textarea.workspace-editor')
+    const element = editor.element as HTMLTextAreaElement
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+
+    element.dispatchEvent(tab)
+
+    expect(tab.defaultPrevented).toBe(false)
+    expect(element.value).toBe('<p>v1</p>')
+  })
+
   it('Shift+Tab 收回一级缩进', async () => {
     const page = await openWorkspace()
     const editor = page.find('textarea.workspace-editor')
@@ -533,8 +546,7 @@ describe('编辑器只读语义与按键（C1）', () => {
     expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('  <p></p>')
   })
 
-  it('先按 Esc 再按 Tab 时放行焦点移动，不改动内容', async () => {
-    const page = await openWorkspace()
+  it('先按 Esc 再按 Tab 时放行焦点移动，不改动内容', async () => {    const page = await openWorkspace()
     const editor = page.find('textarea.workspace-editor')
     await editor.setValue('<p></p>')
     const element = editor.element as HTMLTextAreaElement
