@@ -68,7 +68,7 @@ public class CheckService {
         Assignment assignment = studentAssignment(user, assignmentId, false);
         if (revision < 0) throw AssignmentInput.invalid();
         return new Availability(configured(assignment, store.policy(assignmentId)),
-                revision == 0 ? null : store.byRevision(assignmentId, user.id(), revision));
+                titled(revision == 0 ? null : store.byRevision(assignmentId, user.id(), revision)));
     }
 
     public CheckStore.CheckView get(UserDTO user, String checkId) {
@@ -77,7 +77,16 @@ public class CheckService {
         CheckStore.CheckView view = store.forStudent(checkId, user.id());
         if (view == null) throw CourseAccess.notFound();
         studentAssignment(user, view.assignmentId(), false);
-        return view;
+        return titled(view);
+    }
+
+    /** 结果快照只存 ruleId；标题回填自已发布的判题配置，判定结论不变。 */
+    private CheckStore.CheckView titled(CheckStore.CheckView view) {
+        if (view == null || view.result() == null) return view;
+        Map<String, Object> result = CheckPolicy.titled(view.result(), store.policy(view.assignmentId()).config());
+        if (result == view.result()) return view;
+        return new CheckStore.CheckView(view.id(), view.assignmentId(), view.workspaceRevision(),
+                view.checkerVersion(), view.status(), result, view.error(), view.createdAt(), view.completedAt());
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
