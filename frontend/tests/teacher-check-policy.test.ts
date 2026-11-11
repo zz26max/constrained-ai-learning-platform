@@ -22,16 +22,18 @@ const initialConfig = {
 let scripted: ReturnType<typeof createScriptedTransport>
 let wrapper: VueWrapper | undefined
 let conflict = false
+let config: Record<string, unknown> = initialConfig
 
 beforeEach(() => {
   conflict = false
+  config = initialConfig
   scripted = createScriptedTransport()
   scripted.setHandler(request => {
-    if (request.operationId === 'getCheckPolicy') return okEnvelope({ version: 3, config: initialConfig })
+    if (request.operationId === 'getCheckPolicy') return okEnvelope({ version: 3, config })
     if (request.operationId === 'updateCheckPolicy' && conflict) {
       return failEnvelope(409, 'CHECK_POLICY_CONFLICT', { currentVersion: 4 })
     }
-    return okEnvelope({ version: 4, config: initialConfig })
+    return okEnvelope({ version: 4, config })
   })
   const client = new ApiClient(scripted.transport)
   registerAuthApi(new AuthApi(client))
@@ -40,7 +42,7 @@ beforeEach(() => {
 
 afterEach(() => wrapper?.unmount())
 
-async function openPanel(readOnly = false) {
+async function openPanel(readOnly = false, kind: 'sql_text' | 'web_lab' = 'sql_text') {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().$patch({
@@ -53,7 +55,7 @@ async function openPanel(readOnly = false) {
   })
   await router.push('/')
   wrapper = mount(TeacherCheckPolicyPanel, {
-    props: { assignmentId: ASSIGNMENT, kind: 'sql_text', readOnly },
+    props: { assignmentId: ASSIGNMENT, kind, readOnly },
     global: { plugins: [pinia, router] },
   })
   wrapper.get('details').element.setAttribute('open', '')
@@ -97,5 +99,35 @@ describe('教师自动检查配置', () => {
     expect(page.text()).toContain('当前规则仅供查看')
     expect(page.get('fieldset').attributes('disabled')).toBeDefined()
     expect(page.find('button').exists()).toBe(false)
+  })
+})
+
+const WEB_CONFIG = {
+  kind: 'web_lab',
+  rules: [{ id: 'r1', selector: 'h1', check: 'text', expected: '标题', property: null, width: 1440 }],
+}
+
+describe('检查项名称（学生可见）', () => {
+  it('填写名称后随规则一起保存', async () => {
+    config = WEB_CONFIG
+    const page = await openPanel(false, 'web_lab')
+    await page.get('input[placeholder="例如 移动端适配"]').setValue('页面标题')
+    await page.findAll('button').find(button => button.text().includes('保存检查规则'))!.trigger('click')
+    await flushPromises()
+
+    const raw = scripted.requests.find(request => request.operationId === 'updateCheckPolicy')?.body ?? '{}'
+    const body = JSON.parse(raw) as { config: { rules: Record<string, unknown>[] } }
+    expect(body.config.rules[0]!.title).toBe('页面标题')
+  })
+
+  it('名称留空时不上送，由后端按无标题处理', async () => {
+    config = WEB_CONFIG
+    const page = await openPanel(false, 'web_lab')
+    await page.findAll('button').find(button => button.text().includes('保存检查规则'))!.trigger('click')
+    await flushPromises()
+
+    const raw = scripted.requests.find(request => request.operationId === 'updateCheckPolicy')?.body ?? '{}'
+    const body = JSON.parse(raw) as { config: { rules: Record<string, unknown>[] } }
+    expect(body.config.rules[0]).not.toHaveProperty('title')
   })
 })

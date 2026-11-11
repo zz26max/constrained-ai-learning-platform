@@ -29,7 +29,7 @@ const query = usePageQuery(async signal => (await api.getCheckPolicy(props.assig
 
 function addRule() {
   rules.value.push({
-    id: crypto.randomUUID(), selector: '', check: 'exists',
+    id: crypto.randomUUID(), title: '', selector: '', check: 'exists',
     expected: null, property: null, width: 1280,
   })
 }
@@ -79,6 +79,8 @@ function buildConfig(): CheckPolicyConfig | null | undefined {
   if (props.kind === 'web_lab') {
     const normalized = rules.value.map(rule => ({
       ...rule,
+      // 空白标题不上送：后端只接受非空标题，学生端会把空标题当成「没有可读名称」。
+      title: rule.title?.trim() || undefined,
       selector: rule.selector.trim(),
       expected: rule.check === 'exists' ? null : rule.expected ?? '',
       property: rule.check === 'css' ? rule.property?.trim() ?? '' : null,
@@ -139,6 +141,9 @@ async function save() {
         <template v-if="enabled && kind === 'web_lab'">
           <fieldset v-for="(rule, index) in rules" :key="rule.id">
             <legend>检查项 {{ index + 1 }}</legend>
+            <label>检查项名称（可选，学生能看到）
+              <input v-model="rule.title" maxlength="60" placeholder="例如 移动端适配" />
+            </label>
             <label>CSS 选择器 <input v-model="rule.selector" maxlength="200" placeholder="例如 main h1" /></label>
             <label>检查类型
               <select v-model="rule.check">

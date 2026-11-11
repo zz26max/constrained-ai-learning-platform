@@ -570,8 +570,11 @@ describe('编辑器只读语义与按键（C1）', () => {
         id: CHECK_ID, assignmentId: ASSIGNMENT, workspaceRevision: 2, checkerVersion: 'mvp-v1',
         status: 'completed', error: null, createdAt: '2026-10-14T02:00:00Z', completedAt: '2026-10-14T02:00:01Z',
         result: {
-          passed: 0, total: 1, output: '', truncated: false,
-          items: [{ ruleId: 'viewport', status: 'fail', message: '未通过，请检查对应结构、内容或样式。' }],
+          passed: 0, total: 2, output: '', truncated: false,
+          items: [
+            { ruleId: 'viewport', title: '移动端适配', status: 'fail', message: '未通过，请检查对应结构、内容或样式。' },
+            { ruleId: 'h1-title', title: null, status: 'fail', message: '未通过，请检查对应结构、内容或样式。' },
+          ],
         },
       })
       return normalResponse(request)
@@ -581,9 +584,11 @@ describe('编辑器只读语义与按键（C1）', () => {
     await flushPromises()
 
     const items = page.get('.ws-check').findAll('.ws-check-items li')
-    expect(items).toHaveLength(1)
+    expect(items).toHaveLength(2)
     expect(items[0]!.text()).toContain('第 1 项')
     expect(items[0]!.attributes('data-status')).toBe('fail')
-    expect(items[0]!.text()).not.toContain('请检查对应结构、内容或样式')
+    expect(items[0]!.text()).toContain('移动端适配')
+    expect(items[1]!.text()).toContain('第 2 项')
+    expect(items[1]!.text()).not.toContain('请检查对应结构、内容或样式')
   })
 })

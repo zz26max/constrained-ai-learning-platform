@@ -566,7 +566,8 @@ onBeforeUnmount(() => {
                     <li v-for="(item, index) in check.result.value.result.items" :key="item.ruleId" :data-status="item.status">
                       <span class="ws-check-no">第 {{ index + 1 }} 项</span>
                       <span class="ws-check-state">{{ item.status === 'pass' ? '通过' : '未通过' }}</span>
-                      <span v-if="itemDetail(item.message)" class="ws-check-detail">{{ itemDetail(item.message) }}</span>
+                      <span v-if="item.title" class="ws-check-detail">{{ item.title }}</span>
+                      <span v-else-if="itemDetail(item.message)" class="ws-check-detail">{{ itemDetail(item.message) }}</span>
                     </li>
                   </ol>
                   <pre v-if="check.result.value.result.output">{{ check.result.value.result.output }}</pre>
