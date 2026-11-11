@@ -8,15 +8,15 @@
 
 > 改本节必须显式说明改了什么、依据是什么；本节只保留现状块（代码基线、阶段、契约状态、门禁现状、未决事项），带日期的会话日志一律追加到 §1，不再写入本节。
 
-- **代码基线**：`e9fb27f`（教师建班可填班级名，契约 1.6.0；一键演示见 `0c93d4a`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 合并推送后无未推送提交。
+- **代码基线**：`76c9e41`（工作区编辑器可用性与判题规则标题，契约 1.7.0；教师建班见 `e9fb27f`，一键演示见 `0c93d4a`），须为 HEAD 祖先且落后不超过 3 个提交。`master` 合并推送后无未推送提交。
 
 - **阶段**：P1 原有教学闭环证据见 §3.8。P2-A（政策、受限辅导、教师求助）与 P2-B（客户端及可信事件、教师知识证据、建议、共性问题）后端开发完成，任务清单和联调说明见 [P2 后端交付](features/p2-backend-integration.md)；前端知识评价/标签 UI 已由 `801c940` 完成。阶段二（课程选题的学习行为可视化与知识掌握分析）已补教师端学习分析页与学生端掌握概览，2026-10-31 经正式页面、真实后端与 MySQL 验证；共性问题仅展示，不映射知识点。真实供应商已接通（OpenCode Go / `glm-5.3-flash`，经使用者授权并提供 key），外部调用不再关闭；配额与 429 重试已修，示例作业的默认 AI 政策随 V18 分发。自动检查已实现并通过本轮验证，动态学习路径与预测未实现；P2 基础规则建议已实现（nextRecommendation），不应统称为“建议未实现”。工作区已改为 IDE 式分栏（左题面/右编辑器/运行结果），AI 求助以内嵌抽屉方式接入工作区，发送前自动保存并携带最新 revision；本轮按用户授权补充服务端自动判题（Web 静态 HTML/CSS 与 SQL 查询/增删改，已完成真实联调）。**2026-10-31 新增**：双模式注册功能（个人模式自动关联 Web 课程、学校模式支持邀请码加入班级或教师创建班级）已实现后端接口（POST /api/v1/auth/register）与前端页面（#/register）；V16 Flyway 迁移导入真实 Web 开发基础课程数据（5 章、10 份 Markdown 资源、12 个知识点，内容基于 MDN Web Docs 结构手动编写）。迁移不创建账号：`course_offerings.created_by` 已允许为空，个人学习 offering 无创建者；空库没有学期时 V16 会补一个「个人学习学期」作为承载，已有当前学期时保持原样。
 
-- **课设符合性**：依据用户提供的《选题二要求.md》，课设阶段一 MVP 尚未完整满足：自动判题已补齐，真实基础 AI 问答仍未验收。仓库 P1/P2/P3 为内部工作包，不等于课设三阶段；既有教学闭环通过不能替代课设 MVP 完成。阶段二看板/掌握分析已有实现。AI 五层机制中课程讲义检索与出处、静态分析前置尚缺；当前仅传入作业描述和要求，不能称为完整 RAG。阶段三只需选 1–2 项，不必同时做动态路径与预测。软著材料、论文与真实对照实验结果尚无本轮确认的交付证据。
+- **课设符合性**：依据用户提供的《选题二要求.md》，阶段一 MVP 六项均已具备生产实现：注册登录、课程章节、在线编辑器、练习与自动判题（Web 静态 HTML/CSS 与 SQL）、学习进度、基础 AI 问答（2026-11-10 个人模式闭环已用真实供应商验收，见 §1）。因此「MVP 跑通」这一硬门槛可以成立；但「在线编辑器」目前仍是纯 textarea（无语法高亮与行号），自动判题不执行 JavaScript。阶段二看板/掌握分析已有实现。AI 五层机制中课程讲义检索与出处（L1）、静态分析前置（L3）、错误反馈（L4）、记录与拦截（L5）均已落代码；L2 只有三层提示且不给伪代码，不得按 PPT 原话宣传四级。阶段三只需选 1–2 项，已选「受限式 AI 辅导深化」（主项）与规则版个性化建议（次项），动态路径与预测未做。软著材料、论文与真实对照实验结果仍无交付证据。
 
-- **契约状态**：1.3.0，89 个业务操作 + 2 个健康检查；业务操作为 18 verified、69 implemented、2 planned（两个健康检查为 implemented，不计入业务统计）。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式邀请码入班与教师注册建班也已取得真实浏览器证据，未额外更改接口状态。
+- **契约状态**：1.7.0，89 个业务操作 + 2 个健康检查；业务操作为 18 verified、71 implemented、2 planned（两个健康检查为 implemented，不计入业务统计）。1.7.0 给 `WebCheckRule` 加了可选 `title`、给 `CheckItem` 加了可空 `title`：只作学生可读名称，不回显选择器与期望值，不改判定结论。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式邀请码入班与教师注册建班也已取得真实浏览器证据，未额外更改接口状态。
 
-- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（48 文件 / 426 用例、`test:browser:config` 13 例、typecheck、build、生产 mock 隔离）；单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
+- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（49 文件 / 444 用例、`test:browser:config` 13 例、typecheck、build、生产 mock 隔离）；2026-11-11 的后端改动只跑了 `CheckPolicyTest`、`CheckWorkerTest`、`CheckHttpContractTest` 共 14 例，未重跑全量 `mvnw verify`。单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
 
 - **未决事项**（2026-11-08 更新）：
   1. §4 原归档与提交竞态已通过生命周期锁、真实待批阅检查及四组 MySQL 并发测试修复；其余四项既有限制保留。
@@ -40,6 +40,14 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-11 工作区编辑器可用性（master，`58f186b` + `76c9e41`）**：①新增 [editor-text.ts](../frontend/src/features/assignments/editor-text.ts)——Tab/Shift+Tab 按行缩进与反缩进、Enter 继承当前行缩进（行尾是 `{` `(` `[` 时多缩一级），纯函数、无 DOM；②工作区接入键盘处理：Tab 缩进、Ctrl+S 立即 flush、Esc 后 Tab 放行焦点（Tab 会被编辑器吃掉，必须留一条键盘退出路径）；③只读语义拆分——归档/未登录的**持久**只读改用 `readonly`（正文可选中复制），`disabled` 只留给提交与检查准备中的瞬时冻结；实测 Edge 中 `disabled` 的 textarea 选中结果为空、无法复制，`readonly` 可以；④自动检查面板从页面顶部移进编辑列、紧跟代码下方（原位置在 `min-height:100dvh` 的网格之上，点完检查看不到结果），逐条显示「第 N 项 + 通过/未通过」，执行器的通用句不再重复渲染。
+>
+> 检查：`npm run verify` 全通过——typecheck、build、check:no-mock、`vitest` 49 文件 444 用例（新增 editor-text 9 例、workspace-editor 7 例）。未做：无真实浏览器视觉走查；语法高亮与行号仍未实现——原计划的 CodeMirror 6 本轮**装不了包**：npm 仓库经策略代理一律 403（registry.npmjs.org / npmmirror / 腾讯镜像均被拒，代理自身也回 403），本机无 `_cacache`、pnpm store 里也没有 CodeMirror，未绕过代理。
+
+> **2026-11-11 判题规则标题（master，契约 1.7.0，`51af64e` + `fad7428` + `6f9815c`）**：`WebCheckRule` 新增可选 `title`（1–60 字），`CheckItem` 新增可空 `title`。动机：执行器 [web-check.mjs](../backend/check-runner/web-check.mjs) 的失败文案是写死的「未通过，请检查对应结构、内容或样式。」，学生点完检查只看到 N 行一模一样的话，连哪一条没过都不知道；而服务端 `TutoringFeedback` 手里有规则、选择器与动作指令——AI 知道、学生不知道。标题只作可读名称（如「移动端适配」），不回显选择器与期望值，维持规则私密性。后端 `CheckPolicy.titled` 在读路径按 `ruleId` 回填，结果快照不改（`policy_snapshot` 完成后会被清空，映射取自已冻结的 `assignment_check_policies`），无标题时原样返回；教师端每个检查项新增命名输入，留空不上送。
+>
+> 检查：`mvn -o -Dtest=CheckPolicyTest,CheckWorkerTest,CheckHttpContractTest test` BUILD SUCCESS 14 例（新增 `CheckPolicyTest` 5 例：标题可选、空白/超长/未登记字段被拒、回填不改判定、无标题原样返回、未知规则回填 null）；前端 `vitest` 49 文件 444 例、`vue-tsc`；`validate_contract.py` PASS（89 业务 + 2 健康检查、355 schema、38 示例、18 verified / 71 implemented / 2 planned）。未做：未跑真实 MySQL/Docker IT，回填链路只有单元级证据；未做浏览器视觉走查；`BACKEND.md`、`FRONTEND.md` 与 `docs/features/feature-map.md` 的判题字段口径未同步（需授权）。
 
 > **2026-11-11 教师建班可填班级名（分支 `feat/class-name`）**：契约升 **1.6.0**，`RegisterWrite` 新增可选 `className`（1–60 字）。仅「学校模式 + 教师 + 创建班级」允许填写，其它模式填写返回 422 `VALIDATION_ERROR`；省略或留空仍创建「我的班级」。后端 `RegisterService` 校验后把班名透传给 `insertOffering`，`RegisterWrite` 保留 7 参兼容构造以免影响既有调用；前端注册页教师步骤新增「班级名称（可选）」输入并随 `createClass` 一起提交。
 >
