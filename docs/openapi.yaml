@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 个性化学习平台接口契约
-  version: 1.6.0
+  version: 1.7.0
   description: 设计基线 2026-10-11。实现状态以各 operation 的 x-implementation-status 为准，并由后端生产路由测试双向核对；本段不重复维护接口状态数量。
     x-contract-status：reviewed 表示静态契约审计，draft 表示尚未审定的草案，均不等于运行验收；implemented 不表示联调环境已部署。字段以此文件为唯一结构源；运行规则见 DEVELOPMENT.md，存储见 BACKEND.md。
 servers:
@@ -7058,6 +7058,11 @@ components:
       additionalProperties: false
       properties:
         id: {type: string, minLength: 1, maxLength: 64}
+        title:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: 可选规则标题，只作为给学生看的可读名称（如「移动端适配」），不参与判定，也不回显选择器与期望值。
         selector: {type: string, minLength: 1, maxLength: 200}
         check: {type: string, enum: [exists, text, css]}
         expected: {type: [string, 'null'], maxLength: 1000}
@@ -7227,6 +7232,10 @@ components:
       additionalProperties: false
       properties:
         ruleId: {type: string, maxLength: 64, minLength: 1}
+        title:
+          type: [string, 'null']
+          maxLength: 60
+          description: 该规则的标题，取自教师配置；未配置时为 null。只描述检查项名称，不泄漏选择器与期望值。
         status: {type: string, enum: [pass, fail]}
         message: {type: string, maxLength: 8000}
       required:

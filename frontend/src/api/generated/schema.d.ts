@@ -3227,6 +3227,8 @@ export interface components {
         };
         WebCheckRule: {
             id: string;
+            /** @description 可选规则标题，只作为给学生看的可读名称（如「移动端适配」），不参与判定，也不回显选择器与期望值。 */
+            title?: string;
             selector: string;
             /** @enum {string} */
             check: "exists" | "text" | "css";
@@ -3369,6 +3371,8 @@ export interface components {
         };
         CheckItem: {
             ruleId: string;
+            /** @description 该规则的标题，取自教师配置；未配置时为 null。只描述检查项名称，不泄漏选择器与期望值。 */
+            title?: string | null;
             /** @enum {string} */
             status: "pass" | "fail";
             message: string;
