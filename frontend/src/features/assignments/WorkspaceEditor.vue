@@ -563,7 +563,7 @@ onBeforeUnmount(() => {
                 <p v-if="isWebLab && check.configured.value" class="meta">检查 HTML/CSS 静态结构与样式，不执行 JavaScript。</p>
                 <p v-if="check.configured.value && !canRunChecks" class="meta">自动检查服务当前不可用。</p>
                 <p v-if="check.checkedRevision.value !== null" class="meta">
-                  检查版本 r{{ check.checkedRevision.value }}。{{ checkIsStale ? '工作区已有更新，此结果对应旧版本。' : '' }}
+                  检查版本 r{{ check.checkedRevision.value }}。{{ checkIsStale ? '此结果对应旧版本。重新检查可更新判题结果和 AI 排错依据。' : '' }}
                 </p>
                 <ApiState v-if="check.error.value" status="error" :error="check.error.value" @retry="check.retry" />
                 <p v-else-if="check.status.value === 'queued'" role="status">排队中…</p>
@@ -611,7 +611,7 @@ onBeforeUnmount(() => {
                 <div class="ws-tutor-inline-head">
                   <div>
                     <h3>AI 求助</h3>
-                    <p class="meta">默认仅发送你的问题和尝试。附上工作区时会先保存最新内容。</p>
+                    <p class="meta">辅导会参考你的问题、尝试、近期对话和课程资料。勾选附上工作区时会先保存最新代码。</p>
                   </div>
                   <button type="button" class="ws-tutor-inline-close" aria-label="关闭 AI 求助" @click="closeTutor">关闭</button>
                 </div>
