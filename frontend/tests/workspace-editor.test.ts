@@ -24,6 +24,7 @@ let scripted: ScriptedTransport
 let wrapper: VueWrapper | undefined
 let router: Router | undefined
 let assignmentOverride: Record<string, unknown> = {}
+let workspaceOverride: Record<string, unknown> = {}
 let saveFails = false
 
 function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
@@ -33,6 +34,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
     case 'getWorkspace': return okEnvelope({
       assignmentId: assignment, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
       savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null,
+      ...workspaceOverride,
     })
     case 'getAssignment': return okEnvelope({
       id: assignment, canSubmit: true, submissionBlockedReason: null,
@@ -108,6 +110,7 @@ async function editAndConfirmSubmit(page: VueWrapper, content: string): Promise<
 beforeEach(() => {
   clearWorkspaceRecovery()
   assignmentOverride = {}
+  workspaceOverride = {}
   saveFails = false
   if (typeof window.confirm !== 'function') window.confirm = () => false
   const dialog = HTMLDialogElement.prototype
@@ -490,5 +493,97 @@ describe('工作区自动检查', () => {
     }])
     expect(requestsOf('createCheck').map(bodyOf)).toEqual([{ workspaceRevision: 1 }, { workspaceRevision: 2 }])
     expect(page.get('.ws-check').text()).toContain('通过 0 / 1 项')
+  })
+})
+
+describe('编辑器只读语义与按键（C1）', () => {
+  it('canSave 为 false 时用 readonly 保留正文，不再整块 disabled', async () => {
+    workspaceOverride = { canSave: false, saveBlockedReason: 'OFFERING_ARCHIVED' }
+    const page = await openWorkspace()
+
+    const editor = page.find('textarea.workspace-editor')
+    expect(editor.attributes('readonly')).toBeDefined()
+    expect(editor.attributes('disabled')).toBeUndefined()
+    expect(page.text()).toContain('教学班已归档')
+  })
+
+  it('Tab 插入一级缩进而不是把焦点移出编辑器', async () => {
+    const page = await openWorkspace()
+    const editor = page.find('textarea.workspace-editor')
+    await editor.setValue('<p></p>')
+    const element = editor.element as HTMLTextAreaElement
+    element.setSelectionRange(3, 3)
+
+    await editor.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+
+    expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('<p>  </p>')
+  })
+
+  it('Shift+Tab 收回一级缩进', async () => {
+    const page = await openWorkspace()
+    const editor = page.find('textarea.workspace-editor')
+    await editor.setValue('    <p></p>')
+    const element = editor.element as HTMLTextAreaElement
+    element.setSelectionRange(6, 6)
+
+    await editor.trigger('keydown', { key: 'Tab', shiftKey: true })
+    await flushPromises()
+
+    expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('  <p></p>')
+  })
+
+  it('先按 Esc 再按 Tab 时放行焦点移动，不改动内容', async () => {
+    const page = await openWorkspace()
+    const editor = page.find('textarea.workspace-editor')
+    await editor.setValue('<p></p>')
+    const element = editor.element as HTMLTextAreaElement
+    element.setSelectionRange(3, 3)
+
+    await editor.trigger('keydown', { key: 'Escape' })
+    await editor.trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+
+    expect((page.find('textarea.workspace-editor').element as HTMLTextAreaElement).value).toBe('<p></p>')
+  })
+
+  it('Ctrl+S 立即保存，不等防抖', async () => {
+    const page = await openWorkspace()
+    const editor = page.find('textarea.workspace-editor')
+    await editor.setValue('<p>saved-by-hotkey</p>')
+
+    await editor.trigger('keydown', { key: 's', ctrlKey: true })
+    await flushPromises()
+
+    const saves = requestsOf('saveWorkspace')
+    expect(saves).toHaveLength(1)
+    expect((bodyOf(saves[0]!)['files'] as { content: string }[])[0]?.content).toBe('<p>saved-by-hotkey</p>')
+  })
+
+  it('检查结果按条编号，执行器的通用文案不重复渲染', async () => {
+    scripted.setHandler(request => {
+      if (request.operationId === 'getAssignmentCheck') return okEnvelope({ configured: true, check: null })
+      if (request.operationId === 'createCheck') return {
+        status: 202, body: { data: { checkId: CHECK_ID, status: 'queued' }, requestId: 'req-check' },
+      }
+      if (request.operationId === 'getCheck') return okEnvelope({
+        id: CHECK_ID, assignmentId: ASSIGNMENT, workspaceRevision: 2, checkerVersion: 'mvp-v1',
+        status: 'completed', error: null, createdAt: '2026-10-14T02:00:00Z', completedAt: '2026-10-14T02:00:01Z',
+        result: {
+          passed: 0, total: 1, output: '', truncated: false,
+          items: [{ ruleId: 'viewport', status: 'fail', message: '未通过，请检查对应结构、内容或样式。' }],
+        },
+      })
+      return normalResponse(request)
+    })
+    const page = await openWorkspace(true)
+    await page.findAll('button').find(button => button.text() === '自动检查')!.trigger('click')
+    await flushPromises()
+
+    const items = page.get('.ws-check').findAll('.ws-check-items li')
+    expect(items).toHaveLength(1)
+    expect(items[0]!.text()).toContain('第 1 项')
+    expect(items[0]!.attributes('data-status')).toBe('fail')
+    expect(items[0]!.text()).not.toContain('请检查对应结构、内容或样式')
   })
 })

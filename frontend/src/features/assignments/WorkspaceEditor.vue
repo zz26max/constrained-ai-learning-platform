@@ -22,6 +22,7 @@ import { trackLearningEvent, EDITOR_FILES, type EditorFile } from '../analytics/
 import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
 import TutoringPanel from '../tutoring/TutoringPanel.vue'
+import { indent, newline, outdent, type TextEdit } from './editor-text'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,6 +71,7 @@ const outputOpen = ref(false)
 const problemVisible = ref(true)
 const previewRef = ref<{ run: () => void } | null>(null)
 const outputRef = ref<HTMLElement | null>(null)
+const editorRef = ref<HTMLTextAreaElement | null>(null)
 
 // 保存目标固定为已加载工作区的作业，不随路由参数变化，避免旧编辑写入新作业。
 let editingAssignmentId = ''
@@ -168,6 +170,9 @@ const check = useWorkspaceCheck(
     && (detail.value?.type === 'web_lab' || detail.value?.type === 'sql_text'),
 )
 const frozen = computed(() => submitting.value || actions.pending.value || check.preparing.value)
+// 持久只读用 readonly：文字仍可选中复制（归档后学生要能取回自己的作品）。
+// disabled 只留给提交、检查进行中的瞬时冻结。
+const readOnly = computed(() => !canSave.value || auth.phase !== 'authenticated')
 const checkIsStale = computed(() => check.checkedRevision.value !== null
   && (hasUnsavedEdits.value || check.checkedRevision.value !== saveState.value.lastSavedRevision))
 
@@ -266,6 +271,54 @@ function handleFileEdit(content: string): void {
     files,
     activeFile: activeTab.value as 'index.html' | 'style.css' | 'script.js' | 'answer.sql' | 'answer.md'
   })
+}
+
+/** 把纯文本操作写回工作区，等 `:value` 应用到 DOM 后再恢复光标与选区。 */
+function applyEdit(edit: TextEdit): void {
+  handleFileEdit(edit.value)
+  void nextTick(() => {
+    const element = editorRef.value
+    if (!element) return
+    element.selectionStart = Math.min(edit.start, element.value.length)
+    element.selectionEnd = Math.min(edit.end, element.value.length)
+  })
+}
+
+// Tab 会被编辑器吃掉，所以沿用主流编辑器的「Esc 后再按 Tab 才移出焦点」约定，保住键盘可达性。
+let tabEscape = false
+
+function onEditorKeydown(event: KeyboardEvent): void {
+  if (event.isComposing) return
+  if (event.key === 'Escape') { tabEscape = true; return }
+  const modified = event.ctrlKey || event.metaKey
+  if (modified && event.key.toLowerCase() === 's') {
+    event.preventDefault()
+    if (!saveState.value.paused && !frozen.value && auth.phase === 'authenticated') void flush()
+    return
+  }
+  if (event.key === 'Tab') {
+    if (tabEscape) { tabEscape = false; return }
+    event.preventDefault()
+    const element = editorRef.value
+    if (!element || readOnly.value || frozen.value) return
+    applyEdit(event.shiftKey
+      ? outdent(element.value, element.selectionStart, element.selectionEnd)
+      : indent(element.value, element.selectionStart, element.selectionEnd))
+    return
+  }
+  tabEscape = false
+  if (event.key !== 'Enter' || event.shiftKey || modified || event.altKey) return
+  const element = editorRef.value
+  if (!element || readOnly.value || frozen.value) return
+  event.preventDefault()
+  applyEdit(newline(element.value, element.selectionStart, element.selectionEnd))
+}
+
+/** 执行器的通用文案没有信息量（见 backend/check-runner/web-check.mjs），重复渲染只是噪音。 */
+const GENERIC_CHECK_MESSAGES = new Set(['未通过，请检查对应结构、内容或样式。', '符合此项要求。'])
+
+function itemDetail(message: string): string {
+  return GENERIC_CHECK_MESSAGES.has(message) ? '' : message
 }
 
 function openSubmitDialog(): void {
@@ -401,33 +454,6 @@ onBeforeUnmount(() => {
     <ApiState v-if="assignmentQuery.status.value === 'error'" :status="assignmentQuery.status.value" :error="assignmentQuery.error.value" @retry="assignmentQuery.load" />
     <ActionNotice :error="actions.error.value" :message="actions.message.value" />
 
-    <section v-if="check.configured.value !== null || check.error.value" class="surface ws-check" aria-label="自动检查结果">
-      <h2>自动检查</h2>
-      <p v-if="isWebLab && check.configured.value" class="meta">检查 HTML/CSS 静态结构与样式，不执行 JavaScript。</p>
-      <p v-if="check.configured.value && !canRunChecks" class="meta">自动检查服务当前不可用。</p>
-      <p v-if="check.checkedRevision.value !== null" class="meta">
-        检查版本 r{{ check.checkedRevision.value }}。{{ checkIsStale ? '工作区已有更新，此结果对应旧版本。' : '' }}
-      </p>
-      <ApiState v-if="check.error.value" status="error" :error="check.error.value" @retry="check.retry" />
-      <p v-else-if="check.status.value === 'queued'" role="status">排队中…</p>
-      <p v-else-if="check.status.value === 'running'" role="status">正在检查…</p>
-      <UiNotice v-else-if="check.result.value?.error" tone="error" role="alert">
-        检查未完成。{{ check.result.value.error.message }}
-        <span v-if="canRunChecks && canSave">可重新检查当前作品。</span>
-      </UiNotice>
-      <template v-else-if="check.result.value?.result">
-        <p role="status">通过 {{ check.result.value.result.passed }} / {{ check.result.value.result.total }} 项。正式成绩以教师评价为准。</p>
-        <ul>
-          <li v-for="item in check.result.value.result.items" :key="item.ruleId">
-            {{ item.status === 'pass' ? '通过' : '未通过' }} · {{ item.message }}
-          </li>
-        </ul>
-        <pre v-if="check.result.value.result.output">{{ check.result.value.result.output }}</pre>
-        <p v-if="check.result.value.result.truncated" class="meta">输出已截断。</p>
-      </template>
-      <p v-else-if="check.configured.value === false">此作业尚未配置自动检查。</p>
-    </section>
-
     <UiNotice v-if="saveState.error" tone="error">
       {{ saveState.error }}
     </UiNotice>
@@ -506,14 +532,47 @@ onBeforeUnmount(() => {
 
               <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
                 <textarea
+                  ref="editorRef"
                   :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
-                  :disabled="!canSave || frozen || auth.phase !== 'authenticated'"
+                  :readonly="readOnly"
+                  :disabled="frozen"
                   class="workspace-editor"
                   :aria-label="activeTab"
+                  title="Tab 缩进，Shift+Tab 反缩进，Esc 后 Tab 可移出编辑器"
                   rows="20"
                   spellcheck="false"
+                  @keydown="onEditorKeydown"
                   @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
                 />
+              </section>
+
+              <section v-if="check.configured.value !== null || check.error.value" class="ws-check" aria-label="自动检查结果">
+                <h2>自动检查</h2>
+                <p v-if="isWebLab && check.configured.value" class="meta">检查 HTML/CSS 静态结构与样式，不执行 JavaScript。</p>
+                <p v-if="check.configured.value && !canRunChecks" class="meta">自动检查服务当前不可用。</p>
+                <p v-if="check.checkedRevision.value !== null" class="meta">
+                  检查版本 r{{ check.checkedRevision.value }}。{{ checkIsStale ? '工作区已有更新，此结果对应旧版本。' : '' }}
+                </p>
+                <ApiState v-if="check.error.value" status="error" :error="check.error.value" @retry="check.retry" />
+                <p v-else-if="check.status.value === 'queued'" role="status">排队中…</p>
+                <p v-else-if="check.status.value === 'running'" role="status">正在检查…</p>
+                <UiNotice v-else-if="check.result.value?.error" tone="error" role="alert">
+                  检查未完成。{{ check.result.value.error.message }}
+                  <span v-if="canRunChecks && canSave">可重新检查当前作品。</span>
+                </UiNotice>
+                <template v-else-if="check.result.value?.result">
+                  <p role="status">通过 {{ check.result.value.result.passed }} / {{ check.result.value.result.total }} 项。正式成绩以教师评价为准。</p>
+                  <ol class="ws-check-items">
+                    <li v-for="(item, index) in check.result.value.result.items" :key="item.ruleId" :data-status="item.status">
+                      <span class="ws-check-no">第 {{ index + 1 }} 项</span>
+                      <span class="ws-check-state">{{ item.status === 'pass' ? '通过' : '未通过' }}</span>
+                      <span v-if="itemDetail(item.message)" class="ws-check-detail">{{ itemDetail(item.message) }}</span>
+                    </li>
+                  </ol>
+                  <pre v-if="check.result.value.result.output">{{ check.result.value.result.output }}</pre>
+                  <p v-if="check.result.value.result.truncated" class="meta">输出已截断。</p>
+                </template>
+                <p v-else-if="check.configured.value === false">此作业尚未配置自动检查。</p>
               </section>
 
               <Transition name="ws-output">
@@ -628,7 +687,49 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 .ws-check {
+  flex: 0 0 auto;
+  max-height: 15rem;
+  overflow: auto;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
   overflow-wrap: anywhere;
+}
+.ws-check h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.ws-check p {
+  margin: 4px 0;
+}
+.ws-check-items {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-check-items li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+.ws-check-no {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ws-check-state {
+  font-weight: 600;
+}
+.ws-check-items li[data-status='fail'] .ws-check-state {
+  color: var(--red);
+}
+.ws-check-detail {
+  color: var(--muted);
 }
 .ws-check pre {
   white-space: pre-wrap;
