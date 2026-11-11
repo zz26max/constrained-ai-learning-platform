@@ -69,10 +69,18 @@ class TutoringIntegrationIT {
   storeCheck(2,"later");
   jdbc.update("INSERT INTO assignment_check_policies(assignment_id,version,config) VALUES(?,1,?)",assignment,
           "{\"kind\":\"web_lab\",\"rules\":[{\"id\":\"layout\",\"title\":\"容器布局\",\"check\":\"css\",\"selector\":\"private-selector\",\"expected\":\"private-expected\"}]}");
+  provider.delegate=new TutoringProvider() {
+   @Override public boolean available() { return true; }
+   @Override public Output generate(Context context) {
+    return new Output(context.allowedModes().getFirst(),context.hintLevel(),"容器布局检查未通过，你在开发者工具中看到的实际样式是什么？","try_and_report",20,10);
+   }
+  };
   worker.execute(request);
   assertThat(provider.last.checkFindings()).anyMatch(s->s.contains("容器布局"));
   assertThat(provider.last.checkFindings()).noneMatch(s->s.contains("later")||s.contains("private"));
   assertThat(provider.last.feedbackFocus()).singleElement().asString().contains("实际样式");
+  assertThat(service.request(student,request).get("status")).isEqualTo("completed");
+  assertThat(provider.calls).isEqualTo(1);
  }
  @Test void olderCheckIsIgnoredWhenCurrentVersionWasNotChecked() {
   saveAnswer(0,"first version");
