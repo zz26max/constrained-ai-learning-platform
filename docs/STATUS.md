@@ -16,7 +16,7 @@
 
 - **契约状态**：1.7.0，89 个业务操作 + 2 个健康检查；业务操作为 18 verified、71 implemented、2 planned（两个健康检查为 implemented，不计入业务统计）。1.7.0 给 `WebCheckRule` 加了可选 `title`、给 `CheckItem` 加了可空 `title`：只作学生可读名称，不回显选择器与期望值，不改判定结论。新增 `getOfferingActivity`、`getOfferingKnowledgeMastery` 已接生产路由，字段结构与路径见契约，HTTP/IT 与真实页面证据齐备，标记 verified。`getAssignmentStats` 的 `commonIssues` 描述已于 2026-10-31 经授权按真实聚合口径修正，路径、字段与状态未变。`POST /api/v1/auth/register` 已由项目使用者在浏览器完成个人模式注册并确认自动登录可用（2026-10-31，用户验收，未留截图），标记 verified；学校模式邀请码入班与教师注册建班也已取得真实浏览器证据，未额外更改接口状态。
 
-- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（49 文件 / 444 用例、`test:browser:config` 13 例、typecheck、build、生产 mock 隔离）；2026-11-11 的后端改动只跑了 `CheckPolicyTest`、`CheckWorkerTest`、`CheckHttpContractTest` 共 14 例，未重跑全量 `mvnw verify`。单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
+- **门禁现状**：固定 Node 24.21.0 / npm 11.19.0 前端 verify 全通过（49 文件 / 444 用例、`test:browser:config` 13 例、typecheck、build、生产 mock 隔离）；工作区编辑器的 Tab/Shift+Tab/Ctrl+S 与检查面板位置另做了一次真实 Edge 验收（见 §1，2026-11-11）；2026-11-11 的后端改动只跑了 `CheckPolicyTest`、`CheckWorkerTest`、`CheckHttpContractTest` 共 14 例，未重跑全量 `mvnw verify`。单元及模拟 HTTP 测试不作为数据库证据。JDK 21.0.11 最终 `mvnw --batch-mode -Dchecks.it.runners=true verify` 全通过：481 单元/HTTP + 285 真实 MySQL/执行器 IT，0 失败/错误/跳过，耗时 10:31；包括 17 个真实隔离执行器用例、发布与配置保存并发、同 revision 并发入队。真实 Edge 五类题目共 10 次正反例、教师配置发布冻结、学生保存后检查、390px 布局全部通过，0 页面错误。契约静态检查通过；5 个自动判题操作标记 verified。
 
 - **未决事项**（2026-11-08 更新）：
   1. §4 原归档与提交竞态已通过生命周期锁、真实待批阅检查及四组 MySQL 并发测试修复；其余四项既有限制保留。
@@ -40,6 +40,15 @@
 - `docs/archive/` 一律是历史快照，不是规范。其中的 `HANDOFF-2026-10-16.md` 写的是 P1 尚未闭环时的状态，已作废。
 
 ## 1. 历史状态记录（只追加，勿据此判断当前）
+
+> **2026-11-11 工作区编辑器真实浏览器验收（master，基于 `76c9e41`）**：用 `Start-Demo.ps1 -SkipDb` 起前后端（3307 与镜像已就绪），Edge 无头 + 一次性个人账号（注册即自动关联个人课程与 2 份示例作业）实测工作区编辑区：
+> - Tab 在真实 textarea 中插入一级缩进且焦点不回退（`head="  <!do"`、`caret=2`、`focused=true`）；Shift+Tab 收回（`head="<!doct"`、`caret=0`）；Esc 后按 Tab 焦点离开编辑器。
+> - Ctrl+S 命中 `flush`：保存标记由「待保存」直接变为 `r1`，不等 1.5s 防抖。
+> - 自动检查面板的 DOM 位置：`columnChildren=["file-tabs","editor","ws-check"]`、`panelAboveGrid=false`，确认已落在编辑列内、代码下方，而不再在整块网格之上。
+> - 自动检查按钮灰置：`/me/config` 的 `features.serverChecks=false`（`checks.enabled` 默认关）。本轮**未改运行中后端配置**，因此「点检查→逐条结果」的真机链路仍未验证。
+> - 顺带观察到（非本轮引入）：`.workspace-topbar` 是 56px 吸顶栏，编辑器获得焦点后页面自动滚动，页头按钮会被顶栏遮住一半，属于既有滚动/吸顶行为。
+>
+> 检查：上述结论均由真实页面取值；截图在 Git 忽略的 `frontend/.cache/editor-review/shots/`。未做：归档只读态的真机验收（需要可归档的教学班与教师批阅）；`review.editor.*` 临时账号共 4 个，连同 workspace、workspace_files、learning_events、offering_members、auth_sessions 已按外键顺序删除，复查剩余 0。
 
 > **2026-11-11 工作区编辑器可用性（master，`58f186b` + `76c9e41`）**：①新增 [editor-text.ts](../frontend/src/features/assignments/editor-text.ts)——Tab/Shift+Tab 按行缩进与反缩进、Enter 继承当前行缩进（行尾是 `{` `(` `[` 时多缩一级），纯函数、无 DOM；②工作区接入键盘处理：Tab 缩进、Ctrl+S 立即 flush、Esc 后 Tab 放行焦点（Tab 会被编辑器吃掉，必须留一条键盘退出路径）；③只读语义拆分——归档/未登录的**持久**只读改用 `readonly`（正文可选中复制），`disabled` 只留给提交与检查准备中的瞬时冻结；实测 Edge 中 `disabled` 的 textarea 选中结果为空、无法复制，`readonly` 可以；④自动检查面板从页面顶部移进编辑列、紧跟代码下方（原位置在 `min-height:100dvh` 的网格之上，点完检查看不到结果），逐条显示「第 N 项 + 通过/未通过」，执行器的通用句不再重复渲染。
 >
