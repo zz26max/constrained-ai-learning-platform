@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TutoringFindingsTest {
     private static Map<String, Object> policy() {
         return Map.of("kind", "web_lab", "rules", List.of(
-                Map.of("id", "h1-title", "selector", "h1", "check", "text", "expected", "课程作业", "width", 1440),
+                Map.of("id", "h1-title", "title", "页面标题", "selector", "h1", "check", "text", "expected", "课程作业", "width", 1440),
                 Map.of("id", "viewport", "selector", "meta[name=viewport]", "check", "exists", "width", 390),
                 Map.of("id", "nav-color", "selector", "nav", "check", "css", "expected", "rgb(0, 0, 0)", "property", "color", "width", 1440)));
     }
@@ -22,36 +22,34 @@ class TutoringFindingsTest {
         return Map.of("items", items, "passed", 1, "total", failing.length + 1);
     }
 
-    @Test void summarizesOnlyFailedRulesWithTheirSelectors() {
-        var findings = TutoringFindings.build(policy(), result("h1-title", "viewport"), 3, 3);
+    @Test void summarizesPublicLabelsWithoutSelectorsOrExpectedValues() {
+        var failed = TutoringFindings.failedRules(policy(), result("h1-title", "viewport"));
+        var findings = TutoringFindings.summarize(failed, 3);
         assertThat(findings).hasSize(3);
         assertThat(findings.getFirst()).isEqualTo("自动检查（检查版本 3）：2 项未通过");
-        assertThat(findings.get(1)).contains("规则 h1-title", "h1", "文本需为「课程作业」");
-        assertThat(findings.get(2)).contains("规则 viewport", "meta[name=viewport]", "元素需存在");
+        assertThat(findings.get(1)).contains("页面标题").doesNotContain("h1", "课程作业");
+        assertThat(findings.get(2)).contains("viewport").doesNotContain("meta[name=viewport]");
     }
 
-    @Test void marksStaleChecksAndClipsExpectedValues() {
-        var findings = TutoringFindings.build(policy(), result("nav-color"), 2, 5);
-        assertThat(findings.getFirst()).contains("早于当前版本 5");
-        assertThat(findings.get(1)).contains("color 需为「rgb(0, 0, 0)」");
-        var longPolicy = Map.of("kind", "web_lab", "rules", List.of(
-                Map.of("id", "big", "selector", "p", "check", "text", "expected", "x".repeat(400), "width", 1440)));
-        var longFindings = TutoringFindings.build(longPolicy, result("big"), 1, 1);
-        assertThat(longFindings.get(1)).endsWith("」").contains("…");
+    @Test void recognizesSqlQueryAndMutationWithoutUsingVerificationData() {
+        var query = TutoringFindings.failedRules(Map.of("kind", "sql_text", "mode", "query"), result("sql.result"));
+        var mutation = TutoringFindings.failedRules(Map.of("kind", "sql_text", "mode", "mutation"), result("sql.result"));
+        assertThat(TutoringFeedback.directives(query)).singleElement().asString().contains("核对行、列或排序");
+        assertThat(TutoringFeedback.directives(mutation)).singleElement().asString().contains("验证操作后的数据状态");
     }
 
     @Test void returnsEmptyWhenEverythingPassesOrDataIsMissing() {
-        assertThat(TutoringFindings.build(policy(), Map.of("items", List.of(Map.of("ruleId", "h1-title", "status", "pass")), "passed", 1, "total", 1), 1, 1)).isEmpty();
-        assertThat(TutoringFindings.build(policy(), null, 1, 1)).isEmpty();
-        assertThat(TutoringFindings.build(null, result("h1-title"), 1, 1).get(1)).contains("规则 h1-title 未通过");
+        assertThat(TutoringFindings.failedRules(policy(), result())).isEmpty();
+        assertThat(TutoringFindings.failedRules(policy(), null)).isEmpty();
+        assertThat(TutoringFindings.summarize(TutoringFindings.failedRules(null, result("h1-title")), 1).get(1)).contains("检查项「h1-title」未通过");
     }
 
-    @Test void capsItemCountAndTotalLength() {
+    @Test void capsTheNumberOfShownItems() {
         var ids = new java.util.ArrayList<String>();
         for (int i = 0; i < 20; i++) ids.add("rule-" + i);
-        var findings = TutoringFindings.build(Map.of("kind", "web_lab", "rules", List.of()), result(ids.toArray(new String[0])), 1, 1);
-        assertThat(findings.getFirst()).contains("20 项未通过").contains("以下仅列 6 项");
-        assertThat(findings).hasSize(7);
+        var findings = TutoringFindings.summarize(TutoringFindings.failedRules(null, result(ids.toArray(new String[0]))), 1);
+        assertThat(findings.getFirst()).contains("20 项未通过").contains("以下仅列 4 项");
+        assertThat(findings).hasSize(5);
     }
 
     @Test void ablationLayersIgnoreUnknownNames() {

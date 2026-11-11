@@ -37,6 +37,8 @@ public class NoticeService {
     @Transactional(isolation=Isolation.READ_COMMITTED,rollbackFor=Exception.class)
     public NoticeDTO createNotice(String offeringId,UserDTO author,Map<String,Object> body,String requestId) {
         access.requireTeacher(author,AssignmentInput.uuid(offeringId),true);
+        access.lockOfferingShared(offeringId);
+        access.requireTeacher(author,offeringId,true);
         AssignmentInput.checkNoticeKeys(body);
         String title=noticeText(body,"title",1,TITLE_MAX);
         String content=noticeText(body,"content",0,CONTENT_MAX);
@@ -78,7 +80,7 @@ public class NoticeService {
     private static final Set<String> TARGET_KEYS=Set.of("type","id","offeringId");
     private static final String UUID_PATTERN="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
     /**
-     * 校验公告跳转目标：键恰为 type/id/offeringId，offeringId 等于路径班级，目标存在且属于本班；
+     * 校验公告跳转目标：键恰为 type/id/offeringId，offeringId 等于路径班级，目标须对本班学生可读；
      * feedback 目标仅定向公告可用，P1 createNotice 均为全班公告，一律 422；
      * 任何失败均为 422（不用 404，避免暴露他班资源是否存在）。target 为 null 时返回 null。
      */
@@ -98,16 +100,16 @@ public class NoticeService {
         if(!targetOffering.equals(offeringId)) {
             throw AssignmentInput.invalidField("target.offeringId","必须等于公告所属教学班。");
         }
-        boolean belongs=switch(type) {
+        boolean readable=switch(type) {
             case "offering" -> id.equals(offeringId);
-            case "chapter" -> mapper.existsChapterInOffering(id,offeringId);
-            case "resource" -> mapper.existsResourceInOffering(id,offeringId);
-            case "assignment" -> mapper.existsAssignmentInOffering(id,offeringId);
+            case "chapter" -> mapper.lockReadableNoticeChapter(id,offeringId)!=null;
+            case "resource" -> mapper.lockReadableNoticeResource(id,offeringId)!=null;
+            case "assignment" -> mapper.lockReadableNoticeAssignment(id,offeringId)!=null;
             // 全班公告人人都收到，而 feedback 仅评价归属学生可读，全班分发必产生死链（契约 1.1.1）。
             case "feedback" -> throw AssignmentInput.invalidField("target.type","全班公告不能指向单个学生的评价；feedback 目标仅定向公告可用。");
             default -> throw AssignmentInput.invalidField("target.type","P1 暂不支持 help_request 类型的跳转目标。");
         };
-        if(!belongs) throw AssignmentInput.invalidField("target.id","目标不存在或不属于本教学班。");
+        if(!readable) throw AssignmentInput.invalidField("target.id","目标必须是本教学班学生可查看的内容。");
         return new TargetDTO(type,id,offeringId);
     }
     private static NoticeDTO toDto(NoticeView n) {

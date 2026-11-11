@@ -61,6 +61,45 @@ class TutoringIntegrationIT {
  @Test void tightenedAttemptGateRejectsQueuedRequest(){String r=send("ask","如何分析",null);var p=policy(1);p.put("requireAttemptFromLevel",1);service.updatePolicy(teacher,assignment,p);worker.execute(r);assertThat(provider.calls).isZero();assertThat(service.request(student,r).get("status")).isEqualTo("fallback");}
  @Test void disabledQueuedActionNeverCallsProvider(){String r=send("concept","",null);var p=policy(1);p.put("allowedActions",List.of("ask"));service.updatePolicy(teacher,assignment,p);worker.execute(r);assertThat(provider.calls).isZero();assertThat(service.request(student,r).get("status")).isEqualTo("fallback");}
  @Test void queuedWorkspaceSnapshotDoesNotFollowLaterSave(){assignments.saveWorkspace(student,assignment,Map.of("baseRevision",0,"files",List.of(Map.of("path","answer.md","content","first version")),"activeFile","answer.md"),"it");String r=(String)service.send(student,session,Map.of("action","ask","content","如何观察","workspaceRevision",1)).get("tutoringRequestId");assignments.saveWorkspace(student,assignment,Map.of("baseRevision",1,"files",List.of(Map.of("path","answer.md","content","later version")),"activeFile","answer.md"),"it");worker.execute(r);assertThat(provider.last.workspace()).contains("first version").doesNotContain("later version");}
+ @Test void completedCheckUsesRequestedRevisionAndFrozenPublicRuleMetadata() {
+  saveAnswer(0,"first version");
+  storeCheck(1,"layout");
+  String request=askWithRevision(1);
+  saveAnswer(1,"later version");
+  storeCheck(2,"later");
+  jdbc.update("INSERT INTO assignment_check_policies(assignment_id,version,config) VALUES(?,1,?)",assignment,
+          "{\"kind\":\"web_lab\",\"rules\":[{\"id\":\"layout\",\"title\":\"容器布局\",\"check\":\"css\",\"selector\":\"private-selector\",\"expected\":\"private-expected\"}]}");
+  worker.execute(request);
+  assertThat(provider.last.checkFindings()).anyMatch(s->s.contains("容器布局"));
+  assertThat(provider.last.checkFindings()).noneMatch(s->s.contains("later")||s.contains("private"));
+  assertThat(provider.last.feedbackFocus()).singleElement().asString().contains("实际样式");
+ }
+ @Test void olderCheckIsIgnoredWhenCurrentVersionWasNotChecked() {
+  saveAnswer(0,"first version");
+  storeCheck(1,"older");
+  saveAnswer(1,"later version");
+  worker.execute(askWithRevision(2));
+  assertThat(provider.last.checkFindings()).isEmpty();
+  assertThat(provider.last.feedbackFocus()).isEmpty();
+ }
+ @Test void courseWithoutTeachersOffersSelfStudyOnFallback() {
+  jdbc.update("UPDATE offering_members SET status='inactive' WHERE offering_id=? AND user_id=?",offering,teacher.id());
+  String request=send("ask","请直接给我完整代码",null);
+  worker.execute(request);
+  var result=(Map<?,?>)service.request(student,request).get("result");
+  assertThat(result.get("nextAction")).isEqualTo("review_concept");
+  assertThat(result.get("content")).isEqualTo(TutoringSafety.SELF_STUDY_TEMPLATE);
+ }
+ private void saveAnswer(int revision,String text) {
+  assignments.saveWorkspace(student,assignment,Map.of("baseRevision",revision,"files",List.of(Map.of("path","answer.md","content",text)),"activeFile","answer.md"),"it");
+ }
+ private String askWithRevision(int revision) {
+  return (String)service.send(student,session,Map.of("action","ask","content","如何观察","workspaceRevision",revision)).get("tutoringRequestId");
+ }
+ private void storeCheck(int revision,String rule) {
+  jdbc.update("INSERT INTO assignment_checks(id,assignment_id,student_id,workspace_revision,checker_version,status,result,created_at,completed_at) VALUES(?,?,?,?, 'course-check-v1','completed',?,?,?)",
+          id(),assignment,student.id(),revision,"{\"items\":[{\"ruleId\":\""+rule+"\",\"status\":\"fail\"}]}",ts(NOW),ts(NOW));
+ }
  @Test void concurrentWorkspaceSaveCannotMislabeledSnapshot()throws Exception{assignments.saveWorkspace(student,assignment,Map.of("baseRevision",0,"files",List.of(Map.of("path","answer.md","content","first version")),"activeFile","answer.md"),"it");var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);var started=new CountDownLatch(1);try(var pool=Executors.newVirtualThreadPerTaskExecutor()){var future=new java.util.concurrent.atomic.AtomicReference<Future<String>>();tx.executeWithoutResult(t->{jdbc.queryForMap("SELECT id FROM workspaces WHERE assignment_id=? AND student_id=? FOR UPDATE",assignment,student.id());future.set(pool.submit(()->{started.countDown();try{service.send(student,session,Map.of("action","ask","content","如何观察","workspaceRevision",1));return "accepted";}catch(BusinessException e){return e.getCode();}}));try{assertThat(started.await(3,TimeUnit.SECONDS)).isTrue();}catch(InterruptedException e){throw new RuntimeException(e);}assignments.saveWorkspace(student,assignment,Map.of("baseRevision",1,"files",List.of(Map.of("path","answer.md","content","second version")),"activeFile","answer.md"),"it");});assertThat(future.get().get(5,TimeUnit.SECONDS)).isEqualTo("WORKSPACE_CONFLICT");}assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tutoring_requests WHERE student_id=?",Integer.class,student.id())).isZero();}
  @Test void concurrentEnqueueHasExactlyOneWinner()throws Exception{String second=(String)service.create(student,Map.of("assignmentId",assignment)).get("id");var start=new CountDownLatch(1);try(var pool=Executors.newVirtualThreadPerTaskExecutor()){List<Future<String>> futures=new ArrayList<>();for(String sid:List.of(session,second))futures.add(pool.submit(()->{start.await();try{return (String)service.send(student,sid,Map.of("action","ask","content","如何观察")).get("tutoringRequestId");}catch(BusinessException e){return e.getCode();}}));start.countDown();List<String> outcomes=new ArrayList<>();for(var f:futures)outcomes.add(f.get(8,TimeUnit.SECONDS));assertThat(outcomes.stream().filter("AI_REQUEST_IN_PROGRESS"::equals).count()).isEqualTo(1);assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tutoring_requests WHERE student_id=? AND status IN ('queued','running')",Integer.class,student.id())).isEqualTo(1);}}
  @Test void policyCompositeForeignKeysRejectCrossAssignment(){String second=assignments.createAssignment(teacher,offering,assignmentBody,"it").id();String firstPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,assignment);assertThatThrownBy(()->jdbc.update("UPDATE assignments SET current_ai_policy_id=? WHERE id=?",firstPolicy,second)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);service.updatePolicy(teacher,second,policy(0));String otherPolicy=jdbc.queryForObject("SELECT current_ai_policy_id FROM assignments WHERE id=?",String.class,second);assignments.saveWorkspace(student,assignment,Map.of("baseRevision",0,"files",List.of(Map.of("path","answer.md","content","reflection")),"activeFile","answer.md"),"it");var submission=assignments.submitAssignment(student,assignment,Map.of("workspaceRevision",1,"reflection","分析空间"),"it").submission();assertThatThrownBy(()->jdbc.update("UPDATE submissions SET ai_policy_id=? WHERE id=?",otherPolicy,submission.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);}

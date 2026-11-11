@@ -33,8 +33,18 @@ public interface KnowledgeMapper {
     int inProgress(String student,String offering,String knowledge);
     @Select("SELECT r.id FROM resources r JOIN chapters c ON c.id=r.chapter_id WHERE r.offering_id=#{offering} AND r.knowledge_point_id=#{knowledge} AND r.status='active' AND c.status='published' ORDER BY r.position,r.id LIMIT 1")
     String resource(String offering,String knowledge);
-    @Select("SELECT a.id FROM assignments a JOIN assignment_knowledge_points ak ON ak.assignment_id=a.id JOIN course_offerings o ON o.id=a.offering_id WHERE a.offering_id=#{offering} AND ak.knowledge_point_id=#{knowledge} AND a.status='published' AND o.status='active' AND a.published_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{student} AND s.is_current=1) ORDER BY a.due_at,a.id LIMIT 1")
-    String task(String student,String offering,String knowledge);
+    /** Recommend first submissions only. Like submission eligibility, the final deadline is inclusive. */
+    @Select("""
+        SELECT a.id FROM assignments a
+        JOIN assignment_knowledge_points ak ON ak.assignment_id=a.id
+        JOIN course_offerings o ON o.id=a.offering_id
+        WHERE a.offering_id=#{offering} AND ak.knowledge_point_id=#{knowledge}
+          AND a.status='published' AND a.published_at IS NOT NULL AND o.status='active'
+          AND COALESCE(a.late_until,a.due_at) >= #{now,typeHandler=com.learningplatform.common.mybatis.UtcInstantTypeHandler}
+          AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.student_id=#{student})
+        ORDER BY a.due_at,a.id LIMIT 1
+        """)
+    String nextSubmittableTask(String student,String offering,String knowledge,Instant now);
     @Select("SELECT f.student_id AS studentId,t.tag,f.issue_tag_version AS version,f.published_at AS occurredAt FROM feedback f JOIN feedback_issue_tags t ON t.feedback_id=f.id WHERE f.assignment_id=#{assignment} AND f.status='published'")
     List<Map<String,Object>> confirmed(String assignment);
     @Select("SELECT student_id AS studentId,issue_tags AS tags,issue_tag_version AS version,created_at AS occurredAt FROM help_requests WHERE assignment_id=#{assignment}")

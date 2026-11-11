@@ -243,15 +243,16 @@ ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
 SELECT status FROM chapters WHERE id=#{chapterId} AND offering_id=#{offeringId}
 </select>
 
-<!-- 公告跳转目标存在性：均要求属于本班（offering_id 相等）；feedback 额外要求已发布。 -->
-<select id="existsChapterInOffering" resultType="boolean">
-SELECT EXISTS(SELECT 1 FROM chapters WHERE id=#{id} AND offering_id=#{offeringId})
+<!-- 发布公告时锁定学生可读的目标，避免校验后、公告提交前归档。 -->
+<select id="lockReadableNoticeChapter" resultType="string" flushCache="true" useCache="false">
+SELECT id FROM chapters WHERE id=#{id} AND offering_id=#{offeringId} AND status='published' FOR SHARE
 </select>
-<select id="existsResourceInOffering" resultType="boolean">
-SELECT EXISTS(SELECT 1 FROM resources WHERE id=#{id} AND offering_id=#{offeringId})
+<select id="lockReadableNoticeResource" resultType="string" flushCache="true" useCache="false">
+SELECT r.id FROM resources r JOIN chapters c ON c.id=r.chapter_id AND c.offering_id=r.offering_id
+WHERE r.id=#{id} AND r.offering_id=#{offeringId} AND r.status='active' AND c.status='published' FOR SHARE
 </select>
-<select id="existsAssignmentInOffering" resultType="boolean">
-SELECT EXISTS(SELECT 1 FROM assignments WHERE id=#{id} AND offering_id=#{offeringId})
+<select id="lockReadableNoticeAssignment" resultType="string" flushCache="true" useCache="false">
+SELECT id FROM assignments WHERE id=#{id} AND offering_id=#{offeringId} AND status IN ('published','archived') FOR SHARE
 </select>
 
 <select id="listKnowledgePointRefs" resultType="com.learningplatform.modules.courses.mapper.AssignmentMapper$KnowledgePointRef">

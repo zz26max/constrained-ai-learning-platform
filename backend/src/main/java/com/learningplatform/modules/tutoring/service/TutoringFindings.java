@@ -1,73 +1,49 @@
 package com.learningplatform.modules.tutoring.service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
-/** 把最近一次自动检查压缩成少量可交给模型的发现项；只含规则元数据，不含学生原文。 */
-public final class TutoringFindings {
-    private static final int MAX_ITEMS = 6;
-    private static final int MAX_CHARS = 1200;
-    private static final int MAX_EXPECTED = 120;
+/** Extracts the public part of the failed checks. Selectors and expected results stay in the checker. */
+final class TutoringFindings {
+    static final int MAX_ITEMS = 4;
 
     private TutoringFindings() {}
 
-    public static List<String> build(Map<String, Object> policySnapshot, Map<String, Object> result,
-                                     int checkRevision, Integer requestRevision) {
+    record FailedRule(String label, String kind) {}
+
+    static List<FailedRule> failedRules(Map<String, Object> policy, Map<String, Object> result) {
         if (result == null || !(result.get("items") instanceof List<?> items)) return List.of();
-        Map<String, Map<?, ?>> rules = rules(policySnapshot);
-        List<String> lines = new ArrayList<>();
-        int failed = 0;
+        var rules = new HashMap<String, Map<?, ?>>();
+        if (policy != null && policy.get("rules") instanceof List<?> configured) {
+            for (Object value : configured) {
+                if (value instanceof Map<?, ?> rule && rule.get("id") instanceof String id) rules.put(id, rule);
+            }
+        }
+        var failed = new ArrayList<FailedRule>();
         for (Object value : items) {
             if (!(value instanceof Map<?, ?> item) || !"fail".equals(item.get("status"))) continue;
-            failed++;
-            if (lines.size() >= MAX_ITEMS) continue;
-            String ruleId = Objects.toString(item.get("ruleId"), "unknown");
-            Map<?, ?> rule = rules.get(ruleId);
-            String line = rule == null ? "规则 " + ruleId + " 未通过" : describe(ruleId, rule);
-            if (chars(lines) + line.length() > MAX_CHARS) continue;
-            lines.add(line);
+            String id = Objects.toString(item.get("ruleId"), "");
+            if ("sql.result".equals(id) && policy != null && "sql_text".equals(policy.get("kind"))) {
+                failed.add(new FailedRule("SQL 检查", "query".equals(policy.get("mode")) ? "sql_query" : "sql_change"));
+                continue;
+            }
+            Map<?, ?> rule = rules.get(id);
+            String label = rule != null && rule.get("title") instanceof String title && !title.isBlank() ? title : id;
+            if (!label.isBlank()) failed.add(new FailedRule(label, rule == null ? "" : Objects.toString(rule.get("check"), "")));
         }
-        if (failed == 0) return List.of();
-        String header = "自动检查（检查版本 " + checkRevision
-                + (requestRevision != null && requestRevision > checkRevision ? "，早于当前版本 " + requestRevision : "")
-                + "）：" + failed + " 项未通过"
-                + (failed > lines.size() ? "，以下仅列 " + lines.size() + " 项" : "");
-        List<String> out = new ArrayList<>(lines.size() + 1);
-        out.add(header);
-        out.addAll(lines);
-        return List.copyOf(out);
+        return List.copyOf(failed);
     }
 
-    private static Map<String, Map<?, ?>> rules(Map<String, Object> policySnapshot) {
-        Map<String, Map<?, ?>> byId = new HashMap<>();
-        if (policySnapshot == null || !(policySnapshot.get("rules") instanceof List<?> rules)) return byId;
-        for (Object value : rules) {
-            if (value instanceof Map<?, ?> rule && rule.get("id") instanceof String id) byId.put(id, rule);
-        }
-        return byId;
-    }
-
-    private static String describe(String ruleId, Map<?, ?> rule) {
-        String selector = Objects.toString(rule.get("selector"), "");
-        String expected = clip(Objects.toString(rule.get("expected"), null));
-        String property = clip(Objects.toString(rule.get("property"), null));
-        String requirement = switch (Objects.toString(rule.get("check"), "")) {
-            case "exists" -> "元素需存在";
-            case "text" -> "文本需为「" + expected + "」";
-            case "css" -> property + " 需为「" + expected + "」";
-            default -> "检查方式未知";
-        };
-        return "规则 " + ruleId + "：定位 " + (selector.isBlank() ? "（未配置）" : selector) + "，" + requirement;
-    }
-
-    private static String clip(String value) {
-        if (value == null || value.isBlank()) return "（空）";
-        return value.codePointCount(0, value.length()) <= MAX_EXPECTED ? value
-                : value.substring(0, value.offsetByCodePoints(0, MAX_EXPECTED)) + "…";
-    }
-
-    private static int chars(List<String> lines) {
-        int total = 0;
-        for (String line : lines) total += line.length();
-        return total;
+    static List<String> summarize(List<FailedRule> failed, int revision) {
+        if (failed.isEmpty()) return List.of();
+        int shown = Math.min(MAX_ITEMS, failed.size());
+        var summary = new ArrayList<String>();
+        summary.add("自动检查（检查版本 " + revision + "）：" + failed.size() + " 项未通过"
+                + (shown < failed.size() ? "，以下仅列 " + shown + " 项" : ""));
+        failed.stream().limit(shown).map(rule -> "检查项「" + rule.label() + "」未通过").forEach(summary::add);
+        return List.copyOf(summary);
     }
 }

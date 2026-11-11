@@ -164,6 +164,65 @@ class AnalyticsIntegrationIT {
         assertThat(dashboard.getLearningRecords(STUDENT,o.id()).summary().needsPracticeCount()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM learning_events WHERE type='feedback_published'",Integer.class)).isEqualTo(1);
     }
+
+    @Test void recommendationSkipsClosedAndReviewedTasksButIncludesExactDeadlines() {
+        var offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String point = knowledgePoint(offering.id());
+        String submissionId = submission(offering.id(), point);
+        var feedback = assignmentService.saveFeedback(TEACHER, submissionId, feedback(point, "needs_practice"), "save").feedback();
+        assignmentService.publishFeedback(TEACHER, submissionId, Map.of("baseVersion", feedback.version()), "publish");
+        jdbc.update("UPDATE assignments SET due_at=?,late_until=? WHERE id=?",
+                ts(NOW.minusSeconds(3600)), ts(NOW.plusSeconds(60)), feedback.assignmentId());
+
+        String closed = publishAssignmentWithKnowledgePoint(offering.id(), point).id();
+        String late = publishAssignmentWithKnowledgePoint(offering.id(), point).id();
+        String regular = publishAssignmentWithKnowledgePoint(offering.id(), point).id();
+        jdbc.update("UPDATE assignments SET due_at=?,late_until=NULL WHERE id=?", ts(NOW.minusSeconds(60)), closed);
+        jdbc.update("UPDATE assignments SET due_at=?,late_until=? WHERE id=?", ts(NOW.minusSeconds(30)), ts(NOW), late);
+        jdbc.update("UPDATE assignments SET due_at=?,late_until=NULL WHERE id=?", ts(NOW), regular);
+
+        assertThat(((AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, closed)).canSubmit()).isFalse();
+        assertThat(((AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, late)).canSubmit()).isTrue();
+        var recommendation = JSON.valueToTree(dashboard.getLearningRecords(STUDENT, offering.id()).nextRecommendation());
+        assertThat(recommendation.path("target").path("id").asText()).isEqualTo(late);
+        assertThat(recommendation.path("sourceFeedbackId").asText()).isEqualTo(feedback.id());
+        var teacherRecommendation = JSON.valueToTree(stats.getStudentLearningRecords(offering.id(), STUDENT.id(), TEACHER, 1, 20)
+                .nextRecommendation());
+        assertThat(teacherRecommendation).isEqualTo(recommendation);
+
+        jdbc.update("UPDATE assignments SET late_until=? WHERE id=?", ts(NOW.minusNanos(1000)), late);
+        assertThat(((AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, late)).canSubmit()).isFalse();
+        assertThat(((AssignmentDetailDTO) assignmentService.getAssignment(STUDENT, regular)).canSubmit()).isTrue();
+        var updated = JSON.valueToTree(dashboard.getLearningRecords(STUDENT, offering.id()).nextRecommendation());
+        assertThat(updated.path("target").path("id").asText()).isEqualTo(regular);
+    }
+
+    @Test void recommendationFallsBackToReadableMaterialThenCourse() {
+        var offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String point = knowledgePoint(offering.id());
+        String closed = publishAssignmentWithKnowledgePoint(offering.id(), point).id();
+        jdbc.update("UPDATE assignments SET due_at=?,late_until=NULL WHERE id=?", ts(NOW.minusNanos(1000)), closed);
+        String chapter = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO chapters(id,offering_id,position,title,summary,status,is_required,content_version,published_at,created_at,updated_at) VALUES(?,?,1,'Chapter','Summary','published',1,1,?,?,?)",
+                chapter, offering.id(), ts(NOW), ts(NOW), ts(NOW));
+        String resource = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO resources(id,offering_id,chapter_id,knowledge_point_id,title,content_markdown,position,status,created_at,updated_at) VALUES(?,?,?,?,'Resource','Text',1,'active',?,?)",
+                resource, offering.id(), chapter, point, ts(NOW), ts(NOW));
+
+        var review = JSON.valueToTree(dashboard.getLearningRecords(STUDENT, offering.id()).nextRecommendation());
+        assertThat(review.path("target").path("type").asText()).isEqualTo("resource");
+        assertThat(review.path("target").path("id").asText()).isEqualTo(resource);
+        assertThat(courseService.getResource(STUDENT, resource).id()).isEqualTo(resource);
+
+        courseService.archiveResource(TEACHER, resource, "archive");
+        var course = JSON.valueToTree(dashboard.getLearningRecords(STUDENT, offering.id()).nextRecommendation());
+        assertThat(course.path("target").path("type").asText()).isEqualTo("offering");
+        assertThat(course.path("target").path("id").asText()).isEqualTo(offering.id());
+        assertThat(course.path("reason").asText()).contains("暂无可提交的新任务或关联讲义");
+    }
+
     @Test void badKnowledgeAndTagsRollbackWholeDraft() {
         var o=createOffering();enrollStudent(o.id(),STUDENT);String kp=knowledgePoint(o.id()),sid=submission(o.id(),kp);
         var body=feedback(UUID.randomUUID().toString(),"meets_expectation");

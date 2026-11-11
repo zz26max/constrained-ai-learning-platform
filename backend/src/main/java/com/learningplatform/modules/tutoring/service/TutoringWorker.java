@@ -52,17 +52,17 @@ public class TutoringWorker {
    var materials=new ArrayList<String>();materials.add(a.description());for(var requirement:assignments.getRequirements(a.id()))materials.add(requirement.requirementText());
    var selection=disabled("rag")?TutoringRetrieval.EMPTY:retrieve(a,Objects.toString(question,""),Objects.toString(attempt,""));
    materials.addAll(selection.materials());
-   String all=String.join("\n",materials)+Objects.toString(question,"")+Objects.toString(attempt,"")+Objects.toString(workspace,"")+String.join("\n",history);
    if(db.count(COUNT_DISCLOSED_CHARACTERS,request.get("student_id"),request.get("assignment_id"))>=12000){deliver(id,pid,policy,null,"OUTPUT_REJECTED");return;}
    if(expired){deliver(id,pid,policy,null,"HISTORY_EXPIRED");return;}
-   if(!disabled("intercept_input")&&(TutoringSafety.prohibited(all)||TutoringSafety.sensitive(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
-   if(!provider.available()){fail(id,"PROVIDER_UNAVAILABLE");return;}
    int level=requestedLevel;var modes=(List<String>)policy.get("allowedModes");
-   var findings=staticContext(a.id(),Objects.toString(request.get("student_id"),null),request.get("workspace_revision") instanceof Number revision?revision.intValue():null);
+    var findings="concept".equals(request.get("action"))?StaticCheck.EMPTY:staticContext(a.id(),Objects.toString(request.get("student_id"),null),request.get("workspace_revision") instanceof Number revision?revision.intValue():null);
    var context=new TutoringProvider.Context((String)request.get("action"),level,((Number)policy.get("maxOutputTokens")).intValue(),modes,TutoringService.boundary(),question,attempt,workspace,materials,history,findings.findings(),findings.directives());
+    String all=String.join("\n",Objects.toString(question,""),Objects.toString(attempt,""),Objects.toString(workspace,""),
+            String.join("\n",materials),String.join("\n",history),String.join("\n",findings.findings()),String.join("\n",findings.directives()));
    for(int call=0;call<2;call++){
     // Repeat the exact same transmission gate before each controlled generation.
     if(!disabled("intercept_input")&&(TutoringSafety.sensitive(all)||TutoringSafety.prohibited(all))){deliver(id,pid,policy,null,"POLICY_REJECTED");return;}
+     if(!provider.available()){fail(id,"PROVIDER_UNAVAILABLE");return;}
     if(db.update(RESERVE_PROVIDER_CALL,pid,clock.instant(),id)!=1)return;
     TutoringProvider.Output output;
     try{output=provider.generate(context);}catch(java.net.http.HttpTimeoutException e){logFailure(id,"provider_generate","PROVIDER_RESULT_UNKNOWN",e);fail(id,"PROVIDER_RESULT_UNKNOWN");return;}catch(Exception e){logFailure(id,"provider_generate","PROVIDER_UNAVAILABLE",e);fail(id,"PROVIDER_UNAVAILABLE");return;}
@@ -72,17 +72,16 @@ public class TutoringWorker {
    deliver(id,pid,policy,null,"OUTPUT_REJECTED");
   }catch(Exception e){logFailure(id,"execute","INTERNAL_ERROR",e);fail(id,"INTERNAL_ERROR");}
  }
- /** 最近一次已完成自动检查：失败项、对应的引导动作与校验词；缺数据或解析失败时返回空。 */
+ /** 只读取请求关联版本的检查结果。规则配置发布后冻结，终态任务不保留执行快照。 */
  record StaticCheck(List<String> findings,List<String> directives,List<String> tokens){
   static final StaticCheck EMPTY=new StaticCheck(List.of(),List.of(),List.of());
  }
  private StaticCheck staticContext(String assignmentId,String studentId,Integer requestRevision){
-  if(disabled("static")||assignmentId==null||studentId==null)return StaticCheck.EMPTY;
+   if(disabled("static")||assignmentId==null||studentId==null||requestRevision==null)return StaticCheck.EMPTY;
   try{
-   var row=db.one(STATIC_CHECK_SNAPSHOT,assignmentId,studentId);if(row==null)return StaticCheck.EMPTY;
-   int revision=((Number)row.get("workspace_revision")).intValue();
-   var policy=json.read(row.get("policy_snapshot"));var result=json.read(row.get("result"));
-   return new StaticCheck(TutoringFindings.build(policy,result,revision,requestRevision),TutoringFeedback.directives(policy,result),TutoringFeedback.tokens(policy,result));
+    var row=db.one(STATIC_CHECK_SNAPSHOT,assignmentId,studentId,requestRevision);if(row==null)return StaticCheck.EMPTY;
+    var failed=TutoringFindings.failedRules(json.read(row.get("config")),json.read(row.get("result")));
+    return new StaticCheck(TutoringFindings.summarize(failed,requestRevision),TutoringFeedback.directives(failed),TutoringFeedback.tokens(failed));
   }catch(RuntimeException unusable){return StaticCheck.EMPTY;}
  }
  static Set<String> parseLayers(String raw){
@@ -118,10 +117,15 @@ public class TutoringWorker {
    // Policy identity is checked again in the final conditional transition. A changed policy permits only fixed fallback.
    boolean changed=!Objects.equals(a.currentAiPolicyId(),generatedPolicyId);String reason=changed?"POLICY_REJECTED":error;
    boolean fallback=reason!=null;int level=Math.min(((Number)r.get("hint_level")).intValue(),((Number)policy.get("maxHintLevel")).intValue());
-   String mode=fallback?"fallback":output.mode(),content=fallback?TutoringSafety.TEMPLATE:output.content();Instant now=clock.instant();
+   String nextAction=fallback?"request_teacher_help":output.nextAction();
+   boolean noTeacher="request_teacher_help".equals(nextAction)&&db.count(COUNT_OFFERING_TEACHERS,a.offeringId())==0;
+   if(noTeacher)nextAction="review_concept";
+   String mode=fallback?"fallback":output.mode();
+   String content=fallback?(noTeacher?TutoringSafety.SELF_STUDY_TEMPLATE:TutoringSafety.TEMPLATE):output.content();
+   Instant now=clock.instant();
    if(!TutoringService.time(r,"content_expires_at").isAfter(now)){fail(id,"HISTORY_EXPIRED");return;}
    var generation=r.get("generation_policy_id");Integer generationVersion=generation==null?null:((Number)db.one(FIND_GENERATION_POLICY_VERSION,generation).get("version")).intValue();
-   var result=map("mode",mode,"hintLevel",level,"policyVersion",policy.get("version"),"generationPolicyVersion",generationVersion,"content",content,"nextAction",fallback?"request_teacher_help":output.nextAction(),"contentUnavailableReason",null,"citations",fallback?List.of():citations);
+   var result=map("mode",mode,"hintLevel",level,"policyVersion",policy.get("version"),"generationPolicyVersion",generationVersion,"content",content,"nextAction",nextAction,"contentUnavailableReason",null,"citations",fallback?List.of():citations);
    int changedRows=db.update(DELIVER_REQUEST,fallback?"fallback":"completed",json.write(result),reason,reason,a.currentAiPolicyId(),now,now,now,id,a.currentAiPolicyId());
    if(changedRows!=1){fail(id,"POLICY_REJECTED");return;}
    service.addMessage((String)r.get("session_id"),id,"assistant",content,mode,level,a.currentAiPolicyId(),now);

@@ -78,9 +78,9 @@ public interface AssignmentMapper {
     /** 章节在本班内的状态；章节不存在或不属于本班返回 null。 */
     String findChapterStatus(@Param("chapterId") String chapterId,@Param("offeringId") String offeringId);
     /** 公告跳转目标存在性：目标必须属于本班。feedback 目标全班公告禁用（Service 层拒绝），无需存在性查询。 */
-    boolean existsChapterInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
-    boolean existsResourceInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
-    boolean existsAssignmentInOffering(@Param("id") String id,@Param("offeringId") String offeringId);
+    String lockReadableNoticeChapter(@Param("id") String id,@Param("offeringId") String offeringId);
+    String lockReadableNoticeResource(@Param("id") String id,@Param("offeringId") String offeringId);
+    String lockReadableNoticeAssignment(@Param("id") String id,@Param("offeringId") String offeringId);
     /** 本班内存在的知识点及其关联章节（可为 null）。 */
     List<KnowledgePointRef> listKnowledgePointRefs(@Param("offeringId") String offeringId,@Param("ids") List<String> ids);
     List<String> listActiveStudentIds(String offeringId);

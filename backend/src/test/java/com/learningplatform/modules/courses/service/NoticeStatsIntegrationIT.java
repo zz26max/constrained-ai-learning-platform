@@ -205,6 +205,48 @@ class NoticeStatsIntegrationIT {
     }
 
     @Test
+    void noticeRejectsDraftTargetsAndArchivedResourcesWithoutPublishing() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String chapter = insertChapter(offering.id());
+        String resource = insertResource(offering.id(), chapter);
+        String draftAssignment = createDraft(offering.id(), "草稿作业").id();
+        for (Map<String, Object> notice : List.of(
+                targetBody("chapter", chapter, offering.id()),
+                targetBody("resource", resource, offering.id()),
+                targetBody("assignment", draftAssignment, offering.id()))) {
+            assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER, notice, "invisible-target"))
+                    .satisfies(t -> assertField(t, "target.id"));
+        }
+        courseService.publishChapter(TEACHER, chapter, "publish-chapter");
+        courseService.archiveResource(TEACHER, resource, "archive-resource");
+        assertThatThrownBy(() -> notices.createNotice(offering.id(), TEACHER,
+                targetBody("resource", resource, offering.id()), "archived-resource-target"))
+                .satisfies(t -> assertField(t, "target.id"));
+        assertThat(notices.listNotices(offering.id(), STUDENT, 1, 20).total()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE type='notice_published'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_logs WHERE action='NOTICE_CREATED'", Integer.class)).isZero();
+    }
+
+    @Test
+    void noticeKeepsItsContentAndTargetAfterResourceArchive() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String chapter = insertChapter(offering.id());
+        courseService.publishChapter(TEACHER, chapter, "publish-chapter");
+        String resource = insertResource(offering.id(), chapter);
+        NoticeDTO notice = notices.createNotice(offering.id(), TEACHER,
+                targetBody("resource", resource, offering.id()), "visible-resource-target");
+        assertThat(courseService.getResource(STUDENT, resource).id()).isEqualTo(resource);
+
+        courseService.archiveResource(TEACHER, resource, "archive-resource");
+
+        assertThatThrownBy(() -> courseService.getResource(STUDENT, resource))
+                .satisfies(t -> assertCode(t, 404, "NOT_FOUND"));
+        assertThat(notices.getNotice(notice.id(), STUDENT)).isEqualTo(notice);
+    }
+
+    @Test
     void noticeNotificationsOnlyGoToActiveStudents() {
         OfferingDTO offering = createOffering();
         enrollStudent(offering.id(), STUDENT);
@@ -355,6 +397,7 @@ class NoticeStatsIntegrationIT {
         enrollStudent(offering.id(), STUDENT);
         String assignmentId = publishAssignment(offering.id(), "目标作业").id();
         String chapterId = insertChapter(offering.id());
+        courseService.publishChapter(TEACHER, chapterId, "publish-chapter");
         String resourceId = insertResource(offering.id(), chapterId);
         String feedbackSubmission = saveAndSubmit(STUDENT, publishAssignment(offering.id(), "评价作业").id());
         publishReview(feedbackSubmission);
@@ -411,6 +454,7 @@ class NoticeStatsIntegrationIT {
         OfferingDTO other = createOffering();
         enrollStudent(offering.id(), STUDENT);
         String otherChapter = insertChapter(other.id());
+        courseService.publishChapter(TEACHER, otherChapter, "publish-chapter");
         String otherResource = insertResource(other.id(), otherChapter);
         String otherAssignment = publishAssignment(other.id(), "他班作业").id();
         String draftSubmission = saveAndSubmit(STUDENT, publishAssignment(offering.id(), "草稿评价作业").id());

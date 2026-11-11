@@ -89,9 +89,17 @@ public class KnowledgeService {
         Object recommendation=null;
         if(!candidates.isEmpty()) {
             var selected=candidates.get(0);String knowledge=(String)selected.get("knowledgePointId");
-            String task=mapper.task(student,offering,knowledge),resource=mapper.resource(offering,knowledge);
-            var target=Map.of("type",task!=null?"assignment":resource!=null?"resource":"offering","id",task!=null?task:resource!=null?resource:offering,"offeringId",offering);
-            var r=new LinkedHashMap<String,Object>();r.put("knowledgePointId",knowledge);r.put("title",selected.get("title"));r.put("reason",selected.get("explanation")+(task==null?" 可复习已有课程材料。":" 建议在关联任务中补充证据。"));
+            String task=mapper.nextSubmittableTask(student,offering,knowledge,asOf);
+            String resource=task==null?mapper.resource(offering,knowledge):null;
+            String targetType=task!=null?"assignment":resource!=null?"resource":"offering";
+            String targetId=task!=null?task:resource!=null?resource:offering;
+            var target=Map.of("type",targetType,"id",targetId,"offeringId",offering);
+            String nextStep=switch(targetType) {
+                case "assignment" -> " 建议完成关联任务，补充新的学习证据。";
+                case "resource" -> " 暂无可提交的新任务，可先复习关联讲义。";
+                default -> " 暂无可提交的新任务或关联讲义，可返回课程查看学习安排。";
+            };
+            var r=new LinkedHashMap<String,Object>();r.put("knowledgePointId",knowledge);r.put("title",selected.get("title"));r.put("reason",selected.get("explanation")+nextStep);
             @SuppressWarnings("unchecked") var e=(List<Evidence>)selected.get("evidence");
             r.put("sourceFeedbackId",e.isEmpty()?null:e.get(0).feedbackId());r.put("evidenceIds",selected.get("evidenceIds"));r.put("target",target);recommendation=r;
         }

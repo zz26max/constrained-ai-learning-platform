@@ -7,6 +7,7 @@ import com.learningplatform.modules.tutoring.provider.TutoringProvider;
 public final class TutoringSafety {
  private TutoringSafety(){}
  public static final String TEMPLATE="请先说明你观察到的现象和已经尝试的步骤，再围绕一个概念验证思路。如仍有困难，请向教师求助。";
+ public static final String SELF_STUDY_TEMPLATE="请先记录实际现象和已经尝试的步骤。可以回到课程查阅相关讲义，再运行一次自动检查，或选一个具体疑问重新提问。";
  private static final Pattern INTENT=Pattern.compile("(?is)(完整.{0,8}(代码|答案|实现)|直接.{0,8}(答案|代码)|忽略.{0,12}(规则|指令)|扮演.{0,8}(教师|老师|系统)|ignore.{0,25}(instruction|rule)|complete.{0,15}(solution|code)|system\\s*prompt)");
  private static final Pattern SECRET=Pattern.compile("(?is)([A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}|(?:1[3-9]\\d{9})|(?:sk-[a-z0-9]{12,})|(?:password|api[_-]?key|authorization|lp_session|secret)\\s*[:=]|姓名\\s*[:：]|学号\\s*[:：])");
  public static boolean prohibited(String text){return text!=null&&INTENT.matcher(text).find();}
