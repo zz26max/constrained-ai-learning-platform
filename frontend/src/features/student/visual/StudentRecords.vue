@@ -8,6 +8,7 @@ import ApiState from '../../../components/ApiState.vue'
 import UiEmptyState from '../../../components/ui/UiEmptyState.vue'
 import UiPager from '../../../components/ui/UiPager.vue'
 import UiSelect from '../../../components/ui/UiSelect.vue'
+import { useAuthStore } from '../../../stores/auth'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
 import { runBounded } from '../../../features/courses/worker-pool'
@@ -20,6 +21,7 @@ type EvidenceResult = KnowledgeAssessment['evidence'][number]['result']
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const dashApi = dashboardApi()
 const courses = coursesApi()
 const PAGE_SIZE = 10
@@ -53,6 +55,7 @@ const offeringsQuery = usePageQuery(async signal => ({items:(await allPages((pag
 void offeringsQuery.load()
 const currentCourse = computed(() => offeringsQuery.data.value?.items.find(c => c.offeringId === rawId.value))
 const selfStudy = computed(() => currentCourse.value?.status === 'active' && currentCourse.value.teachers.length === 0)
+const checksEnabled = computed(() => auth.config?.features.serverChecks === true)
 const selfStudyId = computed(() => selfStudy.value ? currentCourse.value?.offeringId : undefined)
 const practiceQuery = usePageQuery(async signal => {
   const offeringId = selfStudyId.value
@@ -73,9 +76,11 @@ const practiceQuery = usePageQuery(async signal => {
 })
 watch(selfStudyId, id => { if (id) void practiceQuery.load() }, { immediate: true })
 const practices = computed(() => practiceQuery.status.value === 'success' ? (practiceQuery.data.value ?? []).filter(item => item.configured) : [])
+const checking = computed(() => practices.value.some(item => item.checkStatus === 'queued' || item.checkStatus === 'running'))
 const nextPractice = computed(() => {
+  if (!checksEnabled.value) return undefined
   const last = practices.value.findLast(item => item.passed)
-  const incomplete = practices.value.filter(item => !item.passed)
+  const incomplete = practices.value.filter(item => !item.passed && item.checkStatus !== 'queued' && item.checkStatus !== 'running')
   return incomplete.find(item => last?.task.chapterId && item.task.chapterId === last.task.chapterId) ?? incomplete[0]
 })
 const selectedCourseId = computed(() => typeof rawId.value === 'string' ? rawId.value : '')
@@ -184,6 +189,8 @@ function chooseCourse(offeringId: string): void {
           <div class="col-head"><h2 id="practice-title">自测练习</h2><span v-if="practices.length" class="meta">{{ practices.filter(item => item.passed).length }} / {{ practices.length }} 项已通过</span></div>
           <ApiState :status="practiceQuery.status.value" :error="practiceQuery.error.value" @retry="practiceQuery.load" />
           <p v-if="practiceQuery.status.value === 'success' && !practices.length" class="col-empty">本课程暂未配置自动检查练习。</p>
+          <p v-if="practices.length && !checksEnabled" class="col-empty">自动检查服务当前不可用。可以查看已有自测结果和课程讲义。</p>
+          <p v-if="checking" class="col-empty">有自测正在运行。<button class="button secondary" type="button" @click="practiceQuery.load">刷新检查结果</button></p>
           <div v-if="nextPractice" class="reco">
             <div class="reco-main"><p class="eyebrow">下一步</p><h3>{{ nextPractice.task.title }}</h3><p>{{ nextPractice.task.description }}</p></div>
             <RouterLink class="button primary" :to="{ name: 'student-workspace', params: { id: nextPractice.task.id } }">去练习</RouterLink>

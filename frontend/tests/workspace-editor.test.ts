@@ -26,12 +26,13 @@ let router: Router | undefined
 let assignmentOverride: Record<string, unknown> = {}
 let workspaceOverride: Record<string, unknown> = {}
 let saveFails = false
+let hasTeacher = false
 
 function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
   const body = request.body ? JSON.parse(request.body) as Record<string, unknown> : {}
   const assignment = request.path.includes(ASSIGNMENT_B) ? ASSIGNMENT_B : ASSIGNMENT
   switch (request.operationId) {
-    case 'getOffering': return okEnvelope({ id: CHECK_ID, teachers: [] })
+    case 'getOffering': return okEnvelope({ id: CHECK_ID, teachers: hasTeacher ? [DEMO_USER] : [] })
     case 'getWorkspace': return okEnvelope({
       assignmentId: assignment, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
       savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null,
@@ -113,6 +114,7 @@ beforeEach(() => {
   assignmentOverride = {}
   workspaceOverride = {}
   saveFails = false
+  hasTeacher = false
   if (typeof window.confirm !== 'function') window.confirm = () => false
   const dialog = HTMLDialogElement.prototype
   if (typeof dialog.showModal !== 'function') dialog.showModal = function showModal() { this.setAttribute('open', '') }
@@ -326,6 +328,22 @@ describe('工作区题面与实时求助', () => {
     expect(sends).toHaveLength(1)
     expect(bodyOf(sends[0]!)['workspaceRevision']).toBe(2)
     expect(scripted.requests.indexOf(saves[0]!)).toBeLessThan(scripted.requests.indexOf(sends[0]!))
+  })
+
+  it('明确附上未编辑的初始文件时先保存首版，并展示教师求助链接', async () => {
+    workspaceOverride = { revision: 0, savedAt: null }
+    hasTeacher = true
+    const page = await openWorkspace()
+    await openTutor(page)
+    const followUp = page.get('.tutor-follow-up a')
+    expect(followUp.text()).toBe('问老师')
+    expect(followUp.attributes('href')).toContain(`/student/assignments/${ASSIGNMENT}/help`)
+    await page.get('.ws-tutor-inline input[type="checkbox"]').setValue(true)
+    await page.get('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]').setValue('应该从哪里开始检查？')
+    await page.get('.ws-tutor-inline form.composer').trigger('submit')
+    await flushPromises()
+    expect(bodyOf(requestsOf('saveWorkspace')[0]!)).toMatchObject({ baseRevision: 0, files: [{ path: 'index.html', content: '<p>v1</p>' }] })
+    expect(bodyOf(requestsOf('sendTutoringMessage')[0]!)['workspaceRevision']).toBe(1)
   })
 
   it('最新修改保存失败时不发送求助，并在侧边栏内提示原因', async () => {

@@ -116,7 +116,10 @@ async function send(): Promise<void> {
   try {
     let workspaceRevision: number | null = null
     if (includeWorkspace.value && props.prepareWorkspace) {
-      try { workspaceRevision = await props.prepareWorkspace() }
+      try {
+        workspaceRevision = await props.prepareWorkspace()
+        if (workspaceRevision === null) throw new Error('工作区尚未保存。请先保存，或取消附带工作区。')
+      }
       catch (cause) {
         if (current === generation) actionError.value = cause instanceof Error ? cause.message : '最新修改尚未保存，暂不能请求 AI 辅导。'
         return
@@ -229,8 +232,6 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
     <template v-if="policyQuery.status.value === 'success' && policy">
       <div v-if="!policy.enabled" class="chat-empty">
         <p>这项作业没有开启 AI 辅导。</p>
-        <RouterLink v-if="hasTeacher" class="button primary" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
-        <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
       </div>
 
       <div v-else class="tutor-grid">
@@ -338,14 +339,18 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
               <div><dt>次数上限</dt><dd>每天 {{ policy.dailyAssignmentLimit }} 次 · 每分钟 {{ policy.perMinuteLimit }} 次</dd></div>
             </dl>
           </section>
-          <section class="sec">
-            <h2>仍然没解决</h2>
-            <RouterLink v-if="hasTeacher" class="quiet-link" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
-            <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
-            <ApiState v-else-if="offeringQuery.status.value === 'error'" status="error" :error="offeringQuery.error.value" @retry="offeringQuery.load" />
-          </section>
         </aside>
       </div>
     </template>
+
+    <div class="tutor-follow-up">
+      <RouterLink v-if="hasTeacher" class="quiet-link" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+      <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
+      <ApiState v-else-if="offeringQuery.status.value === 'error'" status="error" :error="offeringQuery.error.value" @retry="offeringQuery.load" />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.tutor-follow-up:not(:empty) { margin: 0.75rem 0; }
+</style>

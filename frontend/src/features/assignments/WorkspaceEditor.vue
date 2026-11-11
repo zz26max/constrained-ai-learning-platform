@@ -347,7 +347,7 @@ function closeTutor(): void {
 }
 
 /** AI 求助前先把工作区落到服务端：后端按 revision 快照，提问才能带上最新代码。 */
-async function prepareWorkspaceForAi(): Promise<number | null> {
+async function prepareWorkspaceForAi(): Promise<number> {
   if (frozen.value) throw new Error('正在提交作业，请稍后再求助。')
   if (!canSave.value) throw new Error('当前工作区为只读，不能请求 AI 辅导。')
   if (saveState.value.paused) throw new Error('工作区有未处理的冲突或保存错误，请先恢复保存再求助。')
@@ -355,11 +355,11 @@ async function prepareWorkspaceForAi(): Promise<number | null> {
   if (new TextEncoder().encode(JSON.stringify(files)).byteLength > 16_384) {
     throw new Error('工作区超过 16 KiB。请取消附带工作区，或选中需要讨论的代码后插入问题。')
   }
-  if (hasUnsavedEdits.value) {
-    const saved = await flush()
-    if (!saved) throw new Error('最新修改尚未保存，暂不能请求 AI 辅导。')
+  if (saveState.value.lastSavedRevision === 0 && !hasUnsavedEdits.value) scheduleSave(currentDraft())
+  if (!await flush() || saveState.value.lastSavedRevision <= 0) {
+    throw new Error('最新修改尚未保存，暂不能请求 AI 辅导。')
   }
-  return saveState.value.lastSavedRevision > 0 ? saveState.value.lastSavedRevision : null
+  return saveState.value.lastSavedRevision
 }
 
 function selectedCodeForAi(): string {

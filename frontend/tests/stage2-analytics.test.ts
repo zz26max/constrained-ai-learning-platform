@@ -98,17 +98,17 @@ function analyticsRouter(): Router {
   })
 }
 
-function auth(role: 'student' | 'teacher'): void {
+function auth(role: 'student' | 'teacher', serverChecks = false): void {
   useAuthStore().$patch({
     phase: 'authenticated', bootStatus: 'success', csrfToken: `csrf-${role}`,
-    identity: { ...DEMO_USER, roles: [role] }, config: { ...DEMO_CONFIG, terms: [] },
+    identity: { ...DEMO_USER, roles: [role] }, config: { ...DEMO_CONFIG, terms: [], features: { ...DEMO_CONFIG.features, serverChecks } },
   })
 }
 
-async function open(path: string, role: 'student' | 'teacher'): Promise<VueWrapper> {
+async function open(path: string, role: 'student' | 'teacher', serverChecks = false): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
-  auth(role)
+  auth(role, serverChecks)
   router = analyticsRouter()
   await router.push(path)
   await router.isReady()
@@ -294,19 +294,24 @@ describe('学生知识点掌握概览', () => {
       { id: other, title: 'SQL 练习', chapterId: sql, type: 'sql_text' },
       { id: transfer, title: '迁移练习', chapterId: html, type: 'web_lab' },
     ].map(task => ({ ...task, offeringId: OFFERING, publicationState: 'published', description: '' }))
+    let checkingTransfer = true
     scripted.setHandler(request => {
       switch (request.operationId) {
         case 'listMyCourses': return okEnvelope({ items: [{ offeringId: OFFERING, title: '个人课程', status: 'active', teachers: [], progress: { unit: 'chapter', completed: 1, total: 2 } }], page: 1, pageSize: 100, total: 1 })
         case 'listMyAssignments': return okEnvelope({ items: tasks, page: 1, pageSize: 100, total: 3 })
         case 'getWorkspace': return okEnvelope({ revision: request.path.includes(first) ? 2 : 0 })
-        case 'getAssignmentCheck': return okEnvelope({ configured: true, check: request.path.includes(first) ? { status: 'completed', result: { total: 2, passed: 2 } } : null })
+        case 'getAssignmentCheck': return okEnvelope({ configured: true, check: request.path.includes(first) ? { status: 'completed', result: { total: 2, passed: 2 } } : request.path.includes(transfer) && checkingTransfer ? { status: 'running', result: null } : null })
         default: return okEnvelope({ offeringId: OFFERING, summary: { completedLabCount: 0, publishedFeedbackCount: 0, needsPracticeCount: null }, recentFeedback: null, feedbackPage: { items: [], total: 0 }, knowledgeEvidence: [], nextRecommendation: null })
       }
     })
-    wrapper = await open(`/student/progress/${OFFERING}`, 'student')
+    wrapper = await open(`/student/progress/${OFFERING}`, 'student', true)
     await flushPromises()
     const section = wrapper.get('[aria-labelledby="practice-title"]')
     expect(section.text()).toContain('1 / 3 项已通过')
+    expect(section.get('.reco h3').text()).toBe('SQL 练习')
+    checkingTransfer = false
+    await section.get('button').trigger('click')
+    await flushPromises()
     expect(section.get('.reco h3').text()).toBe('迁移练习')
     expect(section.get('.reco a').attributes('href')).toContain(transfer)
     expect(scripted.requests.find(request => request.operationId === 'getAssignmentCheck' && request.path.includes(first))?.path).toContain('workspaceRevision=2')
