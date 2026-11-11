@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { tutoringApi } from '../../api'
+import { assignmentsApi, coursesApi, tutoringApi } from '../../api'
 import type { TutoringMessageDTO, TutoringSessionDTO, TutoringWrite } from '../../api/tutoring'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
@@ -13,14 +13,23 @@ import { useTutoringPoll } from './use-tutoring-poll'
 
 const props = withDefaults(defineProps<{
   assignmentId: string
+  offeringId?: string
   embedded?: boolean
   prepareWorkspace?: () => Promise<number | null>
+  selectedCode?: () => string
 }>(), { embedded: false, prepareWorkspace: undefined })
 const auth = useAuthStore()
 
 const policyQuery = usePageQuery(async signal => (await tutoringApi().getAiPolicy(props.assignmentId, { signal })).data)
 const sessionsQuery = usePageQuery(async signal => (await tutoringApi().listTutoringSessions(props.assignmentId, { pageSize: 20 }, { signal })).data)
 const policy = computed(() => policyQuery.data.value)
+const offeringQuery = usePageQuery(async signal => {
+  const id = props.offeringId ?? (await assignmentsApi().getAssignment(props.assignmentId, { signal })).data.offeringId
+  return (await coursesApi().getOffering(id, { signal })).data
+})
+watch(() => [props.assignmentId, props.offeringId, auth.identity?.id], () => { void offeringQuery.load() }, { immediate: true })
+const offering = computed(() => offeringQuery.status.value === 'success' ? offeringQuery.data.value : null)
+const hasTeacher = computed(() => (offering.value?.teachers.length ?? 0) > 0)
 
 const activeSession = shallowRef<TutoringSessionDTO | null>(null)
 const messagesQuery = usePageQuery(async signal => {
@@ -36,6 +45,7 @@ const action = ref<'ask' | 'concept' | 'next_hint'>('ask')
 const content = ref('')
 const composerInput = ref<HTMLTextAreaElement | null>(null)
 const attempt = ref('')
+const includeWorkspace = ref(false)
 const sending = ref(false)
 const actionError = ref('')
 const creatingSession = ref(false)
@@ -105,7 +115,7 @@ async function send(): Promise<void> {
   actionError.value = ''
   try {
     let workspaceRevision: number | null = null
-    if (props.prepareWorkspace) {
+    if (includeWorkspace.value && props.prepareWorkspace) {
       try { workspaceRevision = await props.prepareWorkspace() }
       catch (cause) {
         if (current === generation) actionError.value = cause instanceof Error ? cause.message : '最新修改尚未保存，暂不能请求 AI 辅导。'
@@ -125,6 +135,7 @@ async function send(): Promise<void> {
     auth.markActionSucceeded()
     content.value = ''
     attempt.value = ''
+    includeWorkspace.value = false
     await messagesQuery.load()
     poll.poll(result.data.tutoringRequestId)
   } catch (cause) {
@@ -176,12 +187,29 @@ const ACTION_LABELS = { ask: '继续追问', concept: '解释概念', next_hint:
 
 const QUICK_ASKS = [
   { label: '解释题目', action: 'concept', content: '请解释这道题的题意和完成标准。' },
-  { label: '给我提示', action: 'next_hint', content: '请给我一个不直接给出答案的下一步提示。' },
+  { label: '给我提示', action: 'next_hint', content: '请提示我下一步该验证什么。' },
   { label: '检查思路', action: 'ask', content: '请检查我的思路，指出遗漏或错误。' },
 ] as const
 function applyQuickAsk(preset: typeof QUICK_ASKS[number]): void {
   action.value = preset.action
   content.value = preset.content
+  void nextTick(() => composerInput.value?.focus())
+}
+
+function insertSelectedCode(): void {
+  const selection = props.selectedCode?.()
+  if (!selection?.trim()) {
+    actionError.value = '请先在编辑器里选中需要讨论的几行代码。'
+    return
+  }
+  const question = `${content.value.trimEnd()}\n\n选中的代码片段\n${selection}`.trimStart()
+  if (question.length > 4000) {
+    actionError.value = '问题和代码片段合计最多 4000 字符，请缩短选中的代码。'
+    return
+  }
+  actionError.value = ''
+  includeWorkspace.value = false
+  content.value = question
   void nextTick(() => composerInput.value?.focus())
 }
 const hasNoSessions = computed(() => sessionsQuery.status.value === 'success'
@@ -201,8 +229,8 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
     <template v-if="policyQuery.status.value === 'success' && policy">
       <div v-if="!policy.enabled" class="chat-empty">
         <p>这项作业没有开启 AI 辅导。</p>
-        <p class="meta">遇到问题可以直接问老师。</p>
-        <RouterLink class="button primary" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+        <RouterLink v-if="hasTeacher" class="button primary" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+        <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
       </div>
 
       <div v-else class="tutor-grid">
@@ -283,6 +311,10 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
               <UiField :label="`实际尝试（第 ${policy.requireAttemptFromLevel} 级起必填）`" col>
                 <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />
               </UiField>
+              <div v-if="prepareWorkspace" class="quick-asks">
+                <label><input v-model="includeWorkspace" type="checkbox" /> 附上当前工作区（最多 16 KiB）</label>
+                <UiButton v-if="selectedCode" type="button" variant="secondary" @click="insertSelectedCode">插入选中代码</UiButton>
+              </div>
               <p v-if="actionError" class="field-error" role="alert">{{ actionError }}</p>
               <div class="composer-foot">
                 <span class="meta">提示最多 {{ policy.maxHintLevel }} 级</span>
@@ -308,8 +340,9 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
           </section>
           <section class="sec">
             <h2>仍然没解决</h2>
-            <p class="meta">问老师时可以附上这里已经给出的提示。</p>
-            <RouterLink class="quiet-link" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+            <RouterLink v-if="hasTeacher" class="quiet-link" :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
+            <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
+            <ApiState v-else-if="offeringQuery.status.value === 'error'" status="error" :error="offeringQuery.error.value" @retry="offeringQuery.load" />
           </section>
         </aside>
       </div>

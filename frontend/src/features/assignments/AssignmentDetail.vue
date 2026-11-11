@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type LocationQuery } from 'vue-router'
-import { assignmentsApi, tutoringApi } from '../../api'
+import { assignmentsApi, coursesApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import UiButton from '../../components/ui/UiButton.vue'
@@ -41,6 +41,13 @@ const issueTagsQuery = usePageQuery(async signal => {
   return (await tutoringApi().getIssueTags(offeringId, { signal })).data
 })
 watch(() => query.data.value?.offeringId, () => { if (query.data.value?.offeringId) void issueTagsQuery.load() })
+const offeringQuery = usePageQuery(async signal => {
+  const offeringId = query.data.value?.offeringId
+  if (!offeringId) throw new Error('作业尚未加载')
+  return (await coursesApi().getOffering(offeringId, { signal })).data
+})
+watch(() => query.data.value?.offeringId, id => { if (id) void offeringQuery.load() })
+const hasTeacher = computed(() => offeringQuery.status.value === 'success' && (offeringQuery.data.value?.teachers.length ?? 0) > 0)
 
 const feedbackQuery = usePageQuery(async signal => {
   const feedbackId = route.query.feedbackId ?? (route.query.submissionId ? undefined : query.data.value?.publishedFeedbackId ?? undefined)
@@ -265,7 +272,7 @@ const attemptsText = computed(() => {
           <section class="help-block" aria-labelledby="assignment-help-title">
             <h2 id="assignment-help-title" class="section-label">需要帮助</h2>
             <RouterLink class="opt" :to="{ name: 'student-tutoring', params: { id: assignmentId } }"><b>AI 辅导</b><span class="meta">只给思路和排错提示，不给完整答案。</span></RouterLink>
-            <RouterLink class="opt" :to="{ name: 'student-help-new', params: { id: assignmentId } }"><b>问老师</b><span class="meta">附上你的尝试和工作区版本。</span></RouterLink>
+            <RouterLink v-if="hasTeacher" class="opt" :to="{ name: 'student-help-new', params: { id: assignmentId } }"><b>问老师</b><span class="meta">附上你的尝试和工作区版本。</span></RouterLink>
           </section>
         </aside>
       </div>

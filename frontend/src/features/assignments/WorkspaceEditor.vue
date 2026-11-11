@@ -351,11 +351,20 @@ async function prepareWorkspaceForAi(): Promise<number | null> {
   if (frozen.value) throw new Error('正在提交作业，请稍后再求助。')
   if (!canSave.value) throw new Error('当前工作区为只读，不能请求 AI 辅导。')
   if (saveState.value.paused) throw new Error('工作区有未处理的冲突或保存错误，请先恢复保存再求助。')
+  const files = Object.entries(fileContents.value).map(([path, content]) => ({ path, content }))
+  if (new TextEncoder().encode(JSON.stringify(files)).byteLength > 16_384) {
+    throw new Error('工作区超过 16 KiB。请取消附带工作区，或选中需要讨论的代码后插入问题。')
+  }
   if (hasUnsavedEdits.value) {
     const saved = await flush()
     if (!saved) throw new Error('最新修改尚未保存，暂不能请求 AI 辅导。')
   }
   return saveState.value.lastSavedRevision > 0 ? saveState.value.lastSavedRevision : null
+}
+
+function selectedCodeForAi(): string {
+  const editor = editorRef.value
+  return editor ? editor.value.slice(editor.selectionStart, editor.selectionEnd) : ''
 }
 
 function closeSubmitDialog(): void {
@@ -602,20 +611,21 @@ onBeforeUnmount(() => {
                 <div class="ws-tutor-inline-head">
                   <div>
                     <h3>AI 求助</h3>
-                    <p class="meta">发送前自动保存，AI 看到的是当前工作区版本。</p>
+                    <p class="meta">默认仅发送你的问题和尝试。附上工作区时会先保存最新内容。</p>
                   </div>
                   <button type="button" class="ws-tutor-inline-close" aria-label="关闭 AI 求助" @click="closeTutor">关闭</button>
                 </div>
                 <div class="ws-tutor-inline-body">
                   <TutoringPanel
                     :assignment-id="assignmentId"
+                    :offering-id="detail?.offeringId"
                     embedded
                     :prepare-workspace="prepareWorkspaceForAi"
+                    :selected-code="selectedCodeForAi"
                   />
                 </div>
                 <div class="ws-tutor-inline-foot">
                   <span class="meta">只给思路和排错提示，不给完整答案。</span>
-                  <RouterLink :to="{ name: 'student-help-new', params: { id: assignmentId } }">问老师</RouterLink>
                 </div>
               </div>
             </Transition>

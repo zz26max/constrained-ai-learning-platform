@@ -49,7 +49,9 @@ function onToggle(event: Event): void {
               <span class="tag">{{ sourceText(issue.sources) }}</span>
             </div>
             <p>{{ issue.description }}</p>
-            <p v-if="issue.knowledgePointTitle" class="assignment-issue-kp">关联知识点：{{ issue.knowledgePointTitle }}</p>
+            <p v-if="issue.knowledgePointTitle" class="assignment-issue-kp">
+              知识点「{{ issue.knowledgePointTitle }}」与该标签曾出现在同一份评价中。掌握情况以教师的知识点评价为准。
+            </p>
             <p class="assignment-issue-meta">
               学生自报 {{ issue.reportedStudentCount }} · 教师确认 {{ issue.confirmedStudentCount }} · 涉及 {{ issue.distinctStudentCount }} 名学生
               · {{ formatShortTime(issue.timeRange.from) }} 至 {{ formatShortTime(issue.timeRange.to) }}

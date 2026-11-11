@@ -4,6 +4,7 @@ import { assignmentsApi } from '../../api'
 import type { TargetDTO } from '../../api/notices'
 import { pageError, type PageError } from '../courses/page-error'
 import { targetRoute } from './target-route'
+import { requireReadableNoticeTarget } from './notice-target'
 
 /** 首页公告摘要与公告详情共用的目标跳转；不改变任何已读状态。 */
 export function useOpenTarget() {
@@ -23,6 +24,7 @@ export function useOpenTarget() {
         const feedback = await assignmentsApi().getFeedback(target.id)
         await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId }, query: { feedbackId: target.id } })
       } else {
+        await requireReadableNoticeTarget(target)
         await router.push(route)
       }
     } catch (cause) {

@@ -557,6 +557,22 @@ describe('P1-D 公告', () => {
     expect(detail.find('.notice-content').element.innerHTML).not.toContain('<script>')
     expect(detail.text()).not.toContain('recipientCount')
   })
+
+  it('公告目标后续归档时保留公告正文，并提示相关内容不可访问', async () => {
+    noticeDetail = { content: '请阅读讲义', target: { type: 'resource', id: RESOURCE, offeringId: OFFERING } }
+    scripted.setHandler(request => request.operationId === 'getResource'
+      ? failEnvelope(404, 'NOT_FOUND', {}, 'archived-resource')
+      : normalResponse(request))
+    const path = `/student/notices/${NOTICE}`
+    const page = await open(path)
+    await page.findAll('button').find(button => button.text() === '查看相关内容')!.trigger('click')
+    await flushPromises()
+
+    expect(requestsOf('getResource')).toHaveLength(1)
+    expect(page.text()).toContain('请阅读讲义')
+    expect(page.text()).toContain('该内容已不可访问')
+    expect(router?.currentRoute.value.fullPath).toBe(path)
+  })
 })
 
 describe('P1-D 消息目标映射', () => {
@@ -742,6 +758,62 @@ describe('P1-D 教师统计卡片', () => {
     expect(request?.headers['X-CSRF-Token']).toBe('csrf-teacher')
     expect(JSON.parse(request?.body ?? '{}')).toMatchObject({ title: '本周公告', content: '请查看本周课程安排。', target: { type: 'offering', id: OFFERING, offeringId: OFFERING } })
     expect(page.text()).toContain('公告已发布')
+  })
+
+  it('教师公告只可选学生能查看的章节、资料和作业', async () => {
+    const draftChapter = '00000000-0000-4000-8000-000000000302'
+    const archivedResource = '00000000-0000-4000-8000-000000000502'
+    scripted.setHandler(request => {
+      if (request.operationId === 'listTeacherChapters') return okEnvelope({ offeringId: OFFERING, items: [
+        { id: CHAPTER, number: 1, title: '已发布章节', publicationState: 'published' },
+        { id: draftChapter, number: 2, title: '草稿章节', publicationState: 'draft' },
+      ] })
+      if (request.operationId === 'getTeacherChapter') return okEnvelope({ resources: [
+        { id: RESOURCE, title: '当前讲义', archived: false },
+        { id: archivedResource, title: '旧讲义', archived: true },
+      ] })
+      if (request.operationId === 'listTeacherAssignments') return okEnvelope({ page: 1, pageSize: 100, total: 2, items: [
+        { id: ASSIGNMENT, title: '已发布作业', publicationState: 'published' },
+        { id: ASSIGNMENT_2, title: '草稿作业', publicationState: 'draft' },
+      ] })
+      return normalResponse(request)
+    })
+    const page = await open(`/teacher/offerings/${OFFERING}`, 'teacher')
+    await page.findAll('button').find(button => button.text() === '公告')!.trigger('click')
+    await flushPromises()
+    await page.findAll('button').find(button => button.text() === '发布公告')!.trigger('click')
+    const form = page.get('.teacher-notice-composer form')
+    for (const [type, id] of [['chapter', CHAPTER], ['resource', RESOURCE], ['assignment', ASSIGNMENT]]) {
+      await form.findAll('select')[0]!.setValue(type)
+      const ids = form.findAll('select')[1]!.findAll('option').map(option => option.attributes('value'))
+      expect(ids).toEqual([id])
+    }
+    expect(requestsOf('getTeacherChapter').every(request => !request.path.includes(draftChapter))).toBe(true)
+  })
+
+  it('教师公告可以翻到第二页，分页不会重复读取可关联内容', async () => {
+    const items = Array.from({ length: 23 }, (_, i) => ({
+      id: `notice-${i + 1}`, title: `第 ${i + 1} 条公告`, offeringId: OFFERING,
+      content: '公告正文', target: null, createdAt: '2026-10-14T02:00:00Z', recipientCount: 1,
+    }))
+    scripted.setHandler(request => {
+      if (request.operationId !== 'listNotices') return normalResponse(request)
+      const params = new URL(request.path, 'http://localhost').searchParams
+      const page = Number(params.get('page'))
+      return okEnvelope({ items: items.slice((page - 1) * 20, page * 20), page, pageSize: 20, total: items.length })
+    })
+    const page = await open(`/teacher/offerings/${OFFERING}`, 'teacher')
+    await page.findAll('button').find(button => button.text() === '公告')!.trigger('click')
+    await flushPromises()
+    const catalogRequests = requestsOf('listTeacherAssignments').length
+    const pagination = page.get('nav[aria-label="课程公告分页"]')
+    await pagination.findAll('button').find(button => button.text() === '下一页')!.trigger('click')
+    await flushPromises()
+
+    expect(requestsOf('listNotices').at(-1)?.path).toContain('page=2&pageSize=20')
+    expect(requestsOf('listTeacherAssignments')).toHaveLength(catalogRequests)
+    expect(page.get('.teacher-notice-list').text()).toContain('第 23 条公告')
+    expect(page.get('.teacher-notice-list').text()).not.toContain('第 1 条公告')
   })
 })
 

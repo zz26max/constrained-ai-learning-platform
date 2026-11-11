@@ -8,7 +8,6 @@ import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
-import { targetRoute } from '../notifications/target-route'
 
 type TeacherLearningRecordsDTO = components['schemas']['TeacherLearningRecordsDTO']
 type KnowledgeAssessment = components['schemas']['KnowledgeAssessment']
@@ -69,10 +68,18 @@ const pagedItems = computed(() => (records.value?.feedbackPage.items ?? []).filt
 const totalPages = computed(() => Math.max(1, Math.ceil((records.value?.feedbackPage.total ?? 0) / PAGE_SIZE)))
 
 const recommendationLink = computed(() => {
-  const target = records.value?.nextRecommendation?.target ?? null
-  if (target === null) return null
-  const routeTo = targetRoute(target)
-  return typeof routeTo === 'string' || routeTo === null ? null : routeTo
+  const target = records.value?.nextRecommendation?.target
+  if (!target || target.offeringId !== offeringId.value || !isUuid(target.id)) return null
+  switch (target.type) {
+    case 'assignment':
+      return { label: '查看作业', to: { name: 'teacher-assignment', params: { id: target.id } } }
+    case 'resource':
+      return { label: '查看班级资料', to: { name: 'teacher-offering', params: { id: target.offeringId } } }
+    case 'offering':
+      return { label: '查看教学班', to: { name: 'teacher-offering', params: { id: target.offeringId } } }
+    default:
+      return null
+  }
 })
 </script>
 
@@ -132,7 +139,7 @@ const recommendationLink = computed(() => {
           <h2 id="progress-reco-title">下一步建议</h2>
           <p class="progress-reco-title">{{ records.nextRecommendation.title }}</p>
           <p class="progress-explanation">{{ records.nextRecommendation.reason }}</p>
-          <RouterLink v-if="recommendationLink !== null" class="button secondary" :to="recommendationLink">查看关联内容</RouterLink>
+          <RouterLink v-if="recommendationLink !== null" class="button secondary" :to="recommendationLink.to">{{ recommendationLink.label }}</RouterLink>
         </section>
 
         <section class="surface progress-section" aria-labelledby="progress-feedback-title">

@@ -9,6 +9,7 @@ import { useAssignmentActions } from '../assignments/use-assignment-actions'
 import { useAuthStore } from '../../stores/auth'
 import { useNotificationsStore } from '../../stores/notifications'
 import { targetRoute } from './target-route'
+import { requireReadableNoticeTarget } from './notice-target'
 import { useMessageOverflow } from './use-message-overflow'
 import { isUuid } from '../assignments/format'
 
@@ -109,6 +110,7 @@ export function useMessageInbox(options: { withCourses?: boolean } = {}) {
         const feedback = await api.getFeedback(target.id)
         await router.push({ name: 'student-assignment', params: { id: feedback.data.assignmentId }, query: { feedbackId: target.id } })
       } else {
+        if (isCourseNotice(notification)) await requireReadableNoticeTarget(target)
         await router.push(route)
       }
       await markRead(notification)

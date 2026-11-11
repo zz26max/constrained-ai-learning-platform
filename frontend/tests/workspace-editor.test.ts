@@ -31,6 +31,7 @@ function normalResponse(request: Parameters<ScriptHandler>[0]): ScriptedResponse
   const body = request.body ? JSON.parse(request.body) as Record<string, unknown> : {}
   const assignment = request.path.includes(ASSIGNMENT_B) ? ASSIGNMENT_B : ASSIGNMENT
   switch (request.operationId) {
+    case 'getOffering': return okEnvelope({ id: CHECK_ID, teachers: [] })
     case 'getWorkspace': return okEnvelope({
       assignmentId: assignment, revision: 1, files: [{ path: 'index.html', content: '<p>v1</p>' }], activeFile: 'index.html',
       savedAt: '2026-10-14T02:00:00Z', canSave: true, saveBlockedReason: null,
@@ -313,6 +314,7 @@ describe('工作区题面与实时求助', () => {
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('AI_LATEST_CODE')
     await openTutor(page)
+    await page.get('.ws-tutor-inline input[type="checkbox"]').setValue(true)
     await page.find('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]').setValue('这段代码为什么没生效？')
     await page.find('.ws-tutor-inline form.composer').trigger('submit')
     await flushPromises()
@@ -331,12 +333,37 @@ describe('工作区题面与实时求助', () => {
     const page = await openWorkspace()
     await page.find('textarea.workspace-editor').setValue('WILL_NOT_SAVE')
     await openTutor(page)
+    await page.get('.ws-tutor-inline input[type="checkbox"]').setValue(true)
     await page.find('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]').setValue('先保存再问我')
     await page.find('.ws-tutor-inline form.composer').trigger('submit')
     await flushPromises()
 
     expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
     expect(page.find('.ws-tutor-inline .field-error').text()).toContain('最新修改尚未保存，暂不能请求 AI 辅导。')
+  })
+
+  it('较大工作区仍可只提问或插入选中代码，不附带整个工作区', async () => {
+    const page = await openWorkspace()
+    const editor = page.get<HTMLTextAreaElement>('textarea.workspace-editor')
+    const snippet = '.layout { display: grid }'
+    await editor.setValue(`${snippet}\n${'填充内容'.repeat(5000)}`)
+    editor.element.setSelectionRange(0, snippet.length)
+    await openTutor(page)
+    const question = page.get('.ws-tutor-inline textarea[placeholder="描述现象与具体疑问"]')
+    await question.setValue('为什么布局没有变化？')
+    await page.get('.ws-tutor-inline input[type="checkbox"]').setValue(true)
+    const composer = page.get('.ws-tutor-inline form.composer')
+    await composer.trigger('submit')
+    expect(page.get('.ws-tutor-inline .field-error').text()).toContain('工作区超过 16 KiB')
+    expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
+
+    await page.findAll('.ws-tutor-inline button').find(button => button.text() === '插入选中代码')!.trigger('click')
+    await composer.trigger('submit')
+    await flushPromises()
+    const body = bodyOf(requestsOf('sendTutoringMessage')[0]!)
+    expect(body['content']).toContain(snippet)
+    expect(body['content']).not.toContain('填充内容')
+    expect(body['workspaceRevision']).toBeUndefined()
   })
 })
 

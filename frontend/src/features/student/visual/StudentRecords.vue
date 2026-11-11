@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { coursesApi, dashboardApi } from '../../../api'
+import { assignmentsApi, coursesApi, dashboardApi } from '../../../api'
 import type { LearningRecordsDTO } from '../../../api/dashboard'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
@@ -10,6 +10,7 @@ import UiPager from '../../../components/ui/UiPager.vue'
 import UiSelect from '../../../components/ui/UiSelect.vue'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
+import { runBounded } from '../../../features/courses/worker-pool'
 import { isUuid } from '../../../features/assignments/format'
 import { byRecentStudy } from '../../../features/assignments/task-presentation'
 import { targetRoute } from '../../../features/notifications/target-route'
@@ -31,7 +32,7 @@ const ASSESSMENT_LABELS: Record<KnowledgeAssessment['assessmentState'], string> 
 }
 const FRESHNESS_LABELS: Record<KnowledgeAssessment['freshness'], string> = {
   fresh: '证据较新',
-  stale: '证据超过 30 天',
+  stale: '证据超过 90 天',
   none: '暂无证据',
 }
 const RESULT_LABELS: Record<EvidenceResult, string> = {
@@ -51,6 +52,32 @@ const page = computed(() => {
 const offeringsQuery = usePageQuery(async signal => ({items:(await allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal)).sort(byRecentStudy)}))
 void offeringsQuery.load()
 const currentCourse = computed(() => offeringsQuery.data.value?.items.find(c => c.offeringId === rawId.value))
+const selfStudy = computed(() => currentCourse.value?.status === 'active' && currentCourse.value.teachers.length === 0)
+const selfStudyId = computed(() => selfStudy.value ? currentCourse.value?.offeringId : undefined)
+const practiceQuery = usePageQuery(async signal => {
+  const offeringId = selfStudyId.value
+  if (!offeringId) return []
+  const api = assignmentsApi()
+  const assignments = await allPages((page, pageSize, signal) => api.listMyAssignments({ offeringId, page, pageSize }, { signal }).then(r => r.data), signal)
+  const active = assignments.filter(task => task.publicationState === 'published' && task.type !== 'text')
+  return runBounded(active.map(task => async () => {
+    const { data: workspace } = await api.getWorkspace(task.id, { signal })
+    const { data: { configured, check } } = await api.getAssignmentCheck(task.id, workspace.revision, { signal })
+    return {
+      task,
+      configured,
+      passed: check?.status === 'completed' && check.result !== null && check.result.total > 0 && check.result.total === check.result.passed,
+      checkStatus: check?.status,
+    }
+  }), 3, signal)
+})
+watch(selfStudyId, id => { if (id) void practiceQuery.load() }, { immediate: true })
+const practices = computed(() => practiceQuery.status.value === 'success' ? (practiceQuery.data.value ?? []).filter(item => item.configured) : [])
+const nextPractice = computed(() => {
+  const last = practices.value.findLast(item => item.passed)
+  const incomplete = practices.value.filter(item => !item.passed)
+  return incomplete.find(item => last?.task.chapterId && item.task.chapterId === last.task.chapterId) ?? incomplete[0]
+})
 const selectedCourseId = computed(() => typeof rawId.value === 'string' ? rawId.value : '')
 const courseOptions = computed(() => [
   ...(selecting.value || !currentCourse.value ? [{ value: '', label: '选择课程' }] : []),
@@ -102,6 +129,10 @@ const recommendationLink = computed(() => {
   const routeTo = targetRoute(target)
   return typeof routeTo === 'string' || routeTo === null ? null : routeTo
 })
+const recommendationLabel = computed(() => {
+  const type = records.value?.nextRecommendation?.target?.type
+  return type === 'assignment' ? '去练习' : type === 'resource' ? '查看讲义' : '查看课程'
+})
 
 function goToPage(next: number): void {
   if (next < 1 || next > totalPages.value) return
@@ -118,7 +149,8 @@ function chooseCourse(offeringId: string): void {
     <header class="page-head">
       <div>
         <h1 class="page-title" tabindex="-1">学习记录</h1>
-        <p class="page-summary">掌握判断只依据已批阅作业里的知识点评价，不代表考试成绩。</p>
+        <p v-if="selfStudy" class="page-summary">查看自测结果和下一项练习。自测记录对应每道题当前保存的版本。</p>
+        <p v-else class="page-summary">掌握判断只依据已批阅作业里的知识点评价，不代表考试成绩。</p>
       </div>
       <div class="page-actions">
         <UiSelect :model-value="selectedCourseId" :options="courseOptions" :disabled="offeringsQuery.status.value !== 'success'" aria-label="课程" @update:model-value="chooseCourse" />
@@ -137,21 +169,44 @@ function chooseCourse(offeringId: string): void {
       <template v-if="recordsQuery.status.value === 'success' && records">
         <dl class="stats vx-results" aria-label="学习概览">
           <div><dt>{{ progressLabel }}</dt><dd><template v-if="courseProgress"><b>{{ courseProgress.completed }}</b>/{{ courseProgress.total }}</template><span v-else class="stat-note">未配置</span></dd></div>
-          <div><dt>已完成实验</dt><dd><b>{{ records.summary.completedLabCount ?? 0 }}</b><small>个</small></dd></div>
-          <div><dt>已发布评价</dt><dd><b>{{ records.summary.publishedFeedbackCount ?? 0 }}</b><small>份</small></dd></div>
-          <div><dt>需要练习的知识点</dt><dd><template v-if="records.summary.needsPracticeCount !== null"><b>{{ records.summary.needsPracticeCount }}</b></template><span v-else class="stat-note">暂无统计</span></dd></div>
+          <template v-if="selfStudy">
+            <div><dt>已通过自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ practices.filter(item => item.passed).length }}</b><span v-else class="stat-note">待读取</span></dd></div>
+            <div><dt>待完成自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ practices.filter(item => !item.passed).length }}</b><span v-else class="stat-note">待读取</span></dd></div>
+          </template>
+          <template v-else>
+            <div><dt>已完成实验</dt><dd><b>{{ records.summary.completedLabCount ?? 0 }}</b><small>个</small></dd></div>
+            <div><dt>已发布评价</dt><dd><b>{{ records.summary.publishedFeedbackCount ?? 0 }}</b><small>份</small></dd></div>
+            <div><dt>需要练习的知识点</dt><dd><template v-if="records.summary.needsPracticeCount !== null"><b>{{ records.summary.needsPracticeCount }}</b></template><span v-else class="stat-note">暂无统计</span></dd></div>
+          </template>
         </dl>
 
-        <section v-if="records.nextRecommendation" class="reco" aria-labelledby="reco-title">
+        <section v-if="selfStudy" class="col knowledge" aria-labelledby="practice-title">
+          <div class="col-head"><h2 id="practice-title">自测练习</h2><span v-if="practices.length" class="meta">{{ practices.filter(item => item.passed).length }} / {{ practices.length }} 项已通过</span></div>
+          <ApiState :status="practiceQuery.status.value" :error="practiceQuery.error.value" @retry="practiceQuery.load" />
+          <p v-if="practiceQuery.status.value === 'success' && !practices.length" class="col-empty">本课程暂未配置自动检查练习。</p>
+          <div v-if="nextPractice" class="reco">
+            <div class="reco-main"><p class="eyebrow">下一步</p><h3>{{ nextPractice.task.title }}</h3><p>{{ nextPractice.task.description }}</p></div>
+            <RouterLink class="button primary" :to="{ name: 'student-workspace', params: { id: nextPractice.task.id } }">去练习</RouterLink>
+          </div>
+          <ul v-if="practices.length" class="kp-list">
+            <li v-for="item in practices" :key="item.task.id" class="kp">
+              <RouterLink :to="{ name: 'student-workspace', params: { id: item.task.id } }">{{ item.task.title }}</RouterLink>
+              <span class="meta"> · {{ item.passed ? '已通过自测' : item.checkStatus === 'completed' ? '需要再练' : item.checkStatus === 'error' ? '检查未完成' : item.checkStatus ? '检查中' : '当前版本未检查' }}</span>
+              <RouterLink v-if="item.task.chapterId" :to="{ name: 'chapter', params: { offeringId: item.task.offeringId, chapterId: item.task.chapterId } }"> · 查看章节</RouterLink>
+            </li>
+          </ul>
+        </section>
+
+        <section v-else-if="records.nextRecommendation" class="reco" aria-labelledby="reco-title">
           <div class="reco-main">
             <p class="eyebrow">下一步</p>
             <h2 id="reco-title">{{ records.nextRecommendation.title }}</h2>
             <p>{{ records.nextRecommendation.reason }}</p>
           </div>
-          <RouterLink v-if="recommendationLink !== null" class="button primary" :to="recommendationLink">去复习</RouterLink>
+          <RouterLink v-if="recommendationLink !== null" class="button primary" :to="recommendationLink">{{ recommendationLabel }}</RouterLink>
         </section>
 
-        <div class="records-grid">
+        <div v-if="!selfStudy || records.summary.publishedFeedbackCount > 0" class="records-grid">
           <section class="col knowledge" aria-labelledby="knowledge-title">
             <div class="col-head">
               <h2 id="knowledge-title">知识点</h2>
