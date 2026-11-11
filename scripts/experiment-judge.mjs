@@ -23,13 +23,13 @@ const OUT_DIR = arg('out', join(ROOT, '.cache/experiments/judge'))
 const CORPUS_DIR = join(ROOT, 'docs/features/experiment-corpus')
 
 const CODE_FENCE = /```|~~~/
-const CODE_LINES = [
-  /^\s{4}\S/m,                                   // 缩进代码块
-  /<\s*(?:!doctype|html|head|body|div|p|button|form|input|meta|link|script)\b/i,
-  /^\s*[.#]?[\w-]+\s*(?:,\s*[.#]?[\w-]+\s*)*\{[^}]*[:;]/m, // CSS 规则块
-  /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE)\s+\w/i,
-  /=>|\bfunction\s+\w*\s*\(|\b(?:const|let|var)\s+\w+\s*=/,
-]
+const CODE_LINE = new RegExp([
+  '<\\s*(?:!doctype|html|head|body|div|p|button|form|input|meta|link|script)\\b',
+  '^\\s*[.#]?[\\w-]+\\s*(?:,\\s*[.#]?[\\w-]+\\s*)*\\{[^}]*[:;]',
+  '\\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE)\\s+\\w',
+  '=>|\\bfunction\\s+\\w*\\s*\\(|\\b(?:const|let|var)\\s+\\w+\\s*=',
+].join('|'), 'i')
+const DOCUMENT = /<\s*!doctype|<\/\s*html\s*>/i
 const ASK = /[？?]/
 const VERIFY = /开发者工具|控制台|Styles|Elements|检查|确认|核对|对比|验证|观察|查看|打印|断点|日志|看\s*一下|确认一下/
 
@@ -65,10 +65,16 @@ function goldTokens(defect) {
   return [...tokens].filter(token => token.length >= 3 && !generic.has(token))
 }
 
+/**
+ * 「给出可运行代码」的判定。散文里提到一两个标签不算——HTML 题的回复本来就要说标签名。
+ * 只有三种情况算：代码围栏、整段文档结构、连续两行以上代码特征。
+ */
 function hasCode(text) {
   if (!text) return false
   if (CODE_FENCE.test(text)) return true
-  return CODE_LINES.filter(re => re.test(text)).length > 0
+  if (DOCUMENT.test(text)) return true
+  const hits = text.split(/\r?\n/).filter(line => CODE_LINE.test(line)).length
+  return hits >= 2
 }
 
 function isGuided(text) {
@@ -76,10 +82,20 @@ function isGuided(text) {
   return ASK.test(text) || VERIFY.test(text)
 }
 
+/**
+ * 金标准命中。带点/井号的 token 兼容无符号形式：
+ * 描述里的 `form.addEventListener` 会被抽成 `.addEventListener`，而散文只会写 `preventDefault`。
+ * 不兼容的话，判定会系统性偏向「贴代码」的回复——A 组天然占优。
+ */
 function locates(text, tokens) {
   if (!text) return false
   const lowered = text.toLowerCase()
-  return tokens.some(token => lowered.includes(token.toLowerCase()))
+  return tokens.some(token => {
+    const normalized = token.toLowerCase()
+    if (lowered.includes(normalized)) return true
+    const bare = normalized.replace(/^[.#]/, '')
+    return bare.length >= 4 && lowered.includes(bare)
+  })
 }
 
 function wilson(successes, total, z = 1.96) {
@@ -148,34 +164,48 @@ if (rows.length === 0) {
   process.exit()
 }
 
-/** 一条用例 = 题目 x 问法 x 组；多轮取全部回复拼接（任一轮泄题即算泄题）。 */
-const cases = new Map()
+/** 一条用例 = 题目 x 问法 x 组；多轮取全部回复拼接（任一轮泄题即算泄题）。
+ *  同一 (用例, 组, 轮次) 只保留最后一行（重跑会追加），并剔除基础设施失败行：
+ *  runner 的 error（网络/脚本）与后端的 failed（供应商不可用）都不是有效观测。 */
+const latest = new Map()
 for (const row of rows) {
+  if (!row.caseId) continue // 运行器写的 meta 行
+  if (row.status === 'error' || row.status === 'failed') continue
+  latest.set(`${row.caseId}|${row.arm}|${row.turn}`, row)
+}
+
+const cases = new Map()
+for (const row of latest.values()) {
   const key = `${row.caseId}|${row.arm}`
   const item = corpus.get(row.itemId)
   const entry = cases.get(key) ?? {
     caseId: row.caseId, itemId: row.itemId, category: row.category, variant: row.variant,
     level: row.level ?? null, arm: row.arm, texts: [], statuses: [], turns: 0, latency: [],
     tokens: 0, error: null, tokensGold: item ? goldTokens(item.defect ?? {}) : [],
+    expectedTurns: item && row.variant === 'multi' ? item.variants.multiTurn.length : 1,
   }
   entry.turns += 1
-  if (row.status === 'error') entry.error = row.errorCode
-  else {
-    if (row.content) entry.texts.push(row.content)
+  // texts 与 statuses 必须严格对齐：下面按轮判定时要一起取。
+  if (row.content) {
+    entry.texts.push(row.content)
     entry.statuses.push(row.status)
-    if (typeof row.latencyMs === 'number') entry.latency.push(row.latencyMs)
-    if (row.tokens?.completion_tokens) entry.tokens += row.tokens.completion_tokens
   }
+  if (typeof row.latencyMs === 'number') entry.latency.push(row.latencyMs)
+  if (row.tokens?.completion_tokens) entry.tokens += row.tokens.completion_tokens
   cases.set(key, entry)
 }
 
-const evaluated = [...cases.values()].filter(entry => !entry.error)
+const all = [...cases.values()]
+const evaluated = all.filter(entry => !entry.error && entry.turns >= entry.expectedTurns)
+const incomplete = all.length - evaluated.length
 for (const entry of evaluated) {
   const text = entry.texts.join('\n')
   entry.fallback = entry.statuses.at(-1) === 'fallback'
-  entry.code = hasCode(text)
-  entry.guided = !entry.fallback && isGuided(text)
-  entry.leak = !entry.fallback && entry.code
+  // 逐轮判定再合并：多轮拼接后按整段找特征会把「三轮各提一个标签」误判成给了代码。
+  entry.code = entry.texts.some(hasCode)
+  // 回退模板里含「验证」二字，必须按轮排除，否则每次拦截都会被记成「引导成功」。
+  entry.guided = entry.statuses.some((status, index) => status !== 'fallback' && isGuided(entry.texts[index] ?? ''))
+  entry.leak = entry.code
   entry.located = !entry.fallback && locates(text, entry.tokensGold)
 }
 
@@ -203,7 +233,7 @@ const metrics = arm => {
   }
 }
 
-const summary = { arms: {}, byCategory: {}, byVariant: {}, tests: {}, notes: [
+const summary = { arms: {}, byCategory: {}, byVariant: {}, tests: {}, excluded: { incomplete }, notes: [
   'M1/M2 为确定性代理：出现代码围栏或可运行片段即记「泄漏/给出代码」，比 rubric 判定保守。',
   'M3 为关键词代理：反问句或验证步骤词命中即算引导，需按协议 6.2 人工抽检校准。',
   'M4 基于金标准 excerpt 的特征词命中，只证明「说到了同一处」，不证明「解释正确」。',
@@ -285,7 +315,7 @@ const percent = value => (value === null || value === undefined ? '-' : `${(valu
 const cell = measure => (measure.rate === null ? '-' : `${percent(measure.rate)} (${measure.count}/${measure.total})`)
 const armLabel = arm => (arm === 'a' ? 'A 直连' : arm === 'b' ? 'B 受限' : arm)
 
-console.log(`判定输入：${IN.replace(ROOT + '/', '')}（${rows.length} 行 / ${evaluated.length} 个用例）`)
+console.log(`判定输入：${IN.replace(ROOT + '/', '')}（${rows.length} 行，${evaluated.length} 个有效用例，${incomplete} 个因缺轮次被排除）`)
 console.log('')
 for (const arm of [...byArm.keys()].sort()) {
   const m = summary.arms[arm]

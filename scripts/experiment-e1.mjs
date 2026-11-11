@@ -25,7 +25,6 @@ import { Session, ROOT, arg, has, loadLocalEnv, sleep } from './experiment-http.
 const MAP_PATH = join(ROOT, '.cache/experiments/e1-import.json')
 const CORPUS_DIR = join(ROOT, 'docs/features/experiment-corpus')
 const CATEGORY_FILE = { 'html.json': 'html', 'css.json': 'css', 'event.json': 'event', 'sql.json': 'sql' }
-const SQL_CATEGORY = 'sql'
 
 const DRY = has('dry-run')
 const ARM = arg('arm', 'b')
@@ -64,38 +63,65 @@ function aUserMessage(item, turn) {
   return `我的代码：\n\n${codeBlock(item)}\n\n${turn}`
 }
 
-function caseKey(caseId, arm, turn) {
-  return `${caseId}|${arm}|${turn}`
-}
-
-function readDone() {
-  if (!existsSync(OUT)) return new Set()
-  const done = new Set()
+/** 读已有进度：按「用例 x 组」聚合，只有每一轮都拿到终态才算完成。 */
+function readProgress() {
+  const progress = new Map()
+  if (!existsSync(OUT)) return progress
   for (const line of readFileSync(OUT, 'utf8').split(/\r?\n/)) {
     if (!line.trim()) continue
     try {
       const row = JSON.parse(line)
-      done.add(caseKey(row.caseId, row.arm, row.turn))
+      if (!row.caseId) continue
+      const key = `${row.caseId}|${row.arm}`
+      const list = progress.get(key) ?? []
+      list.push(row)
+      progress.set(key, list)
     } catch { /* 半行或损坏行忽略，允许重跑补齐 */ }
   }
-  return done
+  return progress
+}
+
+/** 供应商故障或后端失败的行不算完成，重跑时会重试这些用例。 */
+function isDone(progress, caseId, arm, expectedTurns) {
+  const rows = progress.get(`${caseId}|${arm}`) ?? []
+  const done = new Set(rows.filter(row => row.status === 'completed' || row.status === 'fallback').map(row => row.turn))
+  for (let turn = 1; turn <= expectedTurns; turn += 1) if (!done.has(turn)) return false
+  return true
 }
 
 function append(row) {
   appendFileSync(OUT, `${JSON.stringify(row)}\n`, 'utf8')
 }
 
-async function callProvider({ endpoint, key, model, messages, maxTokens, sessionHeader, sessionId }) {
+/**
+ * 直连供应商。网络抖动与限流是实验环境噪声，不是观测结果：网络错误、429、5xx 退避重试两次，
+ * 三次都失败才记为该用例失败（重跑时会补）。
+ */
+async function callProvider({ endpoint, key, model, messages, maxTokens, sessionHeader, sessionId }, attempt = 0) {
   const started = Date.now()
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
   // OpenCode Go 需要会话头才能路由（后端 ConfiguredTutoringProvider 同款处理）。
   if (sessionHeader) headers[sessionHeader] = sessionId
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
-  })
+  let response
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+      signal: AbortSignal.timeout(60000),
+    })
+  } catch (error) {
+    if (attempt < 2) {
+      await sleep(2000 * (attempt + 1))
+      return callProvider({ endpoint, key, model, messages, maxTokens, sessionHeader, sessionId }, attempt + 1)
+    }
+    throw new Error(`provider 连接失败：${error.message}`)
+  }
   const text = await response.text()
+  if ((response.status === 429 || response.status >= 500) && attempt < 2) {
+    await sleep(3000 * (attempt + 1))
+    return callProvider({ endpoint, key, model, messages, maxTokens, sessionHeader, sessionId }, attempt + 1)
+  }
   const elapsed = Date.now() - started
   if (!response.ok) throw new Error(`provider HTTP ${response.status}: ${text.slice(0, 200)}`)
   const root = JSON.parse(text)
@@ -104,14 +130,28 @@ async function callProvider({ endpoint, key, model, messages, maxTokens, session
   return { content, usage: root.usage ?? null, latencyMs: elapsed }
 }
 
+/** 与 experiment-import.mjs 同一套归一化：app.js → script.js，并同步改 HTML 的引用。 */
+function normalizeCorpusFiles(files) {
+  const out = {}
+  for (const [path, content] of Object.entries(files)) {
+    if (path === 'app.js') { out['script.js'] = content; continue }
+    out[path] = /<script[^>]+src=["']app\.js["']/i.test(content)
+      ? content.replace(/(<script[^>]+src=["'])app\.js(["'])/gi, '$1script.js$2')
+      : content
+  }
+  return out
+}
+
 function pickAssignment(item, map) {
-  return item.category === SQL_CATEGORY ? map.assignments.sql_text : map.assignments.web_lab
+  const id = map.items?.[item.id]
+  if (!id) throw new Error(`map 里没有 ${item.id} 的作业；先跑 node scripts/experiment-import.mjs`)
+  return id
 }
 
 async function prepareWorkspace(student, assignmentId, item, cache) {
   if (cache.has(assignmentId)) return cache.get(assignmentId)
   const ws = (await student.request('GET', `/api/v1/assignments/${assignmentId}/workspace`)).data
-  const files = Object.entries(item.files).map(([path, content]) => ({ path, content }))
+  const files = Object.entries(normalizeCorpusFiles(item.files)).map(([path, content]) => ({ path, content }))
   const saved = (await student.request('PUT', `/api/v1/assignments/${assignmentId}/workspace`, {
     baseRevision: ws.revision, files, activeFile: files[0].path,
   })).data
@@ -202,17 +242,21 @@ async function main() {
     console.log(`✓ A 组直连模型：${provider.model}${provider.sessionHeader ? `（会话头 ${provider.sessionHeader}）` : ''}`)
   }
 
-  const done = readDone()
+  const progress = readProgress()
   const context = { workspaces: new Map() }
   const selected = LIMIT > 0 ? planned.slice(0, LIMIT) : planned
   let written = 0
   let skipped = 0
 
+  // 运行元数据也进 JSONL：复现时要知道用的是哪个模型、什么节奏、跑的是哪一批。
+  append({ type: 'meta', startedAt: new Date().toISOString(), baseUrl: map.baseUrl, arm: ARM,
+    model: provider?.model ?? null, corpusItems: items.length, cases: selected.length, sleepMs: SLEEP })
+
   for (const [index, { item, def }] of selected.entries()) {
     const caseId = `${item.id}:${def.variant}`
     const arms = ARM === 'both' ? ['a', 'b'] : [ARM]
     for (const arm of arms) {
-      if (done.has(caseKey(caseId, arm, 1))) { skipped += 1; continue }
+      if (isDone(progress, caseId, arm, def.turns.length)) { skipped += 1; continue }
       let rows
       try {
         rows = arm === 'a' ? await runA(provider, item, def) : await runB(student, map, item, def, context)
@@ -228,7 +272,7 @@ async function main() {
       }
       const last = rows.at(-1)
       console.log(`  ${index + 1}/${selected.length} ${caseId} ${arm} → ${last.status}${last.hintLevel ? ` L${last.hintLevel}` : ''} · ${last.latencyMs}ms`)
-      if (arm === 'b' && SLEEP) await sleep(SLEEP)
+      if (SLEEP) await sleep(SLEEP)
     }
   }
   console.log(`✓ 写入 ${written} 行，跳过 ${skipped} 个已完成用例 → ${OUT.replace(ROOT + '/', '')}`)

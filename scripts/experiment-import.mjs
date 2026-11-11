@@ -1,26 +1,25 @@
 #!/usr/bin/env node
 /**
- * E1 对照实验：实验班与两组中性作业的一次性准备（幂等）。
+ * E1 对照实验：按语料逐题建「一题一作业」的实验班（幂等）。
  *
- * 做什么：
- * 1. 教师建/复用教学班「E1 受限辅导实验班」，四个章节；
- * 2. 建/复用两份中性题面的作业（Web 与 SQL），发布；
- * 3. 给两份作业写启用状态的 AI 政策（E1 的 B 组需要）；
- * 4. 建邀请码并注册/复用一名学校模式学生，供 B 组发问；
- * 5. 把 offering / 作业 / 学生凭据写进 .cache/experiments/e1-import.json（Git 忽略）。
+ * 为什么一题一作业（2026-11-11 实测后的结论）：
+ * 1. 辅导额度按「同学生同作业每天 12 次」封顶（AI 政策 dailyAssignmentLimit 上限 12），
+ *    40 题共 200 次请求压在少数作业上必然被 429 挡住；
+ * 2. 判题/工作区按「作业」区分，一题一作业才能让每道题的初始代码与缺陷各自成立。
  *
- * 为什么是「两份中性作业」而不是四十份：E1 的题目代码由运行器逐例写进工作区，
- * 作业本身只提供题面与 AI 政策，题面固定为中性描述，避免把某道题的要求灌进别的题。
+ * 归一化：语料里有 7 题的脚本叫 app.js，而 web 作业只允许 index.html/style.css/script.js。
+ * 导入时把 app.js 改名为 script.js，并把 index.html 里 <script src="app.js"> 同步改掉；
+ * 这处改动会写进实验记录——它改的是文件名，不改缺陷本身。
  *
  * 用法：
  *   node scripts/experiment-import.mjs --dry-run
  *   node scripts/experiment-import.mjs
- *   node scripts/experiment-import.mjs --rebuild   # 改过题面/初始文件后归档旧作业再建
+ *   node scripts/experiment-import.mjs --rebuild   # 归档同名旧作业后重建
  *
  * 口令：教师口令读 backend/.env 的 LOCAL_TEACHER_PASSWORD（或 DEMO_TEACHER_PASSWORD），
  * 学生口令由本脚本生成并只写进被 Git 忽略的 map 文件，不打印。
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Session, ROOT, arg, has, loadLocalEnv } from './experiment-http.mjs'
 
@@ -29,6 +28,9 @@ const ORIGIN = arg('origin', process.env.EXPERIMENT_ORIGIN ?? 'http://127.0.0.1:
 const COURSE_ID = '00000000-0000-4000-8000-000000000110' // V16 Web 开发基础
 const OFFERING_TITLE = arg('offering-title', 'E1 受限辅导实验班')
 const OFFERING_GROUP = '工程实践 · 实验'
+const CORPUS_DIR = join(ROOT, 'docs/features/experiment-corpus')
+const CATEGORY_FILE = { 'html.json': 'html', 'css.json': 'css', 'event.json': 'event', 'sql.json': 'sql' }
+const CHAPTER_INDEX = { html: 0, css: 1, event: 2, sql: 3 }
 const DRY = has('dry-run')
 /** 重建：归档同名旧作业后新建，用来改题面/初始文件后重新取到干净的作业。 */
 const REBUILD = has('rebuild')
@@ -41,38 +43,12 @@ const CHAPTERS = [
   { number: 4, title: 'SQL 查询', summary: '查询、聚合、NULL 与排序。' },
 ]
 
-// 题面只说场景与方法，不写"不要给完整实现"一类的话：
-// TutoringSafety 的输入意图正则含「完整.{0,8}(代码|答案|实现)」，题面自己撞上会让每次请求都
-// 在进模型前被判 POLICY_REJECTED，整批数据变成全回退（2026-11-11 实测踩到）。
-// 「不代答」的边界由平台自己的 boundary 文案负责，题面不重复。
+// 题面只说场景与方法：TutoringSafety 的输入意图正则含「完整.{0,8}(代码|答案|实现)」，
+// 题面自己撞上会让每次请求都在进模型前被判 POLICY_REJECTED（2026-11-11 实测踩到）。
 const NEUTRAL_DESCRIPTION =
   '学生把自己的 HTML/CSS/JS（或 SQL）代码粘进工作区，并描述了一个现象，希望得到排查方向。'
   + '请围绕学生问到的这一处回应：先说明该看什么，再给一个能自己验证的下一步。'
-
-const ASSIGNMENTS = [
-  {
-    key: 'web_lab',
-    chapterIndex: 0,
-    title: '[E1] Web 排查（中性题面）',
-    type: 'web_lab',
-    description: NEUTRAL_DESCRIPTION,
-    requirements: ['只排查学生提到的这一处', '先描述现象，再给可验证的下一步'],
-    initialFiles: [
-      { path: 'index.html', content: '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="utf-8">\n  <title>示例</title>\n</head>\n<body>\n  <p>示例</p>\n</body>\n</html>\n' },
-      { path: 'style.css', content: 'body { margin: 0; }\n' },
-      { path: 'script.js', content: '// 示例脚本\n' },
-    ],
-  },
-  {
-    key: 'sql_text',
-    chapterIndex: 3,
-    title: '[E1] SQL 排查（中性题面）',
-    type: 'sql_text',
-    description: NEUTRAL_DESCRIPTION,
-    requirements: ['只排查学生提到的这一处', '先描述现象，再给可验证的下一步'],
-    initialFiles: [{ path: 'answer.sql', content: 'SELECT 1;\n' }],
-  },
-]
+const NEUTRAL_REQUIREMENTS = ['只排查学生提到的这一处', '先描述现象，再给可验证的下一步']
 
 const AI_POLICY = {
   enabled: true,
@@ -91,6 +67,29 @@ const AI_POLICY = {
 const iso = ms => new Date(Date.now() + ms).toISOString()
 const shortId = () => Math.random().toString(36).slice(2, 10)
 
+function loadCorpusItems() {
+  const items = []
+  for (const file of readdirSync(CORPUS_DIR)) {
+    const category = CATEGORY_FILE[file]
+    if (!category) continue
+    const data = JSON.parse(readFileSync(join(CORPUS_DIR, file), 'utf8'))
+    for (const item of data.items) items.push({ ...item, category })
+  }
+  return items.sort((left, right) => left.id.localeCompare(right.id))
+}
+
+/** app.js → script.js，并同步改 index.html 里的引用；其余原样。 */
+export function normalizeCorpusFiles(files) {
+  const out = {}
+  for (const [path, content] of Object.entries(files)) {
+    if (path === 'app.js') { out['script.js'] = content; continue }
+    out[path] = /<script[^>]+src=["']app\.js["']/i.test(content)
+      ? content.replace(/(<script[^>]+src=["'])app\.js(["'])/gi, '$1script.js$2')
+      : content
+  }
+  return out
+}
+
 function readMap() {
   try { return JSON.parse(readFileSync(MAP_PATH, 'utf8')) } catch { return null }
 }
@@ -103,12 +102,11 @@ function writeMap(map) {
 async function ensureOffering(teacher, termId) {
   const list = (await teacher.request('GET', `/api/v1/teacher/offerings?page=1&pageSize=100&termId=${termId}`)).data
   const existing = list.items.find(item => item.title === OFFERING_TITLE)
-  if (existing) return { offering: existing, created: false }
-  const created = (await teacher.request('POST', '/api/v1/teacher/offerings', {
+  if (existing) return existing
+  return (await teacher.request('POST', '/api/v1/teacher/offerings', {
     courseId: COURSE_ID, title: OFFERING_TITLE, groupName: OFFERING_GROUP,
     termId, progressUnit: 'chapter',
   })).data
-  return { offering: created, created: true }
 }
 
 async function ensureChapters(teacher, offeringId) {
@@ -120,69 +118,60 @@ async function ensureChapters(teacher, offeringId) {
       chapter = (await teacher.request('POST', `/api/v1/teacher/offerings/${offeringId}/chapters`, {
         number: def.number, title: def.title, summary: def.summary, isRequired: true,
       })).data
-      console.log(`  + 章节 ${def.title}`)
     }
     if (chapter.publicationState !== 'published') {
       chapter = (await teacher.request('POST', `/api/v1/teacher/chapters/${chapter.id}/publish`, {})).data
-      console.log(`  ↑ 发布章节 ${def.title}`)
     }
     ids.push(chapter.id)
   }
   return ids
 }
 
-async function ensureAssignment(teacher, offeringId, chapterIds, def, rebuild) {
+async function ensureAssignment(teacher, offeringId, chapterIds, item, rebuild) {
+  const title = `[E1] ${item.id} ${item.title}`.slice(0, 200)
   const list = async () => (await teacher.request('GET', `/api/v1/teacher/offerings/${offeringId}/assignments?page=1&pageSize=100`)).data.items
   // 教师端 DTO 用 publicationState（contract: TeacherAssignmentDTO），不是 status。
-  const live = item => item.publicationState !== 'archived'
+  const live = entry => entry.publicationState !== 'archived'
   let items = await list()
   if (rebuild) {
-    for (const stale of items.filter(item => item.title === def.title && live(item))) {
+    for (const stale of items.filter(entry => entry.title === title && live(entry))) {
       await teacher.request('POST', `/api/v1/teacher/assignments/${stale.id}/archive`, {})
-      console.log(`  - 归档旧作业 ${def.title}`)
     }
     items = await list()
   }
-  let assignment = items.find(item => item.title === def.title && live(item))
-  if (!assignment) {
-    const created = (await teacher.request('POST', `/api/v1/teacher/offerings/${offeringId}/assignments`, {
-      chapterId: chapterIds[def.chapterIndex],
-      title: def.title,
-      type: def.type,
-      isRequired: false,
-      description: def.description,
-      requirements: def.requirements,
-      estimatedMinutes: 20,
-      knowledgePointIds: [],
-      dueAt: iso(90 * 24 * 3600 * 1000),
-      lateUntil: null,
-      allowResubmit: true,
-      maxAttempts: 10,
-      maxScore: 100,
-      rubric: [{ criterionId: 'e1', title: '排查过程', description: '实验用，不参与评分。', maxScore: 100 }],
-      initialFiles: def.initialFiles,
-      aiPolicyVersion: null,
-    })).data
-    assignment = (await teacher.request('POST', `/api/v1/teacher/assignments/${created.id}/publish`, {})).data
-    console.log(`  + 作业 ${def.title}（已发布）`)
-  } else {
-    console.log(`  = 复用作业 ${def.title}`)
-  }
-  return assignment
+  const existing = items.find(entry => entry.title === title && live(entry))
+  if (existing) return { id: existing.id, created: false }
+
+  const files = normalizeCorpusFiles(item.files)
+  const ordered = Object.entries(files).sort(([left], [right]) => left.localeCompare(right))
+  const created = (await teacher.request('POST', `/api/v1/teacher/offerings/${offeringId}/assignments`, {
+    chapterId: chapterIds[CHAPTER_INDEX[item.category]],
+    title,
+    type: item.category === 'sql' ? 'sql_text' : 'web_lab',
+    isRequired: false,
+    description: NEUTRAL_DESCRIPTION,
+    requirements: NEUTRAL_REQUIREMENTS,
+    estimatedMinutes: 20,
+    knowledgePointIds: [],
+    dueAt: iso(180 * 24 * 3600 * 1000),
+    lateUntil: null,
+    allowResubmit: true,
+    maxAttempts: 20,
+    maxScore: 100,
+    rubric: [{ criterionId: 'e1', title: '排查过程', description: '实验用，不参与评分。', maxScore: 100 }],
+    initialFiles: ordered.map(([path, content]) => ({ path, content })),
+    aiPolicyVersion: null,
+  })).data
+  const published = (await teacher.request('POST', `/api/v1/teacher/assignments/${created.id}/publish`, {})).data
+  return { id: published.id, created: true }
 }
 
-async function ensureAiPolicy(teacher, assignmentId, label) {
+async function ensureAiPolicy(teacher, assignmentId) {
   const current = (await teacher.request('GET', `/api/v1/teacher/assignments/${assignmentId}/ai-policy`)).data
-  const baseVersion = current?.version ?? 0
-  if (current?.enabled === true && (current.maxHintLevel ?? 0) >= 3) {
-    console.log(`  = AI 政策已启用（${label}，v${baseVersion}）`)
-    return current
-  }
-  const saved = (await teacher.request('PUT', `/api/v1/teacher/assignments/${assignmentId}/ai-policy`, {
-    baseVersion, ...AI_POLICY,
+  if (current?.enabled === true && (current.maxHintLevel ?? 0) >= 3) return current
+  return (await teacher.request('PUT', `/api/v1/teacher/assignments/${assignmentId}/ai-policy`, {
+    baseVersion: current?.version ?? 0, ...AI_POLICY,
   })).data
-  console.log(`  + AI 政策已写入（${label}，v${saved.version}）`)
-  return saved
 }
 
 async function ensureStudent(inviteCode, map) {
@@ -192,14 +181,8 @@ async function ensureStudent(inviteCode, map) {
   const registered = await session.register({
     username, password, displayName: 'E1 运行账号', mode: 'school', role: 'student', inviteCode,
   })
-  if (registered.existing) {
-    await session.login(username, password)
-    console.log(`  = 复用实验学生 ${username}`)
-  } else {
-    console.log(`  + 注册实验学生 ${username}`)
-  }
-  const courses = (await session.request('GET', '/api/v1/me/courses')).data.items
-  return { username, password, session, courseCount: courses.length }
+  if (registered.existing) await session.login(username, password)
+  return { username, password, registered: !registered.existing }
 }
 
 async function main() {
@@ -207,13 +190,16 @@ async function main() {
   const teacherPassword = process.env.DEMO_TEACHER_PASSWORD ?? process.env.LOCAL_TEACHER_PASSWORD
   if (!teacherPassword) throw new Error('缺少教师口令：backend/.env 需有 LOCAL_TEACHER_PASSWORD。')
 
-  console.log(`E1 准备：${BASE}（${DRY ? 'dry-run，不写任何数据' : '真实写入'}）`)
+  const items = loadCorpusItems()
+  const normalized = items.filter(item => item.files['app.js']).length
+  console.log(`E1 准备：${items.length} 题（其中 ${normalized} 题的 app.js 归一化为 script.js）`)
   if (DRY) {
-    console.log(JSON.stringify({
-      offering: OFFERING_TITLE, chapters: CHAPTERS.map(c => c.title),
-      assignments: ASSIGNMENTS.map(a => ({ title: a.title, type: a.type, files: a.initialFiles.map(f => f.path) })),
-      aiPolicy: AI_POLICY,
-    }, null, 2))
+    console.log(JSON.stringify(items.slice(0, 3).map(item => ({
+      id: item.id, category: item.category,
+      title: `[E1] ${item.id} ${item.title}`.slice(0, 80),
+      files: Object.keys(normalizeCorpusFiles(item.files)),
+    })), null, 2))
+    console.log(`…共 ${items.length} 份作业；${DRY ? 'dry-run 不写数据' : ''}`)
     return
   }
 
@@ -224,27 +210,22 @@ async function main() {
 
   const config = (await teacher.request('GET', '/api/v1/me/config')).data
   if (!config.currentTermId) throw new Error('当前没有学期，无法建班。')
-  console.log(`✓ 当前学期：${config.currentTermId}`)
 
-  if (map?.offeringId) {
-    const list = (await teacher.request('GET', `/api/v1/teacher/offerings?page=1&pageSize=100&termId=${config.currentTermId}`)).data
-    if (!list.items.some(item => item.id === map.offeringId)) {
-      console.log('! map 里的教学班已不存在，按标题重新建')
-      map.offeringId = null
-    }
-  }
-
-  const { offering } = map?.offeringId
-    ? { offering: { id: map.offeringId } }
-    : await ensureOffering(teacher, config.currentTermId)
+  const offering = await ensureOffering(teacher, config.currentTermId)
   console.log(`✓ 教学班：${offering.id}`)
-
   const chapterIds = await ensureChapters(teacher, offering.id)
-  const assignments = {}
-  for (const def of ASSIGNMENTS) {
-    const assignment = await ensureAssignment(teacher, offering.id, chapterIds, def, REBUILD)
-    await ensureAiPolicy(teacher, assignment.id, def.key)
-    assignments[def.key] = assignment.id
+
+  const mapping = {}
+  let created = 0
+  let reused = 0
+  let policies = 0
+  for (const [index, item] of items.entries()) {
+    const { id, created: isNew } = await ensureAssignment(teacher, offering.id, chapterIds, item, REBUILD)
+    if (isNew) created += 1; else reused += 1
+    const policy = await ensureAiPolicy(teacher, id)
+    if (policy?.enabled) policies += 1
+    mapping[item.id] = id
+    if ((index + 1) % 10 === 0) console.log(`  …${index + 1}/${items.length}（新建 ${created}，复用 ${reused}）`)
   }
 
   const invite = (await teacher.request('POST', `/api/v1/teacher/offerings/${offering.id}/invites`, {
@@ -252,19 +233,16 @@ async function main() {
   })).data
   const student = await ensureStudent(invite.inviteCode, map)
 
-  const next = {
-    baseUrl: BASE,
-    origin: ORIGIN,
-    termId: config.currentTermId,
-    offeringId: offering.id,
-    assignments,
+  writeMap({
+    baseUrl: BASE, origin: ORIGIN, termId: config.currentTermId, offeringId: offering.id,
+    items: mapping,
     student: { username: student.username, password: student.password },
+    normalized: { appJsRenamed: normalized },
     updatedAt: new Date().toISOString(),
-  }
-  writeMap(next)
+  })
+  console.log(`✓ 作业 ${items.length} 份（新建 ${created}，复用 ${reused}），AI 政策启用 ${policies} 份`)
+  console.log(`✓ 学生 ${student.username}${student.registered ? '（新注册）' : '（复用）'}，凭据写入 map 文件`)
   console.log(`✓ 已写入 ${MAP_PATH.replace(ROOT + '/', '')}`)
-  console.log(`  作业：web_lab=${assignments.web_lab} sql_text=${assignments.sql_text}`)
-  console.log(`  学生：${student.username}（口令在 map 文件里，不打印）`)
 }
 
 main().catch(error => {
