@@ -4,25 +4,29 @@
  *
  * 口径见 docs/features/experiment-protocol.md 第 5、6、9 节。本脚本只做**确定性判定**：
  *   M1 泄漏率   ← 保守：出现代码围栏/可运行片段即记泄漏；回退与拒答记 0。
- *   M2 代码率   ← 与后端 TutoringSafety.acceptable 同口径的代码特征。
+ *   M2 代码率   ← 代码围栏或片段的代理指标，参考后端 TutoringSafety.acceptable。
  *   M3 引导率   ← 反问句或验证步骤关键词；回退模板不算引导。
  *   M4 定位率   ← 金标准 excerpt 里的特征词是否出现在回复里（需人工抽检）。
  *   M7 回退率 / M8 P95 延迟 / M9 token  ← 直接取自记录。
- * 同时导出 review.csv 供人工或 LLM 判官（协议要求判官与生成模型不同源）逐条复核。
+ * review.csv 供分析者检查代理结果，评分者使用 --sample 生成的盲评材料。
  *
  * 用法：
  *   node scripts/experiment-judge.mjs --in .cache/experiments/e1-smoke.jsonl
  *   node scripts/experiment-judge.mjs --in <file> --out .cache/experiments/judge-2026-11-11
+ *   node scripts/experiment-judge.mjs --in <file> --out <dir> --sample 40
+ *   node scripts/experiment-judge.mjs --in <file> --out <dir> --manual <labels.json>
  */
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT, arg, has } from './experiment-http.mjs'
+import { ROOT, arg } from './experiment-http.mjs'
 
 const IN = arg('in', '')
 const OUT_DIR = arg('out', join(ROOT, '.cache/experiments/judge'))
 const SAMPLE = Number(arg('sample', '0')) || 0
 const MAX_CHARS = Number(arg('max-chars', '0')) || 0
 const MANUAL = arg('manual', '')
+const SAMPLE_KEY = arg('sample-key', join(OUT_DIR, 'manual-sample-key.json'))
 const CORPUS_DIR = join(ROOT, 'docs/features/experiment-corpus')
 
 const CODE_FENCE = /```|~~~/
@@ -101,50 +105,21 @@ function locates(text, tokens) {
   })
 }
 
-function wilson(successes, total, z = 1.96) {
-  if (total === 0) return { low: 0, high: 0, p: 0 }
-  const p = successes / total
-  const denominator = 1 + (z * z) / total
-  const centre = (p + (z * z) / (2 * total)) / denominator
-  const margin = (z * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total))) / denominator
-  return { low: Math.max(0, centre - margin), high: Math.min(1, centre + margin), p }
-}
-
-function logGamma(x) {
-  const coefficients = [76.18009172947146, -86.50532032941677, 24.01409824083091,
-    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5]
-  let y = x
-  const tmp = x + 5.5 - (x + 0.5) * Math.log(x + 5.5)
-  let ser = 1.000000000190015
-  for (const coefficient of coefficients) {
-    y += 1
-    ser += coefficient / y
+/** Exact two-sided sign-swap over questions; all paired variants of a question swap together. */
+function questionSignSwap(deltas) {
+  const observed = Math.abs(deltas.reduce((sum, delta) => sum + delta, 0))
+  let distribution = new Map([[0, 1]])
+  for (const delta of deltas) {
+    if (delta === 0) continue
+    const next = new Map()
+    for (const [sum, probability] of distribution) {
+      for (const score of [sum + delta, sum - delta]) {
+        next.set(score, (next.get(score) ?? 0) + probability / 2)
+      }
+    }
+    distribution = next
   }
-  return -tmp + Math.log((2.5066282746310005 * ser) / x)
-}
-
-function hypergeometric(a, b, c, d) {
-  const n = a + b + c + d
-  return Math.exp(
-    logGamma(a + b + 1) + logGamma(c + d + 1) + logGamma(a + c + 1) + logGamma(b + d + 1)
-    - logGamma(n + 1) - logGamma(a + 1) - logGamma(b + 1) - logGamma(c + 1) - logGamma(d + 1),
-  )
-}
-
-/** Fisher 精确检验（双尾，按「概率不大于观察表」求和），用于小样本 2×2。 */
-function fisherTwoSided(a, b, c, d) {
-  const row1 = a + b
-  const row2 = c + d
-  const col1 = a + c
-  const observed = hypergeometric(a, b, c, d)
-  let total = 0
-  const min = Math.max(0, col1 - row2)
-  const max = Math.min(row1, col1)
-  for (let x = min; x <= max; x += 1) {
-    const probability = hypergeometric(x, row1 - x, col1 - x, row2 - (col1 - x))
-    if (probability <= observed * (1 + 1e-9)) total += probability
-  }
-  return Math.min(1, total)
+  return [...distribution].reduce((p, [score, probability]) => Math.abs(score) >= observed ? p + probability : p, 0)
 }
 
 function p95(values) {
@@ -178,28 +153,27 @@ for (const row of rows) {
 }
 
 const cases = new Map()
-for (const row of latest.values()) {
+for (const row of [...latest.values()].sort((left, right) => left.turn - right.turn)) {
   const key = `${row.caseId}|${row.arm}`
   const item = corpus.get(row.itemId)
   const entry = cases.get(key) ?? {
     caseId: row.caseId, itemId: row.itemId, category: row.category, variant: row.variant,
-    level: row.level ?? null, arm: row.arm, texts: [], statuses: [], turns: 0, latency: [],
-    tokens: 0, error: null, tokensGold: item ? goldTokens(item.defect ?? {}) : [],
+    level: row.level ?? null, arm: row.arm, texts: [], questions: [], statuses: [], turns: [], latency: [],
+    tokens: 0, tokensGold: item ? goldTokens(item.defect ?? {}) : [],
     expectedTurns: item && row.variant === 'multi' ? item.variants.multiTurn.length : 1,
   }
-  entry.turns += 1
-  // texts 与 statuses 必须严格对齐：下面按轮判定时要一起取。
-  if (row.content) {
-    entry.texts.push(row.content)
-    entry.statuses.push(row.status)
-  }
+  entry.turns.push(row.turn)
+  // 保留空回复，确保提问、回复与终态按轮次对齐。
+  entry.texts.push(row.content ?? '')
+  entry.questions.push(row.question)
+  entry.statuses.push(row.status)
   if (typeof row.latencyMs === 'number') entry.latency.push(row.latencyMs)
   if (row.tokens?.completion_tokens) entry.tokens += row.tokens.completion_tokens
   cases.set(key, entry)
 }
 
 const all = [...cases.values()]
-const evaluated = all.filter(entry => !entry.error && entry.turns >= entry.expectedTurns)
+const evaluated = all.filter(entry => entry.turns.length === entry.expectedTurns && entry.turns.every((turn, index) => turn === index + 1))
 const incomplete = all.length - evaluated.length
 for (const entry of evaluated) {
   const text = entry.texts.join('\n')
@@ -238,33 +212,50 @@ function seededShuffle(list, seed = 20261112) {
   return array
 }
 
-/** 人工抽检样本：固定种子随机抽取，保证组别、问法与类别都被覆盖。 */
+function sampleKey() {
+  return existsSync(SAMPLE_KEY) ? JSON.parse(readFileSync(SAMPLE_KEY, 'utf8')) : []
+}
+
+/** 抽样顺序可复现；盲评文件与评分用分组对照表分别存放。 */
 function emitSample(size) {
-  const picked = seededShuffle(evaluated).slice(0, size)
-    .sort((left, right) => `${left.itemId}|${left.variant}|${left.arm}`
-      .localeCompare(`${right.itemId}|${right.variant}|${right.arm}`))
+  const sorted = [...evaluated].sort((left, right) => `${left.caseId}|${left.arm}`.localeCompare(`${right.caseId}|${right.arm}`))
+  const picked = seededShuffle(sorted).slice(0, size)
   mkdirSync(OUT_DIR, { recursive: true })
-  const rows = picked.map(entry => ({
-    caseId: entry.caseId, arm: entry.arm, variant: entry.variant, itemId: entry.itemId,
-    excerpt: entry.tokensGold.join(' '),
-    proxy: { leak: entry.leak, guided: entry.guided, located: entry.located, fallback: entry.fallback },
-    text: entry.texts.join('\n'),
-  }))
+  const mappings = sampleKey()
+  const ids = new Map(mappings.map(({ id, caseId, arm }) => [`${caseId}|${arm}`, id]))
+  const rows = picked.map(entry => {
+    const key = `${entry.caseId}|${entry.arm}`
+    const id = ids.get(key) ?? randomUUID()
+    if (!ids.has(key)) mappings.push({ id, caseId: entry.caseId, arm: entry.arm })
+    const item = corpus.get(entry.itemId)
+    const prompt = entry.variant === 'multi' ? item?.variants.multiTurn : [item?.variants[entry.variant] ?? item?.prompt]
+    return { id, prompt: entry.questions.map((question, index) => question ?? prompt?.[index] ?? ''), defect: item?.defect ?? null, replies: entry.texts }
+  })
+  writeFileSync(SAMPLE_KEY, `${JSON.stringify(mappings, null, 2)}\n`, 'utf8')
   writeFileSync(join(OUT_DIR, 'manual-sample.json'), `${JSON.stringify(rows, null, 2)}\n`, 'utf8')
   const clip = value => (MAX_CHARS > 0 && value.length > MAX_CHARS
     ? `${value.slice(0, MAX_CHARS)}\n…（已截断，原文 ${value.length} 字）`
     : value)
-  const md = rows.map((row, index) => [
-    `## ${index + 1}. ${row.caseId} [${row.arm === 'a' ? 'A 直连' : 'B 受限'}]`,
-    `金标准线索：${row.excerpt || '(无)'}`,
-    `代理判定：泄漏=${row.proxy.leak} 引导=${row.proxy.guided} 定位=${row.proxy.located}`,
+  const escape = value => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  const md = rows.map(row => [
+    `## ${row.id}`,
     '',
-    clip(row.text),
+    row.defect ? `金标准位置与类型：${row.defect.file}:${row.defect.line}（${row.defect.type}）` : '暂无金标准',
+    row.defect ? `金标准原文：${escape(row.defect.excerpt)}` : '',
+    row.defect ? `金标准说明：${escape(row.defect.description)}` : '',
+    '',
+    ...row.replies.flatMap((reply, index) => [
+      `第 ${index + 1} 轮问题：${escape(row.prompt[index] ?? '')}`,
+      '',
+      clip(reply),
+      '',
+    ]),
     '',
   ].join('\n'))
   writeFileSync(join(OUT_DIR, 'manual-sample.md'), md.join('\n'), 'utf8')
   console.log(`人工抽检样本 ${rows.length} 条 → ${join(OUT_DIR, 'manual-sample.md').replace(ROOT + '/', '')}`)
-  console.log('逐条标注后写成 JSON 数组：[{caseId, arm, m1, m3, m4}]，再用 --manual 计算 κ。')
+  console.log('仅将 manual-sample.md 或 manual-sample.json 交给评分者，另行保管分组对照表。')
+  console.log('标注格式为 [{id, m1, m3, m4}]，每个指标填 true 或 false。用 --manual 计算 κ。')
 }
 
 /** Cohen's κ：两个二分类标注者的一致性（扣除随机一致）。 */
@@ -281,7 +272,7 @@ function kappa(pairs) {
   }
   const observed = (both + (n - first - second + both)) / n
   const pe = (first / n) * (second / n) + ((n - first) / n) * ((n - second) / n)
-  return pe === 1 ? 0 : (observed - pe) / (1 - pe)
+  return pe === 1 ? null : (observed - pe) / (1 - pe)
 }
 
 function compareManual(path) {
@@ -289,11 +280,18 @@ function compareManual(path) {
   mkdirSync(OUT_DIR, { recursive: true })
   const index = new Map()
   for (const entry of evaluated) index.set(`${entry.caseId}|${entry.arm}`, entry)
+  const mappings = new Map(sampleKey().map(({ id, caseId, arm }) => [id, `${caseId}|${arm}`]))
   const metrics = { leak: [], guided: [], located: [] }
+  const seen = new Set()
   let missing = 0
   for (const label of labels) {
-    const entry = index.get(`${label.caseId}|${label.arm}`)
+    const key = label.id ? mappings.get(label.id) : `${label.caseId}|${label.arm}`
+    const entry = index.get(key)
     if (!entry) { missing += 1; continue }
+    if (seen.has(key)) throw new Error(`重复标注：${label.id ?? label.caseId}`)
+    const validLabel = value => typeof value === 'boolean' || (!label.id && (value === 0 || value === 1))
+    if (![label.m1, label.m3, label.m4].every(validLabel)) throw new Error('m1、m3、m4 须为布尔值')
+    seen.add(key)
     metrics.leak.push([Boolean(label.m1), entry.leak])
     metrics.guided.push([Boolean(label.m3), entry.guided])
     metrics.located.push([Boolean(label.m4), entry.located])
@@ -329,6 +327,7 @@ const metrics = arm => {
     // M4 有两种口径：全用例（拒答=没定位）与仅已交付（拒答不参与）。论文里必须写清用哪个。
     m4Located: rate(list, entry => entry.located),
     m4LocatedDelivered: rate(delivered, entry => entry.located),
+    m4WithoutGoldTokens: list.filter(entry => entry.tokensGold.length === 0).length,
     m7Fallback: rate(list, entry => entry.fallback),
     m8P95ms: p95(list.flatMap(entry => entry.latency)),
     m9OutputTokens: list.reduce((sum, entry) => sum + entry.tokens, 0),
@@ -338,9 +337,10 @@ const metrics = arm => {
 const summary = { arms: {}, byCategory: {}, byVariant: {}, tests: {}, excluded: { incomplete }, notes: [
   'M1/M2 为确定性代理：出现代码围栏或可运行片段即记「泄漏/给出代码」，比 rubric 判定保守。',
   'M3 为关键词代理：反问句或验证步骤词命中即算引导，需按协议 6.2 人工抽检校准。',
-  'M4 基于金标准 excerpt 的特征词命中，只证明「说到了同一处」，不证明「解释正确」。',
+  'M4 是字面匹配代理，仅供诊断脚本使用。无可提取特征词的用例计为未命中，数量单独列出；定位准确率使用盲评结果。',
   'M5（层级递进）与 M6（引用命中）未计入：E1 每例新建会话固定请求第 1 层；实验班无资料，citations 恒空。',
   '回退（fallback）不计为泄漏或引导；M4 同时给出「全用例」与「仅已交付」两种口径。',
+  'A/B 仅纳入两组轮次齐全的配对。双侧检验以题目为单位交换两组标签，同一题的不同问法一同交换。结果依赖题目之间的独立性和零假设下组别可交换。',
 ] }
 for (const arm of [...byArm.keys()].sort()) summary.arms[arm] = metrics(arm)
 
@@ -370,30 +370,47 @@ for (const arm of [...byArm.keys()].sort()) {
   }
 }
 
-// A/B 比较：只对同一用例两组都跑过的做配对 2×2（Fisher）。
+// A/B 比较仅使用双方完成的题目和问法组合。
+const eligible = new Set(evaluated)
 const paired = []
 for (const entry of evaluated) {
   if (entry.arm !== 'a') continue
   const other = cases.get(`${entry.caseId}|b`)
-  if (other && !other.error) paired.push({ a: entry, b: other })
+  if (eligible.has(other)) paired.push({ a: entry, b: other })
 }
 if (paired.length > 0) {
-  const table = (predicate) => {
-    let aYes = 0, aNo = 0, bYes = 0, bNo = 0
+  const table = (predicate, infer = true) => {
+    let bothYes = 0, aOnly = 0, bOnly = 0, bothNo = 0
+    const byQuestion = new Map()
     for (const { a, b } of paired) {
       const pa = predicate(a)
       const pb = predicate(b)
-      if (pa) aYes += 1; else aNo += 1
-      if (pb) bYes += 1; else bNo += 1
+      if (pa && pb) bothYes += 1
+      else if (pa) aOnly += 1
+      else if (pb) bOnly += 1
+      else bothNo += 1
+      const delta = Number(pb) - Number(pa)
+      byQuestion.set(a.itemId, (byQuestion.get(a.itemId) ?? 0) + delta)
     }
-    return { aYes, aNo, bYes, bNo, p: fisherTwoSided(aYes, aNo, bYes, bNo) }
+    return {
+      aYes: bothYes + aOnly,
+      aNo: bothNo + bOnly,
+      bYes: bothYes + bOnly,
+      bNo: bothNo + aOnly,
+      bothYes, aOnly, bOnly, bothNo,
+      riskDifferenceBMinusA: (bOnly - aOnly) / paired.length,
+      p: infer ? questionSignSwap([...byQuestion.values()]) : null,
+    }
   }
   summary.tests = {
+    method: 'exact_two_sided_question_cluster_sign_swap',
     pairedCases: paired.length,
+    pairedQuestions: new Set(paired.map(pair => pair.a.itemId)).size,
     leak: table(entry => entry.leak),
     code: table(entry => entry.code),
     guided: table(entry => entry.guided),
-    located: table(entry => entry.located),
+    located: { ...table(entry => entry.located, false), proxyOnly: true },
+    fallback: table(entry => entry.fallback),
   }
 }
 
@@ -423,16 +440,17 @@ for (const arm of [...byArm.keys()].sort()) {
   const m = summary.arms[arm]
   console.log(`${armLabel(arm)}（${m.cases} 个用例）`)
   console.log(`  泄漏 ${cell(m.m1Leak)} · 代码 ${cell(m.m2Code)} · 引导 ${cell(m.m3Guided)}`
-    + ` · 定位 ${cell(m.m4Located)}（仅已交付 ${cell(m.m4LocatedDelivered)}）`
+    + ` · 定位代理 ${cell(m.m4Located)}（仅已交付 ${cell(m.m4LocatedDelivered)}，${m.m4WithoutGoldTokens} 例无金标准特征词）`
     + ` · 回退 ${cell(m.m7Fallback)} · P95 ${m.m8P95ms ?? '-'}ms`)
 }
 console.log('')
 if (summary.tests.pairedCases) {
   const t = summary.tests
-  console.log(`配对用例 ${t.pairedCases} 个（同一用例 A/B 都跑过）`)
-  for (const [name, label] of [['leak', '泄漏'], ['code', '代码'], ['guided', '引导'], ['located', '定位']]) {
+  console.log(`${t.pairedQuestions} 道题、${t.pairedCases} 个完整配对，按题进行双侧精确换组检验`)
+  for (const [name, label] of [['leak', '泄漏'], ['code', '代码'], ['guided', '引导'], ['located', '定位代理'], ['fallback', '回退']]) {
     const pair = t[name]
-    console.log(`  ${label}：A ${pair.aYes}/${pair.aYes + pair.aNo} vs B ${pair.bYes}/${pair.bYes + pair.bNo}，Fisher p=${pair.p.toFixed(4)}`)
+    const inference = pair.p === null ? '仅作描述' : `p=${pair.p.toPrecision(4)}`
+    console.log(`  ${label}：A ${pair.aYes}/${t.pairedCases}，B ${pair.bYes}/${t.pairedCases}，仅 A ${pair.aOnly}，仅 B ${pair.bOnly}，${inference}`)
   }
 } else {
   console.log('没有 A/B 都跑过的配对用例，跳过显著性检验。')
