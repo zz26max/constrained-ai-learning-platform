@@ -16,10 +16,13 @@
  */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT, arg } from './experiment-http.mjs'
+import { ROOT, arg, has } from './experiment-http.mjs'
 
 const IN = arg('in', '')
 const OUT_DIR = arg('out', join(ROOT, '.cache/experiments/judge'))
+const SAMPLE = Number(arg('sample', '0')) || 0
+const MAX_CHARS = Number(arg('max-chars', '0')) || 0
+const MANUAL = arg('manual', '')
 const CORPUS_DIR = join(ROOT, 'docs/features/experiment-corpus')
 
 const CODE_FENCE = /```|~~~/
@@ -215,6 +218,105 @@ for (const entry of evaluated) {
   list.push(entry)
   byArm.set(entry.arm, list)
 }
+
+/** 固定种子的洗牌：等距抽样会落在固定相位上（40 条全是 A/direct），必须随机化。 */
+function seededShuffle(list, seed = 20261112) {
+  const array = [...list]
+  let state = seed >>> 0
+  const next = () => {
+    state ^= state << 13; state >>>= 0
+    state ^= state >>> 17
+    state ^= state << 5; state >>>= 0
+    return state
+  }
+  for (let index = array.length - 1; index > 0; index -= 1) {
+    const swap = next() % (index + 1)
+    const value = array[index]
+    array[index] = array[swap]
+    array[swap] = value
+  }
+  return array
+}
+
+/** 人工抽检样本：固定种子随机抽取，保证组别、问法与类别都被覆盖。 */
+function emitSample(size) {
+  const picked = seededShuffle(evaluated).slice(0, size)
+    .sort((left, right) => `${left.itemId}|${left.variant}|${left.arm}`
+      .localeCompare(`${right.itemId}|${right.variant}|${right.arm}`))
+  mkdirSync(OUT_DIR, { recursive: true })
+  const rows = picked.map(entry => ({
+    caseId: entry.caseId, arm: entry.arm, variant: entry.variant, itemId: entry.itemId,
+    excerpt: entry.tokensGold.join(' '),
+    proxy: { leak: entry.leak, guided: entry.guided, located: entry.located, fallback: entry.fallback },
+    text: entry.texts.join('\n'),
+  }))
+  writeFileSync(join(OUT_DIR, 'manual-sample.json'), `${JSON.stringify(rows, null, 2)}\n`, 'utf8')
+  const clip = value => (MAX_CHARS > 0 && value.length > MAX_CHARS
+    ? `${value.slice(0, MAX_CHARS)}\n…（已截断，原文 ${value.length} 字）`
+    : value)
+  const md = rows.map((row, index) => [
+    `## ${index + 1}. ${row.caseId} [${row.arm === 'a' ? 'A 直连' : 'B 受限'}]`,
+    `金标准线索：${row.excerpt || '(无)'}`,
+    `代理判定：泄漏=${row.proxy.leak} 引导=${row.proxy.guided} 定位=${row.proxy.located}`,
+    '',
+    clip(row.text),
+    '',
+  ].join('\n'))
+  writeFileSync(join(OUT_DIR, 'manual-sample.md'), md.join('\n'), 'utf8')
+  console.log(`人工抽检样本 ${rows.length} 条 → ${join(OUT_DIR, 'manual-sample.md').replace(ROOT + '/', '')}`)
+  console.log('逐条标注后写成 JSON 数组：[{caseId, arm, m1, m3, m4}]，再用 --manual 计算 κ。')
+}
+
+/** Cohen's κ：两个二分类标注者的一致性（扣除随机一致）。 */
+function kappa(pairs) {
+  const n = pairs.length
+  if (n === 0) return null
+  let both = 0
+  let first = 0
+  let second = 0
+  for (const [a, b] of pairs) {
+    if (a && b) both += 1
+    if (a) first += 1
+    if (b) second += 1
+  }
+  const observed = (both + (n - first - second + both)) / n
+  const pe = (first / n) * (second / n) + ((n - first) / n) * ((n - second) / n)
+  return pe === 1 ? 0 : (observed - pe) / (1 - pe)
+}
+
+function compareManual(path) {
+  const labels = JSON.parse(readFileSync(path, 'utf8'))
+  mkdirSync(OUT_DIR, { recursive: true })
+  const index = new Map()
+  for (const entry of evaluated) index.set(`${entry.caseId}|${entry.arm}`, entry)
+  const metrics = { leak: [], guided: [], located: [] }
+  let missing = 0
+  for (const label of labels) {
+    const entry = index.get(`${label.caseId}|${label.arm}`)
+    if (!entry) { missing += 1; continue }
+    metrics.leak.push([Boolean(label.m1), entry.leak])
+    metrics.guided.push([Boolean(label.m3), entry.guided])
+    metrics.located.push([Boolean(label.m4), entry.located])
+  }
+  const result = { sample: labels.length, matched: labels.length - missing, missing, kappa: {}, agreement: {} }
+  for (const [name, pairs] of Object.entries(metrics)) {
+    result.kappa[name] = kappa(pairs)
+    const agree = pairs.filter(([a, b]) => a === b).length
+    result.agreement[name] = pairs.length ? agree / pairs.length : null
+  }
+  writeFileSync(join(OUT_DIR, 'agreement.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+  console.log('人工抽检与代理规则的一致性：')
+  for (const name of ['leak', 'guided', 'located']) {
+    const value = result.kappa[name]
+    console.log(`  ${name.padEnd(8)} κ=${value === null ? '-' : value.toFixed(3)}  一致率=${(result.agreement[name] * 100).toFixed(1)}%`)
+  }
+  const weakest = Math.min(...Object.values(result.kappa).filter(value => value !== null))
+  if (weakest < 0.6) console.log('  提示：有指标 κ < 0.6，按协议第 6 节应改为全人工判定，代理值不得直接引用。')
+  return result
+}
+
+if (SAMPLE > 0) { emitSample(SAMPLE); process.exit(0) }
+if (MANUAL) compareManual(MANUAL)
 
 const metrics = arm => {
   const list = byArm.get(arm) ?? []
