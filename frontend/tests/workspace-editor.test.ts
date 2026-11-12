@@ -284,6 +284,23 @@ async function openTutor(page: VueWrapper): Promise<void> {
 }
 
 describe('工作区题面与实时求助', () => {
+  it('行号与语法预览随编辑和滚动同步，编辑器保留原文', async () => {
+    const page = await openWorkspace()
+    const editor = page.get<HTMLTextAreaElement>('textarea.workspace-editor')
+    const value = '<!-- 注释 -->\n<p>第一段</p>\n'
+    await editor.setValue(value)
+    expect(editor.element.value).toBe(value)
+    expect(page.get('.editor-lines').element.textContent).toBe('1\n2\n3')
+    expect(page.get('.editor-code').element.textContent).toBe(value)
+    expect(page.get('.editor-code [data-kind="tag"]').text()).toBe('<p>')
+    expect(page.get('.editor-highlight').attributes('aria-hidden')).toBe('true')
+    editor.element.scrollTop = 48
+    editor.element.scrollLeft = 16
+    await editor.trigger('scroll')
+    expect(page.get('.editor-lines').attributes('style')).toContain('translateY(-48px)')
+    expect(page.get('.editor-code').attributes('style')).toContain('translate(-16px, -48px)')
+  })
+
   it('左侧题面展示说明、要求与评分标准，右侧保留编辑器与运行入口', async () => {
     const page = await openWorkspace()
 

@@ -23,6 +23,7 @@ import { onTablistKeydown } from '../../components/tabs'
 import WebPreview from './WebPreview.vue'
 import TutoringPanel from '../tutoring/TutoringPanel.vue'
 import { indent, newline, outdent, type TextEdit } from './editor-text'
+import { highlightEditorSource } from './editor-syntax'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,6 +73,11 @@ const problemVisible = ref(true)
 const previewRef = ref<{ run: () => void } | null>(null)
 const outputRef = ref<HTMLElement | null>(null)
 const editorRef = ref<HTMLTextAreaElement | null>(null)
+const editorScroll = ref({ top: 0, left: 0 })
+function syncEditorScroll(event: Event): void {
+  const { scrollTop: top, scrollLeft: left } = event.target as HTMLTextAreaElement
+  editorScroll.value = { top, left }
+}
 
 // 保存目标固定为已加载工作区的作业，不随路由参数变化，避免旧编辑写入新作业。
 let editingAssignmentId = ''
@@ -123,6 +129,12 @@ watch(() => route.params.id, async () => {
 const currentFile = computed(() => {
   return query.data.value?.files.find(f => f.path === activeTab.value)
 })
+const editorContent = computed(() => fileContents.value[activeTab.value] ?? currentFile.value?.content ?? '')
+// Textareas normalize CR and CRLF when displaying a value. Match that display without changing the saved source.
+const editorDisplay = computed(() => editorContent.value.replace(/\r\n?/g, '\n'))
+const syntax = computed(() => highlightEditorSource(activeTab.value, editorDisplay.value))
+const lineCount = computed(() => editorDisplay.value.split('\n').length)
+const lineNumbers = computed(() => Array.from({ length: lineCount.value }, (_, index) => index + 1).join('\n'))
 
 const canSave = computed(() => {
   return query.data.value?.canSave ?? false
@@ -542,20 +554,31 @@ onBeforeUnmount(() => {
                 </button>
               </div>
 
-              <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined">
-                <textarea
-                  ref="editorRef"
-                  :value="fileContents[activeTab] ?? currentFile?.content ?? ''"
-                  :readonly="readOnly"
-                  :disabled="frozen"
-                  class="workspace-editor"
-                  :aria-label="activeTab"
-                  title="Tab 缩进，Shift+Tab 反缩进，Esc 后 Tab 可移出编辑器"
-                  rows="20"
-                  spellcheck="false"
-                  @keydown="onEditorKeydown"
-                  @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
-                />
+              <section class="editor" role="tabpanel" :aria-labelledby="activeTabIndex >= 0 ? `workspace-file-tab-${activeTabIndex}` : undefined"
+                :style="{ '--gutter-columns': String(lineCount).length }">
+                <div class="editor-gutter" aria-hidden="true">
+                  <div class="editor-lines" :style="{ transform: `translateY(${-editorScroll.top}px)` }">{{ lineNumbers }}</div>
+                </div>
+                <div class="editor-input" :class="{ 'has-syntax': syntax.length, 'is-readonly': readOnly, 'is-frozen': frozen }">
+                  <div v-if="syntax.length" class="editor-highlight" aria-hidden="true">
+                    <div class="editor-code" :style="{ transform: `translate(${-editorScroll.left}px, ${-editorScroll.top}px)` }"><span v-for="(token, index) in syntax" :key="index" :data-kind="token.kind">{{ token.text }}</span></div>
+                  </div>
+                  <textarea
+                    ref="editorRef"
+                    :value="editorContent"
+                    :readonly="readOnly"
+                    :disabled="frozen"
+                    class="workspace-editor"
+                    :aria-label="activeTab"
+                    title="Tab 缩进，Shift+Tab 反缩进，Esc 后 Tab 可移出编辑器"
+                    rows="20"
+                    wrap="off"
+                    spellcheck="false"
+                    @scroll="syncEditorScroll"
+                    @keydown="onEditorKeydown"
+                    @input="handleFileEdit(($event.target as HTMLTextAreaElement).value)"
+                  />
+                </div>
               </section>
 
               <section v-if="check.configured.value !== null || check.error.value" class="ws-check" aria-label="自动检查结果">
@@ -699,6 +722,57 @@ onBeforeUnmount(() => {
 .ws-head-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.editor {
+  display: grid;
+  grid-template-columns: calc(var(--gutter-columns) * 1ch + 1.25rem) minmax(0, 1fr);
+  font: 14px / 1.65 Consolas, 'Cascadia Code', monospace;
+  color: var(--ink);
+}
+.editor-gutter, .editor-input { position: relative; min-width: 0; overflow: hidden; }
+.editor-gutter { border-inline-end: 1px solid var(--line); background: var(--sunken); }
+.editor-lines, .editor-code, .workspace-editor {
+  box-sizing: border-box;
+  font: inherit;
+  font-variant-ligatures: none;
+  letter-spacing: normal;
+  white-space: pre;
+  tab-size: 2;
+}
+.editor-lines { position: absolute; inset-inline: 0; padding: 14px 7px; text-align: end; color: var(--muted); user-select: none; }
+.editor-input.is-readonly, .editor-input.is-frozen { background: var(--sunken); }
+.editor-highlight { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.editor-code { width: max-content; padding: 14px 16px; }
+.workspace-editor {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  caret-color: var(--ink);
+  overflow: auto;
+  resize: none;
+}
+.workspace-editor:focus-visible { outline: 2px solid var(--sr-brand, var(--blue)); outline-offset: -2px; }
+.workspace-editor[readonly] { cursor: default; }
+.workspace-editor:disabled { cursor: not-allowed; }
+.has-syntax .workspace-editor { color: transparent; }
+.has-syntax .workspace-editor::selection { color: transparent; background: #2467c23d; }
+.editor-code [data-kind='comment'] { color: var(--muted); }
+.editor-code [data-kind='tag'] { color: #075b86; }
+.editor-code [data-kind='keyword'] { color: #62379a; }
+.editor-code [data-kind='string'] { color: #17614d; }
+.editor-code [data-kind='number'] { color: #934716; }
+@media (forced-colors: active) {
+  .editor-highlight { display: none; }
+  .has-syntax .workspace-editor { color: CanvasText; caret-color: CanvasText; }
+  .has-syntax .workspace-editor::selection { color: HighlightText; background: Highlight; }
 }
 .ws-check {
   flex: 0 0 auto;
