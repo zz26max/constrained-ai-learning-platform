@@ -2,6 +2,7 @@ package com.learningplatform.common.api;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -225,6 +226,31 @@ class NoticeStatsHttpContractTest {
                 .andExpect(jsonPath("$.data.reviewedStudentCount").value(15))
                 .andExpect(jsonPath("$.data.commonIssues", hasSize(0)))
                 .andExpect(jsonPath("$.data.avgScore").doesNotExist());
+    }
+
+    @Test
+    void getAssignmentStatsRetainsPresentAndNullableKnowledgePointLinks() throws Exception {
+        Map<String, Object> timeRange = Map.of("from", T, "to", T);
+        Map<String, Object> withoutLink = new LinkedHashMap<>(Map.of(
+                "issueTag", "layout_overflow", "title", "布局溢出", "reportedStudentCount", 1,
+                "confirmedStudentCount", 0, "distinctStudentCount", 1, "description", "仅有学生自报",
+                "sources", List.of("student_help"), "timeRange", timeRange));
+        withoutLink.put("knowledgePointId", null);
+        withoutLink.put("knowledgePointTitle", null);
+        Map<String, Object> withLink = Map.of(
+                "issueTag", "box_model", "title", "盒模型", "reportedStudentCount", 0,
+                "confirmedStudentCount", 1, "distinctStudentCount", 1, "description", "教师评价已确认",
+                "sources", List.of("teacher_feedback"), "timeRange", timeRange,
+                "knowledgePointId", ID, "knowledgePointTitle", "盒模型");
+        when(stats.getAssignmentStats(anyString(), any()))
+                .thenReturn(new AssignmentStatsDTO(30, 20, 5, 15, List.of(withoutLink, withLink)));
+
+        mvc.perform(get("/api/v1/teacher/assignments/" + ID + "/stats", TEACHER_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.commonIssues[0].knowledgePointId").value(nullValue()))
+                .andExpect(jsonPath("$.data.commonIssues[0].knowledgePointTitle").value(nullValue()))
+                .andExpect(jsonPath("$.data.commonIssues[1].knowledgePointId").value(ID))
+                .andExpect(jsonPath("$.data.commonIssues[1].knowledgePointTitle").value("盒模型"));
     }
 
     @Test

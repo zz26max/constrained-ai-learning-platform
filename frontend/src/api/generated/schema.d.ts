@@ -1117,7 +1117,7 @@ export interface paths {
         };
         /**
          * getAssignmentStats
-         * @description 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues` 按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间，`knowledgePointId` 当前恒为 null。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues` 按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间。`knowledgePointId` 与 `knowledgePointTitle` 可来自同一份已发布教师评价中的标签与知识点评估共现，无共现证据时均为 null。业务规则以 DEVELOPMENT.md 为准。
          */
         get: operations["getAssignmentStats"];
         put?: never;
@@ -1746,6 +1746,7 @@ export interface components {
             termLabel: string;
             status: components["schemas"]["OfferingStatus"];
             progressUnit: components["schemas"]["ProgressUnit"];
+            /** @description 授课教师列表。个人课程没有授课教师时返回空数组。 */
             teachers: components["schemas"]["TeacherBrief"][];
         };
         ProgressDTO: {
@@ -1770,6 +1771,7 @@ export interface components {
             termId: components["schemas"]["UUID"];
             termLabel: string;
             status: components["schemas"]["OfferingStatus"];
+            /** @description 授课教师列表。个人课程没有授课教师时返回空数组。 */
             teachers: components["schemas"]["TeacherBrief"][];
             currentChapter: components["schemas"]["CurrentChapter"] | null;
             progress: components["schemas"]["ProgressDTO"];
@@ -2850,8 +2852,9 @@ export interface components {
             description: string;
             sources: ("student_help" | "teacher_feedback" | "checker")[];
             timeRange: components["schemas"]["TimeRange"];
+            /** @description 该标签与同一份已发布教师评价中的知识点评估共现时，返回关联知识点 ID。无共现证据时为 null。 */
             knowledgePointId: components["schemas"]["UUID"] | null;
-            /** @description 由同一份评价里的知识点评估推导；没有共现证据时为 null。 */
+            /** @description 与 knowledgePointId 对应的知识点标题。无共现证据时为 null。 */
             knowledgePointTitle: string | null;
         };
         AssignmentStatsDTO: {
@@ -3434,6 +3437,40 @@ export interface components {
          *           },
          *           "lastStudiedAt": "2026-10-02T01:20:00Z",
          *           "pendingAssignmentCount": 2,
+         *           "unreadFeedbackCount": 0
+         *         }
+         *       ],
+         *       "page": 1,
+         *       "pageSize": 20,
+         *       "total": 1
+         *     }
+         * @example {
+         *       "items": [
+         *         {
+         *           "offeringId": "00000000-0000-4000-8000-000000000210",
+         *           "courseId": "00000000-0000-4000-8000-000000000110",
+         *           "title": "Web 开发基础（个人学习）",
+         *           "mark": "WEB",
+         *           "groupName": "个人学习",
+         *           "termId": "00000000-0000-4000-8000-000000000010",
+         *           "termLabel": "个人学习学期",
+         *           "status": "active",
+         *           "teachers": [],
+         *           "currentChapter": {
+         *             "id": "00000000-0000-4000-8000-000000000310",
+         *             "number": 1,
+         *             "title": "HTML 基础"
+         *           },
+         *           "progress": {
+         *             "unit": "chapter",
+         *             "completed": 0,
+         *             "total": 5,
+         *             "percent": 0,
+         *             "notConfigured": false,
+         *             "asOf": "2026-11-12T02:00:00Z"
+         *           },
+         *           "lastStudiedAt": null,
+         *           "pendingAssignmentCount": 3,
          *           "unreadFeedbackCount": 0
          *         }
          *       ],
@@ -4080,6 +4117,21 @@ export interface components {
          *       },
          *       "requestId": "req-getOffering-1"
          *     }
+         * @example {
+         *       "data": {
+         *         "id": "00000000-0000-4000-8000-000000000210",
+         *         "courseId": "00000000-0000-4000-8000-000000000110",
+         *         "title": "Web 开发基础（个人学习）",
+         *         "mark": "WEB",
+         *         "groupName": "个人学习",
+         *         "termId": "00000000-0000-4000-8000-000000000010",
+         *         "termLabel": "个人学习学期",
+         *         "status": "active",
+         *         "progressUnit": "chapter",
+         *         "teachers": []
+         *       },
+         *       "requestId": "req-getOffering-personal"
+         *     }
          */
         Response_getOffering: {
             data: components["schemas"]["OfferingDTO"];
@@ -4689,6 +4741,54 @@ export interface components {
             data: components["schemas"]["OfferingKnowledgeMasteryDTO"];
             requestId: string;
         };
+        /**
+         * @example {
+         *       "data": {
+         *         "studentCount": 30,
+         *         "submittedStudentCount": 20,
+         *         "pendingReviewCount": 5,
+         *         "reviewedStudentCount": 15,
+         *         "commonIssues": [
+         *           {
+         *             "issueTag": "layout_overflow",
+         *             "title": "布局溢出",
+         *             "reportedStudentCount": 1,
+         *             "confirmedStudentCount": 0,
+         *             "distinctStudentCount": 1,
+         *             "description": "当前词表下学生自报与教师确认分别计数。",
+         *             "sources": [
+         *               "student_help"
+         *             ],
+         *             "timeRange": {
+         *               "from": "2026-10-12T03:00:00Z",
+         *               "to": "2026-10-12T03:00:00Z"
+         *             },
+         *             "knowledgePointId": null,
+         *             "knowledgePointTitle": null
+         *           },
+         *           {
+         *             "issueTag": "box_model",
+         *             "title": "盒模型",
+         *             "reportedStudentCount": 3,
+         *             "confirmedStudentCount": 2,
+         *             "distinctStudentCount": 4,
+         *             "description": "当前词表下学生自报与教师确认分别计数。",
+         *             "sources": [
+         *               "student_help",
+         *               "teacher_feedback"
+         *             ],
+         *             "timeRange": {
+         *               "from": "2026-10-12T03:00:00Z",
+         *               "to": "2026-10-13T03:00:00Z"
+         *             },
+         *             "knowledgePointId": "00000000-0000-4000-8000-000000000005",
+         *             "knowledgePointTitle": "盒模型"
+         *           }
+         *         ]
+         *       },
+         *       "requestId": "req-getAssignmentStats-1"
+         *     }
+         */
         Response_getAssignmentStats: {
             data: components["schemas"]["AssignmentStatsDTO"];
             requestId: string;

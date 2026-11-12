@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 个性化学习平台接口契约
-  version: 1.7.0
+  version: 1.7.1
   description: 设计基线 2026-10-11。实现状态以各 operation 的 x-implementation-status 为准，并由后端生产路由测试双向核对；本段不重复维护接口状态数量。
     x-contract-status：reviewed 表示静态契约审计，draft 表示尚未审定的草案，均不等于运行验收；implemented 不表示联调环境已部署。字段以此文件为唯一结构源；运行规则见 DEVELOPMENT.md，存储见 BACKEND.md。
 servers:
@@ -2644,7 +2644,7 @@ paths:
       operationId: getAssignmentStats
       summary: getAssignmentStats
       description: 权限：本班授课教师。请求约定：无。结果约定：200 `{studentCount,submittedStudentCount,pendingReviewCount,reviewedStudentCount,commonIssues}`；`commonIssues`
-        按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间，`knowledgePointId` 当前恒为 null。业务规则以 DEVELOPMENT.md 为准。
+        按本班当前问题标签词表版本汇总该作业的学生求助自报（`student_help`）与已发布教师评价确认（`teacher_feedback`），仅返回计数非零的标签并按词表顺序排列；两类计数分别按学生去重，`distinctStudentCount` 为并集，`timeRange` 取相关记录的最早与最晚时间。`knowledgePointId` 与 `knowledgePointTitle` 可来自同一份已发布教师评价中的标签与知识点评估共现，无共现证据时均为 null。业务规则以 DEVELOPMENT.md 为准。
       tags:
       - teacher
       x-phase: P1
@@ -3865,7 +3865,7 @@ components:
         teachers:
           type: array
           items: {$ref: '#/components/schemas/TeacherBrief'}
-          minItems: 1
+          description: 授课教师列表。个人课程没有授课教师时返回空数组。
       required:
       - id
       - courseId
@@ -3920,7 +3920,7 @@ components:
         teachers:
           type: array
           items: {$ref: '#/components/schemas/TeacherBrief'}
-          minItems: 1
+          description: 授课教师列表。个人课程没有授课教师时返回空数组。
         currentChapter:
           anyOf:
           - {$ref: '#/components/schemas/CurrentChapter'}
@@ -6106,11 +6106,12 @@ components:
           anyOf:
           - {$ref: '#/components/schemas/UUID'}
           - {type: 'null'}
+          description: 该标签与同一份已发布教师评价中的知识点评估共现时，返回关联知识点 ID。无共现证据时为 null。
         knowledgePointTitle:
           anyOf:
           - {type: string, maxLength: 200, minLength: 1}
           - {type: 'null'}
-          description: 由同一份评价里的知识点评估推导；没有共现证据时为 null。
+          description: 与 knowledgePointId 对应的知识点标题。无共现证据时为 null。
       required:
       - issueTag
       - title
@@ -7358,6 +7359,24 @@ components:
           progress: {unit: assignment, completed: 3, total: 5, percent: 60, notConfigured: false, asOf: '2026-10-02T02:00:00Z'}
           lastStudiedAt: '2026-10-02T01:20:00Z'
           pendingAssignmentCount: 2
+          unreadFeedbackCount: 0
+        page: 1
+        pageSize: 20
+        total: 1
+      - items:
+        - offeringId: 00000000-0000-4000-8000-000000000210
+          courseId: 00000000-0000-4000-8000-000000000110
+          title: Web 开发基础（个人学习）
+          mark: WEB
+          groupName: 个人学习
+          termId: 00000000-0000-4000-8000-000000000010
+          termLabel: 个人学习学期
+          status: active
+          teachers: []
+          currentChapter: {id: 00000000-0000-4000-8000-000000000310, number: 1, title: HTML 基础}
+          progress: {unit: chapter, completed: 0, total: 5, percent: 0, notConfigured: false, asOf: '2026-11-12T02:00:00Z'}
+          lastStudiedAt: null
+          pendingAssignmentCount: 3
           unreadFeedbackCount: 0
         page: 1
         pageSize: 20
@@ -8665,6 +8684,18 @@ components:
           id: 00000000-0000-4000-8000-000000000003
           progressUnit: assignment
         requestId: req-getOffering-1
+      - data:
+          id: 00000000-0000-4000-8000-000000000210
+          courseId: 00000000-0000-4000-8000-000000000110
+          title: Web 开发基础（个人学习）
+          mark: WEB
+          groupName: 个人学习
+          termId: 00000000-0000-4000-8000-000000000010
+          termLabel: 个人学习学期
+          status: active
+          progressUnit: chapter
+          teachers: []
+        requestId: req-getOffering-personal
       description: 教学班详情。
     Response_listChapters:
       type: object
@@ -9485,6 +9516,34 @@ components:
       required:
       - data
       - requestId
+      examples:
+      - data:
+          studentCount: 30
+          submittedStudentCount: 20
+          pendingReviewCount: 5
+          reviewedStudentCount: 15
+          commonIssues:
+          - issueTag: layout_overflow
+            title: 布局溢出
+            reportedStudentCount: 1
+            confirmedStudentCount: 0
+            distinctStudentCount: 1
+            description: 当前词表下学生自报与教师确认分别计数。
+            sources: [student_help]
+            timeRange: {from: '2026-10-12T03:00:00Z', to: '2026-10-12T03:00:00Z'}
+            knowledgePointId: null
+            knowledgePointTitle: null
+          - issueTag: box_model
+            title: 盒模型
+            reportedStudentCount: 3
+            confirmedStudentCount: 2
+            distinctStudentCount: 4
+            description: 当前词表下学生自报与教师确认分别计数。
+            sources: [student_help, teacher_feedback]
+            timeRange: {from: '2026-10-12T03:00:00Z', to: '2026-10-13T03:00:00Z'}
+            knowledgePointId: 00000000-0000-4000-8000-000000000005
+            knowledgePointTitle: 盒模型
+        requestId: req-getAssignmentStats-1
     Response_getStudentLearningRecords:
       type: object
       additionalProperties: false
@@ -10896,3 +10955,4 @@ x-change-log:
 - {version: 1.4.0, date: '2026-11-09', changes: ['受限式 AI 辅导新增课程资料检索（服务端按作业知识点与章节召回 resources），回复携带 citations（resourceId/title，最多 3 项）；固定模板回退与过期内容为空数组。', 'TutoringResult 与 TutoringMessageDTO 同时新增 citations 必填字段；学生消息为 []。']}
 - {version: 1.5.0, date: '2026-11-10', changes: ['CommonIssue 新增 knowledgePointTitle（可空）：按同一份评价中问题标签与知识点评估的共现推导关联知识点。', '无共现证据时 knowledgePointId 与 knowledgePointTitle 均为 null，行为兼容。']}
 - {version: 1.6.0, date: '2026-11-11', changes: ['RegisterWrite 新增可选 className：学校模式教师注册并创建班级时可自定义班名，省略或留空用「我的班级」；其他模式填写返回 422 VALIDATION_ERROR。']}
+- {version: 1.7.1, date: '2026-11-12', changes: ['OfferingDTO 与 CourseSummaryDTO 的 teachers 允许为空数组，与个人课程响应一致。', '修订 getAssignmentStats 对共现知识点的说明，保留无共现证据时两个字段均为 null 的现有行为。']}

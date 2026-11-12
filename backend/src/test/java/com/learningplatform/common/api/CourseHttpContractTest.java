@@ -176,6 +176,30 @@ class CourseHttpContractTest {
                 .andExpect(jsonPath("$.data").exists());
     }
 
+    @Test
+    void personalCourseRetainsEmptyTeachersArrayInSummaryAndDetail() throws Exception {
+        String personalTitle = "Web 开发基础（个人学习）";
+        String termLabel = "个人学习学期";
+        ProgressDTO progress = new ProgressDTO("chapter", 0, 5, 0, false,
+                Instant.parse("2026-11-12T02:00:00Z"));
+        CourseSummaryDTO summary = new CourseSummaryDTO(ID, COURSE, personalTitle, "WEB", "个人学习",
+                TERM, termLabel, "active", List.of(), null, progress, null, 3, 0);
+        OfferingDTO offering = new OfferingDTO(ID, COURSE, personalTitle, "WEB", "个人学习",
+                TERM, termLabel, "active", "chapter", List.of());
+        when(courses.listMyCourses(any(), nullable(String.class), nullable(String.class), anyInt(), anyInt()))
+                .thenReturn(new Page<>(List.of(summary), 1, 20, 1));
+        when(courses.getOffering(any(), anyString())).thenReturn(offering);
+
+        mvc.perform(request(HttpMethod.GET, "/api/v1/me/courses").cookie(new Cookie("lp_session", STUDENT_TOKEN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].teachers").isArray())
+                .andExpect(jsonPath("$.data.items[0].teachers").isEmpty());
+        mvc.perform(request(HttpMethod.GET, "/api/v1/offerings/" + ID).cookie(new Cookie("lp_session", STUDENT_TOKEN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.teachers").isArray())
+                .andExpect(jsonPath("$.data.teachers").isEmpty());
+    }
+
     @ParameterizedTest(name = "{0}") @MethodSource("operations")
     void anonymousRequestIsRejected(Operation op) throws Exception {
         MockHttpServletRequestBuilder builder = base(op);
