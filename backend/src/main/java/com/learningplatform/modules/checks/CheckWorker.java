@@ -49,7 +49,7 @@ public class CheckWorker {
         Map<String, Object> result = null;
         Map<String, Object> error = null;
         try {
-            result = runner.run(id, job.policy(), job.files());
+            result = CheckPolicy.titled(runner.run(id, job.policy(), job.files()), job.policy());
         } catch (CheckRunner.RunnerFailure e) {
             error = Map.of("code", e.code, "message", e.getMessage());
         } catch (RuntimeException e) {

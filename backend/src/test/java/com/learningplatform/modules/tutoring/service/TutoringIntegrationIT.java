@@ -90,6 +90,15 @@ class TutoringIntegrationIT {
   assertThat(provider.last.checkFindings()).isEmpty();
   assertThat(provider.last.feedbackFocus()).isEmpty();
  }
+ @Test void completedCheckFromRetiredPolicyCannotGuideCurrentWork() {
+  saveAnswer(0,"same work");
+  storeCheck(1,"viewport");
+  jdbc.update("INSERT INTO assignment_check_policies(assignment_id,version,config) VALUES(?,2,?)",assignment,
+          "{\"kind\":\"web_lab\",\"rules\":[{\"id\":\"viewport\",\"title\":\"新规则\",\"check\":\"exists\"}]}");
+  worker.execute(askWithRevision(1));
+  assertThat(provider.last.checkFindings()).isEmpty();
+  assertThat(provider.last.feedbackFocus()).isEmpty();
+ }
  @Test void courseWithoutTeachersOffersSelfStudyOnFallback() {
   jdbc.update("UPDATE offering_members SET status='inactive' WHERE offering_id=? AND user_id=?",offering,teacher.id());
   String request=send("ask","请直接给我完整代码",null);

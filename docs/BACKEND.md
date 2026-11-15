@@ -353,10 +353,10 @@ P2 不单独存 `knowledge_assessment/recommendation` 表。人数少时按有�
 | 表 | 主要字段 | 约束/说明 |
 | --- | --- | --- |
 | `assignment_check_policies` | `assignment_id, version, config` | 仅草稿可改；发布后冻结；类型改变时清除配置并递增版本 |
-| `assignment_checks` | `id, assignment_id, student_id, workspace_revision, checker_version, status, policy_snapshot, file_snapshot, result, error, lease_token, lease_until, created_at, completed_at` | 作业、学生与工作区版本唯一；终态清除快照及租约；student_id 由登录态取得 |
+| `assignment_checks` | `id, assignment_id, student_id, workspace_revision, policy_version, checker_version, status, policy_snapshot, file_snapshot, result, error, lease_token, lease_until, created_at, completed_at` | 作业、学生、工作区版本与规则版本唯一，终态清除执行快照和租约，student_id 由登录态取得 |
 | `check_queue_guard` | `id` | 入队额度判断串行化；不持锁执行学生代码 |
 
-学生只能对本人已保存的当前工作区版本创建检查，重复请求返回已有任务。后台执行把快照送到独立 runner；API 与业务数据库不执行学生代码。基础设施 `error` 不转换为学生 `fail`。
+学生只能对本人已保存的当前工作区版本创建检查，同一规则版本的重复请求返回已有任务。当前检查和 AI 诊断均按规则版本匹配，报告保存执行时的可公开规则标题。后台执行把快照送到独立 runner。基础设施错误以 `error` 记录。
 
 P3 将检查转为知识证据时需更新分析规则版本，并标注 source=checker、检查规则与可信度。不要在尚无检查服务时填充“通过检查”的种子事实。
 

@@ -35,15 +35,22 @@ public class CheckStore {
                 """, assignmentId, version, value);
     }
 
-    CheckView byRevision(String assignmentId, String studentId, int revision) {
+    CheckView byRevision(String assignmentId, String studentId, int revision, int policyVersion) {
         return jdbc.query("""
-                SELECT * FROM assignment_checks WHERE assignment_id=? AND student_id=? AND workspace_revision=?
-                """, (r, n) -> view(r), assignmentId, studentId, revision).stream().findFirst().orElse(null);
+                SELECT * FROM assignment_checks
+                WHERE assignment_id=? AND student_id=? AND workspace_revision=? AND policy_version=?
+                """, (r, n) -> view(r), assignmentId, studentId, revision, policyVersion)
+                .stream().findFirst().orElse(null);
     }
 
-    CheckView forStudent(String id, String studentId) {
-        return jdbc.query("SELECT * FROM assignment_checks WHERE id=? AND student_id=?",
-                (r, n) -> view(r), id, studentId).stream().findFirst().orElse(null);
+    StoredCheck forStudent(String id, String studentId) {
+        return jdbc.query("""
+                SELECT c.*, p.config FROM assignment_checks c
+                LEFT JOIN assignment_check_policies p
+                ON p.assignment_id=c.assignment_id AND p.version=c.policy_version
+                WHERE c.id=? AND c.student_id=?
+                """, (r, n) -> new StoredCheck(view(r), readMap(r.getString("config"))), id, studentId)
+                .stream().findFirst().orElse(null);
     }
 
     void lockQueue() {
@@ -57,14 +64,14 @@ public class CheckStore {
     }
 
     void enqueue(String id, String assignmentId, String studentId, int revision,
-                 Map<String, Object> policy, Map<String, String> files, Instant now) {
+                 Policy policy, Map<String, String> files, Instant now) {
         jdbc.update("""
                 INSERT INTO assignment_checks
-                    (id,assignment_id,student_id,workspace_revision,checker_version,status,
+                    (id,assignment_id,student_id,workspace_revision,policy_version,checker_version,status,
                      policy_snapshot,file_snapshot,created_at)
-                VALUES (?,?,?,?,'course-check-v1','queued',?,?,?)
-                """, id, assignmentId, studentId, revision,
-                json.writeValueAsString(policy), json.writeValueAsString(files), sqlTime(now));
+                VALUES (?,?,?,?,?,'course-check-v1','queued',?,?,?)
+                """, id, assignmentId, studentId, revision, policy.version(),
+                json.writeValueAsString(policy.config()), json.writeValueAsString(files), sqlTime(now));
     }
 
     List<String> queued() {
@@ -132,6 +139,7 @@ public class CheckStore {
     }
 
     public record Policy(int version, Map<String, Object> config) {}
+    record StoredCheck(CheckView view, Map<String, Object> currentConfig) {}
     public record CheckView(String id, String assignmentId, int workspaceRevision, String checkerVersion,
                             String status, Map<String, Object> result, Map<String, Object> error,
                             Instant createdAt, Instant completedAt) {}

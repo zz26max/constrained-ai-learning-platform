@@ -104,6 +104,45 @@ class CourseContentIntegrationIT {
     }
 
     @Test
+    void publicChapterListsOnlyItsPublishedAssignmentsInDeadlineAndIdOrder() {
+        OfferingDTO offering = offering();
+        var invite = service.createInvite(TEACHER, offering.id(), Map.of("expiresAt", NOW.plusSeconds(3600).toString()), "invite");
+        service.enroll(STUDENT, Map.of("inviteCode", invite.inviteCode()), "enroll");
+        var chapter = service.createChapter(TEACHER, offering.id(),
+                Map.of("number", 1, "title", "第一章", "summary", "摘要", "isRequired", true), "create");
+        service.publishChapter(TEACHER, chapter.id(), "publish");
+        String sql = """
+                INSERT INTO assignments (id,offering_id,chapter_id,title,description,estimated_minutes,type,status,
+                    is_required,due_at,allow_resubmit,max_attempts,max_score,content_version,published_at,
+                    created_by,created_at,updated_at)
+                VALUES (?,?,?,?,?,20,'text',?,1,?,0,1,100,?,?,?, ?,?)
+                """;
+        String firstId = "00000000-0000-4000-8000-000000000081";
+        String secondId = "00000000-0000-4000-8000-000000000082";
+        String lastId = "00000000-0000-4000-8000-000000000080";
+        jdbc.update(sql, lastId, offering.id(), chapter.id(), "第三题", "", "published",
+                ts(NOW.plusSeconds(7200)), 1, ts(NOW), TEACHER.id(), ts(NOW), ts(NOW));
+        jdbc.update(sql, secondId, offering.id(), chapter.id(), "第二题", "", "published",
+                ts(NOW.plusSeconds(3600)), 1, ts(NOW), TEACHER.id(), ts(NOW), ts(NOW));
+        jdbc.update(sql, firstId, offering.id(), chapter.id(), "第一题", "", "published",
+                ts(NOW.plusSeconds(3600)), 1, ts(NOW), TEACHER.id(), ts(NOW), ts(NOW));
+        jdbc.update(sql, UUID.randomUUID().toString(), offering.id(), chapter.id(), "草稿", "", "draft",
+                ts(NOW.plusSeconds(60)), 0, null, TEACHER.id(), ts(NOW), ts(NOW));
+        jdbc.update(sql, UUID.randomUUID().toString(), offering.id(), chapter.id(), "已归档", "", "archived",
+                ts(NOW.plusSeconds(60)), 1, ts(NOW), TEACHER.id(), ts(NOW), ts(NOW));
+        jdbc.update(sql, UUID.randomUUID().toString(), offering.id(), null, "未关联", "", "published",
+                ts(NOW.plusSeconds(60)), 1, ts(NOW), TEACHER.id(), ts(NOW), ts(NOW));
+
+        var details = service.getChapter(STUDENT, chapter.id());
+        assertThat(details.assignmentCount()).isEqualTo(3);
+        assertThat(details.assignments()).extracting(item -> item.id()).containsExactly(firstId, secondId, lastId);
+        assertThat(details.assignments()).allSatisfy(item -> assertThat(item.assignmentState()).isEqualTo("NOT_STARTED"));
+        assertThat(service.getChapter(TEACHER, chapter.id()).assignmentCount()).isEqualTo(3);
+        assertThatThrownBy(() -> service.getChapter(OUTSIDER, chapter.id()))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getCode()).isEqualTo("NOT_FOUND"));
+    }
+
+    @Test
     void draftIsHiddenUntilPublishAndPublishedPositionFreezes() {
         OfferingDTO offering = offering();
         InviteCreatedDTO invite = service.createInvite(TEACHER, offering.id(), Map.of("expiresAt", NOW.plusSeconds(3600).toString(), "maxUses", 1), "invite");

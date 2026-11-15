@@ -72,8 +72,8 @@ final class CheckPolicy {
     }
 
     /**
-     * 学生视角回填规则标题：结果快照只存 ruleId，标题按发布后已冻结的配置映射，
-     * 只补可读名称，不改判定结论，也不回显选择器与期望值。
+     * 按执行时的规则配置保存可公开的标题，也可为同一规则版本的旧结果回填标题。
+     * 判定结论保留原值，学生只看到可公开的结果字段。
      */
     static Map<String, Object> titled(Map<String, Object> result, Map<String, Object> config) {
         if (config == null || !(config.get("rules") instanceof List<?> rules)

@@ -67,23 +67,25 @@ public class CheckService {
     public Availability availability(UserDTO user, String assignmentId, int revision) {
         Assignment assignment = studentAssignment(user, assignmentId, false);
         if (revision < 0) throw AssignmentInput.invalid();
-        return new Availability(configured(assignment, store.policy(assignmentId)),
-                titled(revision == 0 ? null : store.byRevision(assignmentId, user.id(), revision)));
+        CheckStore.Policy policy = store.policy(assignmentId);
+        return new Availability(configured(assignment, policy), titled(
+                revision == 0 ? null : store.byRevision(assignmentId, user.id(), revision, policy.version()),
+                policy.config()));
     }
 
     public CheckStore.CheckView get(UserDTO user, String checkId) {
         CourseAccess.role(user, "student");
         AssignmentInput.uuid(checkId);
-        CheckStore.CheckView view = store.forStudent(checkId, user.id());
-        if (view == null) throw CourseAccess.notFound();
-        studentAssignment(user, view.assignmentId(), false);
-        return titled(view);
+        CheckStore.StoredCheck saved = store.forStudent(checkId, user.id());
+        if (saved == null) throw CourseAccess.notFound();
+        studentAssignment(user, saved.view().assignmentId(), false);
+        return titled(saved.view(), saved.currentConfig());
     }
 
-    /** 结果快照只存 ruleId；标题回填自已发布的判题配置，判定结论不变。 */
-    private CheckStore.CheckView titled(CheckStore.CheckView view) {
+    /** 历史结果缺少标题时，只能以同一版本的配置回填。 */
+    private static CheckStore.CheckView titled(CheckStore.CheckView view, Map<String, Object> config) {
         if (view == null || view.result() == null) return view;
-        Map<String, Object> result = CheckPolicy.titled(view.result(), store.policy(view.assignmentId()).config());
+        Map<String, Object> result = CheckPolicy.titled(view.result(), config);
         if (result == view.result()) return view;
         return new CheckStore.CheckView(view.id(), view.assignmentId(), view.workspaceRevision(),
                 view.checkerVersion(), view.status(), result, view.error(), view.createdAt(), view.completedAt());
@@ -95,14 +97,15 @@ public class CheckService {
                 !(body.get("workspaceRevision") instanceof Integer revision) || revision < 1)
             throw AssignmentInput.invalid();
         Assignment assignment = studentAssignment(user, assignmentId, false);
-        CheckStore.CheckView prior = store.byRevision(assignmentId, user.id(), revision);
+        CheckStore.CheckView prior = store.byRevision(assignmentId, user.id(), revision, store.policy(assignmentId).version());
         if (prior != null) return new Accepted(prior.id(), prior.status());
 
         access.lockOfferingShared(assignment.offeringId());
         assignments.lockAssignmentShared(assignmentId);
         assignment = studentAssignment(user, assignmentId, false);
         var workspace = assignments.findWorkspaceForUpdate(assignmentId, user.id());
-        prior = store.byRevision(assignmentId, user.id(), revision);
+        CheckStore.Policy policy = store.policy(assignmentId);
+        prior = store.byRevision(assignmentId, user.id(), revision, policy.version());
         if (prior != null) return new Accepted(prior.id(), prior.status());
 
         access.requireStudent(user, assignment.offeringId(), true);
@@ -112,7 +115,6 @@ public class CheckService {
         if (revision != currentRevision)
             throw new BusinessException(HttpStatus.CONFLICT, "WORKSPACE_CONFLICT", "工作区版本冲突，请刷新后重试。",
                     Map.of("currentRevision", currentRevision));
-        CheckStore.Policy policy = store.policy(assignmentId);
         if (!configured(assignment, policy)) throw conflict("CHECK_NOT_CONFIGURED", "该作业尚未配置自动判题。");
         if (!enabled) throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "自动判题服务暂不可用。");
         store.lockQueue();
@@ -122,7 +124,7 @@ public class CheckService {
         var files = new LinkedHashMap<String, String>();
         for (var file : assignments.getWorkspaceFiles(workspace.id())) files.put(file.filePath(), file.content());
         String id = UUID.randomUUID().toString();
-        store.enqueue(id, assignmentId, user.id(), revision, policy.config(), files, clock.instant());
+        store.enqueue(id, assignmentId, user.id(), revision, policy, files, clock.instant());
         return new Accepted(id, "queued");
     }
 

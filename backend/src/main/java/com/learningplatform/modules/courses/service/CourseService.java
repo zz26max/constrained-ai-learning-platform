@@ -8,7 +8,9 @@ import java.util.UUID;
 import com.learningplatform.common.audit.AuditService;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.modules.auth.dto.UserDTO;
+import com.learningplatform.modules.courses.dto.AssignmentDTOs.AssignmentSummaryDTO;
 import com.learningplatform.modules.courses.dto.CourseDTOs.*;
+import com.learningplatform.modules.courses.mapper.AssignmentMapper;
 import com.learningplatform.modules.courses.mapper.CourseMapper;
 import com.learningplatform.modules.courses.model.CourseRows;
 import com.learningplatform.modules.courses.model.CourseRows.*;
@@ -23,15 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CourseService {
     private final CourseMapper mapper;
+    private final AssignmentMapper assignments;
     private final CourseAccess access;
     private final CourseLearningQuery learning;
     private final InviteCodeCodec codes;
     private final OfferingArchiveGuard archiveGuard;
     private final AuditService audit;
     private final Clock clock;
-    public CourseService(CourseMapper mapper,CourseAccess access,CourseLearningQuery learning,InviteCodeCodec codes,
+    public CourseService(CourseMapper mapper,AssignmentMapper assignments,CourseAccess access,CourseLearningQuery learning,InviteCodeCodec codes,
             OfferingArchiveGuard archiveGuard,AuditService audit,Clock clock) {
-        this.mapper=mapper;this.access=access;this.learning=learning;this.codes=codes;
+        this.mapper=mapper;this.assignments=assignments;this.access=access;this.learning=learning;this.codes=codes;
         this.archiveGuard=archiveGuard;this.audit=audit;this.clock=clock;
     }
     public Page<BaseCourseDTO> listBaseCourses(UserDTO user,int page,int pageSize) {
@@ -183,9 +186,9 @@ public class CourseService {
 
     public ChapterDetailDTO getChapter(UserDTO u, String id) {
         var c = chapterOr404(id);
-        access.requireReader(u, c.offeringId());
+        var reader = access.requireReader(u, c.offeringId());
         if (!"published".equals(c.status())) throw CourseAccess.notFound();
-        return detail(c, u);
+        return detail(c, reader);
     }
 
     public ResourceDTO getResource(UserDTO u, String id) {
@@ -422,7 +425,24 @@ public class CourseService {
     private CourseRows.Chapter chapterOr404(String id){CourseInput.uuid(id);var c=mapper.chapter(id);if(c==null)throw CourseAccess.notFound();return c;}
     private ChapterSummaryDTO summary(CourseRows.Chapter c,String mid){return new ChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),progressView(mapper.chapterProgress(mid,c.id())),c.contentVersion(),mapper.resources(c.id(),true).size(),mapper.assignmentCountForChapter(c.id(),true));}
     private TeacherChapterSummaryDTO teacherSummary(CourseRows.Chapter c){return new TeacherChapterSummaryDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),mapper.resources(c.id(),false).size(),mapper.assignmentCountForChapter(c.id(),false));}
-    private ChapterDetailDTO detail(CourseRows.Chapter c,UserDTO u){var x=access.requireReader(u,c.offeringId());var p=mapper.chapterProgress(x.member().id(),c.id());var rs=mapper.resources(c.id(),true);return new ChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),p==null?new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress("not_started",null):progressView(p),c.contentVersion(),rs.size(),mapper.assignmentCountForChapter(c.id(),true),rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
+    private ChapterDetailDTO detail(CourseRows.Chapter chapter, CourseAccess.Context reader) {
+        var progress = mapper.chapterProgress(reader.member().id(), chapter.id());
+        var resources = mapper.resources(chapter.id(), true);
+        boolean student = "student".equals(reader.member().role());
+        List<AssignmentSummaryDTO> chapterAssignments = student
+                ? assignments.listPublishedChapterAssignments(reader.member().userId(), chapter.offeringId(),
+                        reader.offering().termId(), chapter.id(), now())
+                : List.of();
+        int assignmentCount = student ? chapterAssignments.size() : mapper.assignmentCountForChapter(chapter.id(), true);
+        return new ChapterDetailDTO(chapter.id(), chapter.offeringId(), chapter.position(), chapter.title(),
+                chapter.summary(), chapter.isRequired(), chapter.status(),
+                progress == null ? new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress("not_started", null)
+                        : progressView(progress),
+                chapter.contentVersion(), resources.size(), assignmentCount,
+                resources.stream().map(this::resourceView).toList(),
+                mapper.knowledgePoints(chapter.offeringId(), chapter.id()).stream().map(this::knowledgeView).toList(),
+                chapterAssignments);
+    }
     private TeacherChapterDetailDTO teacherDetail(CourseRows.Chapter c){var rs=mapper.resources(c.id(),false);return new TeacherChapterDetailDTO(c.id(),c.offeringId(),c.position(),c.title(),c.summary(),c.isRequired(),c.status(),null,c.contentVersion(),rs.size(),mapper.assignmentCountForChapter(c.id(),false),rs.stream().map(this::resourceView).toList(),mapper.knowledgePoints(c.offeringId(),c.id()).stream().map(this::knowledgeView).toList(),List.of());}
     private com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress progressView(CourseRows.ChapterProgress p){return p==null?null:new com.learningplatform.modules.courses.dto.CourseDTOs.ChapterProgress(p.status(),p.completedAt());}
     private ResourceDTO resourceView(CourseRows.Resource r){return new ResourceDTO(r.id(),r.offeringId(),r.chapterId(),r.knowledgePointId(),r.title(),"markdown",r.contentMarkdown(),null,r.position(),"archived".equals(r.status()));}

@@ -107,6 +107,13 @@ CAST(COALESCE(SUM(CASE WHEN t.assignment_state IN ('NOT_STARTED','IN_PROGRESS') 
 FROM (<include refid="studentAssignmentBase"/>) t
 </select>
 
+<select id="listPublishedChapterAssignments" resultType="com.learningplatform.modules.courses.dto.AssignmentDTOs$AssignmentSummaryDTO">
+SELECT <include refid="studentSummaryColumns"/>
+FROM (<include refid="studentAssignmentBase"/>) t
+WHERE t.chapter_id=#{chapterId} AND t.publication_state='published'
+ORDER BY t.due_at,t.id
+</select>
+
 <select id="getRequirements" resultType="com.learningplatform.modules.courses.model.AssignmentRows$AssignmentRequirement">
 SELECT assignment_id,requirement_index,requirement_text FROM assignment_requirements WHERE assignment_id=#{assignmentId} ORDER BY requirement_index
 </select>

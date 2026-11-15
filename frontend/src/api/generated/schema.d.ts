@@ -1474,13 +1474,13 @@ export interface paths {
         };
         /**
          * 获取本人指定作品版本的检查状态
-         * @description 已发布作业本人可读；归档历史可读。revision=0表示尚未保存，check=null。不返回教师规则或标准答案。
+         * @description 已发布作业本人可读，归档后仍可查。返回指定工作区版本采用当前有效规则的检查。未保存或没有对应检查时 check=null。旧规则的结果可按 checkId 读取。不返回教师规则或标准答案。
          */
         get: operations["getAssignmentCheck"];
         put?: never;
         /**
          * createCheck
-         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status}`；同一作业/学生/workspaceRevision已有检查返回原checkId与真实当前status（自然幂等）。未配置返回CHECK_NOT_CONFIGURED。业务规则以 DEVELOPMENT.md 为准。
+         * @description 权限：本班学生本人，需 CSRF。请求约定：`{workspaceRevision}`。结果约定：202 `{checkId,status}`。同一作业、学生、工作区版本及判题规则版本已有检查时，返回原 checkId 与实际状态（自然幂等）。未配置返回 CHECK_NOT_CONFIGURED。业务规则以 DEVELOPMENT.md 为准。
          */
         post: operations["createCheck"];
         delete?: never;
@@ -6238,7 +6238,7 @@ export interface components {
                 "application/json": components["schemas"]["Response_getHelpRequest"];
             };
         };
-        /** @description 202 `{checkId,status:'queued'}` */
+        /** @description 202 `{checkId,status}`，返回已入队或已有检查的实际状态。 */
         createCheck_202: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestID"];

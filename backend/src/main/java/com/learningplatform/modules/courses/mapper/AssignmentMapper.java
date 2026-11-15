@@ -24,6 +24,9 @@ public interface AssignmentMapper {
     List<AssignmentSummaryDTO> listStudentAssignments(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
             @Param("termId") String termId,@Param("filter") String filter,@Param("now") Instant now,
             @Param("offset") long offset,@Param("size") int size);
+    List<AssignmentSummaryDTO> listPublishedChapterAssignments(@Param("studentId") String studentId,
+            @Param("offeringId") String offeringId, @Param("termId") String termId,
+            @Param("chapterId") String chapterId, @Param("now") Instant now);
     /** 单个作业的学生个人视图（与列表同一派生状态）；draft 或非本班学生返回 null。offeringId/termId 传 null。 */
     AssignmentSummaryDTO findStudentAssignmentSummary(@Param("studentId") String studentId,@Param("offeringId") String offeringId,
             @Param("termId") String termId,@Param("assignmentId") String assignmentId,@Param("now") Instant now);

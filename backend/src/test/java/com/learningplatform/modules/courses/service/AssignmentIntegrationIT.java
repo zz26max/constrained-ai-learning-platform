@@ -248,6 +248,40 @@ class AssignmentIntegrationIT {
         return Map.of("baseVersion", baseVersion, "config", Map.of("kind", "web_lab", "rules", List.of(rule)));
     }
 
+    @Test
+    void policyCorrectionPreservesOldReportAndChecksTheSameSavedWorkAgain() {
+        OfferingDTO offering = createOffering();
+        enrollStudent(offering.id(), STUDENT);
+        String id = assignmentService.createAssignment(TEACHER, offering.id(), assignmentBody(), "create").id();
+        checks.savePolicy(TEACHER, id, checkPolicy(0));
+        assignmentService.publishAssignment(TEACHER, id, "publish");
+        saveCheckWorkspace(STUDENT, id, 0, "<h1>First</h1>");
+        var request = Map.<String, Object>of("workspaceRevision", 1);
+        var original = checks.create(STUDENT, id, request);
+        jdbc.update("""
+                UPDATE assignment_checks SET status='completed',completed_at=?,policy_snapshot=NULL,file_snapshot=NULL,
+                    result='{"passed":1,"total":1,"items":[{"ruleId":"heading","status":"pass","message":"通过"}],"output":"","truncated":false}'
+                WHERE id=?
+                """, ts(NOW), original.checkId());
+        jdbc.update("""
+                UPDATE assignment_check_policies
+                SET version=2,config=JSON_SET(config,'$.rules[0].expected','Second','$.rules[0].title','新标题')
+                WHERE assignment_id=?
+                """, id);
+
+        assertThat(checks.availability(STUDENT, id, 1)).isEqualTo(new CheckService.Availability(true, null));
+        var corrected = checks.create(STUDENT, id, request);
+        assertThat(corrected.checkId()).isNotEqualTo(original.checkId());
+        assertThat(checks.create(STUDENT, id, request)).isEqualTo(corrected);
+        assertThat(checks.availability(STUDENT, id, 1).check().id()).isEqualTo(corrected.checkId());
+        assertThat(checks.get(STUDENT, original.checkId()).result()).containsEntry("passed", 1);
+        assertThat(checks.get(STUDENT, original.checkId()).result().get("items").toString()).doesNotContain("新标题");
+        assertThat(jdbc.queryForObject("""
+                SELECT JSON_UNQUOTE(JSON_EXTRACT(policy_snapshot,'$.rules[0].expected'))
+                FROM assignment_checks WHERE id=? AND policy_version=2
+                """, String.class, corrected.checkId())).isEqualTo("Second");
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
     void checkPolicySaveAndPublishSerializeAcrossBothCommitOrders(boolean publishFirst) throws Exception {

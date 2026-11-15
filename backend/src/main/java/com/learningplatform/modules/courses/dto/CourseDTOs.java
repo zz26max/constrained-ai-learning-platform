@@ -28,7 +28,7 @@ public final class CourseDTOs {
     public record KnowledgePointDTO(String id,String offeringId,String chapterId,String title,String description,int order) {}
     public record ChapterDetailDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
             String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount,
-            List<ResourceDTO> resources,List<KnowledgePointDTO> knowledgePoints,List<Object> assignments) {}
+            List<ResourceDTO> resources,List<KnowledgePointDTO> knowledgePoints,List<AssignmentDTOs.AssignmentSummaryDTO> assignments) {}
     public record TeacherChapterSummaryDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
             String publicationState,ChapterProgress studentProgress,int contentVersion,int resourceCount,int assignmentCount) {}
     public record TeacherChapterDetailDTO(String id,String offeringId,int number,String title,String summary,boolean isRequired,
