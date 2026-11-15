@@ -10,6 +10,7 @@ import UiField from '../../components/ui/UiField.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { useTutoringPoll } from './use-tutoring-poll'
+import TutoringResourceDialog from './TutoringResourceDialog.vue'
 
 const props = withDefaults(defineProps<{
   assignmentId: string
@@ -17,6 +18,7 @@ const props = withDefaults(defineProps<{
   embedded?: boolean
   prepareWorkspace?: () => Promise<number | null>
   selectedCode?: () => string
+  resumeEditing?: (() => void) | undefined
 }>(), { embedded: false, prepareWorkspace: undefined })
 const auth = useAuthStore()
 
@@ -40,6 +42,27 @@ const messages = computed(() => messagesQuery.data.value?.items ?? [])
 
 const poll = useTutoringPoll()
 const pendingRequest = poll.request
+type Citation = TutoringMessageDTO['citations'][number]
+const activeCitation = shallowRef<Citation | null>(null)
+let citationTrigger: HTMLElement | null = null
+
+function openCitation(citation: Citation, event: MouseEvent): void {
+  citationTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  activeCitation.value = citation
+}
+
+function closeCitation(destination: 'tutoring' | 'editor'): void {
+  const trigger = citationTrigger
+  activeCitation.value = null
+  citationTrigger = null
+  if (destination === 'editor' && props.resumeEditing) props.resumeEditing()
+  else if (trigger?.isConnected) trigger.focus({ preventScroll: true })
+}
+
+watch([() => props.assignmentId, () => auth.identity?.id], () => {
+  activeCitation.value = null
+  citationTrigger = null
+}, { flush: 'sync' })
 
 const action = ref<'ask' | 'concept' | 'next_hint'>('ask')
 const content = ref('')
@@ -257,8 +280,7 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
           <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
 
           <section v-if="embedded && hasNoSessions" class="chat-empty">
-            <p>随时可以求助。</p>
-            <p class="meta">提问前会自动保存工作区，AI 只看到你这一版内容。</p>
+            <p>描述你卡住的地方，以及已经试过的办法。</p>
             <UiButton variant="primary" :disabled="creatingSession" @click="startSession">
               {{ creatingSession ? '正在创建…' : '开始求助' }}
             </UiButton>
@@ -272,9 +294,11 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                 </span>
                 <p v-if="message.content !== null" class="msg-text">{{ message.content }}</p>
                 <p v-else class="msg-text meta">内容已过保留期限，不可查看。</p>
-                <p v-if="message.role === 'assistant' && message.citations.length > 0" class="msg-cites">
-                  依据课程资料：<template v-for="(citation, index) in message.citations" :key="citation.resourceId"><template v-if="index > 0">；</template><RouterLink class="cite" :to="`/resource/${citation.resourceId}`">《{{ citation.title }}》</RouterLink></template>
-                </p>
+                <div v-if="message.role === 'assistant' && message.citations.length > 0" class="msg-cites">
+                  <span>参考讲义</span>
+                  <button v-for="citation in message.citations" :key="citation.resourceId" type="button" class="cite"
+                    aria-haspopup="dialog" @click="openCitation(citation, $event)">{{ citation.title }}</button>
+                </div>
                 <span v-if="message.role === 'student'" class="meta msg-time">{{ clock(message.createdAt) }}</span>
               </li>
               <li v-if="poll.state.value === 'polling'" class="msg assistant pending" aria-live="polite">
@@ -348,9 +372,35 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
       <RouterLink v-else-if="offering" class="quiet-link" :to="{ name: 'course', params: { offeringId: offering.id } }">查看课程讲义</RouterLink>
       <ApiState v-else-if="offeringQuery.status.value === 'error'" status="error" :error="offeringQuery.error.value" @retry="offeringQuery.load" />
     </div>
+    <TutoringResourceDialog v-if="activeCitation" :key="activeCitation.resourceId"
+      :resource-id="activeCitation.resourceId" :title="activeCitation.title" :offering-id="offeringId ?? offering?.id"
+      :can-resume-editing="Boolean(resumeEditing)" @close="closeCitation" />
   </div>
 </template>
 
 <style scoped>
 .tutor-follow-up:not(:empty) { margin: 0.75rem 0; }
+.msg-cites {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 10px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cite {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 4px 0;
+  border: 0;
+  color: var(--blue-text);
+  background: none;
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
 </style>

@@ -25,3 +25,10 @@ export function statusLabel(status: string): string {
 }
 
 export const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+
+/** 阅读界面已经显示资料标题时，省略 Markdown 正文中重复的标题。 */
+export function resourceBody(resource: { title: string; content: string }): string {
+  const heading = /^#{1,6}[ \t]+(.+)\r?\n+/.exec(resource.content)
+  if (!heading || heading[1]?.trim() !== resource.title.trim()) return resource.content
+  return resource.content.slice(heading[0].length)
+}

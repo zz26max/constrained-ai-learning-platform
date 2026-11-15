@@ -374,6 +374,10 @@ function closeTutor(): void {
   tutorOpen.value = false
 }
 
+function focusEditor(): void {
+  editorRef.value?.focus()
+}
+
 /** AI 求助前先把工作区落到服务端：后端按 revision 快照，提问才能带上最新代码。 */
 async function prepareWorkspaceForAi(): Promise<number> {
   if (frozen.value) throw new Error('正在提交作业，请稍后再求助。')
@@ -669,6 +673,7 @@ onBeforeUnmount(() => {
                     embedded
                     :prepare-workspace="prepareWorkspaceForAi"
                     :selected-code="selectedCodeForAi"
+                    :resume-editing="readOnly || frozen ? undefined : focusEditor"
                   />
                 </div>
                 <div class="ws-tutor-inline-foot">

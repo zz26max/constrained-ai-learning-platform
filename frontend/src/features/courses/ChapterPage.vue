@@ -9,7 +9,7 @@ import UiButton from '../../components/ui/UiButton.vue'
 import UiNotice from '../../components/ui/UiNotice.vue'
 import { usePageQuery } from './use-page-query'
 import { useCourseActions } from './use-course-actions'
-import { formatShortTime, isUuid, statusLabel } from './format'
+import { formatShortTime, isUuid, resourceBody, statusLabel } from './format'
 import { trackLearningEvent } from '../analytics/reporter'
 const route = useRoute(), api = coursesApi(), actions = useCourseActions()
 const confirmedProgress = shallowRef<ProgressDTO | null>(null)
@@ -44,11 +44,6 @@ async function confirmCompleted() {
     confirmedProgress.value = result.courseProgress
     data.chapter.studentProgress = result.studentProgress
   }
-}
-// 资料正文有时以同名 Markdown 标题开头；页面已渲染资料标题。
-function resourceBody(resource: { title: string; content: string }) {
-  const heading = resource.content.match(/^#{1,6}[ \t]+(.+)\r?\n+/)
-  return heading && heading[1]!.trim() === resource.title.trim() ? resource.content.slice(heading[0].length) : resource.content
 }
 function goToResource(id: string): void {
   const heading = document.getElementById('resource-' + id)

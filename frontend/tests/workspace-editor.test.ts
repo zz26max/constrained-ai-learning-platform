@@ -19,6 +19,8 @@ const ASSIGNMENT_B = '00000000-0000-4000-8000-000000000702'
 const CHECK_ID = '00000000-0000-4000-8000-000000000801'
 const TUTOR_SESSION = '00000000-0000-4000-8000-000000000901'
 const TUTOR_REQUEST = '00000000-0000-4000-8000-000000000902'
+const FIRST_RESOURCE = { resourceId: '00000000-0000-4000-8000-000000000411', title: '响应式布局' }
+const SECOND_RESOURCE = { resourceId: '00000000-0000-4000-8000-000000000412', title: '样式与盒模型' }
 
 let scripted: ScriptedTransport
 let wrapper: VueWrapper | undefined
@@ -399,6 +401,105 @@ describe('工作区题面与实时求助', () => {
     expect(body['content']).toContain(snippet)
     expect(body['content']).not.toContain('填充内容')
     expect(body['workspaceRevision']).toBeUndefined()
+  })
+})
+
+describe('在辅导中阅读引用讲义', () => {
+  const resourceDialog = '.tutoring-resource-dialog'
+
+  function withCitations(request: Parameters<ScriptHandler>[0]): ScriptedResponse {
+    if (request.operationId === 'listTutoringMessages') return okEnvelope({
+      items: [{
+        id: 'answer-1', role: 'assistant', mode: 'debug_hint', hintLevel: 1,
+        content: '先检查父容器的布局。', citations: [FIRST_RESOURCE, SECOND_RESOURCE],
+      }],
+      page: 1, pageSize: 50, total: 1,
+    })
+    return normalResponse(request)
+  }
+
+  function lecture(citation: typeof FIRST_RESOURCE) {
+    return okEnvelope({
+      id: citation.resourceId, offeringId: CHECK_ID, title: citation.title,
+      content: `## ${citation.title}\n\n检查容器宽度、边距和换行设置。`,
+    })
+  }
+
+  async function openFirstLecture(page: VueWrapper): Promise<void> {
+    const citation = page.get<HTMLButtonElement>('.msg-cites .cite:first-of-type')
+    citation.element.focus()
+    await citation.trigger('click')
+    await flushPromises()
+  }
+
+  it('讲义就地打开，返回辅导或继续编辑都保留问题草稿和代码选区', async () => {
+    scripted.setHandler(request => request.operationId === 'getResource' ? lecture(FIRST_RESOURCE) : withCitations(request))
+    const page = await openWorkspace()
+    const editor = page.get<HTMLTextAreaElement>('textarea.workspace-editor')
+    await openTutor(page)
+    expect(requestsOf('getResource')).toHaveLength(0)
+    const question = page.get<HTMLTextAreaElement>('.tutoring-panel textarea')
+    await question.setValue('还有一段没想明白，先留着问题。')
+    await editor.setValue('<p>还在编辑</p>')
+    editor.element.setSelectionRange(3, 8)
+    const routeBefore = router!.currentRoute.value.fullPath
+
+    await openFirstLecture(page)
+    const dialog = page.get(resourceDialog)
+    expect(dialog.attributes('open')).toBeDefined()
+    expect(dialog.get('h2').text()).toBe(FIRST_RESOURCE.title)
+    expect(dialog.get('.safe-markdown').text()).toBe('检查容器宽度、边距和换行设置。')
+    expect(router!.currentRoute.value.fullPath).toBe(routeBefore)
+    await dialog.get('button.secondary').trigger('click')
+    expect(page.find(resourceDialog).exists()).toBe(false)
+    expect(document.activeElement).toBe(page.get('.msg-cites .cite:first-of-type').element)
+
+    await openFirstLecture(page)
+    await page.get(`${resourceDialog} button.primary`).trigger('click')
+    expect(page.find(resourceDialog).exists()).toBe(false)
+    expect(document.activeElement).toBe(editor.element)
+    expect(editor.element.value).toBe('<p>还在编辑</p>')
+    expect([editor.element.selectionStart, editor.element.selectionEnd]).toEqual([3, 8])
+    expect(question.element.value).toBe('还有一段没想明白，先留着问题。')
+    expect(requestsOf('getWorkspace')).toHaveLength(1)
+    expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
+  })
+
+  it('关闭加载中的讲义后，迟到的响应不会覆盖随后打开的资料', async () => {
+    let completeFirst: ((response: ScriptedResponse) => void) | undefined
+    const pending = new Promise<ScriptedResponse>(resolve => { completeFirst = resolve })
+    scripted.setHandler(request => request.operationId === 'getResource'
+      ? (request.path.endsWith(FIRST_RESOURCE.resourceId) ? pending : lecture(SECOND_RESOURCE))
+      : withCitations(request))
+    const page = await openWorkspace()
+    await openTutor(page)
+    await openFirstLecture(page)
+    expect(page.get(`${resourceDialog} [role="status"]`).text()).toContain('正在加载')
+    await page.get(`${resourceDialog} button.secondary`).trigger('click')
+    await page.get('.msg-cites .cite:last-of-type').trigger('click')
+    await flushPromises()
+    completeFirst?.(lecture(FIRST_RESOURCE))
+    await flushPromises()
+    expect(page.get(`${resourceDialog} h2`).text()).toBe(SECOND_RESOURCE.title)
+    expect(page.get(resourceDialog).text()).not.toContain(FIRST_RESOURCE.title)
+  })
+
+  it('讲义服务失败时可就地重试，只读工作区显示返回辅导', async () => {
+    workspaceOverride = { canSave: false, saveBlockedReason: 'OFFERING_ARCHIVED' }
+    let available = false
+    scripted.setHandler(request => request.operationId === 'getResource'
+      ? (available ? lecture(FIRST_RESOURCE) : failEnvelope(503, 'SERVICE_UNAVAILABLE'))
+      : withCitations(request))
+    const page = await openWorkspace()
+    await openTutor(page)
+    await openFirstLecture(page)
+    const dialog = page.get(resourceDialog)
+    expect(dialog.get('[role="alert"]').text()).toContain('暂时无法完成请求')
+    expect(dialog.text()).not.toContain('继续编辑')
+    available = true
+    await dialog.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(dialog.get('.safe-markdown').text()).toContain('检查容器宽度')
   })
 })
 
