@@ -79,6 +79,6 @@ if ($backendReady) { Write-Host "后端  http://127.0.0.1:$BackendPort  ready" -
 if ($frontendReady) { Write-Host "前端  http://127.0.0.1:$FrontendPort  打开即可演示" -ForegroundColor Green } else { Write-Host '前端  未就绪，请看前端窗口日志' -ForegroundColor Red }
 Write-Host ''
 Write-Host '演示账号：student.demo / teacher.demo / admin.demo（口令在 backend/.env，不要贴在演示材料里）'
-Write-Host '个人模式入口：/register 选「个人自学」，注册后自动关联 Web 课程，含 2 份示例作业与 AI 辅导。'
+Write-Host '个人模式入口：/register 选「个人自学」，注册后自动关联 Web 课程，含练习自测与 AI 辅导。'
 Write-Host '停止：powershell -ExecutionPolicy Bypass -File scripts/Stop-Demo.ps1'
 if (-not ($backendReady -and $frontendReady)) { exit 1 }
