@@ -829,6 +829,47 @@ describe('P1-D 只读加载', () => {
   })
 })
 
+describe('教师评价的下一步', () => {
+  it.each([
+    { scenario: '匹配', tab: 'feedback', archived: false, source: FEEDBACK, fail: false, direct: true, requested: true },
+    { scenario: '来自其他评价', tab: 'feedback', archived: false, source: NOTICE, fail: false, direct: false, requested: true },
+    { scenario: '建议请求失败', tab: 'feedback', archived: false, source: FEEDBACK, fail: true, direct: false, requested: true },
+    { scenario: '只看作业要求', tab: 'req', archived: false, source: FEEDBACK, fail: false, direct: false, requested: false },
+    { scenario: '作业已归档', tab: 'feedback', archived: true, source: FEEDBACK, fail: false, direct: false, requested: false },
+  ])('$scenario 时只展示适合当前评价的入口', async ({ tab, archived, source, fail, direct, requested }) => {
+    const review = feedback(FEEDBACK, ASSIGNMENT, '作业')
+    scripted.setHandler(request => {
+      if (request.operationId === 'getAssignment') return okEnvelope(summary(ASSIGNMENT, {
+        publicationState: archived ? 'archived' : 'published', publishedFeedbackId: FEEDBACK,
+      }))
+      if (request.operationId === 'getSubmission') return okEnvelope({
+        id: review.submissionId, assignmentId: ASSIGNMENT, assignmentSnapshot: { rubric: [], knowledgePoints: [] },
+        files: [], reflection: '', attemptNumber: 1, workspaceRevision: 1, publishedFeedback: review,
+      })
+      if (request.operationId === 'getMyLearningRecords') return fail
+        ? failEnvelope(500, 'INTERNAL_ERROR', {}, 'req-recommendation')
+        : okEnvelope({
+          ...recordsFor(0),
+          nextRecommendation: {
+            title: '巩固盒模型', reason: '练习内外边距', sourceFeedbackId: source,
+            target: { type: 'assignment', id: ASSIGNMENT_2, offeringId: OFFERING },
+          },
+        })
+      return normalResponse(request)
+    })
+    const page = await open(`/student/assignments/${ASSIGNMENT}?feedbackId=${FEEDBACK}&tab=${tab}`)
+    expect(requestsOf('getMyLearningRecords')).toHaveLength(requested ? 1 : 0)
+    if (tab !== 'feedback') {
+      expect(page.find('#feedback-next-step').exists()).toBe(false)
+      return
+    }
+    expect(page.get('.feedback-view').text()).toContain('整体不错')
+    const entry = page.get('section[aria-labelledby="feedback-next-step"] a')
+    expect(entry.text()).toBe(direct ? '去练习' : '查看本班学习记录')
+    expect(entry.attributes('href')).toBe(direct ? `/student/assignments/${ASSIGNMENT_2}` : `/student/progress/${OFFERING}`)
+  })
+})
+
 describe('P1-D 归档与期限', () => {
   it('10a. 作业列表显示已归档与已逾期文字标签', async () => {
     const page = await open('/student/assignments?status=all')

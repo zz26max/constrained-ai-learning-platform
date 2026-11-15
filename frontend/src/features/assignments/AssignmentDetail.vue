@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type LocationQuery } from 'vue-router'
-import { assignmentsApi, coursesApi, tutoringApi } from '../../api'
+import { assignmentsApi, coursesApi, dashboardApi, tutoringApi } from '../../api'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
 import UiButton from '../../components/ui/UiButton.vue'
@@ -13,6 +13,7 @@ import { usePageQuery } from '../courses/use-page-query'
 import { formatShortTime } from '../courses/format'
 import { assignmentStateLabel, assignmentTypeLabel, dueInfo, isUuid } from './format'
 import { deadlineLabel } from './task-presentation'
+import { targetRoute } from '../notifications/target-route'
 
 const route = useRoute()
 const api = assignmentsApi()
@@ -112,6 +113,38 @@ const archived = computed(() => detail.value?.offeringStatus !== 'active' || det
 const snapshot = computed(() => feedbackQuery.data.value)
 const feedback = computed(() => feedbackQuery.data.value?.feedback ?? null)
 const historyTotal = computed(() => historyQuery.data.value?.total ?? 0)
+
+const viewedFeedback = computed(() => {
+  const review = feedback.value
+  const assignment = detail.value
+  if (tab.value !== 'feedback' || query.status.value !== 'success' || feedbackQuery.status.value !== 'success'
+    || !review || !assignment || review.status !== 'published' || assignment.id !== assignmentId.value
+    || !isUuid(assignment.offeringId)
+    || review.assignmentId !== assignment.id || review.offeringId !== assignment.offeringId) return null
+  return { id: review.id, offeringId: assignment.offeringId }
+})
+const recommendationSource = computed(() => archived.value ? null : viewedFeedback.value)
+const recommendationQuery = usePageQuery(async signal => {
+  const source = recommendationSource.value
+  if (!source) return null
+  const { data } = await dashboardApi().getMyLearningRecords(source.offeringId, { page: 1, pageSize: 1 }, { signal })
+  const recommendation = data.nextRecommendation
+  if (data.offeringId !== source.offeringId || recommendation?.sourceFeedbackId !== source.id) return null
+  const target = recommendation.target
+  if (!target || target.offeringId !== source.offeringId) return null
+  if (target.type === 'assignment' && target.id === assignmentId.value) return null
+  const label = target.type === 'assignment' ? '去练习'
+    : target.type === 'resource' ? '查看讲义'
+      : target.type === 'offering' && target.id === source.offeringId ? '查看课程' : null
+  const to = label ? targetRoute(target) : null
+  return to && typeof to !== 'string' ? { source, recommendation, label, to } : null
+})
+watch(recommendationSource, source => { if (source) void recommendationQuery.load() }, { flush: 'sync' })
+const nextStep = computed(() => {
+  const source = recommendationSource.value
+  const result = recommendationQuery.data.value
+  return recommendationQuery.status.value === 'success' && result && result.source === source ? result : null
+})
 
 const canStartWork = computed(() => {
   const data = detail.value
@@ -252,6 +285,15 @@ const attemptsText = computed(() => {
               <h2>还没有发布的评价</h2>
               <p>教师发布后，这里会显示得分、评语和知识点结论。</p>
             </div>
+            <section v-if="viewedFeedback" class="req-block" aria-labelledby="feedback-next-step">
+              <h2 id="feedback-next-step" class="section-label">下一步</h2>
+              <template v-if="nextStep">
+                <h3>{{ nextStep.recommendation.title }}</h3>
+                <p>{{ nextStep.recommendation.reason }}</p>
+                <RouterLink class="button primary" :to="nextStep.to">{{ nextStep.label }}</RouterLink>
+              </template>
+              <RouterLink v-else class="button secondary" :to="{ name: 'student-progress', params: { offeringId: viewedFeedback.offeringId } }">查看本班学习记录</RouterLink>
+            </section>
           </section>
         </div>
 

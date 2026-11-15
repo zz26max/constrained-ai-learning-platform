@@ -98,6 +98,14 @@ describe('P1-A 课程页面验收', () => {
     expect(scripted.requests.find(request => request.operationId === 'getChapter')?.path).toBe(`/api/v1/chapters/${P1A_IDS.chapterWeb}`)
   })
 
+  it('点击章内资料目录时聚焦资料标题，保留当前章节路由', async () => {
+    const path = `/course/${P1A_IDS.offeringWeb}/chapter/${P1A_IDS.chapterWeb}`
+    const { rendered, navigation } = await open(path)
+    await rendered.get('.mini-toc button').trigger('click')
+    expect(document.activeElement).toBe(rendered.get(`#resource-${P1A_IDS.resourceWeb}`).element)
+    expect(navigation.currentRoute.value.fullPath).toBe(path)
+  })
+
   it('资料直达URL恢复课程与章节上下文，返回入口包含两个完整UUID', async () => {
     const { rendered, navigation } = await open(`/resource/${P1A_IDS.resourceWeb}`)
     expect(navigation.currentRoute.value.name).toBe('resource')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { EChartsCoreOption } from 'echarts/core'
 import { statsApi } from '../../api'
@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/auth'
 import { formatTime } from '../courses/format'
 import { isUuid } from '../assignments/format'
 import UiChart from './analytics/UiChart.vue'
+import KnowledgePracticeStudents from './analytics/KnowledgePracticeStudents.vue'
 import {
   ACTIVITY_FIELDS, DISTRIBUTION_FIELDS, MASTERY_LABELS, MASTERY_ORDER,
   activityEventTotal, analyticsColors, escapeHtml, formatPercent, prefersReducedMotion,
@@ -27,6 +28,15 @@ const id = computed(() => {
   return typeof value === 'string' && isUuid(value) ? value : ''
 })
 const valid = computed(() => id.value !== '')
+const selectedPoint = ref<string | null>(null)
+
+function togglePracticeStudents(pointId: string): void {
+  selectedPoint.value = selectedPoint.value === pointId ? null : pointId
+}
+
+function closePracticeStudents(event: Event): void {
+  if (event.currentTarget instanceof HTMLDetailsElement && !event.currentTarget.open) selectedPoint.value = null
+}
 
 const { data: activityData, status: activityStatus, error: activityError, load: loadActivity } = usePageQuery(async signal => {
   if (!valid.value) throw new Error('链接无效')
@@ -38,11 +48,13 @@ const { data: masteryData, status: masteryStatus, error: masteryError, load: loa
 })
 
 watch(id, () => {
+  selectedPoint.value = null
   if (!valid.value) return
   void loadActivity()
   void loadMastery()
 }, { immediate: true })
 watch(() => auth.identity?.id, () => {
+  selectedPoint.value = null
   if (!valid.value) return
   void loadActivity()
   void loadMastery()
@@ -270,7 +282,7 @@ const masteryOption = computed<EChartsCoreOption>(() => {
             </ul>
             <p class="analytics-summary">{{ masterySummary }}</p>
             <UiChart :option="masteryOption" :label="masteryLabel" :height="masteryHeight" />
-            <details class="mastery-details">
+            <details class="mastery-details" @toggle="closePracticeStudents">
               <summary>各知识点明细（{{ masteryItems.length }} 个）</summary>
               <ul>
                 <li v-for="item in masteryItems" :key="item.knowledgePointId">
@@ -278,6 +290,15 @@ const masteryOption = computed<EChartsCoreOption>(() => {
                   <span v-for="segment in MASTERY_ORDER" :key="segment">
                     {{ MASTERY_LABELS[segment] }} {{ item.distribution[DISTRIBUTION_FIELDS[segment]] }}
                   </span>
+                  <template v-if="item.distribution.needsPractice > 0">
+                    <button type="button" class="button secondary" :aria-expanded="selectedPoint === item.knowledgePointId"
+                      :aria-label="`${item.title}：${selectedPoint === item.knowledgePointId ? '收起学生列表' : '查看需要练习的学生'}`"
+                      @click="togglePracticeStudents(item.knowledgePointId)">
+                      {{ selectedPoint === item.knowledgePointId ? '收起学生列表' : '查看需要练习的学生' }}
+                    </button>
+                    <KnowledgePracticeStudents v-if="selectedPoint === item.knowledgePointId" :key="id + item.knowledgePointId"
+                      :offering-id="id" :knowledge-point-id="item.knowledgePointId" :title="item.title" />
+                  </template>
                 </li>
               </ul>
             </details>

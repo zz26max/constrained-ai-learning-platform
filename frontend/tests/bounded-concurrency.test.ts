@@ -78,16 +78,17 @@ const dashboardFixture = {
 }
 
 const courseFixture = {
-  items: [{ offeringId: OFFERING, title: '课程 A', groupName: '1 班', status: 'active', currentChapter: null, teachers: [], lastStudiedAt: null }],
+  items: [{ offeringId: OFFERING, title: '课程 A', groupName: '1 班', status: 'active', currentChapter: null, teachers: [{ id: uuid(9), displayName: '授课教师' }], lastStudiedAt: null }],
   page: 1, pageSize: 100, total: 1,
 }
 
-async function open(path: string): Promise<VueWrapper> {
+async function open(path: string, serverChecks = false): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAuthStore().$patch({
     phase: 'authenticated', bootStatus: 'success', csrfToken: 'csrf-student',
-    identity: { ...DEMO_USER, roles: ['student'] }, config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms] },
+    identity: { ...DEMO_USER, roles: ['student'] },
+    config: { ...DEMO_CONFIG, terms: [...DEMO_CONFIG.terms], features: { ...DEMO_CONFIG.features, serverChecks } },
   })
   router = createAppRouter(createMemoryHistory())
   await router.push(path)
@@ -165,6 +166,42 @@ describe('F6 首页待办的有界并发与单项降级', () => {
     const alert = page.find('[role="alert"]')
     expect(alert.exists()).toBe(true)
     expect(alert.text()).toContain('重新登录')
+  })
+})
+
+describe('个人自学首页', () => {
+  it.each([false, true])('当前版本自测决定主操作，全部通过为 %s', async allPassed => {
+    const [first, sql, follow] = [uuid(2010), uuid(2011), uuid(2012)]
+    const tasks = [
+      summaryTask(first, '第一道 HTML'),
+      { ...summaryTask(sql, 'SQL 练习'), type: 'sql_text', chapterId: uuid(302) },
+      summaryTask(follow, 'HTML 迁移练习'),
+    ]
+    handler = request => {
+      switch (request.operationId) {
+        case 'getDashboard': return okEnvelope(dashboardFixture)
+        case 'listMyCourses': return okEnvelope({
+          ...courseFixture, items: [{ ...courseFixture.items[0], teachers: [], currentChapter: { id: CHAPTER } }],
+        })
+        case 'listMyAssignments': return okEnvelope({ ...taskList([first, sql, follow], '练习'), items: tasks })
+        case 'listChapters': return okEnvelope({ offeringId: OFFERING, items: [] })
+        case 'getWorkspace': return okEnvelope({ revision: 4 })
+        case 'getAssignmentCheck': {
+          const passed = allPassed || request.path.includes(first)
+          return okEnvelope({
+            configured: true,
+            check: passed ? { status: 'completed', result: { passed: 3, total: 3 }, completedAt: '2026-11-13T03:00:00Z' } : null,
+          })
+        }
+        default: return failEnvelope(404, 'NOT_FOUND')
+      }
+    }
+    const page = await open('/student/home', true)
+    const action = page.get('[data-home-action="primary"]')
+    expect(action.text()).toBe(allPassed ? '回课程继续学' : '做下一题')
+    expect(action.attributes('href')).toBe(allPassed ? `/course/${OFFERING}` : `/student/workspaces/${follow}`)
+    expect(page.text()).not.toContain('距离截止')
+    expect(counts.getAssignment ?? 0).toBe(0)
   })
 })
 

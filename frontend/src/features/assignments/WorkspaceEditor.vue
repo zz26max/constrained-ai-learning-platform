@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter, type RouteLocationNormalized } from 'vue-router'
 import { API_MODE } from '../../app/api-mode'
-import { assignmentsApi } from '../../api'
+import { assignmentsApi, coursesApi } from '../../api'
 import type { WorkspaceWrite } from '../../api/assignments'
 import ApiState from '../../components/ApiState.vue'
 import ActionNotice from '../../components/ActionNotice.vue'
@@ -24,6 +24,7 @@ import WebPreview from './WebPreview.vue'
 import TutoringPanel from '../tutoring/TutoringPanel.vue'
 import { indent, newline, outdent, type TextEdit } from './editor-text'
 import { highlightEditorSource } from './editor-syntax'
+import { isSelfStudyCourse, nextSelfStudyPractice, passedSelfCheck, useSelfStudyPractices } from './self-study-practices'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,6 +143,14 @@ const canSave = computed(() => {
 
 const detail = computed(() => assignmentQuery.data.value)
 const isWebLab = computed(() => detail.value?.type === 'web_lab')
+const offeringId = computed(() => detail.value?.id === assignmentId.value ? detail.value?.offeringId : undefined)
+const offeringQuery = usePageQuery(async signal => {
+  const id = offeringId.value
+  return id ? (await coursesApi().getOffering(id, { signal })).data : null
+})
+watch(offeringId, () => { void offeringQuery.load() }, { immediate: true })
+const selfStudy = computed(() => offeringQuery.status.value === 'success'
+  && offeringQuery.data.value?.id === offeringId.value && isSelfStudyCourse(offeringQuery.data.value))
 const requirements = computed(() => detail.value?.requirements ?? [])
 const rubric = computed(() => detail.value?.rubric ?? [])
 const typeLabel = computed(() => assignmentTypeLabel(detail.value?.type))
@@ -187,6 +196,13 @@ const frozen = computed(() => submitting.value || actions.pending.value || check
 const readOnly = computed(() => !canSave.value || auth.phase !== 'authenticated')
 const checkIsStale = computed(() => check.checkedRevision.value !== null
   && (hasUnsavedEdits.value || check.checkedRevision.value !== saveState.value.lastSavedRevision))
+const passedPracticeOffering = computed(() => selfStudy.value && canSave.value && !checkIsStale.value && passedSelfCheck(check.result.value)
+  ? offeringId.value : undefined)
+const practiceQuery = useSelfStudyPractices(() => passedPracticeOffering.value)
+const nextPractice = computed(() => canRunChecks.value
+  ? nextSelfStudyPractice(practiceQuery.practices.value, assignmentId.value) : undefined)
+const allPracticesPassed = computed(() => practiceQuery.practices.value.length > 0
+  && practiceQuery.passedCount.value === practiceQuery.practices.value.length)
 
 function startCheck(): void {
   if (!canRunChecks.value || !canSave.value || frozen.value || saveState.value.paused) return
@@ -448,7 +464,7 @@ onBeforeUnmount(() => {
         <UiButton v-if="isWebLab" variant="secondary" title="预览网页效果" @click="runPreview">运行</UiButton>
         <UiButton
           v-if="check.configured.value"
-          variant="secondary"
+          :variant="selfStudy ? 'primary' : 'secondary'"
           :disabled="!canRunChecks || !canSave || frozen || saveState.paused || check.running.value"
           @click="startCheck"
         >
@@ -465,7 +481,7 @@ onBeforeUnmount(() => {
           AI
         </UiButton>
         <UiButton
-          variant="primary"
+          :variant="selfStudy ? 'secondary' : 'primary'"
           :disabled="!canSubmit"
           @click="openSubmitDialog"
         >
@@ -596,7 +612,15 @@ onBeforeUnmount(() => {
                   <span v-if="canRunChecks && canSave">可重新检查当前作品。</span>
                 </UiNotice>
                 <template v-else-if="check.result.value?.result">
-                  <p role="status">通过 {{ check.result.value.result.passed }} / {{ check.result.value.result.total }} 项。正式成绩以教师评价为准。</p>
+                  <p role="status">通过 {{ check.result.value.result.passed }} / {{ check.result.value.result.total }} 项。{{ selfStudy ? '这是练习自测结果。' : '正式成绩以教师评价为准。' }}</p>
+                  <div v-if="passedPracticeOffering" class="ws-practice-next">
+                    <ApiState :status="practiceQuery.status.value" :error="practiceQuery.error.value" @retry="practiceQuery.load" />
+                    <RouterLink v-if="nextPractice" class="button primary" :to="{ name: 'student-workspace', params: { id: nextPractice.task.id } }">
+                      下一题 · {{ nextPractice.task.title }}
+                    </RouterLink>
+                    <RouterLink v-else-if="allPracticesPassed" class="button primary" :to="{ name: 'course', params: { offeringId: passedPracticeOffering } }">回课程继续学</RouterLink>
+                    <RouterLink :to="{ name: 'student-progress', params: { offeringId: passedPracticeOffering } }">查看自测记录</RouterLink>
+                  </div>
                   <ol class="ws-check-items">
                     <li v-for="(item, index) in check.result.value.result.items" :key="item.ruleId" :data-status="item.status">
                       <span class="ws-check-no">第 {{ index + 1 }} 项</span>
@@ -823,5 +847,11 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
   max-height: 12rem;
   overflow: auto;
+}
+.ws-practice-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
 }
 </style>

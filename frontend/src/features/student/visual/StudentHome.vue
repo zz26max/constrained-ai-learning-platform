@@ -9,6 +9,7 @@ import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { coursesApi } from '../../../api'
 import { useStudentHome } from '../../../features/dashboard/use-student-home'
 import { taskAction, deadlineLabel, canEnterWorkspace } from '../../../features/assignments/task-presentation'
+import { isSelfStudyCourse, nextSelfStudyPractice, useSelfStudyPractices } from '../../assignments/self-study-practices'
 import type { AssignmentDetailDTO } from '../../../api/assignments'
 import { formatTime } from '../../../features/courses/format'
 
@@ -19,8 +20,15 @@ import { chapterOverview } from '../../../features/dashboard/bplus-presentation'
 import { useAuthStore } from '../../../stores/auth'
 
 const auth = useAuthStore()
-const home = useStudentHome()
+const home = useStudentHome({ includeSelfStudy: false })
 const { query, tasksQuery, nextTask, recentTasks, TYPE_LABELS, excerpt } = home
+const selfStudyCourse = computed(() => tasksQuery.data.value?.classes.find(isSelfStudyCourse))
+const hasClassroom = computed(() => tasksQuery.data.value?.classes.some(course => !isSelfStudyCourse(course)))
+const checksEnabled = computed(() => auth.config?.features.serverChecks === true)
+const practiceQuery = useSelfStudyPractices(() => !nextTask.value ? selfStudyCourse.value?.offeringId : undefined)
+const { practices, passedCount, checking } = practiceQuery
+const nextPractice = computed(() => checksEnabled.value ? nextSelfStudyPractice(practices.value) : undefined)
+const allPracticesPassed = computed(() => practices.value.length > 0 && passedCount.value === practices.value.length)
 const now = useServerClock(computed(() => query.data.value?.serverTime))
 let boundaryRefreshPending = false
 watch(tasksQuery.status, status => {
@@ -43,10 +51,11 @@ function refreshOnReturn() {
   if (document.visibilityState !== 'visible') return
   if (query.status.value !== 'loading') void query.load()
   if (tasksQuery.status.value !== 'loading') void tasksQuery.load()
+  if (selfStudyCourse.value && !nextTask.value && practiceQuery.status.value !== 'loading') void practiceQuery.load()
 }
 onMounted(() => document.addEventListener('visibilitychange', refreshOnReturn))
 onUnmounted(() => document.removeEventListener('visibilitychange', refreshOnReturn))
-const selectedCourse = computed(() => tasksQuery.data.value?.classes[0])
+const selectedCourse = computed(() => selfStudyCourse.value ?? tasksQuery.data.value?.classes[0])
 const chaptersQuery = usePageQuery(async signal => {
   const id = selectedCourse.value?.offeringId
   if (!id) throw new Error('没有可读取章节的课程')
@@ -125,7 +134,7 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
 
     <div v-if="query.status.value === 'success' && query.data.value" class="home">
       <section class="home-sec" aria-labelledby="home-current-title">
-        <header class="sec-head"><h2 id="home-current-title">当前任务</h2></header>
+        <header class="sec-head"><h2 id="home-current-title">{{ !nextTask && selfStudyCourse ? '个人自学' : '当前任务' }}</h2></header>
         <section class="explore-focus" aria-labelledby="explore-focus-title">
           <ApiState :status="tasksQuery.status.value" :error="tasksQuery.error.value" @retry="tasksQuery.load" />
           <template v-if="tasksQuery.status.value === 'success'">
@@ -166,6 +175,27 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
               <p v-if="chaptersFailed" class="focus-unconfirmed">章节进度未能确认。<template v-if="chaptersQuery.error.value?.requestId">requestId: {{ chaptersQuery.error.value.requestId }}。 </template><UiButton variant="quiet" @click="chaptersQuery.load">重新加载</UiButton></p>
             </template>
 
+            <template v-else-if="selfStudyCourse">
+              <p class="explore-label">{{ selfStudyCourse.title }}</p>
+              <ApiState :status="practiceQuery.status.value" :error="practiceQuery.error.value" @retry="practiceQuery.load" />
+              <h2 id="explore-focus-title">{{ nextPractice?.task.title ?? (allPracticesPassed ? '已通过全部自测' : '继续课程学习') }}</h2>
+              <p v-if="practices.length" class="focus-course">自测已通过 {{ passedCount }} / {{ practices.length }} 项</p>
+              <p v-if="checking" class="focus-empty-text" role="status">
+                有自测正在运行。<UiButton variant="quiet" @click="practiceQuery.load">刷新结果</UiButton>
+              </p>
+              <p v-else-if="!checksEnabled && !allPracticesPassed" class="focus-empty-text">自动检查当前不可用，可以先阅读课程。</p>
+              <div class="focus-actions">
+                <RouterLink v-if="nextPractice" class="button primary" data-home-action="primary" :data-task-id="nextPractice.task.id" :to="{ name: 'student-workspace', params: { id: nextPractice.task.id } }">
+                  {{ passedCount ? '做下一题' : '去自测' }}
+                </RouterLink>
+                <RouterLink v-else class="button primary bplus-course-action" data-home-action="primary" :to="bplusCourseAction.to">
+                  {{ allPracticesPassed ? '回课程继续学' : bplusCourseAction.label }}
+                </RouterLink>
+                <RouterLink v-if="nextPractice?.task.chapterId" :to="{ name: 'chapter', params: { offeringId: selfStudyCourse.offeringId, chapterId: nextPractice.task.chapterId } }">查看本章</RouterLink>
+                <RouterLink :to="{ name: 'student-progress', params: { offeringId: selfStudyCourse.offeringId } }">学习记录</RouterLink>
+              </div>
+            </template>
+
             <template v-else>
               <h2 id="explore-focus-title">当前没有可提交的待办</h2>
               <p class="focus-empty-text">把时间留给课程学习。已截止任务与历史提交仍可查看。</p>
@@ -179,7 +209,7 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
         </section>
       </section>
 
-      <section class="home-sec" aria-labelledby="home-next-title">
+      <section v-if="!selfStudyCourse || hasClassroom" class="home-sec" aria-labelledby="home-next-title">
         <header class="sec-head"><h2 id="home-next-title">接下来</h2><RouterLink to="/student/assignments">全部</RouterLink></header>
         <div v-if="upcomingTasks.length" class="next-list">
           <RouterLink v-for="task in upcomingTasks" :key="task.id" class="next-row" :to="{ name: 'student-assignment', params: { id: task.id } }" :data-task-id="task.id" :data-tone="taskContentTone(task, task)">
@@ -193,7 +223,7 @@ function dueWeekdayTime(value: string) { return timeFormat.format(new Date(value
         <p v-else class="home-empty">近期没有新的截止。</p>
       </section>
 
-      <section class="home-sec" aria-labelledby="home-feedback-title">
+      <section v-if="!selfStudyCourse || hasClassroom || query.data.value.recentFeedback" class="home-sec" aria-labelledby="home-feedback-title">
         <header class="sec-head">
           <h2 id="home-feedback-title">最新评价</h2>
           <RouterLink v-if="query.data.value.recentFeedback" :to="{ name: 'student-progress', params: { offeringId: query.data.value.recentFeedback.offeringId } }">学习记录</RouterLink>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { assignmentsApi, coursesApi, dashboardApi } from '../../../api'
+import { coursesApi, dashboardApi } from '../../../api'
 import type { LearningRecordsDTO } from '../../../api/dashboard'
 import { allPages } from '../../../api/pagination'
 import ApiState from '../../../components/ApiState.vue'
@@ -11,8 +11,8 @@ import UiSelect from '../../../components/ui/UiSelect.vue'
 import { useAuthStore } from '../../../stores/auth'
 import { usePageQuery } from '../../../features/courses/use-page-query'
 import { formatTime } from '../../../features/courses/format'
-import { runBounded } from '../../../features/courses/worker-pool'
 import { isUuid } from '../../../features/assignments/format'
+import { isSelfStudyCourse, nextSelfStudyPractice, useSelfStudyPractices } from '../../assignments/self-study-practices'
 import { byRecentStudy } from '../../../features/assignments/task-presentation'
 import { targetRoute } from '../../../features/notifications/target-route'
 
@@ -54,35 +54,12 @@ const page = computed(() => {
 const offeringsQuery = usePageQuery(async signal => ({items:(await allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal)).sort(byRecentStudy)}))
 void offeringsQuery.load()
 const currentCourse = computed(() => offeringsQuery.data.value?.items.find(c => c.offeringId === rawId.value))
-const selfStudy = computed(() => currentCourse.value?.status === 'active' && currentCourse.value.teachers.length === 0)
+const selfStudy = computed(() => isSelfStudyCourse(currentCourse.value))
 const checksEnabled = computed(() => auth.config?.features.serverChecks === true)
 const selfStudyId = computed(() => selfStudy.value ? currentCourse.value?.offeringId : undefined)
-const practiceQuery = usePageQuery(async signal => {
-  const offeringId = selfStudyId.value
-  if (!offeringId) return []
-  const api = assignmentsApi()
-  const assignments = await allPages((page, pageSize, signal) => api.listMyAssignments({ offeringId, page, pageSize }, { signal }).then(r => r.data), signal)
-  const active = assignments.filter(task => task.publicationState === 'published' && task.type !== 'text')
-  return runBounded(active.map(task => async () => {
-    const { data: workspace } = await api.getWorkspace(task.id, { signal })
-    const { data: { configured, check } } = await api.getAssignmentCheck(task.id, workspace.revision, { signal })
-    return {
-      task,
-      configured,
-      passed: check?.status === 'completed' && check.result !== null && check.result.total > 0 && check.result.total === check.result.passed,
-      checkStatus: check?.status,
-    }
-  }), 3, signal)
-})
-watch(selfStudyId, id => { if (id) void practiceQuery.load() }, { immediate: true })
-const practices = computed(() => practiceQuery.status.value === 'success' ? (practiceQuery.data.value ?? []).filter(item => item.configured) : [])
-const checking = computed(() => practices.value.some(item => item.checkStatus === 'queued' || item.checkStatus === 'running'))
-const nextPractice = computed(() => {
-  if (!checksEnabled.value) return undefined
-  const last = practices.value.findLast(item => item.passed)
-  const incomplete = practices.value.filter(item => !item.passed && item.checkStatus !== 'queued' && item.checkStatus !== 'running')
-  return incomplete.find(item => last?.task.chapterId && item.task.chapterId === last.task.chapterId) ?? incomplete[0]
-})
+const practiceQuery = useSelfStudyPractices(() => selfStudyId.value)
+const { practices, checking, passedCount } = practiceQuery
+const nextPractice = computed(() => checksEnabled.value ? nextSelfStudyPractice(practices.value) : undefined)
 const selectedCourseId = computed(() => typeof rawId.value === 'string' ? rawId.value : '')
 const courseOptions = computed(() => [
   ...(selecting.value || !currentCourse.value ? [{ value: '', label: '选择课程' }] : []),
@@ -175,8 +152,8 @@ function chooseCourse(offeringId: string): void {
         <dl class="stats vx-results" aria-label="学习概览">
           <div><dt>{{ progressLabel }}</dt><dd><template v-if="courseProgress"><b>{{ courseProgress.completed }}</b>/{{ courseProgress.total }}</template><span v-else class="stat-note">未配置</span></dd></div>
           <template v-if="selfStudy">
-            <div><dt>已通过自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ practices.filter(item => item.passed).length }}</b><span v-else class="stat-note">待读取</span></dd></div>
-            <div><dt>待完成自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ practices.filter(item => !item.passed).length }}</b><span v-else class="stat-note">待读取</span></dd></div>
+            <div><dt>已通过自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ passedCount }}</b><span v-else class="stat-note">待读取</span></dd></div>
+            <div><dt>待完成自测</dt><dd><b v-if="practiceQuery.status.value === 'success'">{{ practices.length - passedCount }}</b><span v-else class="stat-note">待读取</span></dd></div>
           </template>
           <template v-else>
             <div><dt>已完成实验</dt><dd><b>{{ records.summary.completedLabCount ?? 0 }}</b><small>个</small></dd></div>
@@ -186,7 +163,7 @@ function chooseCourse(offeringId: string): void {
         </dl>
 
         <section v-if="selfStudy" class="col knowledge" aria-labelledby="practice-title">
-          <div class="col-head"><h2 id="practice-title">自测练习</h2><span v-if="practices.length" class="meta">{{ practices.filter(item => item.passed).length }} / {{ practices.length }} 项已通过</span></div>
+          <div class="col-head"><h2 id="practice-title">自测练习</h2><span v-if="practices.length" class="meta">{{ passedCount }} / {{ practices.length }} 项已通过</span></div>
           <ApiState :status="practiceQuery.status.value" :error="practiceQuery.error.value" @retry="practiceQuery.load" />
           <p v-if="practiceQuery.status.value === 'success' && !practices.length" class="col-empty">本课程暂未配置自动检查练习。</p>
           <p v-if="practices.length && !checksEnabled" class="col-empty">自动检查服务当前不可用。可以查看已有自测结果和课程讲义。</p>
@@ -198,7 +175,7 @@ function chooseCourse(offeringId: string): void {
           <ul v-if="practices.length" class="kp-list">
             <li v-for="item in practices" :key="item.task.id" class="kp">
               <RouterLink :to="{ name: 'student-workspace', params: { id: item.task.id } }">{{ item.task.title }}</RouterLink>
-              <span class="meta"> · {{ item.passed ? '已通过自测' : item.checkStatus === 'completed' ? '需要再练' : item.checkStatus === 'error' ? '检查未完成' : item.checkStatus ? '检查中' : '当前版本未检查' }}</span>
+              <span class="meta"> · {{ item.passed ? '已通过自测' : item.check?.status === 'completed' ? '需要再练' : item.check?.status === 'error' ? '检查未完成' : item.check ? '检查中' : '当前版本未检查' }}</span>
               <RouterLink v-if="item.task.chapterId" :to="{ name: 'chapter', params: { offeringId: item.task.offeringId, chapterId: item.task.chapterId } }"> · 查看章节</RouterLink>
             </li>
           </ul>

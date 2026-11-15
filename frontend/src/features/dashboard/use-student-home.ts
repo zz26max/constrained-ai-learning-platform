@@ -5,12 +5,13 @@ import { allPages } from '../../api/pagination'
 import type { AssignmentDetailDTO } from '../../api/assignments'
 import { ApiError } from '../../api/client'
 import { byDeadline, byRecentStudy } from '../assignments/task-presentation'
+import { isSelfStudyCourse } from '../assignments/self-study-practices'
 import { usePageQuery } from '../courses/use-page-query'
 import { runBounded } from '../courses/worker-pool'
 import { useOpenTarget } from '../notifications/use-open-target'
 import { useNotificationsStore } from '../../stores/notifications'
 
-export function useStudentHome() {
+export function useStudentHome(options: { includeSelfStudy?: boolean } = {}) {
 const route = useRoute()
 const api = dashboardApi()
 const target = useOpenTarget()
@@ -42,7 +43,10 @@ const tasksQuery=usePageQuery(async signal=>{
     allPages((page,pageSize,signal)=>tasksApi.listMyAssignments({filter:'todo',page,pageSize},{signal}).then(r=>r.data),signal),
     allPages((page,pageSize,signal)=>courses.listMyCourses({status:'all',page,pageSize},{signal}).then(r=>r.data),signal),
   ])
-  const candidates=tasks.filter(t=>t.publicationState!=='archived'&&t.offeringStatus!=='archived').sort(byDeadline)
+  const selfStudyIds = new Set(options.includeSelfStudy === false
+    ? classes.filter(isSelfStudyCourse).map(course => course.offeringId)
+    : [])
+  const candidates=tasks.filter(t=>t.publicationState!=='archived'&&t.offeringStatus!=='archived'&&!selfStudyIds.has(t.offeringId)).sort(byDeadline)
   const actionable: AssignmentDetailDTO[]=[]
   let unconfirmed=0
   await runBounded(candidates.map(task=>async()=>{

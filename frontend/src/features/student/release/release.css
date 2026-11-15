@@ -130,7 +130,7 @@
 .student-release .sr-chapter .res {margin:0 0 44px;scroll-margin-top:72px}
 .student-release .sr-chapter .res:last-of-type {margin-bottom:32px}
 .student-release .sr-chapter .res-head {display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:12px}
-.student-release .sr-chapter .res-head h2 {font-size:20px;font-weight:600;line-height:1.4;margin:0}
+.student-release .sr-chapter .res-head h2 {font-size:20px;font-weight:600;line-height:1.4;margin:0;scroll-margin-top:72px}
 .student-release .sr-chapter .res-head a {font-size:13px;color:var(--sr-brand);white-space:nowrap}
 .student-release .sr-chapter .chapter-empty {padding:36px 20px;text-align:center;border:1px dashed var(--sr-line-strong);border-radius:var(--sr-r-m);font-size:14px;color:var(--sr-muted)}
 .student-release .sr-chapter .read-progress {padding-top:20px;border-top:1px solid var(--sr-line)}
@@ -140,7 +140,8 @@
 .student-release .sr-chapter .side {display:grid;gap:24px;min-width:0}
 .student-release .sr-chapter .sec>h2 {font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--sr-muted);margin:0 0 6px}
 .student-release .sr-chapter .mini-toc {list-style:none;margin:0;padding:8px 0 0;display:grid;gap:2px;font-size:14px}
-.student-release .sr-chapter .mini-toc a {display:block;padding:6px 0;color:var(--sr-brand)}
+.student-release .sr-chapter .mini-toc button {display:block;padding:6px 0;color:var(--sr-brand);background:none;border:0;font:inherit;text-align:start;cursor:pointer}
+.student-release .sr-chapter .mini-toc button:hover {text-decoration:underline}
 .student-release .sr-chapter .rows {display:grid}
 .student-release .sr-chapter .row {display:flex;align-items:center;gap:14px;padding:12px 0;color:var(--sr-ink)}
 .student-release .sr-chapter .row:first-child {padding-top:6px}

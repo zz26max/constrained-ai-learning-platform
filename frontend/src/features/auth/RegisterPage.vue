@@ -371,7 +371,7 @@ async function submit(): Promise<void> {
           <!-- Step 3a: Personal Confirm -->
           <template v-else-if="step === 'personal-confirm'">
             <div class="confirm-box">
-              <p class="confirm-text">你选择了<strong>个人自学模式</strong>。注册后将自动关联默认 Web 课程（含 5 章讲义与 2 份自带检查规则的示例作业），可以立即「读讲义 → 做作业 → 检查 → 问 AI」。</p>
+              <p class="confirm-text">你选择了<strong>个人自学模式</strong>。注册后即可打开默认 Web 课程，阅读讲义、完成练习自测，并在卡住时向 AI 求助。</p>
             </div>
 
             <div class="button-group">
