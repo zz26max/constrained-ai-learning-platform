@@ -716,7 +716,7 @@
 
 @media (max-width:1199px) {
   .student-release .sr-tutoring .tutor-grid {grid-template-columns:minmax(0,1fr)}
-  .student-release .sr-tutoring .chat {max-height:none;overflow:visible}
+  .student-release .sr-tutoring .chat {max-height:min(50dvh,28rem)}
 }
 
 @media (max-width:760px) {

@@ -316,7 +316,7 @@ describe('工作区题面与实时求助', () => {
     expect(page.findAll('button').some(item => item.text() === '运行')).toBe(true)
   })
 
-  it('AI 求助侧边栏懒加载：点击前不请求辅导，关闭后卸载', async () => {
+  it('首次打开时加载 AI 求助，收起后保留提问草稿与附带选项', async () => {
     const page = await openWorkspace()
     expect(page.find('.ws-tutor-inline').exists()).toBe(false)
     expect(requestsOf('getAiPolicy')).toHaveLength(0)
@@ -327,8 +327,21 @@ describe('工作区题面与实时求助', () => {
     expect(requestsOf('getAiPolicy')).toHaveLength(1)
     expect(requestsOf('listTutoringSessions')).toHaveLength(1)
 
+    const question = page.get<HTMLTextAreaElement>('.composer textarea:first-of-type')
+    const attempt = page.findAll<HTMLTextAreaElement>('.composer textarea')[1]!
+    const attachment = page.get<HTMLInputElement>('.composer input[type="checkbox"]')
+    await question.setValue('还没发送的问题')
+    await attempt.setValue('已经检查过一列布局')
+    await attachment.setValue(true)
     await page.find('.ws-tutor-inline-close').trigger('click')
-    expect(page.find('.ws-tutor-inline').exists()).toBe(false)
+    expect(page.get('.ws-tutor-inline').isVisible()).toBe(false)
+    await openTutor(page)
+    expect(page.get('.ws-tutor-inline').isVisible()).toBe(true)
+    expect(question.element.value).toBe('还没发送的问题')
+    expect(attempt.element.value).toBe('已经检查过一列布局')
+    expect(attachment.element.checked).toBe(true)
+    expect(requestsOf('getAiPolicy')).toHaveLength(1)
+    expect(requestsOf('listTutoringSessions')).toHaveLength(1)
   })
 
   it('发送求助前先保存最新内容，并以保存后的 revision 请求 AI', async () => {
@@ -433,6 +446,7 @@ describe('在辅导中阅读引用讲义', () => {
   }
 
   it('讲义就地打开，返回辅导或继续编辑都保留问题草稿和代码选区', async () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
     scripted.setHandler(request => request.operationId === 'getResource' ? lecture(FIRST_RESOURCE) : withCitations(request))
     const page = await openWorkspace()
     const editor = page.get<HTMLTextAreaElement>('textarea.workspace-editor')
@@ -457,12 +471,34 @@ describe('在辅导中阅读引用讲义', () => {
     await openFirstLecture(page)
     await page.get(`${resourceDialog} button.primary`).trigger('click')
     expect(page.find(resourceDialog).exists()).toBe(false)
+    expect(page.get('.ws-tutor-inline').isVisible()).toBe(true)
     expect(document.activeElement).toBe(editor.element)
     expect(editor.element.value).toBe('<p>还在编辑</p>')
     expect([editor.element.selectionStart, editor.element.selectionEnd]).toEqual([3, 8])
     expect(question.element.value).toBe('还有一段没想明白，先留着问题。')
     expect(requestsOf('getWorkspace')).toHaveLength(1)
     expect(requestsOf('sendTutoringMessage')).toHaveLength(0)
+  })
+
+  it('窄屏继续编辑时收起底部辅导，重新打开后仍有未发送的草稿', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(max-width: 767px)' }) as MediaQueryList)
+    scripted.setHandler(request => request.operationId === 'getResource' ? lecture(FIRST_RESOURCE) : withCitations(request))
+    const page = await openWorkspace()
+    const editor = page.get<HTMLTextAreaElement>('textarea.workspace-editor')
+    await openTutor(page)
+    const question = page.get<HTMLTextAreaElement>('.composer textarea')
+    await question.setValue('暂存的窄屏提问')
+    editor.element.setSelectionRange(2, 5)
+
+    await openFirstLecture(page)
+    await page.get(`${resourceDialog} button.primary`).trigger('click')
+
+    expect(page.get('.ws-tutor-inline').isVisible()).toBe(false)
+    expect(document.activeElement).toBe(editor.element)
+    expect([editor.element.selectionStart, editor.element.selectionEnd]).toEqual([2, 5])
+    await openTutor(page)
+    expect(question.element.value).toBe('暂存的窄屏提问')
+    expect(requestsOf('getWorkspace')).toHaveLength(1)
   })
 
   it('关闭加载中的讲义后，迟到的响应不会覆盖随后打开的资料', async () => {

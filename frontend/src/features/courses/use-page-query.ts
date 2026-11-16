@@ -12,6 +12,13 @@ export function usePageQuery<T>(loader: (signal: AbortSignal) => Promise<T>) {
   let controller: AbortController | null = null
   const invalidate = () => { generation += 1; controller?.abort(); controller = null }
 
+  function clear(): void {
+    invalidate()
+    data.value = null
+    error.value = null
+    status.value = 'idle'
+  }
+
   async function load(): Promise<void> {
     invalidate()
     const current = generation, userId = auth.identity?.id
@@ -33,9 +40,7 @@ export function usePageQuery<T>(loader: (signal: AbortSignal) => Promise<T>) {
       status.value = 'error'
     }
   }
-  watch(() => auth.identity?.id, () => {
-    invalidate(); data.value = null; error.value = null; status.value = 'idle'
-  }, { flush: 'sync' })
+  watch(() => auth.identity?.id, clear, { flush: 'sync' })
   onScopeDispose(invalidate)
-  return { data, status, error, load }
+  return { data, status, error, load, clear }
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { assignmentsApi, coursesApi, tutoringApi } from '../../api'
-import type { TutoringMessageDTO, TutoringSessionDTO, TutoringWrite } from '../../api/tutoring'
+import type { TutoringMessageDTO, TutoringWrite } from '../../api/tutoring'
 import { ApiError } from '../../api/client'
 import ApiState from '../../components/ApiState.vue'
 import UiButton from '../../components/ui/UiButton.vue'
@@ -10,16 +10,18 @@ import UiField from '../../components/ui/UiField.vue'
 import { usePageQuery } from '../courses/use-page-query'
 import { useAuthStore } from '../../stores/auth'
 import { useTutoringPoll } from './use-tutoring-poll'
+import { useTutoringThread } from './use-tutoring-thread'
 import TutoringResourceDialog from './TutoringResourceDialog.vue'
 
 const props = withDefaults(defineProps<{
   assignmentId: string
   offeringId?: string
   embedded?: boolean
+  visible?: boolean
   prepareWorkspace?: () => Promise<number | null>
   selectedCode?: () => string
   resumeEditing?: (() => void) | undefined
-}>(), { embedded: false, prepareWorkspace: undefined })
+}>(), { embedded: false, visible: true, prepareWorkspace: undefined })
 const auth = useAuthStore()
 
 const policyQuery = usePageQuery(async signal => (await tutoringApi().getAiPolicy(props.assignmentId, { signal })).data)
@@ -29,19 +31,31 @@ const offeringQuery = usePageQuery(async signal => {
   const id = props.offeringId ?? (await assignmentsApi().getAssignment(props.assignmentId, { signal })).data.offeringId
   return (await coursesApi().getOffering(id, { signal })).data
 })
-watch(() => [props.assignmentId, props.offeringId, auth.identity?.id], () => { void offeringQuery.load() }, { immediate: true })
+watch(() => [props.assignmentId, props.offeringId, auth.identity?.id], () => {
+  if (auth.identity) void offeringQuery.load()
+}, { immediate: true })
 const offering = computed(() => offeringQuery.status.value === 'success' ? offeringQuery.data.value : null)
 const hasTeacher = computed(() => (offering.value?.teachers.length ?? 0) > 0)
 
-const activeSession = shallowRef<TutoringSessionDTO | null>(null)
-const messagesQuery = usePageQuery(async signal => {
-  if (activeSession.value === null) throw new Error('尚未选择辅导会话')
-  return (await tutoringApi().listTutoringMessages(activeSession.value.id, { pageSize: 50 }, { signal })).data
-})
-const messages = computed(() => messagesQuery.data.value?.items ?? [])
+const activeSessionId = ref<string | null>(null)
+const sessions = computed(() => sessionsQuery.data.value?.items.filter(session => session.assignmentId === props.assignmentId) ?? [])
+const thread = useTutoringThread(activeSessionId)
+const { messages } = thread
+const chat = ref<HTMLElement | null>(null)
 
 const poll = useTutoringPoll()
-const pendingRequest = poll.request
+const followedRequest = shallowRef<{ id: string; sessionId: string | null } | null>(null)
+const waitingHere = computed(() => poll.state.value === 'polling' && followedRequest.value?.sessionId === activeSessionId.value)
+const sendingSessionId = ref<string | null>(null)
+const sendingHere = computed(() => sendingSessionId.value !== null && sendingSessionId.value === activeSessionId.value)
+const creatingSession = ref(false)
+const sendingBlocked = computed(() => creatingSession.value || sendingSessionId.value !== null || poll.state.value === 'polling')
+const otherSessionActivity = computed(() => {
+  if (sendingSessionId.value !== null && !sendingHere.value) return '另一会话正在发送问题。'
+  if (poll.state.value === 'polling' && !waitingHere.value) return '这项作业还有一条 AI 请求，回复会出现在对应的会话。'
+  return ''
+})
+
 type Citation = TutoringMessageDTO['citations'][number]
 const activeCitation = shallowRef<Citation | null>(null)
 let citationTrigger: HTMLElement | null = null
@@ -59,124 +73,144 @@ function closeCitation(destination: 'tutoring' | 'editor'): void {
   else if (trigger?.isConnected) trigger.focus({ preventScroll: true })
 }
 
-watch([() => props.assignmentId, () => auth.identity?.id], () => {
-  activeCitation.value = null
-  citationTrigger = null
-}, { flush: 'sync' })
+interface Draft {
+  action: TutoringWrite['action']
+  content: string
+  attempt: string
+  includeWorkspace: boolean
+  error: string
+}
 
-const action = ref<'ask' | 'concept' | 'next_hint'>('ask')
-const content = ref('')
+const drafts = reactive(new Map<string, Draft>())
+const draft = computed(() => activeSessionId.value === null ? undefined : drafts.get(activeSessionId.value))
 const composerInput = ref<HTMLTextAreaElement | null>(null)
-const attempt = ref('')
-const includeWorkspace = ref(false)
-const sending = ref(false)
-const actionError = ref('')
-const creatingSession = ref(false)
+const sessionError = ref('')
 let generation = 0
 
-watch(() => props.assignmentId, () => {
-  generation += 1
-  activeSession.value = null
-  actionError.value = ''
-  void policyQuery.load()
-  void sessionsQuery.load()
-}, { immediate: true })
+function draftFor(sessionId: string): Draft {
+  if (!drafts.has(sessionId)) {
+    drafts.set(sessionId, { action: 'ask', content: '', attempt: '', includeWorkspace: false, error: '' })
+  }
+  return drafts.get(sessionId)!
+}
 
-watch(() => auth.identity?.id, (next, previous) => {
-  if (next !== previous) {
-    activeSession.value = null
-    poll.stop()
+watch([() => props.assignmentId, () => auth.identity?.id], () => {
+  generation += 1
+  activeSessionId.value = null
+  activeCitation.value = null
+  citationTrigger = null
+  drafts.clear()
+  sessionError.value = ''
+  creatingSession.value = false
+  sendingSessionId.value = null
+  followedRequest.value = null
+  poll.stop()
+  if (auth.identity) {
+    void policyQuery.load()
     void sessionsQuery.load()
   }
-})
+}, { immediate: true, flush: 'sync' })
 
 /** 会话列表加载后默认进入最近一个会话；存在遗留 pendingRequestId 时恢复轮询（FRONTEND §6）。 */
-watch(sessionsQuery.data, sessions => {
-  if (sessions === null || activeSession.value !== null) return
-  if (sessions.items.length > 0) selectSession(sessions.items[0]!)
+watch(sessions, items => {
+  const newest = items[0]
+  if (activeSessionId.value === null && newest) selectSession(newest.id)
+  if (poll.state.value !== 'idle' && poll.state.value !== 'done') return
+  const pending = items.find(item => item.pendingRequestId !== null && item.pendingRequestId !== followedRequest.value?.id)
+  if (pending?.pendingRequestId) followRequest(pending.pendingRequestId, pending.id)
 })
 
-function selectSession(session: TutoringSessionDTO): void {
-  if (activeSession.value?.id === session.id) return
-  activeSession.value = session
-  poll.stop()
-  void messagesQuery.load().then(() => {
-    const pending = activeSession.value?.pendingRequestId
-    if (pending !== null && pending !== undefined) poll.poll(pending)
-  })
+function selectSession(sessionId: string): void {
+  if (activeSessionId.value === sessionId) return
+  draftFor(sessionId)
+  activeCitation.value = null
+  citationTrigger = null
+  activeSessionId.value = sessionId
+}
+
+function followRequest(id: string, sessionId: string | null): void {
+  if (followedRequest.value?.id === id && poll.state.value === 'polling') return
+  followedRequest.value = { id, sessionId }
+  poll.poll(id)
+}
+
+function retryPolling(): void {
+  if (followedRequest.value) poll.poll(followedRequest.value.id)
 }
 
 async function startSession(): Promise<void> {
-  if (creatingSession.value || sending.value) return
-  const current = ++generation, userId = auth.identity?.id
+  if (creatingSession.value || sendingSessionId.value !== null) return
+  const current = generation
+  const selectedBefore = activeSessionId.value
   creatingSession.value = true
-  actionError.value = ''
+  sessionError.value = ''
   try {
     const token = await auth.ensureCsrfToken()
+    if (current !== generation) return
     const result = await tutoringApi().createTutoringSession({ assignmentId: props.assignmentId }, { csrfToken: token })
-    if (current !== generation || auth.identity?.id !== userId) return
+    if (current !== generation) return
     auth.markActionSucceeded()
-    await sessionsQuery.load()
-    const created = sessionsQuery.data.value?.items.find(item => item.id === result.data.id)
-    if (created !== undefined) selectSession(created)
+    if (activeSessionId.value === selectedBefore) selectSession(result.data.id)
+    void sessionsQuery.load()
   } catch (cause) {
-    if (current !== generation || auth.identity?.id !== userId) return
-    actionError.value = cause instanceof ApiError ? cause.message : '创建会话失败，请重试。'
+    if (current === generation) sessionError.value = cause instanceof ApiError ? cause.message : '创建会话失败，请重试。'
   } finally {
     if (current === generation) creatingSession.value = false
   }
 }
 
 async function send(): Promise<void> {
-  if (activeSession.value === null || sending.value || poll.state.value === 'polling') return
-  if (content.value.trim() === '') {
-    actionError.value = '请先写下你的问题。'
+  const sessionId = activeSessionId.value
+  const currentDraft = draft.value
+  if (sessionId === null || !currentDraft || sendingBlocked.value) return
+  if (currentDraft.content.trim() === '') {
+    currentDraft.error = '请先写下你的问题。'
     return
   }
-  const current = ++generation, userId = auth.identity?.id
-  sending.value = true
-  actionError.value = ''
+  const current = generation
+  const body: TutoringWrite = {
+    action: currentDraft.action,
+    content: currentDraft.content,
+    studentAttempt: currentDraft.attempt.trim() || null,
+  }
+  sendingSessionId.value = sessionId
+  currentDraft.error = ''
   try {
-    let workspaceRevision: number | null = null
-    if (includeWorkspace.value && props.prepareWorkspace) {
+    if (currentDraft.includeWorkspace && props.prepareWorkspace) {
       try {
-        workspaceRevision = await props.prepareWorkspace()
+        const workspaceRevision = await props.prepareWorkspace()
         if (workspaceRevision === null) throw new Error('工作区尚未保存。请先保存，或取消附带工作区。')
+        body.workspaceRevision = workspaceRevision
       }
       catch (cause) {
-        if (current === generation) actionError.value = cause instanceof Error ? cause.message : '最新修改尚未保存，暂不能请求 AI 辅导。'
+        if (current === generation) currentDraft.error = cause instanceof Error ? cause.message : '最新修改尚未保存，暂不能请求 AI 辅导。'
         return
       }
     }
-    if (current !== generation || auth.identity?.id !== userId) return
+    if (current !== generation) return
     const token = await auth.ensureCsrfToken()
-    const body: TutoringWrite = {
-      action: action.value,
-      content: content.value,
-      studentAttempt: attempt.value.trim() === '' ? null : attempt.value.trim(),
-      ...(workspaceRevision === null ? {} : { workspaceRevision }),
-    }
-    const result = await tutoringApi().sendTutoringMessage(activeSession.value.id, body, { csrfToken: token })
-    if (current !== generation || auth.identity?.id !== userId) return
+    if (current !== generation) return
+    const result = await tutoringApi().sendTutoringMessage(sessionId, body, { csrfToken: token })
+    if (current !== generation) return
     auth.markActionSucceeded()
-    content.value = ''
-    attempt.value = ''
-    includeWorkspace.value = false
-    await messagesQuery.load()
-    poll.poll(result.data.tutoringRequestId)
+    currentDraft.content = ''
+    currentDraft.attempt = ''
+    currentDraft.includeWorkspace = false
+    followRequest(result.data.tutoringRequestId, sessionId)
+    if (activeSessionId.value === sessionId) void thread.refresh()
   } catch (cause) {
-    if (current !== generation || auth.identity?.id !== userId) return
+    if (current !== generation) return
     if (cause instanceof ApiError && cause.code === 'AI_REQUEST_IN_PROGRESS') {
       const pending = readPendingRequestId(cause.errorDetails)
       if (pending !== null) {
-        actionError.value = '同一作业已有进行中的 AI 请求，正在改为等待它的结果。'
-        poll.poll(pending)
+        const owner = sessions.value.find(item => item.pendingRequestId === pending)
+        followRequest(pending, owner?.id ?? null)
         return
       }
     }
-    actionError.value = cause instanceof ApiError ? cause.message : '发送失败，请重试。'
+    currentDraft.error = cause instanceof ApiError ? cause.message : '发送失败，请重试。'
   } finally {
-    if (current === generation) sending.value = false
+    if (current === generation) sendingSessionId.value = null
   }
 }
 
@@ -188,20 +222,39 @@ function readPendingRequestId(details: unknown): string | null {
   return null
 }
 
-/** 终态落定后刷新消息与列表（pendingRequestId 清空、助手消息可见）。 */
-watch(() => poll.state.value, state => {
-  if (state === 'done') {
-    void messagesQuery.load()
-    void sessionsQuery.load()
+watch(poll.request, request => {
+  if (!request || request.id !== followedRequest.value?.id) return
+  // 409 只返回请求 ID。回复状态的归属以请求详情中的会话为准。
+  followedRequest.value = { id: request.id, sessionId: request.sessionId }
+  if (request.status === 'failed') {
+    draftFor(request.sessionId).error = request.error !== null
+      ? `请求失败（${request.error.code}）：${request.error.message}`
+      : '请求失败，请稍后重试。'
   }
 })
-watch(pendingRequest, request => {
-  if (request !== null && request.status === 'failed') {
-    actionError.value = request.error !== null ? `请求失败（${request.error.code}）：${request.error.message}` : '请求失败，请稍后重试。'
-  }
+watch(poll.state, state => {
+  if (state !== 'done') return
+  if (poll.request.value?.sessionId === activeSessionId.value) void thread.refresh()
+  void sessionsQuery.load()
 })
 
 onScopeDispose(() => { generation += 1 })
+
+watch([messages, chat, () => props.visible, waitingHere], ([current, container, visible], [previous, previousChat, wasVisible]) => {
+  if (!visible || !container) return
+  const top = container.scrollTop
+  const height = container.scrollHeight
+  const first = previous[0]
+  const prepended = first && current[0]?.id !== first.id && current.some(message => message.id === first.id)
+  const anchor = prepended ? container.querySelector('.thread > .msg:not(.pending)') : null
+  const anchorTop = anchor?.getBoundingClientRect().top
+  const followLatest = !wasVisible || previousChat !== container || previous.length === 0 || height - top - container.clientHeight < 32
+  void nextTick(() => {
+    if (chat.value !== container || messages.value !== current || !props.visible) return
+    if (anchor?.isConnected && anchorTop !== undefined) container.scrollTop += anchor.getBoundingClientRect().top - anchorTop
+    else if (followLatest) container.scrollTop = container.scrollHeight
+  })
+})
 
 const MODE_LABELS: Record<string, string> = {
   concept: '概念解释',
@@ -217,34 +270,36 @@ const QUICK_ASKS = [
   { label: '检查思路', action: 'ask', content: '请检查我的思路，指出遗漏或错误。' },
 ] as const
 function applyQuickAsk(preset: typeof QUICK_ASKS[number]): void {
-  action.value = preset.action
-  content.value = preset.content
+  if (!draft.value) return
+  draft.value.action = preset.action
+  draft.value.content = preset.content
   void nextTick(() => composerInput.value?.focus())
 }
 
 function insertSelectedCode(): void {
+  const current = draft.value
+  if (!current) return
   const selection = props.selectedCode?.()
   if (!selection?.trim()) {
-    actionError.value = '请先在编辑器里选中需要讨论的几行代码。'
+    current.error = '请先在编辑器里选中需要讨论的几行代码。'
     return
   }
-  const question = `${content.value.trimEnd()}\n\n选中的代码片段\n${selection}`.trimStart()
+  const question = `${current.content.trimEnd()}\n\n选中的代码片段\n${selection}`.trimStart()
   if (question.length > 4000) {
-    actionError.value = '问题和代码片段合计最多 4000 字符，请缩短选中的代码。'
+    current.error = '问题和代码片段合计最多 4000 字符，请缩短选中的代码。'
     return
   }
-  actionError.value = ''
-  includeWorkspace.value = false
-  content.value = question
+  current.error = ''
+  current.includeWorkspace = false
+  current.content = question
   void nextTick(() => composerInput.value?.focus())
 }
 const hasNoSessions = computed(() => sessionsQuery.status.value === 'success'
-  && activeSession.value === null && (sessionsQuery.data.value?.items.length ?? 0) === 0)
+  && activeSessionId.value === null && sessions.value.length === 0)
 
-/** 已到达的提示层级：安全模板不计层，与契约的 fallback 语义一致。 */
-const hintLevel = computed(() => Math.max(0, ...messages.value
-  .filter(message => message.role === 'assistant' && message.mode !== 'fallback')
-  .map(message => message.hintLevel ?? 0)))
+/** 仅统计当前加载的回复。历史页可能还未加载，安全模板不计入。 */
+const hintLevel = computed(() => messages.value.reduce((highest, message) =>
+  message.role === 'assistant' && message.mode !== 'fallback' ? Math.max(highest, message.hintLevel ?? 0) : highest, 0))
 const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
 </script>
 
@@ -259,25 +314,26 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
 
       <div v-else class="tutor-grid">
         <div class="chat-col">
-          <div v-if="!embedded || activeSession !== null" class="sessions">
+          <div v-if="!embedded || activeSessionId !== null" class="sessions">
             <div v-if="!embedded" class="session-btns" role="group" aria-label="辅导会话">
               <button
-                v-for="session in sessionsQuery.data.value?.items ?? []"
+                v-for="session in sessions"
                 :key="session.id"
                 type="button"
                 class="session-btn"
-                :aria-pressed="activeSession?.id === session.id"
-                @click="selectSession(session)"
+                :aria-pressed="activeSessionId === session.id"
+                @click="selectSession(session.id)"
               >
                 会话 · {{ new Date(session.createdAt).toLocaleDateString('zh-CN') }}
               </button>
             </div>
-            <UiButton variant="quiet" :disabled="creatingSession" @click="startSession">
+            <UiButton variant="quiet" :disabled="creatingSession || sendingSessionId !== null" @click="startSession">
               {{ creatingSession ? '正在创建…' : embedded ? '+ 新建求助' : '+ 新会话' }}
             </UiButton>
           </div>
 
           <ApiState v-if="sessionsQuery.status.value === 'error'" :status="sessionsQuery.status.value" :error="sessionsQuery.error.value" @retry="sessionsQuery.load" />
+          <p v-if="sessionError" class="field-error" role="alert">{{ sessionError }}</p>
 
           <section v-if="embedded && hasNoSessions" class="chat-empty">
             <p>描述你卡住的地方，以及已经试过的办法。</p>
@@ -286,8 +342,16 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
             </UiButton>
           </section>
 
-          <section v-if="activeSession !== null" class="chat" aria-label="辅导对话">
-            <ol v-if="messages.length > 0" class="thread">
+          <section v-if="activeSessionId !== null" ref="chat" class="chat" aria-label="辅导对话">
+            <UiButton v-if="thread.hasEarlier.value" variant="quiet" class="earlier-messages"
+              :disabled="thread.earlierStatus.value === 'loading'" @click="thread.loadEarlier">
+              {{ thread.earlierStatus.value === 'loading' ? '正在加载更早消息…' : '加载更早消息' }}
+            </UiButton>
+            <ApiState v-if="thread.earlierStatus.value === 'error'" :status="thread.earlierStatus.value"
+              :error="thread.earlierError.value" @retry="thread.loadEarlier" />
+            <ApiState v-if="thread.status.value === 'error' || (thread.status.value === 'loading' && messages.length === 0)"
+              :status="thread.status.value" :error="thread.error.value" @retry="thread.refresh" />
+            <ol v-if="messages.length > 0 || waitingHere" class="thread">
               <li v-for="message in messages" :key="message.id" :class="['msg', message.role]">
                 <span class="lv">
                   {{ message.role === 'student' ? '我' : 'AI 助教' }}<template v-if="message.role === 'assistant' && message.mode !== null"> · {{ MODE_LABELS[message.mode] ?? message.mode }}<template v-if="message.hintLevel !== null"> · 第 {{ message.hintLevel }} 级</template></template>
@@ -301,21 +365,26 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                 </div>
                 <span v-if="message.role === 'student'" class="meta msg-time">{{ clock(message.createdAt) }}</span>
               </li>
-              <li v-if="poll.state.value === 'polling'" class="msg assistant pending" aria-live="polite">
-                <span class="lv">AI 助教 · {{ pendingRequest?.status === 'running' ? '生成中' : '排队中' }}</span>
+              <li v-if="waitingHere" class="msg assistant pending" aria-live="polite">
+                <span class="lv">AI 助教 · {{ poll.request.value?.status === 'running' ? '生成中' : '排队中' }}</span>
                 <p class="msg-text meta" role="status">回复经过审核后才会显示。</p>
               </li>
             </ol>
-            <p v-else-if="poll.state.value !== 'polling'" class="chat-empty-text">
+            <p v-else-if="thread.status.value === 'success'" class="chat-empty-text">
               {{ embedded ? '选一个快捷提问，或直接描述你卡住的地方。' : '还没有提问。描述你遇到的问题，或请 AI 解释一个概念。' }}
             </p>
           </section>
+          <p v-if="otherSessionActivity" class="meta session-activity" role="status">{{ otherSessionActivity }}</p>
+          <div v-if="poll.state.value === 'error'" class="meta session-activity">
+            <span role="status">AI 请求状态暂时无法读取。</span>
+            <UiButton variant="quiet" @click="retryPolling">重试查询</UiButton>
+          </div>
 
-          <form v-if="activeSession !== null" class="composer" @submit.prevent="send">
-            <fieldset :disabled="sending || poll.state.value === 'polling'" class="composer-fields" aria-label="向 AI 助教提问">
+          <form v-if="draft" :key="activeSessionId ?? undefined" class="composer" @submit.prevent="send">
+            <fieldset :disabled="sendingHere || waitingHere" class="composer-fields" aria-label="向 AI 助教提问">
               <div v-if="!embedded" class="seg" role="radiogroup" aria-label="提问方式">
-                <label v-for="(label, key) in ACTION_LABELS" :key="key" class="seg-option" :aria-pressed="action === key">
-                  <input v-model="action" type="radio" :value="key" name="tutoring-action" />
+                <label v-for="(label, key) in ACTION_LABELS" :key="key" class="seg-option" :aria-pressed="draft.action === key">
+                  <input v-model="draft.action" type="radio" :value="key" name="tutoring-action" />
                   <span>{{ label }}</span>
                 </label>
               </div>
@@ -331,20 +400,20 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
                 </button>
               </div>
               <UiField label="你的问题" col>
-                <textarea ref="composerInput" v-model="content" rows="2" maxlength="4000" :disabled="poll.state.value === 'polling'" required placeholder="描述现象与具体疑问" />
+                <textarea ref="composerInput" v-model="draft.content" rows="2" maxlength="4000" required placeholder="描述现象与具体疑问" />
               </UiField>
               <UiField :label="`实际尝试（第 ${policy.requireAttemptFromLevel} 级起必填）`" col>
-                <textarea v-model="attempt" rows="2" maxlength="8000" :disabled="poll.state.value === 'polling'" placeholder="已经做过什么、结果如何" />
+                <textarea v-model="draft.attempt" rows="2" maxlength="8000" placeholder="已经做过什么、结果如何" />
               </UiField>
               <div v-if="prepareWorkspace" class="quick-asks">
-                <label><input v-model="includeWorkspace" type="checkbox" /> 附上当前工作区（最多 16 KiB）</label>
+                <label><input v-model="draft.includeWorkspace" type="checkbox" /> 附上当前工作区（最多 16 KiB）</label>
                 <UiButton v-if="selectedCode" type="button" variant="secondary" @click="insertSelectedCode">插入选中代码</UiButton>
               </div>
-              <p v-if="actionError" class="field-error" role="alert">{{ actionError }}</p>
+              <p v-if="draft.error" class="field-error" role="alert">{{ draft.error }}</p>
               <div class="composer-foot">
                 <span class="meta">提示最多 {{ policy.maxHintLevel }} 级</span>
-                <UiButton variant="primary" type="submit" :disabled="sending || poll.state.value === 'polling'">
-                  {{ poll.state.value === 'polling' ? '等待回复…' : sending ? '正在发送…' : '发送' }}
+                <UiButton variant="primary" type="submit" :disabled="sendingBlocked">
+                  {{ waitingHere ? '等待回复…' : sendingHere ? '正在发送…' : '发送' }}
                 </UiButton>
               </div>
             </fieldset>
@@ -356,7 +425,7 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
             <h2>本作业的辅导规则</h2>
             <p class="lead-sm">{{ policy.boundaryText }}</p>
             <dl class="facts">
-              <div><dt>当前层级</dt><dd><span class="levels"><i v-for="level in policy.maxHintLevel" :key="level" :class="{ on: level <= hintLevel }" /></span>第 {{ hintLevel }}/{{ policy.maxHintLevel }} 级</dd></div>
+              <div><dt>已显示最高层级</dt><dd><span class="levels"><i v-for="level in policy.maxHintLevel" :key="level" :class="{ on: level <= hintLevel }" /></span>第 {{ hintLevel }}/{{ policy.maxHintLevel }} 级</dd></div>
               <div><dt>完整答案</dt><dd>{{ policy.restrictCompleteSolution ? '不提供' : '可提供' }}</dd></div>
               <div><dt>代码块</dt><dd>{{ policy.allowCodeBlocks ? '允许' : '不生成' }}</dd></div>
               <div><dt>需附尝试</dt><dd>第 {{ policy.requireAttemptFromLevel }} 级起</dd></div>
@@ -380,6 +449,9 @@ const clock = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'A
 
 <style scoped>
 .tutor-follow-up:not(:empty) { margin: 0.75rem 0; }
+.chat { overflow-anchor: none; }
+.earlier-messages { display: flex; margin: 0 auto 8px; }
+.session-activity { margin: 4px 0; padding: 0 14px; }
 .msg-cites {
   display: flex;
   flex-wrap: wrap;

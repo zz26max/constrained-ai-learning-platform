@@ -20,6 +20,7 @@ export function useTutoringPoll() {
   const state = ref<PollState>('idle')
   let requestId: string | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
+  let inFlight: AbortController | null = null
   let delay = START_DELAY_MS
   let generation = 0
 
@@ -33,8 +34,10 @@ export function useTutoringPoll() {
   async function tick(): Promise<void> {
     if (requestId === null) return
     const current = ++generation
+    const controller = new AbortController()
+    inFlight = controller
     try {
-      const result = await tutoringApi().getTutoringRequest(requestId)
+      const result = await tutoringApi().getTutoringRequest(requestId, { signal: controller.signal })
       if (current !== generation) return
       request.value = result.data
       if (isTerminalStatus(result.data.status)) {
@@ -47,6 +50,8 @@ export function useTutoringPoll() {
       if (current !== generation) return
       state.value = 'error'
       clearTimer()
+    } finally {
+      if (inFlight === controller) inFlight = null
     }
   }
 
@@ -57,8 +62,7 @@ export function useTutoringPoll() {
   }
 
   function poll(id: string): void {
-    generation++
-    clearTimer()
+    stop()
     requestId = id
     delay = START_DELAY_MS
     state.value = 'polling'
@@ -68,7 +72,10 @@ export function useTutoringPoll() {
   function stop(): void {
     generation++
     clearTimer()
+    inFlight?.abort()
+    inFlight = null
     requestId = null
+    request.value = null
     state.value = 'idle'
   }
 

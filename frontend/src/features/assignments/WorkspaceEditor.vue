@@ -69,6 +69,7 @@ const confirmSubmit = ref(false)
 const submitting = ref(false)
 const submitFailure = ref<string | null>(null)
 const tutorOpen = ref(false)
+const tutorMounted = ref(false)
 const outputOpen = ref(false)
 const problemVisible = ref(true)
 const previewRef = ref<{ run: () => void } | null>(null)
@@ -99,10 +100,14 @@ const { state: saveState, scheduleSave, cancelPending, flush, recover, resolveCo
   async () => (await api.getWorkspace(editingAssignmentId)).data,
 )
 
+watch([assignmentId, () => auth.identity?.id], () => {
+  tutorOpen.value = false
+  tutorMounted.value = false
+}, { flush: 'sync' })
+
 watch(() => route.params.id, async () => {
   const generation = ++loadGeneration
   const loadingId = assignmentId.value
-  tutorOpen.value = false
   void assignmentQuery.load()
   await query.load()
   if (query.data.value && generation === loadGeneration && loadingId === assignmentId.value) {
@@ -367,6 +372,7 @@ async function runPreview(): Promise<void> {
 }
 
 function toggleTutor(): void {
+  tutorMounted.value = true
   tutorOpen.value = !tutorOpen.value
 }
 
@@ -374,7 +380,9 @@ function closeTutor(): void {
   tutorOpen.value = false
 }
 
-function focusEditor(): void {
+function resumeEditing(): void {
+  // 对应学生端工作区中辅导面板改为底部浮层的断点。
+  if (window.matchMedia('(max-width: 767px)').matches) closeTutor()
   editorRef.value?.focus()
 }
 
@@ -658,7 +666,7 @@ onBeforeUnmount(() => {
             </div>
 
             <Transition name="ws-tutor-slide">
-              <div v-if="tutorOpen" id="workspace-tutor" class="ws-tutor-inline">
+              <div v-if="tutorMounted" v-show="tutorOpen" id="workspace-tutor" class="ws-tutor-inline" :inert="!tutorOpen">
                 <div class="ws-tutor-inline-head">
                   <div>
                     <h3>AI 求助</h3>
@@ -671,9 +679,10 @@ onBeforeUnmount(() => {
                     :assignment-id="assignmentId"
                     :offering-id="detail?.offeringId"
                     embedded
+                    :visible="tutorOpen"
                     :prepare-workspace="prepareWorkspaceForAi"
                     :selected-code="selectedCodeForAi"
-                    :resume-editing="readOnly || frozen ? undefined : focusEditor"
+                    :resume-editing="readOnly || frozen ? undefined : resumeEditing"
                   />
                 </div>
                 <div class="ws-tutor-inline-foot">
